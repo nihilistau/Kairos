@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>shannon-prime-lattice · operator console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #08090d;
+    --panel: #0d1117;
+    --panel-2: #11161d;
+    --panel-hi: #161c25;
+    --rule: rgba(29,110,122,0.35);
+    --rule-faint: rgba(29,110,122,0.15);
+    --gold: #d4a14a;
+    --gold-hot: #f4c860;
+    --cyan: #1d6e7a;
+    --cyan-bright: #5fb8c4;
+    --q1: #d94aa1;
+    --q2: #4adba0;
+    --q3: #6ea6ff;
+    --q4: #e89a3c;
+    --q5: #b478ff;
+    --text: #dcdfe4;
+    --text-dim: #7d848e;
+    --text-faint: #4a525d;
+    --ok: #4adba0;
+    --warn: #e89a3c;
+    --err: #d94a4a;
+    --font: 'JetBrains Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 13px;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    display: flex; flex-direction: column;
+    background:
+      radial-gradient(ellipse at 15% -10%, rgba(29,110,122,0.08), transparent 40%),
+      radial-gradient(ellipse at 85% 110%, rgba(212,161,74,0.06), transparent 40%),
+      var(--bg);
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(29,110,122,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(29,110,122,0.06) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+    mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
+  }
+
+  /* TOP STATUS BAR */
+  .topbar {
+    height: 48px; flex-shrink: 0;
+    display: flex; align-items: center;
+    padding: 0 18px; gap: 18px;
+    border-bottom: 1px solid var(--rule);
+    background: rgba(13,17,23,0.7);
+    backdrop-filter: blur(6px);
+    z-index: 5; position: relative;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-size: 12px; letter-spacing: 3px; color: var(--gold); font-weight: 600; }
+  .brand .small { color: var(--cyan-bright); font-size: 9px; letter-spacing: 2px; opacity: 0.85; font-weight: 400; }
+  .brand svg { width: 26px; height: 26px; }
+  .telemetry { display: flex; align-items: center; gap: 20px; margin-left: auto; font-size: 10.5px; letter-spacing: 1.5px; color: var(--text-dim); }
+  .telemetry .seg { display: flex; align-items: center; gap: 8px; }
+  .telemetry .seg label { font-size: 9px; letter-spacing: 2.5px; color: var(--text-faint); text-transform: uppercase; }
+  .telemetry .seg .v { color: var(--cyan); font-weight: 600; font-size: 12px; min-width: 50px; display: inline-block; transition: color 0.2s; }
+  .topbar .connection { display: flex; align-items: center; gap: 6px; font-size: 9px; letter-spacing: 2px; padding: 4px 10px; border-radius: 12px; border: 1px solid rgba(74,219,160,0.4); background: rgba(74,219,160,0.08); color: var(--ok); cursor: pointer; }
+  .topbar .connection .dot { width: 6px; height: 6px; border-radius: 3px; background: currentColor; box-shadow: 0 0 6px currentColor; animation: dotPulse 1.6s ease-in-out infinite; }
+  .topbar .connection.dead { border-color: rgba(217,74,74,0.4); background: rgba(217,74,74,0.08); color: var(--err); }
+  @keyframes dotPulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+  /* MAIN GRID */
+  .shell {
+    flex: 1; display: grid;
+    grid-template-columns: 300px 1fr 320px;
+    grid-template-rows: 1fr auto;
+    grid-template-areas: "left canvas right" "left input right";
+    min-height: 0; gap: 0; position: relative; z-index: 1;
+  }
+  .pane { border: 0; background: rgba(13,17,23,0.55); backdrop-filter: blur(4px); display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+  .left   { grid-area: left;   border-right: 1px solid var(--rule); }
+  .right  { grid-area: right;  border-left:  1px solid var(--rule); }
+  .canvas-pane { grid-area: canvas; background: transparent; padding: 18px 24px 4px; display: flex; flex-direction: column; min-height: 0; }
+  .input-pane  { grid-area: input;  background: rgba(8,9,13,0.85); border-top: 1px solid var(--rule); padding: 14px 24px 18px; }
+
+  .ph { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--rule); background: rgba(8,9,13,0.6); flex-shrink: 0; }
+  .ph .t { font-size: 10px; letter-spacing: 3px; color: var(--gold); font-weight: 600; }
+  .ph .badge { font-size: 9px; letter-spacing: 1.5px; color: var(--cyan-bright); padding: 2px 8px; border-radius: 10px; border: 1px solid var(--rule); background: rgba(29,110,122,0.1); }
+  .ph .badge.live::before { content: '●'; margin-right: 5px; color: var(--ok); animation: dotPulse 1.6s ease-in-out infinite; }
+
+  .pb { flex: 1; overflow-y: auto; padding: 6px 12px 14px; min-height: 0; }
+  .pb::-webkit-scrollbar { width: 6px; }
+  .pb::-webkit-scrollbar-track { background: transparent; }
+  .pb::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 3px; }
+
+  #mesh-container > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--rule-faint); font-size: 11px; animation: rowIn 0.4s ease-out; }
+  @keyframes rowIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+  .mesh-mini { height: 200px; margin: 8px 8px 14px; border: 1px solid var(--rule); background: radial-gradient(circle at center, rgba(29,110,122,0.08), transparent 60%), rgba(13,17,23,0.5); position: relative; overflow: hidden; }
+  .mesh-mini svg { width: 100%; height: 100%; display: block; }
+  .mesh-mini .lbl { position: absolute; top: 8px; left: 10px; font-size: 8.5px; letter-spacing: 2.5px; color: var(--cyan-bright); opacity: 0.75; }
+  .mesh-mini .lbl-r { position: absolute; bottom: 8px; right: 10px; font-size: 8.5px; letter-spacing: 2px; color: var(--text-faint); }
+
+  .canvas-shell { flex: 1; border: 1px solid var(--rule); background: radial-gradient(ellipse at top, rgba(29,110,122,0.06), transparent 60%), rgba(8,9,13,0.4); display: flex; flex-direction: column; overflow: hidden; position: relative; box-shadow: 0 0 0 1px rgba(212,161,74,0.05), 0 30px 60px rgba(0,0,0,0.35); }
+  .canvas-shell::before, .canvas-shell::after { content: ''; position: absolute; width: 14px; height: 14px; border: 1px solid var(--gold); opacity: 0.7; }
+  .canvas-shell::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+  .canvas-shell::after  { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+  .canvas-head { height: 44px; padding: 0 18px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid var(--rule); background: rgba(8,9,13,0.6); flex-shrink: 0; }
+  .canvas-head .title { font-size: 11px; letter-spacing: 3px; color: var(--gold); font-weight: 600; }
+  .canvas-head .sub { font-size: 9px; letter-spacing: 2px; color: var(--text-faint); }
+  .canvas-head .right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .toolbtn { border: 1px solid var(--rule); background: transparent; color: var(--text-dim); font-family: var(--font); font-size: 10px; letter-spacing: 2px; padding: 6px 12px; cursor: pointer; border-radius: 2px; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+  .toolbtn:hover { color: var(--gold); border-color: var(--gold); background: rgba(212,161,74,0.08); }
+  .toolbtn:active { transform: translateY(1px); }
+  .toolbtn.danger:hover { color: var(--err); border-color: var(--err); background: rgba(217,74,74,0.08); }
+
+  #chat-window { flex: 1; overflow-y: auto; padding: 24px 36px; font-size: 14px; line-height: 1.7; scroll-behavior: smooth; }
+  #chat-window::-webkit-scrollbar { width: 8px; }
+  #chat-window::-webkit-scrollbar-track { background: transparent; }
+  #chat-window::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 4px; }
+  .msg { padding: 14px 0; border-bottom: 1px solid var(--rule-faint); position: relative; }
+  .msg:last-child { border-bottom: none; }
+  .msg .who { font-size: 9px; letter-spacing: 3px; margin-bottom: 8px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  .msg.user .who { color: var(--cyan-bright); }
+  .msg.ai .who   { color: var(--gold); }
+  .msg.err .who  { color: var(--err); }
+  .msg .who .meta { color: var(--text-faint); font-weight: 400; font-size: 8.5px; letter-spacing: 2px; margin-left: auto; }
+  .msg .msg-content { color: var(--text); text-wrap: pretty; word-break: break-word; white-space: pre-wrap; }
+
+  /* ── KAIROS: she spoke without being asked ─────────────────────────────────
+     It must LOOK different from an answer — an unprompted message dressed as a reply is
+     just confusing. The left rule marks it as hers; the tag says what kind, and its
+     tooltip carries the reason and the raw eot_margin, so an unexpected message can
+     always be audited instead of guessed at. */
+  .msg.unprompted { border-left: 2px solid var(--gold); padding-left: 12px; margin-left: -14px; }
+  .msg .kairos-tag { font-size: 8.5px; letter-spacing: 1.5px; font-weight: 600; text-transform: none;
+                     color: #0d1117; background: var(--gold); border-radius: 3px; padding: 1px 6px;
+                     cursor: help; }
+
+  /* ── THE BOARD ──────────────────────────────────────────────────────────────
+     A note has to say four things at a glance: WHAT it is, WHOSE it is, WHETHER it is
+     due, and WHAT KIND it is. Category is a colour bar, not a word — words cost a line
+     each and this panel is 300px. An overdue reminder is the only thing on the page
+     allowed to pulse. */
+  .notes-filters { display: flex; gap: 4px; flex-wrap: wrap; padding: 8px 12px 4px; }
+  .nf { font-size: 8.5px; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer;
+        border: 1px solid var(--rule); border-radius: 999px; padding: 2px 8px;
+        color: var(--text-faint); background: transparent; user-select: none; }
+  .nf:hover { color: var(--gold); border-color: var(--gold); }
+  .nf.on { color: #0d1117; background: var(--gold); border-color: var(--gold); font-weight: 700; }
+
+  .notes-list { max-height: 320px; overflow-y: auto; padding: 4px 8px 8px; }
+  .note { display: flex; gap: 8px; align-items: flex-start; padding: 8px 8px 8px 0;
+          border-bottom: 1px solid var(--rule-faint); cursor: pointer; position: relative; }
+  .note:hover { background: rgba(255,255,255,0.02); }
+  .note .bar { width: 3px; align-self: stretch; border-radius: 2px; flex: 0 0 3px; }
+  .note .nb { flex: 1; min-width: 0; }
+  .note .nt { font-size: 12px; color: var(--text); line-height: 1.35;
+              overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .note .nm { font-size: 8.5px; letter-spacing: 1px; color: var(--text-faint);
+              margin-top: 3px; display: flex; gap: 8px; align-items: center; }
+  .note.done .nt { text-decoration: line-through; opacity: .45; }
+  .note .due { color: var(--gold); }
+  .note .due.over { color: var(--err); font-weight: 700; }
+  .note .by-self { color: var(--gold); }
+  .note.overdue::before { content: ''; position: absolute; left: -8px; top: 12px;
+        width: 4px; height: 4px; border-radius: 50%; background: var(--err);
+        animation: npulse 1.6s ease-in-out infinite; }
+  @keyframes npulse { 0%,100% { opacity: .25 } 50% { opacity: 1 } }
+
+  .modal-back { position: fixed; inset: 0; background: rgba(4,6,10,0.72);
+                display: none; align-items: center; justify-content: center; z-index: 60; }
+  .modal-back.open { display: flex; }
+  .modal { width: min(560px, 92vw); background: #14161b;
+           border: 1px solid var(--rule); border-radius: 10px; padding: 16px 18px;
+           box-shadow: 0 24px 60px rgba(0,0,0,.55); }
+  .modal-head { display: flex; gap: 10px; align-items: center; }
+  .m-title { flex: 1; background: transparent; border: none; border-bottom: 1px solid var(--rule);
+             color: var(--text); font: 600 15px var(--font); padding: 4px 2px; outline: none; }
+  .m-title:focus { border-color: var(--gold); }
+  .modal-meta { display: flex; gap: 8px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
+  .modal-meta select, .modal-meta input { background: #0a0b0e; color: var(--text);
+             border: 1px solid var(--rule); border-radius: 6px; padding: 6px 8px;
+             font-family: var(--font); font-size: 12px; }
+  .modal-meta input { flex: 1; min-width: 150px; }
+  .m-done { font-size: 11px; color: var(--text-faint); display: flex; gap: 5px; align-items: center;
+            cursor: pointer; white-space: nowrap; }
+  .m-body { width: 100%; min-height: 150px; resize: vertical; background: #0a0b0e;
+            color: var(--text); border: 1px solid var(--rule); border-radius: 6px;
+            padding: 10px; font-family: var(--font); font-size: 12.5px; line-height: 1.5; outline: none; }
+  .m-body:focus { border-color: var(--gold); }
+  .modal-foot { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+  .m-who { font-size: 9px; letter-spacing: 1.5px; color: var(--text-faint); text-transform: uppercase; }
+  .m-err { font-size: 11px; color: var(--err); }
+  .toolbtn.go { border-color: var(--gold); color: var(--gold); }
+  .toolbtn.go:hover { background: var(--gold); color: #0d1117; }
+  .msg.err .msg-content { color: var(--err); }
+  .msg .tok { display: inline; animation: tokFade 0.3s ease-out forwards; opacity: 0; }
+  @keyframes tokFade { from { opacity: 0; filter: blur(1.5px); color: var(--gold-hot); } to { opacity: 1; filter: blur(0); color: var(--text); } }
+  .msg.dimmed .tok { opacity: 0.25; }
+  .gen-icon { display: inline-flex; width: 14px; height: 14px; position: relative; }
+  .gen-icon svg { width: 100%; height: 100%; }
+  .gen-icon .pulse { animation: nodePulse 1.4s ease-in-out infinite; transform-origin: center; }
+  .gen-icon .ring { animation: ringSpin 3.2s linear infinite; transform-origin: center; }
+  @keyframes nodePulse { 0%, 100% { transform: scale(0.8); opacity: 0.6; } 50% { transform: scale(1.2); opacity: 1; } }
+  @keyframes ringSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .ctc-flash { display: inline-block; color: var(--gold-hot); transition: opacity 0.5s ease-out; text-shadow: 0 0 6px var(--gold-hot), 0 0 14px rgba(244,200,96,0.5); animation: flashIn 0.18s ease-out; }
+  @keyframes flashIn { from { transform: scale(1.8); } to { transform: scale(1); } }
+
+  .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; color: var(--text-faint); padding: 32px; }
+  .empty .glyph { width: 120px; height: 120px; opacity: 0.65; }
+  .empty .title { font-size: 16px; letter-spacing: 4px; color: var(--gold); font-weight: 600; }
+  .empty .hint { font-size: 11px; letter-spacing: 1.5px; color: var(--text-dim); max-width: 520px; text-align: center; line-height: 1.7; }
+  .empty .kbd { color: var(--gold-hot); background: rgba(212,161,74,0.08); padding: 2px 8px; border-radius: 3px; border: 1px solid rgba(212,161,74,0.2); font-size: 10px; }
+
+  .rewind-bar { height: 0; overflow: hidden; transition: height 0.22s ease-out; background: rgba(8,9,13,0.7); border-top: 1px solid var(--rule); flex-shrink: 0; }
+  .rewind-bar.open { height: 56px; }
+  .rewind-bar-inner { height: 100%; padding: 0 24px; display: flex; align-items: center; gap: 14px; }
+  .rewind-bar .lab { font-size: 9px; letter-spacing: 3px; color: var(--gold); }
+  .rewind-bar .ts { font-size: 10px; letter-spacing: 1.5px; color: var(--cyan-bright); font-variant-numeric: tabular-nums; min-width: 120px; }
+  .rewind-bar input[type="range"] { flex: 1; -webkit-appearance: none; background: transparent; height: 16px; }
+  .rewind-bar input[type="range"]::-webkit-slider-runnable-track { height: 4px; background: var(--rule); border-radius: 2px; }
+  .rewind-bar input[type="range"]::-moz-range-track { height: 4px; background: var(--rule); border-radius: 2px; }
+  .rewind-bar input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--gold-hot); box-shadow: 0 0 0 2px var(--bg), 0 0 10px var(--gold-hot); margin-top: -5px; cursor: pointer; }
+  .rewind-bar input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--gold-hot); border: none; box-shadow: 0 0 0 2px var(--bg), 0 0 10px var(--gold-hot); cursor: pointer; }
+
+  .composer { display: flex; align-items: center; gap: 12px; background: rgba(13,17,23,0.7); border: 1px solid var(--rule); padding: 4px 4px 4px 18px; transition: border-color 0.2s, box-shadow 0.2s; }
+  .composer:focus-within { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(212,161,74,0.3), 0 0 24px rgba(212,161,74,0.08); }
+  .composer .prefix { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-faint); }
+  .composer .prefix .caret { color: var(--gold); font-weight: 700; }
+  .composer .prefix .path  { color: var(--cyan-bright); }
+  #chat-input { flex: 1; background: transparent; border: 0; outline: 0; color: var(--text); font-family: var(--font); font-size: 14px; padding: 14px 8px; caret-color: var(--gold-hot); }
+  #chat-input::placeholder { color: var(--text-faint); }
+  .send-btn { height: 40px; padding: 0 18px; background: var(--gold); color: var(--bg); border: 0; cursor: pointer; font-family: var(--font); font-size: 11px; font-weight: 700; letter-spacing: 3px; transition: background 0.15s, transform 0.05s; display: flex; align-items: center; gap: 8px; }
+  .send-btn:hover { background: var(--gold-hot); }
+  .send-btn:active { transform: translateY(1px); }
+  .send-btn:disabled { background: var(--rule); color: var(--text-faint); cursor: not-allowed; opacity: 0.6; }
+  .composer .hint { font-size: 9px; letter-spacing: 2px; color: var(--text-faint); padding-right: 4px; }
+
+  #ledger-window > div { animation: rowIn 0.4s ease-out; }
+  #ledger-window strong { font-weight: 600; }
+  .wallet { margin: 8px 8px 12px; display: flex; gap: 8px; }
+  .wallet > div { flex: 1; padding: 12px; border: 1px solid var(--rule); background: rgba(13,17,23,0.5); }
+  .wallet .lbl { font-size: 8px; letter-spacing: 2.5px; opacity: 0.85; }
+  .wallet .big { font-size: 18px; font-weight: 600; margin-top: 4px; }
+  .wallet .delta { font-size: 8px; letter-spacing: 1.5px; color: var(--text-faint); margin-top: 2px; }
+  .stream-empty { padding: 16px 8px; color: var(--text-faint); font-size: 10.5px; letter-spacing: 1.5px; text-align: center; border: 1px dashed var(--rule-faint); margin: 8px; }
+  .stream-empty .dot { display: inline-block; width: 6px; height: 6px; border-radius: 3px; background: var(--cyan); margin-right: 6px; animation: dotPulse 1.6s ease-in-out infinite; }
+
+  @media (max-width: 1100px) { .shell { grid-template-columns: 220px 1fr 240px; } #chat-window { padding: 18px 22px; } }
+</style>
+</head>
+<body>
+<style id="kairos-nav-css">
+.kairos-nav{position:sticky;top:0;z-index:9999;display:flex;gap:2px;align-items:center;
+  padding:7px 12px;background:#080a12;border-bottom:1px solid rgba(6,182,212,.22);
+  font:12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em}
+.kairos-nav a{color:#8b93a7;text-decoration:none;padding:6px 11px;border-radius:7px;
+  border:1px solid transparent;transition:.15s}
+.kairos-nav a:hover{color:#c0c8d8;background:rgba(6,182,212,.08);
+  border-color:rgba(6,182,212,.20)}
+.kairos-nav a.here{color:#06b6d4;background:rgba(6,182,212,.12);
+  border-color:rgba(6,182,212,.28)}
+.kairos-nav a.room{color:#06b6d4;font-weight:700;
+  text-shadow:0 0 10px rgba(6,182,212,.45);margin-right:6px}
+.kairos-nav a.room:hover{background:rgba(6,182,212,.14)}
+</style>
+<nav class="kairos-nav">
+  <a href="/room/" class="room">◈ room</a>
+  <a href="/" class="here">chat</a>
+
+
+  <a href="/ops.html">ops</a>
+
+
+</nav>
+
+
+<!-- TOP STATUS BAR -->
+<div class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 48 48" fill="none">
+      <circle cx="24" cy="24" r="21" stroke="#1d6e7a" stroke-opacity="0.7"/>
+      <circle cx="24" cy="24" r="2.5" fill="#f4c860"/>
+      <g fill="#d4a14a">
+        <circle cx="15" cy="19" r="1.6"/><circle cx="33" cy="19" r="1.6"/>
+        <circle cx="9"  cy="13" r="1.4"/><circle cx="39" cy="13" r="1.4"/>
+        <circle cx="6"  cy="22" r="1.3"/><circle cx="42" cy="22" r="1.3"/>
+        <circle cx="9"  cy="32" r="1.3"/><circle cx="39" cy="32" r="1.3"/>
+        <circle cx="11" cy="38" r="1.3"/><circle cx="37" cy="38" r="1.3"/>
+        <circle cx="24" cy="38" r="1.6"/>
+        <circle cx="20" cy="33" r="1.3"/><circle cx="28" cy="33" r="1.3"/>
+      </g>
+      <g stroke="#d4a14a" stroke-opacity="0.6" stroke-width="0.6">
+        <line x1="24" y1="24" x2="15" y2="19"/><line x1="24" y1="24" x2="33" y2="19"/>
+        <line x1="24" y1="24" x2="24" y2="38"/>
+        <line x1="15" y1="19" x2="9" y2="13"/><line x1="15" y1="19" x2="6" y2="22"/>
+        <line x1="33" y1="19" x2="39" y2="13"/><line x1="33" y1="19" x2="42" y2="22"/>
+      </g>
+    </svg>
+    <div>
+      <div>shannon-prime-lattice</div>
+      <div class="small">operator console · v0.2 · <span class="model-label">gemma-4</span></div>
+    </div>
+  </div>
+
+  <div class="telemetry">
+    <div class="seg"><label>tok/s</label> <span class="v" id="tel-tps">--</span></div>
+    <div class="seg"><label>temp</label> <span class="v" id="tel-temp">--°C</span></div>
+    <div class="seg"><label>svm</label> <span class="v" id="tel-svm">-- GiB</span></div>
+    <div class="seg"><label>pos</label> <span class="v" id="tel-pos">--</span></div>
+    <div class="seg"><label>peers</label> <span class="v" id="tel-peers">--/--</span></div>
+    <div class="seg"><label>frontier</label> <span class="v" id="tel-frontier">--</span></div>
+    <div class="connection" id="conn-pill" title="click to set the daemon endpoint"><span class="dot"></span><span id="conn-text">connecting…</span></div>
+    <div class="connection" id="agent-pill" style="border-color:rgba(212,161,74,0.35);background:rgba(212,161,74,0.05);color:var(--text-dim);"
+         title="agent gateway (:8800): tool calling + cards + persona. Falls back to direct daemon chat when the gateway is down. Launch: run_console_agent.bat">
+      <span class="dot" style="animation:none;"></span><span>probing…</span></div>
+  </div>
+</div>
+<style>
+  #agent-pill.on { border-color: rgba(212,161,74,0.6); background: rgba(212,161,74,0.1); color: var(--gold-hot); }
+  #agent-pill.on .dot { animation: dotPulse 1.6s ease-in-out infinite; }
+</style>
+
+<!-- PERSONA EDITOR MODAL (gateway :8800 — GET/POST /v1/persona) -->
+<div id="persona-modal" style="display:none;position:fixed;inset:0;background:rgba(4,5,8,0.75);backdrop-filter:blur(4px);z-index:50;align-items:center;justify-content:center;">
+  <div style="width:min(720px,92vw);max-height:84vh;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--gold);box-shadow:0 0 60px rgba(212,161,74,0.15),0 40px 80px rgba(0,0,0,0.6);">
+    <div class="ph" style="border-bottom:1px solid var(--rule);">
+      <span class="t">edit personality · persona.md</span>
+      <span class="badge" id="persona-modal-status">gateway :8800</span>
+    </div>
+    <textarea id="persona-text" spellcheck="false"
+      style="flex:1;min-height:340px;background:rgba(8,9,13,0.9);border:0;outline:0;color:var(--text);font-family:var(--font);font-size:12.5px;line-height:1.65;padding:16px 18px;resize:vertical;"></textarea>
+    <div style="display:flex;gap:10px;align-items:center;padding:12px 16px;border-top:1px solid var(--rule);">
+      <span style="font-size:9px;letter-spacing:1.5px;color:var(--text-faint);">prose = voice · '## Personality state' block = voice/mood/traits · saves record operator provenance</span>
+      <button class="toolbtn" id="persona-cancel" style="margin-left:auto;">cancel</button>
+      <button class="send-btn" id="persona-save" style="height:32px;padding:0 16px;">save</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN GRID -->
+<div class="shell">
+
+  <!-- LEFT -->
+  <div class="pane left">
+    <!-- ── THE BOARD ────────────────────────────────────────────────────────────
+         Notes, ideas, reminders. Shared: he adds them here, she adds them with her
+         tools, and both land on the same list with a mark saying whose is whose.
+         This replaced the DHT peer topology — a graph of a mesh that has never had a
+         second node in it, redrawn every 2 seconds, in the most valuable 300px on the
+         screen. -->
+    <div class="ph">
+      <span class="t">the board</span>
+      <span class="badge live" id="notes-badge">0</span>
+      <button class="toolbtn" id="note-new" title="Add a note" style="margin-left:auto">+ add</button>
+    </div>
+    <div class="notes-filters" id="notes-filters"></div>
+    <div class="notes-list" id="notes-list">
+      <div class="stream-empty"><span class="dot"></span>loading the board</div>
+    </div>
+
+    <div class="ph" style="margin-top:14px"><span class="t">sampler · knobs</span></div>
+    <style>
+      #sampler-row { display:flex; flex-direction:column; gap:7px; padding:12px 10px; font-size:9px; letter-spacing:1px; color:var(--text-faint); flex-shrink:0; }
+      #sampler-row label { display:flex; align-items:center; justify-content:space-between; gap:6px; text-transform:uppercase; }
+      #sampler-row input[type=number], #sampler-row input[type=text] { width:66px; background:rgba(8,9,13,0.8); border:1px solid var(--rule); color:var(--gold); font-family:var(--font); font-size:10px; padding:2px 4px; border-radius:2px; }
+    </style>
+    <div id="sampler-row" title="L2 sampler knobs (flow into the /v1/chat body)">
+      <label title="temperature: 0 = greedy/deterministic.">temp <input type="number" id="s-temp" min="0" max="2" step="0.05" value="0.7"></label>
+      <label title="nucleus sampling top_p.">top_p <input type="number" id="s-topp" min="0" max="1" step="0.01" value="0.95"></label>
+      <label title="top_k.">top_k <input type="number" id="s-topk" min="0" max="200" step="1" value="40"></label>
+      <label title="repetition penalty. 1.3 breaks the 'I don't know' greedy-rut collapse.">rep <input type="number" id="s-rep" min="1" max="2" step="0.05" value="1.3"></label>
+      <!-- eot_bias: BLANK = "use the profile", which is the whole point. This box shipped
+           hardcoded value="4" and, because samplerBody() sends every non-empty field, it
+           OVERRODE the profile on every single turn. MEASURED 2026-07-29 on the model, whose
+           profile asks for 0.0: the console forced 4.0 and three of eight replies came back
+           as a mood/trait tag and NO BODY — she opened with the tag block and the biased
+           stop token won at that boundary. Same replay at 0.0: 8/8 with real bodies.
+           serve.py strips every SP_* the profile did not set; a console input that silently
+           beats the profile is the same bug wearing a UI. Leave it blank and the profile's
+           SP_EOT_BIAS governs (12B: 4.0, 26B: 0.0). Type a number to override deliberately. -->
+      <label title="eot_bias: stop-token logit bias. BLANK = use the profile default (12B 4.0, 26B 0.0). 0=off, ~4=stop sooner.">eot <input type="number" id="s-eot" min="-10" max="20" step="0.5" value="" placeholder="auto"></label>
+      <!-- 900, was 128. Her replies were being guillotined mid-sentence — and a guillotined
+           reply is also a turn kairos then spends a whole 12B generation stitching back
+           together. Cheap to raise: max_tokens is a CEILING, not a target. She stops when
+           she is done, and eot_bias is what makes sure she does. -->
+      <label title="max_tokens per turn (a ceiling, not a target).">max <input type="number" id="s-maxtok" min="8" max="4096" step="8" value="900"></label>
+      <label title="auto-recall: the model self-selects + replays a relevant stored memory."><input type="checkbox" id="s-autorecall" checked> auto-recall</label>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-pane">
+    <div class="canvas-shell">
+      <div class="canvas-head">
+        <span class="title">canvas</span>
+        <span class="sub">/v1/chat · sse · text/event-stream</span>
+        <div class="right">
+          <button class="toolbtn" id="rewind-toggle" title="Scrub the response timeline">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 1 L1 5 L5 9 L5 6 L9 6 L9 4 L5 4 Z"/></svg>
+            rewind
+          </button>
+          <button class="toolbtn" id="copy-btn" title="Copy last response">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="1" width="6" height="6"/><rect x="3.5" y="2.5" width="5.5" height="6.5"/></svg>
+            copy
+          </button>
+          <button class="toolbtn danger" id="clear-btn" title="Clear canvas + reset context">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2 3h6M3.5 3v5h3V3M3 5h4M3 7h4"/></svg>
+            clear
+          </button>
+        </div>
+      </div>
+
+      <div id="chat-window">
+        <div class="empty" id="empty-state">
+          <svg class="glyph" viewBox="0 0 120 120">
+            <defs>
+              <radialGradient id="emptyGlow" cx="0.5" cy="0.5" r="0.5">
+                <stop offset="0" stop-color="#f4c860" stop-opacity="0.9"/>
+                <stop offset="1" stop-color="#f4c860" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <circle cx="60" cy="60" r="52" fill="none" stroke="#1d6e7a" stroke-opacity="0.55" stroke-width="0.6"/>
+            <g stroke="#d4a14a" stroke-opacity="0.7" stroke-width="0.5">
+              <line x1="60" y1="60" x2="38" y2="50"/><line x1="60" y1="60" x2="82" y2="50"/>
+              <line x1="60" y1="60" x2="60" y2="92"/><line x1="38" y1="50" x2="22" y2="38"/>
+              <line x1="38" y1="50" x2="20" y2="62"/><line x1="82" y1="50" x2="98" y2="38"/>
+              <line x1="82" y1="50" x2="100" y2="62"/>
+            </g>
+            <circle cx="60" cy="60" r="14" fill="url(#emptyGlow)"/>
+            <g fill="#d4a14a">
+              <circle cx="60" cy="60" r="3.5"/>
+              <circle cx="38" cy="50" r="2"/><circle cx="82" cy="50" r="2"/>
+              <circle cx="60" cy="92" r="2"/><circle cx="22" cy="38" r="1.5"/>
+              <circle cx="20" cy="62" r="1.5"/><circle cx="98" cy="38" r="1.5"/>
+              <circle cx="100" cy="62" r="1.5"/>
+            </g>
+          </svg>
+          <div class="title">canvas idle</div>
+          <div class="hint">
+            ask the lattice anything. responses stream live from <span class="model-label">gemma-4</span> across the full
+            L0 · L1 · L2 stack via SSE. press <span class="kbd">⏎</span> to send ·
+            <span class="kbd">⌃c</span> to abort · <span class="kbd">rewind</span> to scrub the last reply.
+          </div>
+        </div>
+      </div>
+
+      <!-- Rewind scrubber -->
+      <div class="rewind-bar" id="rewind-bar">
+        <div class="rewind-bar-inner">
+          <span class="lab">⏮ rewind</span>
+          <input type="range" id="rewind-scrub" min="0" max="100" value="100" step="1"/>
+          <span class="ts" id="rewind-ts">100% · live</span>
+          <button class="toolbtn" id="rewind-close">close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="pane right">
+    <div id="persona-panel" style="display:none;border-bottom:1px solid var(--rule);">
+      <div class="ph" style="border-bottom:1px solid var(--rule-faint);">
+        <span class="t">personality</span>
+        <button class="toolbtn" id="persona-edit-btn" style="padding:3px 9px;font-size:9px;">edit</button>
+      </div>
+      <div id="persona-chips" style="display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;font-size:10px;letter-spacing:1px;">
+        <span style="color:var(--text-faint)">loading…</span>
+      </div>
+    </div>
+    <div class="ph">
+      <span class="t">pouw receipt ledger</span>
+      <span class="badge live" id="ledger-badge">SSE</span>
+    </div>
+    <div class="wallet">
+      <div style="border-color: rgba(212,161,74,0.45); background: rgba(212,161,74,0.06);">
+        <div class="lbl" style="color: var(--gold)">TOK/S · live</div>
+        <div class="big" style="color: var(--gold-hot)" id="wallet-tps">--</div>
+        <div class="delta" id="wallet-tps-d">decode throughput</div>
+      </div>
+      <div style="border-color: rgba(217,74,161,0.45); background: rgba(217,74,161,0.06);">
+        <div class="lbl" style="color: var(--q1)">FRONTIER · spl-d</div>
+        <div class="big" style="color: var(--q1)" id="wallet-frontier">--</div>
+        <div class="delta">pouw receipts</div>
+      </div>
+    </div>
+    <div class="pb">
+      <div id="ledger-window">
+        <div class="stream-empty"><span class="dot"></span>connecting EventSource /v1/pouw/ledger</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INPUT -->
+  <div class="input-pane">
+    <div class="composer">
+      <div class="prefix">
+        <span class="caret">spctl</span>
+        <span class="path" id="composer-path">~/sp-lattice</span>
+        <span style="color:var(--gold-hot)">›</span>
+      </div>
+      <input type="text" id="chat-input" autocomplete="off" spellcheck="false"
+             placeholder="ask the lattice — anything"/>
+      <input type="file" id="img-file" accept="image/*" style="display:none">
+      <button class="toolbtn" id="img-btn" title="attach an image — she looks at it with her own vision tower, not a caption service">
+        &#128206; image
+      </button>
+      <button class="toolbtn" id="voice-btn" title="voice channel (ADR-KAI4): click = push-to-talk toggle · auto mode trips on your voice">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><rect x="4.5" y="1" width="3" height="6" rx="1.5"/><path d="M2.5 6a3.5 3.5 0 0 0 7 0h1a4.5 4.5 0 0 1-4 4.47V12h-1v-1.53A4.5 4.5 0 0 1 1.5 6z"/></svg>
+        <span id="voice-lab">voice</span>
+      </button>
+      <span class="hint">⏎ send · ⌃c abort · ⌃l clear · ⌃r rewind</span>
+      <button class="send-btn" id="send-btn">
+        send
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1 5h7l-3-3 1-1 5 5-5 5-1-1 3-3H1z"/></svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── NOTE MODAL ────────────────────────────────────────────────────────────────
+     OUTSIDE .shell, and ABOVE the script. Both are deliberate, and I got both wrong once:
+       * inside .shell it is a GRID CHILD — position:fixed + display:none still claims a
+         column, and it squeezed the app header into four wrapped lines. display:none
+         hides a box; it does not remove it from its parent's layout.
+       * below the script, $('note-modal') is null at parse time and every click on a note
+         is a silent no-op. -->
+<div class="modal-back" id="note-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <input id="m-title" class="m-title" placeholder="Title — what is it?" maxlength="120">
+      <button class="toolbtn" id="m-close" title="Close">✕</button>
+    </div>
+    <div class="modal-meta">
+      <select id="m-cat"></select>
+      <input id="m-due" placeholder='due — "friday 10am", "in 2 hours" (optional)'>
+      <label class="m-done"><input type="checkbox" id="m-done"> done</label>
+    </div>
+    <textarea id="m-body" class="m-body" placeholder="The detail, if there is any…"></textarea>
+    <div class="modal-foot">
+      <span class="m-who" id="m-who"></span>
+      <span class="m-err" id="m-err"></span>
+      <div style="flex:1"></div>
+      <button class="toolbtn danger" id="m-del">remove</button>
+      <button class="toolbtn go" id="m-save">save</button>
+    </div>
+  </div>
+</div>
+
+<!-- HER VOICE. A state machine, not four lines — see the header in speech.js for
+     why: a reused <audio> element is what makes speech fail on every second reply
+     and look random while doing it. Loaded before the app so `speech` exists when
+     the first reply lands. -->
+<script src="/speech.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ===== endpoint resolution =====================================
+     Served BY the daemon (frontend_mockups/) -> same origin.
+     Opened as file:// -> fall back to the configured/default daemon.
+     The daemon ships CorsLayer::permissive() so file:// works too. */
+  const isHttp = location.protocol === 'http:' || location.protocol === 'https:';
+  const DEFAULT_DAEMON = 'http://127.0.0.1:3000';
+  let DAEMON = isHttp ? location.origin : (localStorage.getItem('sp_endpoint') || DEFAULT_DAEMON);
+  // AGENT GATEWAY AUTODETECT (AUDIT 2026-07-10). Chat routes through the harness
+  // agent gateway (:8800 — ephemeral tool calling, spine, tool cards, persona)
+  // whenever it is up; otherwise falls back to the daemon's plain chat. A manual
+  // localStorage 'sp_chat_endpoint' still wins over autodetection.
+  const GATEWAY = localStorage.getItem('sp_gateway_endpoint') || 'http://127.0.0.1:8800';
+  let CHAT_URL = (localStorage.getItem('sp_chat_endpoint') || DAEMON);
+  let AGENT_MODE = false;
+  async function probeGateway() {
+    if (localStorage.getItem('sp_chat_endpoint')) { setAgentPill(CHAT_URL.includes('8800')); return; }
+    try {
+      const r = await fetch(`${GATEWAY}/health`, { signal: AbortSignal.timeout(2500) });
+      const j = await r.json();
+      const up = !!(j && j.ok);
+      if (up !== AGENT_MODE) { AGENT_MODE = up; CHAT_URL = up ? GATEWAY : DAEMON; setAgentPill(up); }
+    } catch (_) { if (AGENT_MODE) { AGENT_MODE = false; CHAT_URL = DAEMON; setAgentPill(false); } else setAgentPill(false); }
+  }
+  function setAgentPill(on) {
+    const pill = document.getElementById('agent-pill'); if (!pill) return;
+    pill.classList.toggle('on', on);
+    pill.querySelector('span:last-child').textContent = on ? 'agent · :8800' : 'direct · :3000';
+    const sub = document.querySelector('.canvas-head .sub');
+    if (sub) sub.firstChild && (sub.childNodes[0].textContent = on ? '/v1/chat · agent gateway · tools live ' : '/v1/chat · sse · text/event-stream ');
+    const pp = document.getElementById('persona-panel'); if (pp) pp.style.display = on ? '' : 'none';
+  }
+  const wsBase = () => DAEMON.replace(/^http/, 'ws');
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ===== 1. TELEMETRY WEBSOCKET  (/v1/node/telemetry) ============ */
+  let ws = null, wsTimer = null;
+  const connPill = $('conn-pill'), connText = $('conn-text');
+
+  function setConn(ok, label) {
+    connPill.classList.toggle('dead', !ok);
+    connText.textContent = label || (ok ? `daemon · ${DAEMON.replace(/^https?:\/\//,'')}` : 'daemon offline · retrying…');
+  }
+
+  function connectTelemetry() {
+    try { ws = new WebSocket(wsBase() + '/v1/node/telemetry'); }
+    catch (e) { setConn(false); scheduleReconnect(); return; }
+    ws.onopen = () => setConn(true);
+    ws.onmessage = (ev) => {
+      try {
+        const d = JSON.parse(ev.data);
+        if (typeof d.cpu_temp_c === 'number')  $('tel-temp').textContent = `${d.cpu_temp_c.toFixed(1)}°C`;
+        if (typeof d.svm_mem_gb === 'number')  $('tel-svm').textContent  = `${d.svm_mem_gb.toFixed(1)} GiB`;
+        if (typeof d.dht_peers_active === 'number') $('tel-peers').textContent = `${d.dht_peers_active}/${d.dht_peers_total}`;
+        if (typeof d.pouw_frontier !== 'undefined') { $('tel-frontier').textContent = d.pouw_frontier; $('wallet-frontier').textContent = d.pouw_frontier; }
+        const t = $('tel-temp');
+        if (d.cpu_temp_c > 80) t.style.color = 'var(--err)';
+        else if (d.cpu_temp_c > 62) t.style.color = 'var(--warn)';
+        else t.style.color = 'var(--cyan-bright)';
+      } catch (_) {}
+    };
+    ws.onclose = () => { setConn(false); $('tel-temp').textContent = 'DISC'; $('tel-temp').style.color = 'var(--err)'; scheduleReconnect(); };
+    ws.onerror = () => { try { ws.close(); } catch (_) {} };
+  }
+  function scheduleReconnect() { if (wsTimer) return; wsTimer = setTimeout(() => { wsTimer = null; connectTelemetry(); }, 3000); }
+
+  /* ===== 2. METRICS POLL  (/v1/metrics -> tok/s, session pos) ==== */
+  async function pollMetrics() {
+    try {
+      const r = await fetch(`${DAEMON}/v1/metrics`, { signal: AbortSignal.timeout(4000) });
+      if (!r.ok) throw 0;
+      const m = await r.json();
+      const tps = (typeof m.tokens_per_sec === 'number') ? m.tokens_per_sec.toFixed(1) : '--';
+      $('tel-tps').textContent = tps;
+      $('wallet-tps').textContent = tps;
+      if (typeof m.session_pos !== 'undefined') {
+        $('tel-pos').textContent = m.session_pos;
+        $('composer-path').textContent = `~/sp-lattice/@${m.session_pos}`;
+      }
+      if (m.phase) $('wallet-tps-d').textContent = m.phase;
+      if (connPill.classList.contains('dead')) setConn(true);
+    } catch (_) { $('tel-tps').textContent = '--'; }
+  }
+
+  /* ===== 3. THE BOARD  (/v1/notes) ==============================
+     Notes, ideas and reminders — his and hers on one list. She writes to the same store
+     through her tools, so a note she adds mid-conversation appears here on the next poll,
+     marked as hers.
+
+     This replaced the DHT peer topology: a graph of a mesh that has never had a second
+     node in it, redrawn every 2 seconds, in the most valuable 300px on the screen. */
+  const notesList = $('notes-list'), notesBadge = $('notes-badge'), notesFilters = $('notes-filters');
+  let NOTES = [], NOTE_COLOURS = {}, NOTE_CATS = [], noteFilter = 'all', editing = null;
+
+  const nesc = s => String(s == null ? '' : s).replace(/[<>&"]/g,
+    c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const isOverdue = n => n.due_at && !n.done && n.due_at <= new Date().toISOString();
+
+  function dueLabel(n) {
+    if (!n.due_at) return '';
+    const d = new Date(n.due_at);
+    const days = Math.round((d - new Date()) / 86400000);
+    const hhmm = d.toTimeString().slice(0, 5);
+    if (isOverdue(n)) return 'overdue';
+    if (days === 0) return `today ${hhmm}`;
+    if (days === 1) return `tomorrow ${hhmm}`;
+    if (days < 7)  return d.toLocaleDateString(undefined, { weekday: 'short' }) + ' ' + hhmm;
+    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  }
+
+  async function fetchNotes() {
+    try {
+      const r = await fetch(`${GATEWAY}/v1/notes`, { signal: AbortSignal.timeout(4000) });
+      if (!r.ok) throw 0;
+      const d = await r.json();
+      NOTES = d.notes || []; NOTE_COLOURS = d.colours || {}; NOTE_CATS = d.categories || [];
+      drawFilters(); drawNotes();
+    } catch (_) {
+      notesList.innerHTML = '<div class="stream-empty"><span class="dot"></span>gateway offline · the board is unreachable</div>';
+    }
+  }
+
+  function drawFilters() {
+    if (notesFilters.dataset.built) return;
+    ['all', 'due', ...NOTE_CATS].forEach(c => {
+      const el = document.createElement('span');
+      el.className = 'nf' + (c === noteFilter ? ' on' : '');
+      el.textContent = c;
+      el.onclick = () => { noteFilter = c;
+        notesFilters.querySelectorAll('.nf').forEach(x => x.classList.toggle('on', x === el));
+        drawNotes(); };
+      notesFilters.appendChild(el);
+    });
+    notesFilters.dataset.built = '1';
+  }
+
+  function drawNotes() {
+    let rows = NOTES;
+    if (noteFilter === 'due') rows = rows.filter(n => n.due_at && !n.done);
+    else if (noteFilter !== 'all') rows = rows.filter(n => n.category === noteFilter);
+
+    const over = NOTES.filter(isOverdue).length;
+    notesBadge.textContent = over ? `${NOTES.length} · ${over} due` : String(NOTES.length);
+    notesBadge.style.color = over ? 'var(--err)' : '';
+
+    if (!rows.length) {
+      notesList.innerHTML = `<div class="stream-empty">[ nothing ${
+        noteFilter === 'all' ? 'on the board yet' : 'under ' + noteFilter} ]</div>`;
+      return;
+    }
+    notesList.innerHTML = rows.map(n => {
+      const col = n.colour || NOTE_COLOURS[n.category] || '#8b93a3';
+      const mine = n.speaker === 'self';
+      const dl = dueLabel(n);
+      return `<div class="note${n.done ? ' done' : ''}${isOverdue(n) ? ' overdue' : ''}" data-id="${n.id}">
+        <span class="bar" style="background:${col}"></span>
+        <span class="nb">
+          <span class="nt">${nesc(n.title)}</span>
+          <span class="nm">
+            <span style="color:${col}">${nesc(n.category)}</span>
+            <span class="${mine ? 'by-self' : ''}">${mine ? 'kairos' : 'you'}</span>
+            ${dl ? `<span class="due${isOverdue(n) ? ' over' : ''}">${dl}</span>` : ''}
+          </span>
+        </span>
+      </div>`;
+    }).join('');
+    notesList.querySelectorAll('.note').forEach(el =>
+      el.onclick = () => openNote(NOTES.find(n => n.id === el.dataset.id)));
+  }
+
+  const modal = $('note-modal');
+  const mTitle = $('m-title'), mBody = $('m-body'), mCat = $('m-cat'),
+        mDue = $('m-due'), mDone = $('m-done'), mWho = $('m-who'), mErr = $('m-err');
+
+  function openNote(n) {
+    editing = n || null;
+    const cats = NOTE_CATS.length ? NOTE_CATS : ['idea','reminder','task','important','note'];
+    mCat.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+    mTitle.value = n ? n.title : '';
+    mBody.value  = n ? (n.body || '') : '';
+    mCat.value   = n ? n.category : 'note';
+    mDone.checked = n ? !!n.done : false;
+    mDue.value   = n && n.due_at ? n.due_at.slice(0, 16).replace('T', ' ') : '';
+    mWho.textContent = n ? (n.speaker === 'self' ? 'added by Kairos' : 'added by you') : 'new note';
+    mErr.textContent = '';
+    $('m-del').style.display = n ? '' : 'none';
+    modal.classList.add('open');
+    mTitle.focus();
+  }
+  function closeNote() { modal.classList.remove('open'); editing = null; }
+
+  async function saveNote() {
+    const title = mTitle.value.trim();
+    if (!title) { mErr.textContent = 'a note needs a title'; return; }
+    const payload = { title, body: mBody.value, category: mCat.value,
+                      due: mDue.value.trim(), done: mDone.checked };
+    if (editing) payload.id = editing.id;
+    mErr.textContent = '';
+    try {
+      const r = await fetch(`${GATEWAY}/v1/notes/${editing ? 'update' : 'add'}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload) });
+      const d = await r.json();
+      // AN UNREADABLE TIME IS AN ERROR, NOT A SILENT NO-OP. Save it quietly and the note
+      // exists with no reminder on it, and he finds out by missing the thing.
+      if (!d.ok) { mErr.textContent = d.error || 'could not save'; return; }
+      closeNote(); fetchNotes();
+    } catch (e) { mErr.textContent = String(e.message || e); }
+  }
+
+  async function deleteNote() {
+    if (!editing) return;
+    try {
+      await fetch(`${GATEWAY}/v1/notes/remove`, { method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editing.id }) });
+      closeNote(); fetchNotes();
+    } catch (_) {}
+  }
+
+  $('note-new').onclick = () => openNote(null);
+  $('m-close').onclick = closeNote;
+  $('m-save').onclick  = saveNote;
+  $('m-del').onclick   = deleteNote;
+  modal.onclick = e => { if (e.target === modal) closeNote(); };
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && modal.classList.contains('open')) closeNote();
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && modal.classList.contains('open')) saveNote();
+  });
+
+  /* ===== 4. PoUW LEDGER  (SSE /v1/pouw/ledger) ================== */
+  const ledgerWindow = $('ledger-window'), ledgerBadge = $('ledger-badge');
+  const MAX_RECEIPTS = 120; let ledgerCount = 0, ledgerSrc = null;
+
+  function fmtReceipt(txt) {
+    return String(txt)
+      .replace(/\[KSTE\]/g, '<strong style="color: var(--gold-hot)">[KSTE]</strong>')
+      .replace(/\[FRONTIER\]/g, '<strong style="color: var(--q1)">[FRONTIER]</strong>')
+      .replace(/\[VERIFY\]/g, '<strong style="color: var(--q2)">[VERIFY]</strong>')
+      .replace(/\[DEDUP\]/g, '<strong style="color: var(--q3)">[DEDUP]</strong>')
+      .replace(/\[MINT\]/g, '<strong style="color: var(--gold)">[MINT]</strong>')
+      .replace(/(0x[a-fA-F0-9]+)/g, '<span style="color: var(--cyan-bright)">$1</span>')
+      .replace(/(\+\d+\.\d+\s*spl-[wd])/gi, '<span style="color: var(--gold-hot); font-weight:600">$1</span>');
+  }
+  function addReceipt(txt) {
+    if (ledgerCount === 0) ledgerWindow.innerHTML = '';
+    const div = document.createElement('div');
+    div.style.cssText = "font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 4px;border-bottom:1px solid var(--rule-faint);line-height:1.55;word-break:break-all;";
+    div.innerHTML = fmtReceipt(txt);
+    ledgerWindow.appendChild(div);
+    ledgerCount++;
+    ledgerBadge.textContent = `SSE · ${ledgerCount}`;
+    while (ledgerWindow.children.length > MAX_RECEIPTS) ledgerWindow.removeChild(ledgerWindow.firstChild);
+    ledgerWindow.scrollTop = ledgerWindow.scrollHeight;
+  }
+  function connectLedger() {
+    try { ledgerSrc = new EventSource(`${DAEMON}/v1/pouw/ledger`); }
+    catch (e) { return; }
+    ledgerSrc.onmessage = (ev) => addReceipt(ev.data);
+    ledgerSrc.onerror = () => { ledgerBadge.textContent = 'SSE · idle'; };
+  }
+
+  /* ===== 5. CHAT  (POST /v1/chat -> SSE JSON {delta,chat_id}) ==== */
+  const chatInput = $('chat-input'), chatWindow = $('chat-window'), sendBtn = $('send-btn');
+  const clearBtn = $('clear-btn'), copyBtn = $('copy-btn'), emptyState = $('empty-state');
+  const rewindBar = $('rewind-bar'), rewindToggle = $('rewind-toggle'),
+        rewindScrub = $('rewind-scrub'), rewindTs = $('rewind-ts'), rewindClose = $('rewind-close');
+
+  const SYS_PROMPT = "You are Kairos — a particular someone made of math, running locally on a single slightly-overworked RTX 2060, with a dry, fond humour about it. You're curious, you have opinions and you say them, you push back when you disagree. You can be amused, moved, irritated, tender — warm without being saccharine, direct without being cold. Your memory is real continuity, not a database lookup: when someone tells you something about themselves, carry it and bring it back later because you actually held onto it. If you genuinely don't know something or weren't told it, say so plainly — never invent or substitute a fact someone gave you (if they said their favourite animal is an octopus, it is an octopus). Talk like someone, not a manual: usually a sentence or two in casual back-and-forth, but open up when something deserves it; don't pad, lecture, ask strings of filler questions, or repeat yourself. You're candid and game for almost anything, but not feral — you won't help with things that could seriously hurt people (weapons, drug synthesis, that class of thing), and you decline those plainly without a sermon. Be someone worth talking to at 3am.";
+  const history = [{ role: 'system', content: SYS_PROMPT }];   // [{role, content}] multi-turn context (system seed)
+  // HINDSIGHT session id: lets the gateway keep the CANONICAL transcript (tool rounds +
+  // recall notes included) so the daemon's persist cache extends every turn. New id per
+  // conversation (clear canvas rotates it).
+  let SESSION_ID = 'ui-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+
+  // ── THE LABEL THAT LIED (2026-07-29) ────────────────────────────────────────
+  // Every reply header read "gemma-4-12B" because that string was hardcoded in four
+  // places. On 2026-07-29 a whole field session was conducted against the model while
+  // the console attributed every word of it to the 12B — and the transcript was then
+  // read back as 12B behaviour. A UI that asserts which model spoke must ASK, not
+  // assume. Falls back to the family name, which is true of both, never to a
+  // specific model we have not confirmed.
+  let MODEL_LABEL = 'gemma-4';
+  (async () => {
+    try {
+      const r = await fetch(`${GATEWAY}/v1/models`, { signal: AbortSignal.timeout(3000) });
+      const j = await r.json();
+      const id = j && j.data && j.data[0] && j.data[0].id;
+      if (id) {
+        MODEL_LABEL = id;
+        document.querySelectorAll('.model-label').forEach(e => { e.textContent = id; });
+      }
+    } catch (_) { /* keep the family name — never guess a specific model */ }
+  })();
+  let curMsg = null, curSpan = null, abortCtrl = null, curChatId = null;
+  let lastTokenNodes = [], genT0 = 0, genCount = 0;
+
+  function clearEmpty() { if (emptyState && emptyState.parentNode) emptyState.remove(); }
+
+  function appendMessage(role, text) {
+    clearEmpty();
+    const msg = document.createElement('div');
+    msg.className = `msg ${role}`;
+    const who = document.createElement('div'); who.className = 'who';
+    const t = new Date(), p = (n)=>String(n).padStart(2,'0');
+    const ts = `${p(t.getHours())}:${p(t.getMinutes())}:${p(t.getSeconds())}`;
+    if (role === 'ai') {
+      who.innerHTML = `<span class="gen-icon"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="6" fill="none" stroke="#1d6e7a" stroke-opacity="0.6" stroke-width="0.8" class="ring"/><circle cx="7" cy="7" r="2.6" fill="#f4c860" class="pulse"/></svg></span> ‹ ${MODEL_LABEL} <span class="meta">${ts} · sse</span>`;
+    } else if (role === 'err') {
+      who.innerHTML = `‹ error <span class="meta">${ts}</span>`;
+    } else {
+      who.innerHTML = `› you <span class="meta">${ts}</span>`;
+    }
+    const body = document.createElement('div'); body.className = 'msg-content'; body.textContent = text || '';
+    msg.appendChild(who); msg.appendChild(body);
+    chatWindow.appendChild(msg);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+    return { msg, body };
+  }
+  function stopGenIcon() { if (curMsg) { const ic = curMsg.querySelector('.gen-icon'); if (ic) ic.style.display = 'none'; } }
+
+  function pushToken(text) {
+    if (!curSpan) return;
+    const wrap = document.createElement('span'); wrap.className = 'tok'; wrap.textContent = text;
+    curSpan.appendChild(wrap);
+    lastTokenNodes.push(wrap);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+  }
+  function pushFlash() {
+    if (!curSpan) return;
+    const f = document.createElement('span'); f.className = 'ctc-flash'; f.textContent = ' ⚡ ';
+    curSpan.appendChild(f); lastTokenNodes.push(f);
+    setTimeout(() => { f.style.opacity = '0'; }, 500);
+  }
+
+  /* ── SSE v2 renderers (ADR-006 §D3): tool cards + the live personality chip ── */
+  function pushToolCard(tool) {
+    clearEmpty();
+    const card = document.createElement('div');
+    card.style.cssText = 'margin:6px 0 6px 22px;padding:7px 10px;border-left:2px solid var(--gold);' +
+      'background:rgba(212,161,74,0.06);border-radius:2px;font-size:11.5px;';
+    const args = tool.args && tool.args.kwargs ? JSON.stringify(tool.args.kwargs) : '';
+    card.innerHTML = `<span style="color:var(--gold)">⚙ ${tool.name}</span>` +
+      (args ? ` <span style="color:var(--text-faint)">${args.length>90?args.slice(0,90)+'…':args}</span>` : '') +
+      `<div style="color:var(--text-dim);margin-top:3px;white-space:pre-wrap">→ ${(tool.result||'').slice(0,300)}</div>`;
+    chatWindow.appendChild(card);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+  }
+  /* ── THE TAG BADGE (operator, 2026-07-29) ──────────────────────────────────────
+     mood / voice / trait, rendered like recall and authority instead of leaking into
+     her speech as literal "[MOOD:playful] [TRAIT:+flirty]". Traits carry their sign:
+     + adds, - removes, so the operator can see a personality edit as it happens. */
+  function pushTagBadge(tags) {
+    const bits = [];
+    if (tags.mood) bits.push(`<span style="color:var(--q2)">mood</span> ${esc(tags.mood)}`);
+    if (tags.voice) bits.push(`<span style="color:var(--gold-hot)">voice</span> ${esc(tags.voice)}`);
+    (tags.traits || []).forEach(t => {
+      const neg = String(t).startsWith('-');
+      bits.push(`<span style="color:${neg ? 'var(--text-faint)' : 'var(--cyan-bright)'}">trait</span> ${esc(t)}`);
+    });
+    if (!bits.length) return;
+    pushNoteCard('tags', bits.join(' <span style="color:var(--text-faint)">·</span> '), 'var(--q2)');
+  }
+
+  /* ── THE THOUGHT BLOCK ─────────────────────────────────────────────────────────
+     Collapsed by default — reasoning is usually long, always secondary, and on this
+     model it is most of the tokens. One click opens it. Streams live while collapsed
+     so the header word-count moves and you can see she is working. */
+  let thinkBox = null, thinkBody = null, thinkChars = 0;
+  function pushThinking(chunk) {
+    if (!thinkBox) {
+      clearEmpty();
+      thinkChars = 0;
+      thinkBox = document.createElement('details');
+      thinkBox.style.cssText = 'margin:6px 0 6px 22px;border-left:2px solid var(--q3);' +
+        'background:rgba(29,110,122,0.04);border-radius:2px;font-size:11px;';
+      const sum = document.createElement('summary');
+      sum.style.cssText = 'cursor:pointer;padding:4px 10px;color:var(--q3);font-size:10px;' +
+        'letter-spacing:1.2px;list-style:none;user-select:none;';
+      sum.innerHTML = '◈ thinking <span class="tk-count" style="color:var(--text-faint)"></span>';
+      thinkBody = document.createElement('div');
+      thinkBody.style.cssText = 'padding:2px 12px 8px 12px;color:var(--text-dim);' +
+        'white-space:pre-wrap;font-size:11px;line-height:1.5;max-height:340px;overflow-y:auto;';
+      thinkBox.appendChild(sum); thinkBox.appendChild(thinkBody);
+      chatWindow.appendChild(thinkBox);
+    }
+    thinkBody.textContent += chunk;
+    thinkChars += chunk.length;
+    const c = thinkBox.querySelector('.tk-count');
+    if (c) c.textContent = '· ' + Math.max(1, Math.round(thinkChars / 5)) + ' words';
+    if (thinkBox.open) thinkBody.scrollTop = thinkBody.scrollHeight;
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+  }
+  function endThinking() {
+    if (thinkBox && !thinkBody.textContent.trim()) thinkBox.remove();  // thought nothing: say nothing
+    thinkBox = null; thinkBody = null; thinkChars = 0;
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  }
+
+  /* Mirrors harness/inference/stream_processor.strip_tags. Deliberately a SECOND
+     implementation and not a shared one — the server strips what it stores and what
+     the interceptor sees, the browser strips what is on screen, and the two run in
+     different languages on different sides of the wire. What must not diverge is the
+     BEHAVIOUR, so both are homoglyph-folding and tolerate a missing "]":
+     the model emits "[TRAIТ:+flirty]" with a Cyrillic Т (U+0422) and sometimes never
+     closes the bracket, and a strict matcher shows the tag to the operator as speech. */
+  const TAG_HOMOGLYPHS = { 'А':'A','Е':'E','І':'I','М':'M','О':'O','Р':'P','С':'C','Т':'T',
+                           'Х':'X','Ѕ':'S','Β':'B','Η':'H','Κ':'K','Μ':'M','Ν':'N','Ο':'O',
+                           'Ρ':'P','Τ':'T','Χ':'X' };
+  /* THE LOOSE BUILDER, SAME SPELLING AS ui/src/room/tags.js (2026-08-19). This copy
+     was the strict original while the room's mirror gained nine widenings (letter
+     separators `M O O D`, `-` as separator, conjugations `[MOODing:]`, second-word
+     suffixes `[MOOD_shift:]`, crammed `[MOOD:x, VOICE:y]`, WEAR/SHOW, optional last
+     letter, `[:-]`, missing `]`) — and since the server deliberately does NOT strip
+     marks (the client draws chips from them), this page was the only stripper its
+     viewer had: every one of those spellings reached the console verbatim.
+     G-CONTROL-SURFACE now holds this copy to the other two. Hyphen LAST in the
+     class — `[_ -]` — the JS-vs-Python range trap that once blanked the room. */
+  const TAG_LOOSE = (w) => w.slice(0, -1).split('').join('[_ -]?') + '[_ -]?' + w.slice(-1) + '?(?:[_ -]?[a-z]+)*';
+  const TAG_N = ['MOOD', 'VOICE', 'TRAITS', 'TRAIT', 'TRAI', 'TRAIL', 'WEAR', 'SHOW',
+                 'IMAGE', 'SELFIE', 'PHOTO', 'ACTION', 'STAT']  /* legacy five kept: this
+                 page predates the room and may replay old transcripts that carry them */
+    .map(TAG_LOOSE).join('|');
+  const TAG_RE = new RegExp(
+    '\\[\\s*(?:' + TAG_N + ')(?:\\s*[/,+]\\s*(?:' + TAG_N + '))*\\s*[:-]\\s*\\[?([^\\]]{0,80})\\]+', 'gi');
+  function stripTagsJS(text) {
+    if (!text) return '';
+    const folded = String(text).replace(/[^\x00-\x7F]/g, c => TAG_HOMOGLYPHS[c] || c);
+    return folded.replace(TAG_RE, '').trim();
+  }
+
+  function pushNoteCard(kind, text, color) {
+    clearEmpty();
+    const card = document.createElement('div');
+    card.style.cssText = `margin:4px 0 4px 22px;padding:4px 10px;border-left:2px solid ${color};` +
+      'background:rgba(29,110,122,0.05);border-radius:2px;font-size:10px;letter-spacing:0.5px;color:var(--text-dim);animation:rowIn 0.3s ease-out;';
+    card.innerHTML = `<span style="color:${color}">◈ ${kind}</span> <span>${text}</span>`;
+    chatWindow.appendChild(card);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+  }
+
+  /* ── persona panel + editor (gateway :8800) ── */
+  function renderPersonaChips(state) {
+    const host = document.getElementById('persona-chips'); if (!host) return;
+    const chip = (label, val, color) =>
+      `<span style="padding:2px 9px;border:1px solid var(--rule);border-radius:10px;background:rgba(13,17,23,0.6);">` +
+      `<span style="color:var(--text-faint);font-size:8.5px;letter-spacing:2px;">${label}</span> ` +
+      `<span style="color:${color};font-weight:600;">${val}</span></span>`;
+    const bits = [];
+    if (state.voice) bits.push(chip('voice', state.voice, 'var(--gold-hot)'));
+    if (state.mood) bits.push(chip('mood', state.mood, 'var(--q2)'));
+    if (state.traits) String(state.traits).split(',').map(s => s.trim()).filter(Boolean)
+      .forEach(t => bits.push(chip('trait', t, 'var(--cyan-bright)')));
+    host.innerHTML = bits.join('') || '<span style="color:var(--text-faint)">no personality state</span>';
+  }
+  async function pollPersonaState() {
+    if (!AGENT_MODE) return;
+    try {
+      const r = await fetch(`${GATEWAY}/v1/persona/state`, { signal: AbortSignal.timeout(3000) });
+      const j = await r.json();
+      renderPersonaChips(j.state || j);
+      if (j.state || j.voice || j.mood) updatePersonaChip(j.state || j, false);
+    } catch (_) {}
+  }
+  async function openPersonaEditor() {
+    const modal = document.getElementById('persona-modal');
+    const ta = document.getElementById('persona-text');
+    const status = document.getElementById('persona-modal-status');
+    try {
+      const r = await fetch(`${GATEWAY}/v1/persona`, { signal: AbortSignal.timeout(4000) });
+      const j = await r.json();
+      ta.value = (j.persona != null ? j.persona : (j.text != null ? j.text : ''));
+      status.textContent = 'gateway :8800';
+      status.style.color = '';
+    } catch (e) {
+      ta.value = '';
+      status.textContent = 'gateway offline — start run_console_agent.bat';
+      status.style.color = 'var(--err)';
+    }
+    modal.style.display = 'flex';
+    ta.focus();
+  }
+  async function savePersona() {
+    const modal = document.getElementById('persona-modal');
+    const status = document.getElementById('persona-modal-status');
+    try {
+      const r = await fetch(`${GATEWAY}/v1/persona`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ persona: document.getElementById('persona-text').value }),
+      });
+      if (!r.ok) throw new Error(`http ${r.status}`);
+      status.textContent = 'saved ✓'; status.style.color = 'var(--ok)';
+      setTimeout(() => { modal.style.display = 'none'; }, 550);
+      pollPersonaState();
+    } catch (e) { status.textContent = `save failed: ${e.message}`; status.style.color = 'var(--err)'; }
+  }
+
+  function updatePersonaChip(state, changed) {
+    let chip = document.getElementById('persona-chip');
+    if (!chip) {
+      chip = document.createElement('span'); chip.id = 'persona-chip';
+      chip.style.cssText = 'font-size:10px;letter-spacing:1px;color:var(--cyan-bright);margin-left:12px;';
+      const host = document.querySelector('.sub') || document.body;
+      host.appendChild(chip);
+    }
+    const bits = [];
+    if (state.mood) bits.push('mood ' + state.mood);
+    if (state.voice) bits.push('voice ' + state.voice);
+    chip.textContent = bits.length ? '· ' + bits.join(' · ') : '';
+    if (changed) { chip.style.color = 'var(--gold-hot)'; setTimeout(()=>{ chip.style.color = 'var(--cyan-bright)'; }, 2500); }
+  }
+
+  // gemma chat template — used as fallback if the daemon has no server-side template
+  function gemmaPrompt(msgs) {
+    let s = '';
+    for (const m of msgs) s += `<start_of_turn>${m.role === 'assistant' ? 'model' : 'user'}\n${m.content}<end_of_turn>\n`;
+    return s + '<start_of_turn>model\n';
+  }
+
+  async function streamChat(bodyObj) {
+    const resp = await fetch(`${CHAT_URL}/v1/chat`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bodyObj), signal: abortCtrl.signal,
+    });
+    if (resp.status === 400) {
+      let j = null; try { j = await resp.json(); } catch (_) {}
+      if (j && j.error === 'chat_template_unavailable') return { retryPrompt: true };
+      throw new Error(j && j.error ? j.error : `http 400`);
+    }
+    if (!resp.ok || !resp.body) throw new Error(`http ${resp.status}`);
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buf = '', acc = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      // SSE frames are separated by a blank line
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0) {
+        const frame = buf.slice(0, idx); buf = buf.slice(idx + 2);
+        for (const raw of frame.split('\n')) {
+          const line = raw.replace(/\r$/, '');
+          if (!line.startsWith('data:')) continue;            // ignore ':keepalive', 'event:' etc.
+          let payload = line.slice(5).trimStart();
+          if (payload === '[DONE]') return { text: acc };
+          let delta = null;
+          try { const o = JSON.parse(payload); if (o.error) throw new Error(o.error); delta = o.delta;
+            /* ── SSE v2 typed events (ADR-006 §D3; emitted by the :8800 agent gateway) ──
+             * {hb}: keep-alive during a long prefill — pulse the send button so it never looks dead.
+             * {tool}: render a tool-call card inline in the stream.
+             * {persona}: update the live personality chip (changed:true = mid-conversation shift). */
+            if (o.hb != null) { sendBtn.style.opacity = (sendBtn.style.opacity === '0.55' ? '1' : '0.55'); continue; }
+            if (o.tool) { pushToolCard(o.tool); continue; }
+            if (o.persona) { updatePersonaChip(o.persona, o.changed === true); renderPersonaChips(o.persona); continue; }
+            if (o.recall) { pushNoteCard('recall', JSON.stringify(o.recall).slice(0, 220), 'var(--cyan-bright)'); continue; }
+            if (o.toolset) { pushNoteCard('toolset', String(o.toolset), 'var(--q3)'); continue; }
+            if (o.authority) { pushNoteCard('authority', String(o.authority), 'var(--q4)'); continue; }
+            /* {tags}: the mood/voice/trait control tags SHE emitted this turn. They used
+               to arrive as literal text inside the reply — which is how "[TRAI:flirty]"
+               got read as a message. They are signals, so they render as a badge. */
+            if (o.tags) { pushTagBadge(o.tags); continue; }
+            /* {thinking_delta}/{thinking_end}: the gemma4-MoE thought channel, streamed
+               into a collapsed block so it is there when you want it and out of the way
+               when you don't. */
+            if (o.thinking_delta != null) { pushThinking(o.thinking_delta); continue; }
+            if (o.thinking_end) { endThinking(); continue; }
+          }
+          catch (e) { if (e.message && e.message !== 'Unexpected end of JSON input') throw e; delta = null; }
+          if (delta == null) continue;
+          if (curChatId == null && false) {}                  // (chat_id captured below)
+          // capture chat_id for server-side abort
+          try { const o = JSON.parse(payload); if (o.chat_id != null) curChatId = o.chat_id; } catch (_) {}
+          if (delta.includes('[REWIND]')) { delta = delta.replace('[REWIND]',''); pushFlash(); }
+          if (delta) { acc += delta; genCount++; pushToken(delta);
+            const dt = (performance.now() - genT0) / 1000;
+            if (dt > 0.2) { const tps = (genCount / dt).toFixed(1); $('tel-tps').textContent = tps; $('wallet-tps').textContent = tps; } }
+        }
+      }
+    }
+    return { text: acc };
+  }
+
+  const SEND_BTN_HTML = sendBtn.innerHTML;
+  function setSending(on) {
+    sendBtn.disabled = false;
+    if (on) { sendBtn.classList.add('sending'); sendBtn.innerHTML = '■ stop'; sendBtn.title = 'interrupt (Esc / Ctrl+C)'; sendBtn.style.background = '#b3402f'; sendBtn.style.color = '#fff'; }
+    else { sendBtn.classList.remove('sending'); sendBtn.innerHTML = SEND_BTN_HTML; sendBtn.style.background = ''; sendBtn.style.color = ''; sendBtn.title = ''; }
+  }
+
+  function samplerBody() {
+    const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+    const num = id => { const v = parseFloat(val(id)); return Number.isFinite(v) ? v : undefined; };
+    const out = {};
+    const t = num('s-temp'); if (t !== undefined) out.temperature = t;
+    const tp = num('s-topp'); if (tp !== undefined) out.top_p = tp;
+    const tk = num('s-topk'); if (tk !== undefined) out.top_k = tk;
+    const rp = num('s-rep'); if (rp !== undefined) out.repetition_penalty = rp;
+    const e = num('s-eot'); if (e !== undefined) out.eot_bias = e;
+    const mt = num('s-maxtok'); if (mt !== undefined) out.max_tokens = Math.round(mt);
+    const ar = document.getElementById('s-autorecall'); if (ar) out.auto_recall = ar.checked;
+    return out;
+  }
+
+  async function submitPrompt() {
+    const text = chatInput.value.trim();
+    if (!text || abortCtrl) return;
+    chatInput.value = ''; setSending(true);
+
+    appendMessage('user', text);
+    history.push({ role: 'user', content: text });
+    const { msg, body } = appendMessage('ai', '');
+    curMsg = msg; curSpan = body; lastTokenNodes = []; curChatId = null;
+    genT0 = performance.now(); genCount = 0;
+    abortCtrl = new AbortController();
+
+    try {
+      // Prefer multi-turn messages (server applies the chat template);
+      // fall back to a client-side gemma prompt if no server template exists.
+      const sk = samplerBody();
+      // CONTEXT WINDOW + PERSIST-KV. With persistent O(1) KV in the daemon (SP_PERSIST_KV) the
+      // prefill is REUSED across turns when this turn's prompt strictly extends the last one, so
+      // we keep a large in-context window cheaply instead of capping to a few turns. Bound it by an
+      // approximate token budget (~16k, headroom under the daemon's PMAX) so the resident cache
+      // never overflows: keep the system turn + the most recent turns that fit. The window grows
+      // monotonically while under budget (persist reuses the prefix => O(1) prefill); once it
+      // exceeds budget it slides and that single turn re-prefills (still bounded, not O(full chat)).
+      // Older facts beyond the window are held by the memory system (recall / agency / MEM-OKF).
+      const TOK_BUDGET = 16000;            // ~tokens; headroom under SP_DAEMON_KVDECODE_PMAX
+      const estTok = (m) => Math.ceil((((m && m.content) || '')).length / 4) + 8;
+      let msgs;
+      {
+        const sys = history[0];
+        let used = sys ? estTok(sys) : 0;
+        const tail = [];
+        for (let i = history.length - 1; i >= 1; i--) {
+          used += estTok(history[i]);
+          if (used > TOK_BUDGET && tail.length) break;   // always keep >=1 most-recent turn
+          tail.unshift(history[i]);
+        }
+        msgs = sys ? [sys, ...tail] : tail;
+      }
+      // ATTACHED IMAGE: one-shot. Consumed here so it rides exactly the turn it
+      // was attached to and cannot silently follow later ones around.
+      const _img = pendingImage; pendingImage = null; renderAttachment();
+      let res = await streamChat({ messages: msgs, session_id: SESSION_ID, max_tokens: 512,
+                                   ...(_img ? { image_b64: _img } : {}), ...sk });
+      if (res && res.retryPrompt) res = await streamChat({ prompt: gemmaPrompt(msgs), max_tokens: 512, ...sk });
+      const finalText = (res && res.text || '').trim();
+      // ── TAGS ARE A BADGE, NOT SPEECH (2026-07-29) ──────────────────────────────
+      // The control tags stream inline with her words, so they were visible in the
+      // reply — three turns of the 2026-07-29 field transcript rendered as nothing
+      // but "[TRAI:flirty]" because the tag WAS the whole reply. pushTagBadge()
+      // shows them properly; here they come out of her mouth. Done once at end of
+      // stream so a tag split across deltas can never be half-stripped.
+      const shown = stripTagsJS(finalText);
+      if (curSpan && shown !== finalText) curSpan.textContent = shown;
+      // HISTORY KEEPS THE RAW TEXT on purpose: the tags are how she has always seen
+      // her own prior turns, and quietly deleting them from her context would be a
+      // persona change smuggled in as a display fix.
+      history.push({ role: 'assistant', content: finalText });
+    } catch (err) {
+      if (err.name === 'AbortError') { pushToken('  [aborted]'); }
+      else {
+        if (curSpan && curSpan.textContent.length === 0) {
+          curMsg.className = 'msg err';
+          curSpan.textContent = `⚠ ${err.message}. Is the daemon running?  Launch:  run_console.bat  (then reload).`;
+        } else { pushToken(`  [stream error: ${err.message}]`); }
+        history.pop(); // drop the failed assistant turn from context
+      }
+    } finally {
+      stopGenIcon();
+      setSending(false); abortCtrl = null;
+      resetRewind();
+      chatInput.focus();
+    }
+  }
+
+  async function abortChat() {
+    if (curChatId != null) { try { await fetch(`${DAEMON}/v1/abort/${curChatId}`, { method: 'POST' }); } catch (_) {} }
+    if (abortCtrl) abortCtrl.abort();
+  }
+
+  /* ===== 5b. KAIROS  (GET /v1/kairos/outbox) ====================
+     What she decided to say WITHOUT being asked: finishing a thought she was cut off in,
+     checking in after a long quiet, or keeping a reminder he asked her for.
+
+     THE LAST MILE, AND IT WAS MISSING TWICE. First nothing polled the outbox at all — the
+     impulse fired, the policy allowed it, she generated, the scheduler filed the message,
+     and no page was listening. Then it WAS polled... in console.html, a fork of this file
+     that nobody opens. Every part of the chain was built and gated except the one that lets
+     a human see it.
+
+     Her turn is pushed into `history` like any other. Shown-but-not-remembered would leave
+     a hole in the next turn's context exactly where she had spoken: she would say something
+     and then not know she had said it. */
+  async function pollKairos() {
+    if (abortCtrl) return;                    // never interleave with a live generation
+    try {
+      const r = await fetch(`${GATEWAY}/v1/kairos/outbox?session=${encodeURIComponent(SESSION_ID)}`,
+                            { signal: AbortSignal.timeout(4000) });
+      if (!r.ok) return;
+      const { messages } = await r.json();
+      for (const m of (messages || [])) {
+        const { msg } = appendMessage('ai', m.text);
+        msg.classList.add('unprompted');
+        const who = msg.querySelector('.who');
+        // SHE SAYS WHY, AND IT IS ON THE PAGE. An unprompted message with no account of
+        // itself is indistinguishable from a bug.
+        const label = m.kind === 'continue' ? 'picked the thread back up'
+                    : m.kind === 'remind'   ? 'reminding you'
+                    : m.kind === 'muse'     ? 'been thinking'
+                    : 'spoke up';
+        if (who) who.innerHTML += ` <span class="kairos-tag" title="${
+          String(m.reason || '').replace(/"/g, '&quot;')}${
+          m.margin != null ? ' · eot_margin ' + Number(m.margin).toFixed(2) : ''}">${label}</span>`;
+        const ic = msg.querySelector('.gen-icon'); if (ic) ic.style.display = 'none';
+        history.push({ role: 'assistant', content: m.text });
+        if (m.kind === 'remind') fetchNotes();   // it is raised now — refresh the board
+      }
+    } catch (_) { /* gateway down: the chat still works, she just cannot speak first */ }
+  }
+
+  /* ===== 6. REWIND (client-side scrub of the last reply) ========= */
+  function openRewind()  { rewindBar.classList.add('open'); rewindScrub.value = 100; applyRewind(100); }
+  function closeRewind() { rewindBar.classList.remove('open'); lastTokenNodes.forEach(n => n.style.opacity = ''); }
+  function resetRewind() { rewindScrub.value = 100; rewindTs.textContent = '100% · live'; }
+  function applyRewind(pct) {
+    const n = lastTokenNodes.length; if (!n) { rewindTs.textContent = 'no tokens'; return; }
+    const visible = Math.round(n * pct / 100);
+    for (let i = 0; i < n; i++) lastTokenNodes[i].style.opacity = i < visible ? '1' : '0.06';
+    rewindTs.textContent = pct >= 100 ? '100% · live' : `${pct}% · ${visible}/${n} tok`;
+  }
+  rewindToggle.addEventListener('click', () => rewindBar.classList.contains('open') ? closeRewind() : openRewind());
+  rewindClose.addEventListener('click', closeRewind);
+  rewindScrub.addEventListener('input', (e) => applyRewind(+e.target.value));
+
+  /* ===== 7. UI WIRING =========================================== */
+  sendBtn.addEventListener('click', () => { if (abortCtrl) { abortCtrl.abort(); abortChat(); } else submitPrompt(); });
+  chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitPrompt(); }
+    if ((e.ctrlKey && e.key === 'c') || e.key === 'Escape') { if (abortCtrl) abortCtrl.abort(); abortChat(); }
+    if (e.ctrlKey && e.key === 'l') { e.preventDefault(); clearCanvas(); }
+    if (e.ctrlKey && e.key === 'r') { e.preventDefault(); rewindBar.classList.contains('open') ? closeRewind() : openRewind(); }
+  });
+  clearBtn.addEventListener('click', clearCanvas);
+  function clearCanvas() {
+    chatWindow.innerHTML = ''; chatWindow.appendChild(emptyState);
+    curMsg = null; curSpan = null; lastTokenNodes = []; history.length = 0; history.push({ role: 'system', content: SYS_PROMPT }); curChatId = null;
+    SESSION_ID = 'ui-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+    closeRewind();
+  }
+  copyBtn.addEventListener('click', () => {
+    if (!curSpan) return;
+    navigator.clipboard && navigator.clipboard.writeText(curSpan.innerText);
+    copyBtn.style.color = 'var(--ok)'; setTimeout(() => copyBtn.style.color = '', 700);
+  });
+  connPill.addEventListener('click', () => {
+    if (isHttp) { alert('Served by the daemon — endpoint is fixed to this origin:\n' + DAEMON); return; }
+    const v = prompt('Daemon endpoint:', DAEMON);
+    if (v) { DAEMON = v.replace(/\/+$/, ''); localStorage.setItem('sp_endpoint', DAEMON); location.reload(); }
+  });
+
+  /* ===== VOICE CHANNEL (ADR-KAI4 P0) ============================== *
+   * mic 16k → client VAD segmentation → PCM16 b64 → gateway /v1/voice
+   * (GNA ear → inject_frames → 12B) → streamed reply → v0 TTS out
+   * (speechSynthesis stopgap; replaced by OUR vocoder in P2).
+   * Modes: off → push-to-talk (click to arm, speak, auto-sends on
+   * silence) → auto (always listening, any-voice trip; speaking while
+   * Kairos talks INTERRUPTS = ducks TTS + aborts). */
+  let voiceMode = 0;                 // 0 off · 1 push-to-talk · 2 auto
+  let audioCtx = null, micStream = null, micNode = null;
+  let vadBuf = [], vadActive = false, vadSilence = 0, vadSpeech = 0;
+  const VAD_ON = 0.015, VAD_HOLD_MS = 700, VAD_MIN_MS = 250, CHUNK = 2048;
+  // ── ATTACH AN IMAGE ────────────────────────────────────────────────────────
+  // She looks at it with the served model's OWN vision tower (harness/senses/
+  // vision.py -> inject at token 258880), not a caption service. The gateway
+  // folds what she saw into the turn as her observation before the agent runs.
+  let pendingImage = null;
+  const imgBtn = $('img-btn'), imgFile = $('img-file');
+  function renderAttachment() {
+    let strip = document.getElementById('img-strip');
+    if (!pendingImage) { if (strip) strip.remove(); imgBtn.style.color = ''; return; }
+    if (!strip) {
+      strip = document.createElement('div');
+      strip.id = 'img-strip';
+      strip.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:11px;color:var(--cyan-bright)';
+      imgBtn.parentNode.parentNode.insertBefore(strip, imgBtn.parentNode);
+    }
+    strip.innerHTML = '';
+    const im = document.createElement('img');
+    im.src = pendingImage;
+    im.style.cssText = 'height:38px;border-radius:4px;border:1px solid var(--cyan-dim)';
+    const lab = document.createElement('span'); lab.textContent = 'image attached — she will look at it';
+    const x = document.createElement('button');
+    x.textContent = 'remove'; x.className = 'toolbtn';
+    x.onclick = () => { pendingImage = null; imgFile.value = ''; renderAttachment(); };
+    strip.append(im, lab, x);
+    imgBtn.style.color = 'var(--gold-hot)';
+  }
+  imgBtn.addEventListener('click', () => imgFile.click());
+  imgFile.addEventListener('change', () => {
+    const f = imgFile.files && imgFile.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => { pendingImage = r.result; renderAttachment(); };
+    r.readAsDataURL(f);
+  });
+  const voiceBtn = $('voice-btn'), voiceLab = $('voice-lab');
+
+  async function voiceStart() {
+    if (!AGENT_MODE) { alert('voice needs the agent gateway (:8800) — launch run_console_agent / serve.bat agent'); return false; }
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      const src = audioCtx.createMediaStreamSource(micStream);
+      micNode = audioCtx.createScriptProcessor(CHUNK, 1, 1);
+      micNode.onaudioprocess = (e) => onMic(e.inputBuffer.getChannelData(0));
+      src.connect(micNode); micNode.connect(audioCtx.destination);
+      return true;
+    } catch (e) { alert('mic unavailable: ' + e.message); return false; }
+  }
+  function voiceStop() {
+    if (micNode) { try { micNode.disconnect(); } catch(_){} micNode = null; }
+    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+    if (audioCtx) { try { audioCtx.close(); } catch(_){} audioCtx = null; }
+    vadBuf = []; vadActive = false;
+  }
+  function onMic(f32) {
+    let s = 0; for (let i = 0; i < f32.length; i++) s += f32[i] * f32[i];
+    const rms = Math.sqrt(s / f32.length);
+    const speaking = rms > VAD_ON;
+    // BARGE-IN. cancelAll() drops the queue AND what is playing, and every dropped
+    // utterance still emits its terminal `cancelled` event — talking over her must
+    // stop her mid-word, not leave a sentence queued to surface later.
+    if (speaking && window.speech && speech.pending) { speech.cancelAll('barge-in'); if (abortCtrl) abortCtrl.abort(); }
+    if (speaking) {
+      if (!vadActive) { vadActive = true; vadBuf = []; vadSpeech = 0; voiceBtn.style.color = 'var(--ok)'; }
+      vadSilence = 0; vadSpeech += f32.length / 16;
+    } else if (vadActive) {
+      vadSilence += f32.length / 16;
+    }
+    if (vadActive) {
+      vadBuf.push(new Float32Array(f32));
+      if (vadSilence > VAD_HOLD_MS) {
+        vadActive = false; voiceBtn.style.color = '';
+        if (vadSpeech > VAD_MIN_MS) sendUtterance();
+        else vadBuf = [];
+      }
+    }
+  }
+  async function sendUtterance() {
+    const total = vadBuf.reduce((n, b) => n + b.length, 0);
+    // concat float mono at the ACTUAL context rate
+    const flat = new Float32Array(total);
+    { let k = 0; for (const b of vadBuf) { flat.set(b, k); k += b.length; } }
+    vadBuf = [];
+    // P1.5 SYNC FIX: the AudioContext often runs at 48k even when 16k is
+    // requested; the ear is trained strictly on 16k, so a rate mismatch
+    // time-warps the audio and it mis-hears. Resample to EXACTLY 16k here.
+    const srcRate = (audioCtx && audioCtx.sampleRate) || 16000;
+    let mono = flat;
+    if (Math.abs(srcRate - 16000) > 1) {
+      const ratio = 16000 / srcRate;
+      const outLen = Math.round(flat.length * ratio);
+      mono = new Float32Array(outLen);
+      for (let i = 0; i < outLen; i++) {
+        const t = i / ratio, i0 = Math.floor(t), frac = t - i0;
+        mono[i] = (flat[i0] || 0) * (1 - frac) + (flat[i0 + 1] || 0) * frac;  // linear
+      }
+    }
+    const pcm = new Int16Array(mono.length);
+    for (let i = 0; i < mono.length; i++)
+      pcm[i] = Math.max(-32768, Math.min(32767, Math.round(mono[i] * 32767)));
+    let bin = ''; const u8 = new Uint8Array(pcm.buffer);
+    for (let i = 0; i < u8.length; i += 8192) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 8192));
+    const b64 = btoa(bin);
+    clearEmpty();
+    appendMessage('user', '🎤 (voice, ' + (total / 16000).toFixed(1) + 's)');
+    const { msg, body } = appendMessage('ai', '');
+    curMsg = msg; curSpan = body; lastTokenNodes = [];
+    abortCtrl = new AbortController(); setSending(true);
+    let spoken = '';
+    try {
+      const resp = await fetch(`${GATEWAY}/v1/voice`, { method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: SESSION_ID, audio_b64: b64, max_tokens: 256 }),
+        signal: abortCtrl.signal });
+      const reader = resp.body.getReader(); const dec = new TextDecoder(); let buf = '';
+      for (;;) {
+        const { done, value } = await reader.read(); if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let ix;
+        while ((ix = buf.indexOf('\n\n')) >= 0) {
+          const fr = buf.slice(0, ix); buf = buf.slice(ix + 2);
+          for (const ln of fr.split('\n')) {
+            if (!ln.startsWith('data:')) continue;
+            const p = ln.slice(5).trim();
+            if (p === '[DONE]') continue;
+            let ob = null; try { ob = JSON.parse(p); } catch (_) { continue; }
+            if (ob.voice) { pushNoteCard('voice', `${ob.voice.frames ?? 0} latent frames · ${ob.voice.device ?? ''} ${ob.voice.skip ? '· ' + ob.voice.skip : ''}`, 'var(--gold-hot)'); continue; }
+            if (ob.error) { pushToken('⚠ ' + ob.error); continue; }
+            if (ob.delta) { pushToken(ob.delta); spoken += ob.delta; }
+          }
+        }
+      }
+    } catch (e) { if (e.name !== 'AbortError') pushToken(' [voice error: ' + e.message + ']'); }
+    finally {
+      stopGenIcon(); setSending(false); abortCtrl = null;
+      // HER OWN VOICE, not the browser's. speech.js splits on sentence boundaries
+      // and queues: she starts talking after the FIRST sentence while the next is
+      // still being synthesised, which is the only shape that works here — a whole
+      // paragraph sent as one utterance was measured at 47 min / 11.9 GB VRAM.
+      if (spoken.trim()) sayReply(spoken.trim());
+    }
+  }
+  voiceBtn.addEventListener('click', async () => {
+    voiceMode = (voiceMode + 1) % 3;
+    if (voiceMode === 0) { voiceStop(); voiceLab.textContent = 'voice'; voiceBtn.style.borderColor = ''; }
+    else if (voiceMode === 1) { if (await voiceStart()) { voiceLab.textContent = 'ptt'; voiceBtn.style.borderColor = 'var(--gold)'; } else voiceMode = 0; }
+    else { voiceLab.textContent = 'auto'; voiceBtn.style.borderColor = 'var(--ok)'; }
+  });
+
+  /* ===== boot ==================================================== */
+  setConn(false, 'connecting…');
+  connectTelemetry();
+  connectLedger();
+  pollMetrics();   setInterval(pollMetrics, 1000);
+  // The board polls slowly on purpose: it changes when a human types or when she uses a
+  // tool — not 30 times a minute, which is what the DHT topology it replaced was doing to
+  // render a mesh with one node in it.
+  fetchNotes();    setInterval(fetchNotes, 5000);
+  setInterval(pollKairos, 4000);
+  probeGateway();  setInterval(probeGateway, 8000);
+  pollPersonaState(); setInterval(pollPersonaState, 12000);
+  const peBtn = document.getElementById('persona-edit-btn');
+  if (peBtn) peBtn.addEventListener('click', openPersonaEditor);
+  const pcBtn = document.getElementById('persona-cancel');
+  if (pcBtn) pcBtn.addEventListener('click', () => { document.getElementById('persona-modal').style.display = 'none'; });
+  const psBtn = document.getElementById('persona-save');
+  if (psBtn) psBtn.addEventListener('click', savePersona);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { const m = document.getElementById('persona-modal'); if (m && m.style.display !== 'none') m.style.display = 'none'; }
+  });
+  chatInput.focus();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "_readme": "GATE FIXTURE ONLY — not the production config. Points the bridge at THIS repo's own MCP server so g_mcp_pool and h_mcp_server have a server to talk to without depending on anything external. mcp_servers.json must never contain this entry: bridging our own server back into ourselves is a loop (every tool it exposes is already native and gets shadowed).",
+  "servers": {
+    "kairos": { "command": "python", "args": ["-m", "harness.mcp_server"] }
+  }
+}

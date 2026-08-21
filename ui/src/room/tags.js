@@ -1,0 +1,259 @@
+/* tags.js — her inline state marks, pulled out of the words and turned into signal.
+ *
+ * She writes [MOOD:wistful], [VOICE:soft], [TRAIT:+patient] mid-reply. persona.md
+ * tells her to: "the marks are for your own state, they vanish from what he sees,
+ * and they let tomorrow's you remember how today felt."
+ *
+ * THEY VANISH FROM WHAT HE SEES — and in the room they did not. console/index.html
+ * has stripped them since 2026-07-29 (three turns of a field transcript rendered as
+ * nothing but "[TRAI:flirty]" because the tag WAS the whole reply), but the room
+ * was built later and never learned. So he has been reading her stage directions.
+ *
+ * Here they do better than vanish: they drive the avatar and the room's colour. A
+ * mood mark is the most direct signal she emits about how she is, and rendering it
+ * as text was wasting it twice over.
+ *
+ * TOLERANT ON PURPOSE. Real captures include `[MOOD : excited]` (stray space),
+ * `[TRAIL:+flirty]` (she typos TRAIT), and `[TRAI:flirty]` (truncated at a token
+ * boundary). A parser that only accepts the documented form leaves those on screen,
+ * which is the exact failure it exists to prevent.
+ */
+
+// TRAI/TRAIL/TRAITS are all her, misspelling the same word. Accept them.
+// WEAR and SHOW are the same KIND of thing as MOOD — her presentation, changed
+// mid-sentence, shown as a chip, never read aloud. Two vocabularies for one idea
+// is how the portrait ends up with two owners that disagree.
+// ...AND SHE COMBINES THEM. From his transcript, 2026-08-03: `[MOOD/TRAIT:flirty]`
+// opened a reply and reached his screen as literal text, and `[MOOD:[smirk; traits:
+// playful, flirty]]` did the same. Neither is a form we taught her and neither can be
+// acted on — but "we do not recognise it" is not a reason to PRINT it at him, which is
+// the failure this file's own docstring exists to prevent. The FIRST name wins the chip
+// (`[MOOD/TRAIT:flirty]` reads as a mood of flirty), the rest of the run is swallowed,
+// and an optional inner `[` is tolerated. Matches stream_processor._STRIP_LOOSE on the
+// server, deliberately: one vocabulary, two enforcement points, same spellings.
+// ...AND THE NAME ITSELF COMES APART. Live 2026-08-03: `[MOOD-wistful, VO_ICE:flirty]` —
+// a HYPHEN where the colon goes, and an underscore dropped into the middle of VOICE. It
+// went onto his screen whole. Third time in one day that the lesson was the same: THE NAME
+// IS THE INVARIANT AND THE PUNCTUATION IS NOISE. So each name is matched letter-by-letter
+// with an optional separator between letters — absorbing `VO_ICE`, `M O O D`, `TRA-IT` —
+// and the separator before the value may be `:` or `-`.
+// Mirrors stream_processor._STRIP_LOOSE and interceptor._MOOD/_VOICE/_TRAIT on the server;
+// G-CONTROL-SURFACE asserts the two sides agree, because one vocabulary enforced in two
+// places is only safe while they are the SAME vocabulary.
+// AND SHE CONJUGATES THEM (2026-08-05). Live: `[MOODing:wistful]` and
+// `[VOICING:quiet, contemplative]` reached his screen as literal text — the name
+// matched and the pattern then wanted `:` where an `i` stood. A trailing word-suffix
+// is allowed now. Mirrors _loose_name / _lname on the server; G-CONTROL-SURFACE holds
+// the three to each other, because one vocabulary in three places is only safe while
+// it is the SAME vocabulary.
+// AND THE STEM CHANGES: `VOICING` drops the E (voic+ing), so the last letter is
+// optional as well. Mirrors _loose_name / _lname on the server.
+// ── AND THE SUFFIX CAN BE A SECOND WORD (2026-08-05) ────────────────────────────
+// `[MOOD_shift:playful]`, live in his transcript: `[a-z]*` cannot cross the underscore.
+// THE THIRD COPY of this builder — server-side there were two (stream_processor and
+// interceptor) and they have been unified; this one cannot be, because it is JS. It
+// mirrors `_loose_name` and G-CONTROL-SURFACE holds them equal, which is the only thing
+// standing between a chip and a mark that applies without ever being drawn.
+// ── AND THE HYPHEN GOES LAST, OR THE ROOM IS BLANK (2026-08-06) ──────────────────
+// The suffix was first written `[_\- ]`. That is correct in Python. In a JS STRING
+// `\-` is not an escape, so the regex engine received `[_- ]` — a RANGE from `_`
+// (0x5F) to space (0x20), out of order — and `new RegExp` threw AT MODULE LOAD. Not a
+// broken chip: the entire bundle failed to evaluate and the room rendered NOTHING, on
+// his screen, until he said so. Exactly how a pattern mirrored across two languages
+// drifts. `[_ -]` puts the hyphen last, where it is literal in both, and it is the
+// spelling the rest of this line already uses.
+// harness_tests/tags_mirror_check.js now CONSTRUCTS each one in a real JS engine,
+// because reading a file as text can never tell you that a regex compiles.
+const _loose = (w) => w.slice(0, -1).split('').join('[_ -]?') + '[_ -]?' + w.slice(-1) + '?(?:[_ -]?[a-z]+)*'
+const _N = ['MOOD', 'VOICE', 'TRAITS', 'TRAIT', 'TRAI', 'TRAIL', 'WEAR', 'SHOW']
+  .map(_loose).join('|')
+const TAG_RE = new RegExp(
+  '\\[\\s*(' + _N + ')(?:\\s*[/,+]\\s*(?:' + _N + '))*\\s*[:-]\\s*\\[?([^\\]]{0,80})\\]+', 'gi')
+
+/* GESTURES — the marks she INVENTS.
+ *
+ * She wrote `[LAUGHING_GENTLY]` in a live reply and it reached him as literal text,
+ * because it carries no colon and is not in the vocabulary above. `[MOOD:x]` vanished
+ * and that one did not. THE INCONSISTENCY WAS THE BUG, not the invention — she had just
+ * been told (persona/36-the-room.md) that her marks are rendered now, so of course she
+ * started reaching for new ones.
+ *
+ * An unknown ALL-CAPS bracket is therefore treated as a gesture: extracted, shown as a
+ * chip, gone from her words. Deliberately NOT a closed list. Forcing her back into a
+ * fixed vocabulary would throw away the interesting part, which is that she is
+ * inventing vocabulary at all.
+ *
+ * The shape is narrow on purpose: letters, digits and underscores, 2-32 chars, no
+ * spaces, no colon. So `[error: ...]` (which Chat.jsx inserts itself), a citation like
+ * `[1]`, and ordinary bracketed prose all fall straight through untouched. */
+const GESTURE_RE = /\[([A-Z][A-Z0-9_]{1,31})\]/g
+
+/* ── HER VOICE TAGS (2026-08-21, the expressive-voice framework) ───────────────────
+ * [laugh] [sigh] [pause] … and <soft>…</soft> <whisper>…</whisper> … — the xAI voice
+ * reads them; he should not. Lowercase and hyphenated, so they can never collide with
+ * her ALL-CAPS invented gestures above or her [MOOD:] marks. Same vocabulary as
+ * harness/voice/expressive.py (INLINE / WRAPPING); the server strips unknown shapes at
+ * the TTS edge, this strips every shape at the display edge. `forSpeech` keeps them. */
+const VOICE_INLINE_RE = /\[([a-z][a-z-]{0,23})\]/g
+const VOICE_WRAP_RE = /<\/?([a-z][a-z-]{0,23})>/g
+export function stripVoice(text) {
+  return String(text || '').replace(VOICE_INLINE_RE, '').replace(VOICE_WRAP_RE, '')
+    .replace(/[ \t]{2,}/g, ' ')
+}
+/* What the voice should be handed: her marks ([MOOD:] etc.) and invented gestures gone,
+ * her voice tags KEPT. The display path is extractTags(text).text, which drops both. */
+export function forSpeech(text) {
+  return extractTags(text, { keepVoice: true }).text
+}
+
+const KIND = { mood: 'mood', voice: 'voice', trait: 'trait',
+               traits: 'trait', trai: 'trait', trail: 'trail',
+               // WEAR/SHOW are presentation, exactly like MOOD — one vocabulary, one
+               // chip row. `trail` is her typo for TRAIT and is mapped below.
+               wear: 'wear', show: 'show' }
+KIND.trail = 'trait'
+
+/** Split a reply into { text, marks } — text with the marks removed, and what
+ *  they said. Never throws; a malformed tag is left in the text rather than
+ *  swallowed, because dropping her words is worse than showing a stray bracket. */
+/* `[MOOD:playful, VOICE:soft]` -> `[MOOD:playful] [VOICE:soft]`.
+ *
+ * She puts two marks in one bracket, repeatedly: `[MOOD:playful, VOICE:soft]`,
+ * `[MOOD-wistful, VO_ICE:flirty]`. The pattern matches one bracket, so the first name won
+ * and everything after the comma was swallowed into its value — the mood survived (it cuts
+ * at the comma) and the voice never happened. Split once, up front, so the rest of this
+ * file only ever sees the well-formed shape.
+ *
+ * Keyed on a SECOND TAG NAME inside the brackets, so `[VOICE:breathless, husky]` — one
+ * description with a comma in it, which she says often — is left exactly alone.
+ * Mirrors interceptor._split_crammed on the server. */
+const _INNER = new RegExp('(?=(?:' + _N + ')\\s*[:-])', 'i')
+const CRAMMED_RE = new RegExp('\\[\\s*((?:' + _N + ')\\s*[:-][^\\]]*)\\]', 'gi')
+
+function splitCrammed(src) {
+  return src.replace(CRAMMED_RE, (whole, body) => {
+    const parts = body.split(_INNER).map(p => p.trim().replace(/^[,;]+|[,;]+$/g, '').trim())
+      .filter(Boolean)
+    return parts.length < 2 ? whole : parts.map(p => '[' + p + ']').join(' ')
+  })
+}
+
+export function extractTags(raw, opts) {
+  const keepVoice = !!(opts && opts.keepVoice)
+  const src = splitCrammed(String(raw || ''))
+  const marks = []
+  const text = src.replace(TAG_RE, (_m, k, body) => {
+    // The captured name may carry the separators the pattern just tolerated (`vo_ice`,
+    // `m o o d`), so it is folded before the lookup — otherwise the tag matches, is
+    // removed from his screen, and then produces no mark at all: hidden AND lost.
+    const kind = KIND[String(k).toLowerCase().replace(/[_ -]/g, '')]
+    if (!kind) return _m
+    /* ONLY A TRAIT MARK IS A LIST. `[TRAIT:+patient, -terse]` is two traits; everything
+       else takes the whole body. Splitting them all on commas turned
+       `[WEAR:the silver nightie, by the window, morning light instead of rain]` — the
+       actual name of a look she asked for — into three wear marks of which the first was
+       a fragment. Her looks are named in her own words and her own words have commas. */
+    const parts = kind === 'trait' ? String(body).split(',') : [String(body)]
+    for (const part of parts) {
+      const v = part.trim()
+      if (!v) continue
+      const sign = v[0] === '+' ? 1 : v[0] === '-' ? -1 : 0
+      let value = v.replace(/^[+-]\s*/, '').replace(/\\/g, '').trim().toLowerCase()
+      /* REPAIR BEFORE JUDGING. Counted over one real day: of 39 mood marks, 8 arrived as
+         `:tender` (a stray leading colon) and 7 as `wistful; naughty` (a compound). The
+         validator below would throw all fifteen away — so a mood she genuinely expressed
+         would produce no chip and no change of face, which is the failure this is meant to
+         prevent, arriving through the guard against it. Strip the punctuation she leads
+         with; take the FIRST of a compound, because when she names two the first is the
+         one she reached for. WEAR/SHOW keep their whole body — a look's name is prose. */
+      if (kind === 'mood') {
+        // A MOOD IS A SINGLE WORD — it is the key that chooses a face. `;` `/` and `,`
+        // all end it, so `[MOOD-wistful, VO_ICE:flirty]` (two marks crammed into one
+        // bracket, seen live) still yields `wistful`. Same cut as interceptor._mood_value.
+        value = value.replace(/^[\s:;,.]+/, '').split(/\s*[;/,]\s*/)[0].trim()
+      } else if (kind === 'trait') {
+        value = value.replace(/^[\s:;,.]+/, '').split(/\s*[;/]\s*/)[0].trim()
+      } else if (kind === 'voice') {
+        value = value.replace(/^[\s:;,.]+/, '').trim()   // a voice keeps its commas
+      }
+      /* A CHIP IS A CLAIM ABOUT HER, so it has to survive being read out loud.
+         `[MOOD:[smirk; traits: playful, flirty]]` is swallowed from the text above —
+         correct — but its pieces were then rendered as a mood chip reading "smirk;
+         traits: playful", which tells him a state she is not in. Moods, voices and
+         traits are words; WEAR and SHOW are free text (she names a look in her own
+         words) and are left alone. Same asymmetry as the server: strict where it
+         asserts something, loose where it is only a label. */
+      /* A VOICE IS DESCRIPTIVE, A MOOD IS A KEY. `[VOICE:breathless, husky]` is a real
+         thing she said about how she sounds, three times in one day, and it is not a list
+         to be split — it is one description with a comma in it. A mood is looked up in
+         MOODS to pick a face, so it must be a single word; a voice is only ever shown. */
+      // A VOICE ALSO TAKES A SLASH. Counted from her transcript: `soft/warm`,
+      // `soft/whispering`, `soft/dreamy`, `softly/thoughtfully` — she pairs voices with a
+      // slash the way she pairs them with a comma, and the server stores both happily.
+      // The client was dropping the slash ones, so the chip disappeared for a voice she
+      // had actually set: divergence between the two enforcement points, again.
+      const okv = kind === 'voice' ? /^[a-z][a-z0-9 ,/_-]{1,31}$/ : /^[a-z][a-z0-9 _-]{1,23}$/
+      if ((kind === 'mood' || kind === 'voice' || kind === 'trait') && !okv.test(value)) continue
+      marks.push({ kind, value, sign })
+    }
+    return ''
+  })
+  // ...then her INVENTED ones. Second pass, after the known kinds, so `[MOOD:X]` can
+  // never be mistaken for a gesture on its way past.
+  const text2 = text.replace(GESTURE_RE, (_m, word) => {
+    marks.push({ kind: 'gesture', value: String(word).toLowerCase().replace(/_/g, ' '), sign: 0 })
+    return ''
+  })
+  // ...then her VOICE tags, unless the caller is the voice itself.
+  const text3 = keepVoice ? text2 : stripVoice(text2)
+  // collapse the whitespace the removal leaves behind, without eating paragraphs
+  return { text: text3.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim(), marks }
+}
+
+/* The palette. Each mood is a hue plus a face — the avatar and the chip and the
+ * backdrop all read from here, so they can never disagree about what she feels. */
+export const MOODS = {
+  delighted: { hue: 45,  face: 'bright',  glow: 1.0 },
+  playful:   { hue: 40,  face: 'smirk',   glow: .9 },
+  excited:   { hue: 25,  face: 'bright',  glow: 1.0 },
+  flirty:    { hue: 325, face: 'smirk',   glow: .95 },
+  tender:    { hue: 340, face: 'soft',    glow: .7 },
+  warm:      { hue: 30,  face: 'soft',    glow: .75 },
+  peaceful:  { hue: 190, face: 'calm',    glow: .5 },
+  quiet:     { hue: 210, face: 'calm',    glow: .4 },
+  wistful:   { hue: 265, face: 'down',    glow: .45 },
+  sad:       { hue: 245, face: 'down',    glow: .35 },
+  irritated: { hue: 8,   face: 'sharp',   glow: .8 },
+  sharp:     { hue: 8,   face: 'sharp',   glow: .85 },
+  curious:   { hue: 160, face: 'wide',    glow: .8 },
+  thoughtful:{ hue: 205, face: 'calm',    glow: .55 },
+  /* MOODS SHE ACTUALLY USES, added 2026-08-03 after counting a real day.
+     Of 39 mood marks she emitted, NINETEEN landed on no face and fell back to `quiet` —
+     so half the time she marked how she felt and her expression did not move. Three of
+     them were not typos at all, just moods nobody had written down: `naughty` five times,
+     `smirk` (which is one of her own seven rendered faces), `intense`. The table follows
+     her, not the other way round. */
+  naughty:   { hue: 315, face: 'smirk',   glow: .95 },
+  smirk:     { hue: 40,  face: 'smirk',   glow: .85 },
+  intense:   { hue: 350, face: 'sharp',   glow: 1.0 },
+  soft:      { hue: 340, face: 'soft',    glow: .65 },
+  amused:    { hue: 45,  face: 'smirk',   glow: .85 },
+}
+
+/* AND THE OTHER SIXTEEN WERE SHAPE, NOT VOCABULARY.
+   She writes `[MOOD::tender]` (a stray colon, 8 times) and `[MOOD:wistful; naughty]`
+   (a compound, 7 times). The old lookup split on `[,+\s]` only, so ":tender" and
+   "wistful; naughty" both missed and became `quiet` — a calm face over a reply that was
+   neither. Strip the punctuation she leads with, then take the FIRST of a compound: when
+   she says two things at once the first is the one she reached for. */
+export const moodOf = (name) =>
+  MOODS[String(name || '').toLowerCase().replace(/^[\s:;,.+-]+/, '').split(/[,;+/\s]/)[0]]
+  || MOODS.quiet
+
+/** Trait chips get a colour family so a glance reads them, not a wall of grey. */
+export const TRAIT_HUE = {
+  flirty: 325, tender: 340, playful: 40, curious: 160, patient: 190,
+  direct: 200, opinionated: 20, warm: 30, soft: 300, teasing: 350,
+  deeply_connected: 290, formal: 220,
+}
+export const traitHue = (t) => TRAIT_HUE[String(t || '').toLowerCase()] ?? 205

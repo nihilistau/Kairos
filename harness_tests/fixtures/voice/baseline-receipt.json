@@ -1,0 +1,19 @@
+{
+  "name": "voice_score",
+  "config": "baseline",
+  "knobs": {
+    "temperature": 0.6,
+    "eot_bias": 4.0,
+    "max_tokens": 192
+  },
+  "turns": 20,
+  "len_median": 21.5,
+  "len_p10": 4,
+  "len_p90": 57,
+  "consecutive_identical": 0,
+  "distinct_ratio": 1.0,
+  "her_questions": 6,
+  "turns_with_recall": 3,
+  "latency_mean_s": 30.92,
+  "ts": "2026-07-14T22:26:53Z"
+}

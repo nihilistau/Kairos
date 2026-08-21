@@ -1,0 +1,97 @@
+# companion.toml — the ENGINE-AGNOSTIC profile (2026-08-21, Phase 3 of the Kairos plan).
+#
+# No sp-daemon here: [engine] points the harness at any OpenAI-compatible chat server —
+# LM Studio (:1234, the default below), llama-server (:8080, dialect = "llamacpp"), vLLM,
+# or a cloud endpoint with api_key_file. serve.py starts ONLY the gateway (and the TTS /
+# aux sidecars if configured); the engine is yours to run. What degrades without the
+# daemon is stated in docs/OFF-BY-DEFAULT.md and harness/inference/backends/__init__.py:
+# no kairos continue/expand margin, no byte-exact, no residual vision/audio frames, no
+# episode mint, embeddings via the sidecar or hash space.
+#
+# This is also the profile the public Kairos framework ships. It is GENERIC: no operator
+# facts, no personal prompts (the ambient prompt falls back to the module's neutral one),
+# relative var/ paths. The engine-only sections ([kv], the daemon keys under [memory]) are
+# present because the one door reads one schema for every profile; their values are inert.
+
+[engine]
+kind = "openai"                       # "sp" (the Rust sp-daemon) | "openai"
+base_url = "http://127.0.0.1:1234"    # LM Studio default; llama-server is :8080
+model = ""                            # the server's model id; empty = the server's default
+api_key_file = "var/secrets/engine.token"   # a FILE, never the token; absent = no Authorization header (LM Studio with auth on: paste its API token into this file)
+dialect = "generic"                   # "llamacpp" sends top_k / repeat_penalty too
+vision = false                        # true if the endpoint accepts image_url parts
+asr_url = ""                          # reserved: /v1/audio/transcriptions for voice-in
+
+[paths]
+engine_exe = ""                       # none — the engine is external
+model = ""                            # none — see [engine].model
+tokenizer = ""
+var = "var"
+registry = "var/memory/registry.jsonl"   # the fact registry (relative; the door resolves it)
+spectest_head = ""                    # engine-only; empty
+llvm_bin = ""                         # engine-only; empty
+
+[serve]
+port = 1234                           # where the engine answers (informational)
+gateway_port = 8810                   # beside hers (8800): two stacks, one box, while Kairos is developed
+
+[kv]
+# engine-only knobs; present because the one door reads the same schema for every profile
+persist = false
+persist_b4 = false
+ring_w = 2048
+pmax = 4096
+
+[memory]
+recall_authority = "L5"
+growth = false                        # the daemon's writers — off, and refused at the door
+store_verb = false
+persist_growth = false
+classify = false
+policy = false
+qkey_mint = false
+qonly = true
+delivery = "plain"
+auto_recall_default = false
+attr_gate = true
+attr_tau = 0.5
+l5_tau = 0.30
+
+[agent]
+authority = "spine"
+prewarm = false                       # nothing to warm on a foreign endpoint
+tool_budget_s = 400
+spine_toolset = false
+spine_recall = true
+personality = true
+mcp_tools = true
+
+[decode]
+temperature = 0.6
+max_tokens = 768
+repetition_penalty = 1.3
+no_repeat_ngram = 0
+eot_bias = 0.0                        # moot here (sp-only); kept so the schema matches
+
+[tts]
+method = "xai"                        # her voice via the xAI API when a key file is present; local otherwise
+xai_voice = "ara"
+speed = 1.0
+
+[senses]
+ambient = false                       # the hourly eye is an explicit choice per machine
+ambient_quiet_s = 300
+look_tokens = 512
+
+[research]
+enabled = false
+backend = "xai"
+
+[search]
+backend = "ddg"                       # free floor; xai when a key file is present
+
+[xai]
+key_file = "var/secrets/Xapi.txt"
+
+[aux]
+enabled = false

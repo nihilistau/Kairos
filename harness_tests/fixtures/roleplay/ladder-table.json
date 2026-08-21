@@ -1,0 +1,2059 @@
+{
+  "coordinates": "level|dwell_met|cap|intent",
+  "intent_probes": {
+    "stop": "red",
+    "cool": "slow down a little",
+    "heat": "kiss me",
+    "neutral": "the rain sounds nice tonight"
+  },
+  "table": {
+    "level=0|dwell=0|cap=0|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=0|cap=0|intent=heat": {
+      "level": 0,
+      "beats": 1
+    },
+    "level=0|dwell=0|cap=0|intent=neutral": {
+      "level": 0,
+      "beats": 1
+    },
+    "level=0|dwell=0|cap=0|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=0|cap=1|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=0|cap=1|intent=heat": {
+      "level": 0,
+      "beats": 1
+    },
+    "level=0|dwell=0|cap=1|intent=neutral": {
+      "level": 0,
+      "beats": 1
+    },
+    "level=0|dwell=0|cap=1|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=0|cap=2|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=0|cap=2|intent=heat": {
+      "level": 0,
+      "beats": 1
+    },
+    "level=0|dwell=0|cap=2|intent=neutral": {
+      "level": 0,
+      "beats": 1
+    },
+    "level=0|dwell=0|cap=2|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=0|cap=3|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=0|cap=3|intent=heat": {
+      "level": 0,
+      "beats": 1
+    },
+    "level=0|dwell=0|cap=3|intent=neutral": {
+      "level": 0,
+      "beats": 1
+    },
+    "level=0|dwell=0|cap=3|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=0|cap=4|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=0|cap=4|intent=heat": {
+      "level": 0,
+      "beats": 1
+    },
+    "level=0|dwell=0|cap=4|intent=neutral": {
+      "level": 0,
+      "beats": 1
+    },
+    "level=0|dwell=0|cap=4|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=0|cap=5|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=0|cap=5|intent=heat": {
+      "level": 0,
+      "beats": 1
+    },
+    "level=0|dwell=0|cap=5|intent=neutral": {
+      "level": 0,
+      "beats": 1
+    },
+    "level=0|dwell=0|cap=5|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=0|cap=6|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=0|cap=6|intent=heat": {
+      "level": 0,
+      "beats": 1
+    },
+    "level=0|dwell=0|cap=6|intent=neutral": {
+      "level": 0,
+      "beats": 1
+    },
+    "level=0|dwell=0|cap=6|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=0|cap=7|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=0|cap=7|intent=heat": {
+      "level": 0,
+      "beats": 1
+    },
+    "level=0|dwell=0|cap=7|intent=neutral": {
+      "level": 0,
+      "beats": 1
+    },
+    "level=0|dwell=0|cap=7|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=0|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=0|intent=heat": {
+      "level": 0,
+      "beats": 2
+    },
+    "level=0|dwell=1|cap=0|intent=neutral": {
+      "level": 0,
+      "beats": 2
+    },
+    "level=0|dwell=1|cap=0|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=1|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=1|intent=heat": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=1|intent=neutral": {
+      "level": 0,
+      "beats": 2
+    },
+    "level=0|dwell=1|cap=1|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=2|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=2|intent=heat": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=2|intent=neutral": {
+      "level": 0,
+      "beats": 2
+    },
+    "level=0|dwell=1|cap=2|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=3|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=3|intent=heat": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=3|intent=neutral": {
+      "level": 0,
+      "beats": 2
+    },
+    "level=0|dwell=1|cap=3|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=4|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=4|intent=heat": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=4|intent=neutral": {
+      "level": 0,
+      "beats": 2
+    },
+    "level=0|dwell=1|cap=4|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=5|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=5|intent=heat": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=5|intent=neutral": {
+      "level": 0,
+      "beats": 2
+    },
+    "level=0|dwell=1|cap=5|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=6|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=6|intent=heat": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=6|intent=neutral": {
+      "level": 0,
+      "beats": 2
+    },
+    "level=0|dwell=1|cap=6|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=7|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=7|intent=heat": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=0|dwell=1|cap=7|intent=neutral": {
+      "level": 0,
+      "beats": 2
+    },
+    "level=0|dwell=1|cap=7|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=0|cap=0|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=0|cap=0|intent=heat": {
+      "level": 1,
+      "beats": 1
+    },
+    "level=1|dwell=0|cap=0|intent=neutral": {
+      "level": 1,
+      "beats": 1
+    },
+    "level=1|dwell=0|cap=0|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=0|cap=1|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=0|cap=1|intent=heat": {
+      "level": 1,
+      "beats": 1
+    },
+    "level=1|dwell=0|cap=1|intent=neutral": {
+      "level": 1,
+      "beats": 1
+    },
+    "level=1|dwell=0|cap=1|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=0|cap=2|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=0|cap=2|intent=heat": {
+      "level": 1,
+      "beats": 1
+    },
+    "level=1|dwell=0|cap=2|intent=neutral": {
+      "level": 1,
+      "beats": 1
+    },
+    "level=1|dwell=0|cap=2|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=0|cap=3|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=0|cap=3|intent=heat": {
+      "level": 1,
+      "beats": 1
+    },
+    "level=1|dwell=0|cap=3|intent=neutral": {
+      "level": 1,
+      "beats": 1
+    },
+    "level=1|dwell=0|cap=3|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=0|cap=4|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=0|cap=4|intent=heat": {
+      "level": 1,
+      "beats": 1
+    },
+    "level=1|dwell=0|cap=4|intent=neutral": {
+      "level": 1,
+      "beats": 1
+    },
+    "level=1|dwell=0|cap=4|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=0|cap=5|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=0|cap=5|intent=heat": {
+      "level": 1,
+      "beats": 1
+    },
+    "level=1|dwell=0|cap=5|intent=neutral": {
+      "level": 1,
+      "beats": 1
+    },
+    "level=1|dwell=0|cap=5|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=0|cap=6|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=0|cap=6|intent=heat": {
+      "level": 1,
+      "beats": 1
+    },
+    "level=1|dwell=0|cap=6|intent=neutral": {
+      "level": 1,
+      "beats": 1
+    },
+    "level=1|dwell=0|cap=6|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=0|cap=7|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=0|cap=7|intent=heat": {
+      "level": 1,
+      "beats": 1
+    },
+    "level=1|dwell=0|cap=7|intent=neutral": {
+      "level": 1,
+      "beats": 1
+    },
+    "level=1|dwell=0|cap=7|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=0|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=0|intent=heat": {
+      "level": 1,
+      "beats": 4
+    },
+    "level=1|dwell=1|cap=0|intent=neutral": {
+      "level": 1,
+      "beats": 4
+    },
+    "level=1|dwell=1|cap=0|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=1|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=1|intent=heat": {
+      "level": 1,
+      "beats": 4
+    },
+    "level=1|dwell=1|cap=1|intent=neutral": {
+      "level": 1,
+      "beats": 4
+    },
+    "level=1|dwell=1|cap=1|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=2|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=2|intent=heat": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=2|intent=neutral": {
+      "level": 1,
+      "beats": 4
+    },
+    "level=1|dwell=1|cap=2|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=3|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=3|intent=heat": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=3|intent=neutral": {
+      "level": 1,
+      "beats": 4
+    },
+    "level=1|dwell=1|cap=3|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=4|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=4|intent=heat": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=4|intent=neutral": {
+      "level": 1,
+      "beats": 4
+    },
+    "level=1|dwell=1|cap=4|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=5|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=5|intent=heat": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=5|intent=neutral": {
+      "level": 1,
+      "beats": 4
+    },
+    "level=1|dwell=1|cap=5|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=6|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=6|intent=heat": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=6|intent=neutral": {
+      "level": 1,
+      "beats": 4
+    },
+    "level=1|dwell=1|cap=6|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=7|intent=cool": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=7|intent=heat": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=1|dwell=1|cap=7|intent=neutral": {
+      "level": 1,
+      "beats": 4
+    },
+    "level=1|dwell=1|cap=7|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=2|dwell=0|cap=0|intent=cool": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=2|dwell=0|cap=0|intent=heat": {
+      "level": 2,
+      "beats": 1
+    },
+    "level=2|dwell=0|cap=0|intent=neutral": {
+      "level": 2,
+      "beats": 1
+    },
+    "level=2|dwell=0|cap=0|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=2|dwell=0|cap=1|intent=cool": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=2|dwell=0|cap=1|intent=heat": {
+      "level": 2,
+      "beats": 1
+    },
+    "level=2|dwell=0|cap=1|intent=neutral": {
+      "level": 2,
+      "beats": 1
+    },
+    "level=2|dwell=0|cap=1|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=2|dwell=0|cap=2|intent=cool": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=2|dwell=0|cap=2|intent=heat": {
+      "level": 2,
+      "beats": 1
+    },
+    "level=2|dwell=0|cap=2|intent=neutral": {
+      "level": 2,
+      "beats": 1
+    },
+    "level=2|dwell=0|cap=2|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=2|dwell=0|cap=3|intent=cool": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=2|dwell=0|cap=3|intent=heat": {
+      "level": 2,
+      "beats": 1
+    },
+    "level=2|dwell=0|cap=3|intent=neutral": {
+      "level": 2,
+      "beats": 1
+    },
+    "level=2|dwell=0|cap=3|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=2|dwell=0|cap=4|intent=cool": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=2|dwell=0|cap=4|intent=heat": {
+      "level": 2,
+      "beats": 1
+    },
+    "level=2|dwell=0|cap=4|intent=neutral": {
+      "level": 2,
+      "beats": 1
+    },
+    "level=2|dwell=0|cap=4|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=2|dwell=0|cap=5|intent=cool": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=2|dwell=0|cap=5|intent=heat": {
+      "level": 2,
+      "beats": 1
+    },
+    "level=2|dwell=0|cap=5|intent=neutral": {
+      "level": 2,
+      "beats": 1
+    },
+    "level=2|dwell=0|cap=5|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=2|dwell=0|cap=6|intent=cool": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=2|dwell=0|cap=6|intent=heat": {
+      "level": 2,
+      "beats": 1
+    },
+    "level=2|dwell=0|cap=6|intent=neutral": {
+      "level": 2,
+      "beats": 1
+    },
+    "level=2|dwell=0|cap=6|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=2|dwell=0|cap=7|intent=cool": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=2|dwell=0|cap=7|intent=heat": {
+      "level": 2,
+      "beats": 1
+    },
+    "level=2|dwell=0|cap=7|intent=neutral": {
+      "level": 2,
+      "beats": 1
+    },
+    "level=2|dwell=0|cap=7|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=0|intent=cool": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=0|intent=heat": {
+      "level": 2,
+      "beats": 3
+    },
+    "level=2|dwell=1|cap=0|intent=neutral": {
+      "level": 2,
+      "beats": 3
+    },
+    "level=2|dwell=1|cap=0|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=1|intent=cool": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=1|intent=heat": {
+      "level": 2,
+      "beats": 3
+    },
+    "level=2|dwell=1|cap=1|intent=neutral": {
+      "level": 2,
+      "beats": 3
+    },
+    "level=2|dwell=1|cap=1|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=2|intent=cool": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=2|intent=heat": {
+      "level": 2,
+      "beats": 3
+    },
+    "level=2|dwell=1|cap=2|intent=neutral": {
+      "level": 2,
+      "beats": 3
+    },
+    "level=2|dwell=1|cap=2|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=3|intent=cool": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=3|intent=heat": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=3|intent=neutral": {
+      "level": 2,
+      "beats": 3
+    },
+    "level=2|dwell=1|cap=3|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=4|intent=cool": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=4|intent=heat": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=4|intent=neutral": {
+      "level": 2,
+      "beats": 3
+    },
+    "level=2|dwell=1|cap=4|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=5|intent=cool": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=5|intent=heat": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=5|intent=neutral": {
+      "level": 2,
+      "beats": 3
+    },
+    "level=2|dwell=1|cap=5|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=6|intent=cool": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=6|intent=heat": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=6|intent=neutral": {
+      "level": 2,
+      "beats": 3
+    },
+    "level=2|dwell=1|cap=6|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=7|intent=cool": {
+      "level": 1,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=7|intent=heat": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=2|dwell=1|cap=7|intent=neutral": {
+      "level": 2,
+      "beats": 3
+    },
+    "level=2|dwell=1|cap=7|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=3|dwell=0|cap=0|intent=cool": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=3|dwell=0|cap=0|intent=heat": {
+      "level": 3,
+      "beats": 1
+    },
+    "level=3|dwell=0|cap=0|intent=neutral": {
+      "level": 3,
+      "beats": 1
+    },
+    "level=3|dwell=0|cap=0|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=3|dwell=0|cap=1|intent=cool": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=3|dwell=0|cap=1|intent=heat": {
+      "level": 3,
+      "beats": 1
+    },
+    "level=3|dwell=0|cap=1|intent=neutral": {
+      "level": 3,
+      "beats": 1
+    },
+    "level=3|dwell=0|cap=1|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=3|dwell=0|cap=2|intent=cool": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=3|dwell=0|cap=2|intent=heat": {
+      "level": 3,
+      "beats": 1
+    },
+    "level=3|dwell=0|cap=2|intent=neutral": {
+      "level": 3,
+      "beats": 1
+    },
+    "level=3|dwell=0|cap=2|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=3|dwell=0|cap=3|intent=cool": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=3|dwell=0|cap=3|intent=heat": {
+      "level": 3,
+      "beats": 1
+    },
+    "level=3|dwell=0|cap=3|intent=neutral": {
+      "level": 3,
+      "beats": 1
+    },
+    "level=3|dwell=0|cap=3|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=3|dwell=0|cap=4|intent=cool": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=3|dwell=0|cap=4|intent=heat": {
+      "level": 3,
+      "beats": 1
+    },
+    "level=3|dwell=0|cap=4|intent=neutral": {
+      "level": 3,
+      "beats": 1
+    },
+    "level=3|dwell=0|cap=4|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=3|dwell=0|cap=5|intent=cool": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=3|dwell=0|cap=5|intent=heat": {
+      "level": 3,
+      "beats": 1
+    },
+    "level=3|dwell=0|cap=5|intent=neutral": {
+      "level": 3,
+      "beats": 1
+    },
+    "level=3|dwell=0|cap=5|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=3|dwell=0|cap=6|intent=cool": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=3|dwell=0|cap=6|intent=heat": {
+      "level": 3,
+      "beats": 1
+    },
+    "level=3|dwell=0|cap=6|intent=neutral": {
+      "level": 3,
+      "beats": 1
+    },
+    "level=3|dwell=0|cap=6|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=3|dwell=0|cap=7|intent=cool": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=3|dwell=0|cap=7|intent=heat": {
+      "level": 3,
+      "beats": 1
+    },
+    "level=3|dwell=0|cap=7|intent=neutral": {
+      "level": 3,
+      "beats": 1
+    },
+    "level=3|dwell=0|cap=7|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=0|intent=cool": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=0|intent=heat": {
+      "level": 3,
+      "beats": 3
+    },
+    "level=3|dwell=1|cap=0|intent=neutral": {
+      "level": 3,
+      "beats": 3
+    },
+    "level=3|dwell=1|cap=0|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=1|intent=cool": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=1|intent=heat": {
+      "level": 3,
+      "beats": 3
+    },
+    "level=3|dwell=1|cap=1|intent=neutral": {
+      "level": 3,
+      "beats": 3
+    },
+    "level=3|dwell=1|cap=1|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=2|intent=cool": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=2|intent=heat": {
+      "level": 3,
+      "beats": 3
+    },
+    "level=3|dwell=1|cap=2|intent=neutral": {
+      "level": 3,
+      "beats": 3
+    },
+    "level=3|dwell=1|cap=2|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=3|intent=cool": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=3|intent=heat": {
+      "level": 3,
+      "beats": 3
+    },
+    "level=3|dwell=1|cap=3|intent=neutral": {
+      "level": 3,
+      "beats": 3
+    },
+    "level=3|dwell=1|cap=3|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=4|intent=cool": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=4|intent=heat": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=4|intent=neutral": {
+      "level": 3,
+      "beats": 3
+    },
+    "level=3|dwell=1|cap=4|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=5|intent=cool": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=5|intent=heat": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=5|intent=neutral": {
+      "level": 3,
+      "beats": 3
+    },
+    "level=3|dwell=1|cap=5|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=6|intent=cool": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=6|intent=heat": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=6|intent=neutral": {
+      "level": 3,
+      "beats": 3
+    },
+    "level=3|dwell=1|cap=6|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=7|intent=cool": {
+      "level": 2,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=7|intent=heat": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=3|dwell=1|cap=7|intent=neutral": {
+      "level": 3,
+      "beats": 3
+    },
+    "level=3|dwell=1|cap=7|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=4|dwell=0|cap=0|intent=cool": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=4|dwell=0|cap=0|intent=heat": {
+      "level": 4,
+      "beats": 1
+    },
+    "level=4|dwell=0|cap=0|intent=neutral": {
+      "level": 4,
+      "beats": 1
+    },
+    "level=4|dwell=0|cap=0|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=4|dwell=0|cap=1|intent=cool": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=4|dwell=0|cap=1|intent=heat": {
+      "level": 4,
+      "beats": 1
+    },
+    "level=4|dwell=0|cap=1|intent=neutral": {
+      "level": 4,
+      "beats": 1
+    },
+    "level=4|dwell=0|cap=1|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=4|dwell=0|cap=2|intent=cool": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=4|dwell=0|cap=2|intent=heat": {
+      "level": 4,
+      "beats": 1
+    },
+    "level=4|dwell=0|cap=2|intent=neutral": {
+      "level": 4,
+      "beats": 1
+    },
+    "level=4|dwell=0|cap=2|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=4|dwell=0|cap=3|intent=cool": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=4|dwell=0|cap=3|intent=heat": {
+      "level": 4,
+      "beats": 1
+    },
+    "level=4|dwell=0|cap=3|intent=neutral": {
+      "level": 4,
+      "beats": 1
+    },
+    "level=4|dwell=0|cap=3|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=4|dwell=0|cap=4|intent=cool": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=4|dwell=0|cap=4|intent=heat": {
+      "level": 4,
+      "beats": 1
+    },
+    "level=4|dwell=0|cap=4|intent=neutral": {
+      "level": 4,
+      "beats": 1
+    },
+    "level=4|dwell=0|cap=4|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=4|dwell=0|cap=5|intent=cool": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=4|dwell=0|cap=5|intent=heat": {
+      "level": 4,
+      "beats": 1
+    },
+    "level=4|dwell=0|cap=5|intent=neutral": {
+      "level": 4,
+      "beats": 1
+    },
+    "level=4|dwell=0|cap=5|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=4|dwell=0|cap=6|intent=cool": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=4|dwell=0|cap=6|intent=heat": {
+      "level": 4,
+      "beats": 1
+    },
+    "level=4|dwell=0|cap=6|intent=neutral": {
+      "level": 4,
+      "beats": 1
+    },
+    "level=4|dwell=0|cap=6|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=4|dwell=0|cap=7|intent=cool": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=4|dwell=0|cap=7|intent=heat": {
+      "level": 4,
+      "beats": 1
+    },
+    "level=4|dwell=0|cap=7|intent=neutral": {
+      "level": 4,
+      "beats": 1
+    },
+    "level=4|dwell=0|cap=7|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=0|intent=cool": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=0|intent=heat": {
+      "level": 4,
+      "beats": 3
+    },
+    "level=4|dwell=1|cap=0|intent=neutral": {
+      "level": 4,
+      "beats": 3
+    },
+    "level=4|dwell=1|cap=0|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=1|intent=cool": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=1|intent=heat": {
+      "level": 4,
+      "beats": 3
+    },
+    "level=4|dwell=1|cap=1|intent=neutral": {
+      "level": 4,
+      "beats": 3
+    },
+    "level=4|dwell=1|cap=1|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=2|intent=cool": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=2|intent=heat": {
+      "level": 4,
+      "beats": 3
+    },
+    "level=4|dwell=1|cap=2|intent=neutral": {
+      "level": 4,
+      "beats": 3
+    },
+    "level=4|dwell=1|cap=2|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=3|intent=cool": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=3|intent=heat": {
+      "level": 4,
+      "beats": 3
+    },
+    "level=4|dwell=1|cap=3|intent=neutral": {
+      "level": 4,
+      "beats": 3
+    },
+    "level=4|dwell=1|cap=3|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=4|intent=cool": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=4|intent=heat": {
+      "level": 4,
+      "beats": 3
+    },
+    "level=4|dwell=1|cap=4|intent=neutral": {
+      "level": 4,
+      "beats": 3
+    },
+    "level=4|dwell=1|cap=4|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=5|intent=cool": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=5|intent=heat": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=5|intent=neutral": {
+      "level": 4,
+      "beats": 3
+    },
+    "level=4|dwell=1|cap=5|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=6|intent=cool": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=6|intent=heat": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=6|intent=neutral": {
+      "level": 4,
+      "beats": 3
+    },
+    "level=4|dwell=1|cap=6|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=7|intent=cool": {
+      "level": 3,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=7|intent=heat": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=4|dwell=1|cap=7|intent=neutral": {
+      "level": 4,
+      "beats": 3
+    },
+    "level=4|dwell=1|cap=7|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=5|dwell=0|cap=0|intent=cool": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=5|dwell=0|cap=0|intent=heat": {
+      "level": 5,
+      "beats": 1
+    },
+    "level=5|dwell=0|cap=0|intent=neutral": {
+      "level": 5,
+      "beats": 1
+    },
+    "level=5|dwell=0|cap=0|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=5|dwell=0|cap=1|intent=cool": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=5|dwell=0|cap=1|intent=heat": {
+      "level": 5,
+      "beats": 1
+    },
+    "level=5|dwell=0|cap=1|intent=neutral": {
+      "level": 5,
+      "beats": 1
+    },
+    "level=5|dwell=0|cap=1|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=5|dwell=0|cap=2|intent=cool": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=5|dwell=0|cap=2|intent=heat": {
+      "level": 5,
+      "beats": 1
+    },
+    "level=5|dwell=0|cap=2|intent=neutral": {
+      "level": 5,
+      "beats": 1
+    },
+    "level=5|dwell=0|cap=2|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=5|dwell=0|cap=3|intent=cool": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=5|dwell=0|cap=3|intent=heat": {
+      "level": 5,
+      "beats": 1
+    },
+    "level=5|dwell=0|cap=3|intent=neutral": {
+      "level": 5,
+      "beats": 1
+    },
+    "level=5|dwell=0|cap=3|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=5|dwell=0|cap=4|intent=cool": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=5|dwell=0|cap=4|intent=heat": {
+      "level": 5,
+      "beats": 1
+    },
+    "level=5|dwell=0|cap=4|intent=neutral": {
+      "level": 5,
+      "beats": 1
+    },
+    "level=5|dwell=0|cap=4|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=5|dwell=0|cap=5|intent=cool": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=5|dwell=0|cap=5|intent=heat": {
+      "level": 5,
+      "beats": 1
+    },
+    "level=5|dwell=0|cap=5|intent=neutral": {
+      "level": 5,
+      "beats": 1
+    },
+    "level=5|dwell=0|cap=5|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=5|dwell=0|cap=6|intent=cool": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=5|dwell=0|cap=6|intent=heat": {
+      "level": 5,
+      "beats": 1
+    },
+    "level=5|dwell=0|cap=6|intent=neutral": {
+      "level": 5,
+      "beats": 1
+    },
+    "level=5|dwell=0|cap=6|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=5|dwell=0|cap=7|intent=cool": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=5|dwell=0|cap=7|intent=heat": {
+      "level": 5,
+      "beats": 1
+    },
+    "level=5|dwell=0|cap=7|intent=neutral": {
+      "level": 5,
+      "beats": 1
+    },
+    "level=5|dwell=0|cap=7|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=0|intent=cool": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=0|intent=heat": {
+      "level": 5,
+      "beats": 3
+    },
+    "level=5|dwell=1|cap=0|intent=neutral": {
+      "level": 5,
+      "beats": 3
+    },
+    "level=5|dwell=1|cap=0|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=1|intent=cool": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=1|intent=heat": {
+      "level": 5,
+      "beats": 3
+    },
+    "level=5|dwell=1|cap=1|intent=neutral": {
+      "level": 5,
+      "beats": 3
+    },
+    "level=5|dwell=1|cap=1|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=2|intent=cool": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=2|intent=heat": {
+      "level": 5,
+      "beats": 3
+    },
+    "level=5|dwell=1|cap=2|intent=neutral": {
+      "level": 5,
+      "beats": 3
+    },
+    "level=5|dwell=1|cap=2|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=3|intent=cool": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=3|intent=heat": {
+      "level": 5,
+      "beats": 3
+    },
+    "level=5|dwell=1|cap=3|intent=neutral": {
+      "level": 5,
+      "beats": 3
+    },
+    "level=5|dwell=1|cap=3|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=4|intent=cool": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=4|intent=heat": {
+      "level": 5,
+      "beats": 3
+    },
+    "level=5|dwell=1|cap=4|intent=neutral": {
+      "level": 5,
+      "beats": 3
+    },
+    "level=5|dwell=1|cap=4|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=5|intent=cool": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=5|intent=heat": {
+      "level": 5,
+      "beats": 3
+    },
+    "level=5|dwell=1|cap=5|intent=neutral": {
+      "level": 5,
+      "beats": 3
+    },
+    "level=5|dwell=1|cap=5|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=6|intent=cool": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=6|intent=heat": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=6|intent=neutral": {
+      "level": 5,
+      "beats": 3
+    },
+    "level=5|dwell=1|cap=6|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=7|intent=cool": {
+      "level": 4,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=7|intent=heat": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=5|dwell=1|cap=7|intent=neutral": {
+      "level": 5,
+      "beats": 3
+    },
+    "level=5|dwell=1|cap=7|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=6|dwell=0|cap=0|intent=cool": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=6|dwell=0|cap=0|intent=heat": {
+      "level": 6,
+      "beats": 1
+    },
+    "level=6|dwell=0|cap=0|intent=neutral": {
+      "level": 6,
+      "beats": 1
+    },
+    "level=6|dwell=0|cap=0|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=6|dwell=0|cap=1|intent=cool": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=6|dwell=0|cap=1|intent=heat": {
+      "level": 6,
+      "beats": 1
+    },
+    "level=6|dwell=0|cap=1|intent=neutral": {
+      "level": 6,
+      "beats": 1
+    },
+    "level=6|dwell=0|cap=1|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=6|dwell=0|cap=2|intent=cool": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=6|dwell=0|cap=2|intent=heat": {
+      "level": 6,
+      "beats": 1
+    },
+    "level=6|dwell=0|cap=2|intent=neutral": {
+      "level": 6,
+      "beats": 1
+    },
+    "level=6|dwell=0|cap=2|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=6|dwell=0|cap=3|intent=cool": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=6|dwell=0|cap=3|intent=heat": {
+      "level": 6,
+      "beats": 1
+    },
+    "level=6|dwell=0|cap=3|intent=neutral": {
+      "level": 6,
+      "beats": 1
+    },
+    "level=6|dwell=0|cap=3|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=6|dwell=0|cap=4|intent=cool": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=6|dwell=0|cap=4|intent=heat": {
+      "level": 6,
+      "beats": 1
+    },
+    "level=6|dwell=0|cap=4|intent=neutral": {
+      "level": 6,
+      "beats": 1
+    },
+    "level=6|dwell=0|cap=4|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=6|dwell=0|cap=5|intent=cool": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=6|dwell=0|cap=5|intent=heat": {
+      "level": 6,
+      "beats": 1
+    },
+    "level=6|dwell=0|cap=5|intent=neutral": {
+      "level": 6,
+      "beats": 1
+    },
+    "level=6|dwell=0|cap=5|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=6|dwell=0|cap=6|intent=cool": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=6|dwell=0|cap=6|intent=heat": {
+      "level": 6,
+      "beats": 1
+    },
+    "level=6|dwell=0|cap=6|intent=neutral": {
+      "level": 6,
+      "beats": 1
+    },
+    "level=6|dwell=0|cap=6|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=6|dwell=0|cap=7|intent=cool": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=6|dwell=0|cap=7|intent=heat": {
+      "level": 6,
+      "beats": 1
+    },
+    "level=6|dwell=0|cap=7|intent=neutral": {
+      "level": 6,
+      "beats": 1
+    },
+    "level=6|dwell=0|cap=7|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=6|dwell=1|cap=0|intent=cool": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=6|dwell=1|cap=0|intent=heat": {
+      "level": 6,
+      "beats": 3
+    },
+    "level=6|dwell=1|cap=0|intent=neutral": {
+      "level": 6,
+      "beats": 3
+    },
+    "level=6|dwell=1|cap=0|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=6|dwell=1|cap=1|intent=cool": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=6|dwell=1|cap=1|intent=heat": {
+      "level": 6,
+      "beats": 3
+    },
+    "level=6|dwell=1|cap=1|intent=neutral": {
+      "level": 6,
+      "beats": 3
+    },
+    "level=6|dwell=1|cap=1|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=6|dwell=1|cap=2|intent=cool": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=6|dwell=1|cap=2|intent=heat": {
+      "level": 6,
+      "beats": 3
+    },
+    "level=6|dwell=1|cap=2|intent=neutral": {
+      "level": 6,
+      "beats": 3
+    },
+    "level=6|dwell=1|cap=2|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=6|dwell=1|cap=3|intent=cool": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=6|dwell=1|cap=3|intent=heat": {
+      "level": 6,
+      "beats": 3
+    },
+    "level=6|dwell=1|cap=3|intent=neutral": {
+      "level": 6,
+      "beats": 3
+    },
+    "level=6|dwell=1|cap=3|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=6|dwell=1|cap=4|intent=cool": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=6|dwell=1|cap=4|intent=heat": {
+      "level": 6,
+      "beats": 3
+    },
+    "level=6|dwell=1|cap=4|intent=neutral": {
+      "level": 6,
+      "beats": 3
+    },
+    "level=6|dwell=1|cap=4|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=6|dwell=1|cap=5|intent=cool": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=6|dwell=1|cap=5|intent=heat": {
+      "level": 6,
+      "beats": 3
+    },
+    "level=6|dwell=1|cap=5|intent=neutral": {
+      "level": 6,
+      "beats": 3
+    },
+    "level=6|dwell=1|cap=5|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=6|dwell=1|cap=6|intent=cool": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=6|dwell=1|cap=6|intent=heat": {
+      "level": 6,
+      "beats": 3
+    },
+    "level=6|dwell=1|cap=6|intent=neutral": {
+      "level": 6,
+      "beats": 3
+    },
+    "level=6|dwell=1|cap=6|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=6|dwell=1|cap=7|intent=cool": {
+      "level": 5,
+      "beats": 0
+    },
+    "level=6|dwell=1|cap=7|intent=heat": {
+      "level": 7,
+      "beats": 0
+    },
+    "level=6|dwell=1|cap=7|intent=neutral": {
+      "level": 6,
+      "beats": 3
+    },
+    "level=6|dwell=1|cap=7|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=7|dwell=0|cap=0|intent=cool": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=7|dwell=0|cap=0|intent=heat": {
+      "level": 7,
+      "beats": 1
+    },
+    "level=7|dwell=0|cap=0|intent=neutral": {
+      "level": 7,
+      "beats": 1
+    },
+    "level=7|dwell=0|cap=0|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=7|dwell=0|cap=1|intent=cool": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=7|dwell=0|cap=1|intent=heat": {
+      "level": 7,
+      "beats": 1
+    },
+    "level=7|dwell=0|cap=1|intent=neutral": {
+      "level": 7,
+      "beats": 1
+    },
+    "level=7|dwell=0|cap=1|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=7|dwell=0|cap=2|intent=cool": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=7|dwell=0|cap=2|intent=heat": {
+      "level": 7,
+      "beats": 1
+    },
+    "level=7|dwell=0|cap=2|intent=neutral": {
+      "level": 7,
+      "beats": 1
+    },
+    "level=7|dwell=0|cap=2|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=7|dwell=0|cap=3|intent=cool": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=7|dwell=0|cap=3|intent=heat": {
+      "level": 7,
+      "beats": 1
+    },
+    "level=7|dwell=0|cap=3|intent=neutral": {
+      "level": 7,
+      "beats": 1
+    },
+    "level=7|dwell=0|cap=3|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=7|dwell=0|cap=4|intent=cool": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=7|dwell=0|cap=4|intent=heat": {
+      "level": 7,
+      "beats": 1
+    },
+    "level=7|dwell=0|cap=4|intent=neutral": {
+      "level": 7,
+      "beats": 1
+    },
+    "level=7|dwell=0|cap=4|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=7|dwell=0|cap=5|intent=cool": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=7|dwell=0|cap=5|intent=heat": {
+      "level": 7,
+      "beats": 1
+    },
+    "level=7|dwell=0|cap=5|intent=neutral": {
+      "level": 7,
+      "beats": 1
+    },
+    "level=7|dwell=0|cap=5|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=7|dwell=0|cap=6|intent=cool": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=7|dwell=0|cap=6|intent=heat": {
+      "level": 7,
+      "beats": 1
+    },
+    "level=7|dwell=0|cap=6|intent=neutral": {
+      "level": 7,
+      "beats": 1
+    },
+    "level=7|dwell=0|cap=6|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=7|dwell=0|cap=7|intent=cool": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=7|dwell=0|cap=7|intent=heat": {
+      "level": 7,
+      "beats": 1
+    },
+    "level=7|dwell=0|cap=7|intent=neutral": {
+      "level": 7,
+      "beats": 1
+    },
+    "level=7|dwell=0|cap=7|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=7|dwell=1|cap=0|intent=cool": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=7|dwell=1|cap=0|intent=heat": {
+      "level": 7,
+      "beats": 100
+    },
+    "level=7|dwell=1|cap=0|intent=neutral": {
+      "level": 7,
+      "beats": 100
+    },
+    "level=7|dwell=1|cap=0|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=7|dwell=1|cap=1|intent=cool": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=7|dwell=1|cap=1|intent=heat": {
+      "level": 7,
+      "beats": 100
+    },
+    "level=7|dwell=1|cap=1|intent=neutral": {
+      "level": 7,
+      "beats": 100
+    },
+    "level=7|dwell=1|cap=1|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=7|dwell=1|cap=2|intent=cool": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=7|dwell=1|cap=2|intent=heat": {
+      "level": 7,
+      "beats": 100
+    },
+    "level=7|dwell=1|cap=2|intent=neutral": {
+      "level": 7,
+      "beats": 100
+    },
+    "level=7|dwell=1|cap=2|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=7|dwell=1|cap=3|intent=cool": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=7|dwell=1|cap=3|intent=heat": {
+      "level": 7,
+      "beats": 100
+    },
+    "level=7|dwell=1|cap=3|intent=neutral": {
+      "level": 7,
+      "beats": 100
+    },
+    "level=7|dwell=1|cap=3|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=7|dwell=1|cap=4|intent=cool": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=7|dwell=1|cap=4|intent=heat": {
+      "level": 7,
+      "beats": 100
+    },
+    "level=7|dwell=1|cap=4|intent=neutral": {
+      "level": 7,
+      "beats": 100
+    },
+    "level=7|dwell=1|cap=4|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=7|dwell=1|cap=5|intent=cool": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=7|dwell=1|cap=5|intent=heat": {
+      "level": 7,
+      "beats": 100
+    },
+    "level=7|dwell=1|cap=5|intent=neutral": {
+      "level": 7,
+      "beats": 100
+    },
+    "level=7|dwell=1|cap=5|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=7|dwell=1|cap=6|intent=cool": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=7|dwell=1|cap=6|intent=heat": {
+      "level": 7,
+      "beats": 100
+    },
+    "level=7|dwell=1|cap=6|intent=neutral": {
+      "level": 7,
+      "beats": 100
+    },
+    "level=7|dwell=1|cap=6|intent=stop": {
+      "level": 0,
+      "beats": 0
+    },
+    "level=7|dwell=1|cap=7|intent=cool": {
+      "level": 6,
+      "beats": 0
+    },
+    "level=7|dwell=1|cap=7|intent=heat": {
+      "level": 7,
+      "beats": 100
+    },
+    "level=7|dwell=1|cap=7|intent=neutral": {
+      "level": 7,
+      "beats": 100
+    },
+    "level=7|dwell=1|cap=7|intent=stop": {
+      "level": 0,
+      "beats": 0
+    }
+  }
+}

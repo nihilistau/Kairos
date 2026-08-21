@@ -1,0 +1,19 @@
+var/
+persona/
+persona.md
+persona.md.bak-*
+memory-okf*/
+_task_state/
+__pycache__/
+*.pyc
+ui/node_modules/
+# session scratch lives at the ROOT only — an unanchored `_*.py` would also swallow every
+# harness/**/__init__.py and harness_tests/_gate.py (it did, once: 2026-08-21)
+/_*.py
+/_*.log
+/_*.err
+/_*.out
+/_*.ps1
+!harness_tests/_gate.py
+*.7z
+.env

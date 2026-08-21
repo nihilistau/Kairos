@@ -1,0 +1,88 @@
+{
+  "_readme": [
+    "WHAT THE SERVED MODEL CAN ACTUALLY RECEIVE. A COMMITTED TABLE, NOT AN INFERENCE.",
+    "",
+    "Keyed by the STEM of paths.model in the profile (e.g. '.../your model.sp-model'",
+    "-> 'your model'). harness/senses/capability.py rules from this file and from",
+    "nothing else: a model that is not listed here has NO senses, full stop. That is",
+    "deliberate and it is the whole point of the file.",
+    "",
+    "WHY THIS EXISTS. On 2026-07-31 the audio path was found injecting 3840-wide frames",
+    "into a 2816-wide model. var/voice/embed_audio.npz was extracted from gemma4-12b",
+    "(E=3840); the served your model has E=2816 and its config.json carries",
+    "audio_config: null - it has no audio embedder at all. Neither side checked:",
+    "native.py never compared E, and routes.rs only verified the frames were",
+    "self-consistent ('each must be E floats' - but E was taken from frames[0].len()).",
+    "A model swap silently moved the hidden dim and the sense kept its old weights.",
+    "",
+    "'e' MUST match the served model's hidden size. Every encoder asserts against it",
+    "before returning a single frame, and an encoder whose projection disagrees",
+    "refuses rather than injects. Fail closed: no sense is better than a false one.",
+    "",
+    "Token ids are from the model's own config.json, never guessed."
+  ],
+  "models": {
+    "your model": {
+      "source": "C:/Files/Models/Models/gemma-4-26b-a4b-it-qat-GGUF/config.json",
+      "e": 2816,
+      "audio": null,
+      "audio_absent_reason": "config.json audio_config is null and the GGUF ships no audio tensors; mmproj-BF16.gguf is 355 v.* + 1 mm.*, vision only. This model cannot hear. Verified 2026-07-31.",
+      "vision": {
+        "kind": "vit_mmproj",
+        "mmproj": "C:/Files/Models/Models/gemma-4-26b-a4b-it-qat-GGUF/mmproj-BF16.gguf",
+        "image_token": 258880,
+        "boi_token": 255999,
+        "eoi_token": 258882,
+        "soft_tokens_per_image": 280,
+        "layers": 27,
+        "hidden": 1152,
+        "heads": 16,
+        "head_dim": 72,
+        "intermediate": 4304,
+        "patch": 16,
+        "activation": "gelu_pytorch_tanh",
+        "rms_norm_eps": 1e-06,
+        "proj_out": 2816,
+        "pooling_kernel": 3,
+        "standardize": true,
+        "input_hw": [
+          672,
+          960
+        ],
+        "rope_theta": 100.0,
+        "verified": "2026-07-31: 6/6 permuted-colour discrimination, live"
+      }
+    },
+    "gemma4-12b": {
+      "source": "D:/Files/Models/Gemma4/gemma-4-12b-bucket",
+      "e": 3840,
+      "audio": {
+        "kind": "encoder_free",
+        "proj_npz": "var/voice/embed_audio.npz",
+        "audio_token": 258881,
+        "boa_token": 256000,
+        "eoa_token": 258883,
+        "samples_per_token": 640,
+        "sample_rate": 16000
+      },
+      "vision": {
+        "kind": "patch_dense",
+        "image_token": 258880,
+        "boi_token": 255999,
+        "eoi_token": 258882,
+        "soft_tokens_per_image": 280,
+        "patch": 16,
+        "model_patch": 48,
+        "pooling_kernel": 3,
+        "posemb_size": 1120,
+        "proj_out": 3840
+      }
+    },
+    "gemma4-12b-b1-reason": {
+      "alias_of": "gemma4-12b"
+    },
+    "gemma4-12b-q4b": {
+      "alias_of": "gemma4-12b"
+    }
+  }
+}
