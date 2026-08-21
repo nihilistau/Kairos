@@ -1,0 +1,62 @@
+{
+  "_readme": [
+    "EXTERNAL MCP SERVERS the served model can call. Read by harness/mcp_server/bridge.py.",
+    "",
+    "WHAT DOES NOT BELONG HERE: this repo's OWN server (`python -m harness.mcp_server`).",
+    "It was the only entry until 2026-07-31 and it was a LOOP \u2014 it exposes the same",
+    "harness skills she already has natively, so 9 of its 10 tools were shadowed and",
+    "skipped, and the net gain was `disk_free`, an EXAMPLE function in a file whose",
+    "docstring literally says 'Example:'. Two and a quarter seconds per call to reach a",
+    "five-line helper she could already have written in run_python.",
+    "",
+    "harness/mcp_server IS STILL WORTH HAVING \u2014 it just points the other way. It is the",
+    "OUTBOUND surface: how Claude Code, LM Studio, or any MCP client reaches HER memory",
+    "and skills. See MCP-README.md. The gate fixture that still needs a self-connection",
+    "lives at fixtures/mcp/selftest.json.",
+    "",
+    "Per-server keys: `allow` (whitelist), `deny` (blacklist), `env`, `cwd`. A bridged",
+    "tool whose name a native tool owns is NAMESPACED to <server>_<name>, never dropped."
+  ],
+  "servers": {
+    "browser": {
+      "_why": [
+        "A REAL browser, which is the one thing her web tools could not do. web_search",
+        "and web_fetch READ a page; this one can open it, click, fill a form, and see",
+        "what came back. --headless --isolated means it needs no pre-running Chrome and",
+        "leaves no profile behind.",
+        "",
+        "TELEMETRY OFF, DELIBERATELY. chrome-devtools-mcp sends usage statistics to",
+        "Google, and trace URLs to the CrUX API, BY DEFAULT. This is his machine and her",
+        "browsing; neither flag is a preference.",
+        "",
+        "`allow` keeps 7 of its 29 tools. The rest are lighthouse audits, performance",
+        "traces and heap snapshots \u2014 real tools, just not ones she has any use for, and",
+        "every entry in the load-on-demand index costs prompt budget whether she ever",
+        "calls it or not.",
+        "",
+        "take_screenshot collides with her native sight tool, so it arrives as",
+        "browser_take_screenshot. Native keeps the bare name."
+      ],
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--headless",
+        "--isolated",
+        "--no-usage-statistics",
+        "--no-performance-crux"
+      ],
+      "allow": [
+        "navigate_page",
+        "take_snapshot",
+        "take_screenshot",
+        "click",
+        "fill",
+        "new_page",
+        "list_pages"
+      ],
+      "group": "browser",
+      "risk": "world"
+    }
+  }
+}

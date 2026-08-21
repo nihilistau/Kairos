@@ -1,0 +1,1110 @@
+{
+  "actors": [
+    "self",
+    "operator",
+    "system"
+  ],
+  "cells": {
+    "closed|close|by=operator|owner=operator": {
+      "reason": "refused: already closed",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|close|by=operator|owner=self": {
+      "reason": "refused: already closed",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|close|by=self|owner=operator": {
+      "reason": "refused: already closed",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|close|by=self|owner=self": {
+      "reason": "refused: already closed",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|close|by=system|owner=operator": {
+      "reason": "refused: already closed",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|close|by=system|owner=self": {
+      "reason": "refused: already closed",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|exhaust|by=operator|owner=operator": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|exhaust|by=operator|owner=self": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|exhaust|by=self|owner=operator": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|exhaust|by=self|owner=self": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|exhaust|by=system|owner=operator": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|exhaust|by=system|owner=self": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|fail|by=operator|owner=operator": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|fail|by=operator|owner=self": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|fail|by=self|owner=operator": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|fail|by=self|owner=self": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|fail|by=system|owner=operator": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|fail|by=system|owner=self": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|reopen|by=operator|owner=operator": {
+      "reason": "reopened by operator",
+      "refused": false,
+      "status": "pending"
+    },
+    "closed|reopen|by=operator|owner=self": {
+      "reason": "reopened by operator",
+      "refused": false,
+      "status": "pending"
+    },
+    "closed|reopen|by=self|owner=operator": {
+      "reason": "refused: self may not reopen a closed task",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|reopen|by=self|owner=self": {
+      "reason": "refused: self may not reopen a closed task",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|reopen|by=system|owner=operator": {
+      "reason": "refused: system may not reopen a closed task",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|reopen|by=system|owner=self": {
+      "reason": "refused: system may not reopen a closed task",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|start|by=operator|owner=operator": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|start|by=operator|owner=self": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|start|by=self|owner=operator": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|start|by=self|owner=self": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|start|by=system|owner=operator": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|start|by=system|owner=self": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|succeed|by=operator|owner=operator": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|succeed|by=operator|owner=self": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|succeed|by=self|owner=operator": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|succeed|by=self|owner=self": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|succeed|by=system|owner=operator": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "closed|succeed|by=system|owner=self": {
+      "reason": "refused: closed is terminal",
+      "refused": true,
+      "status": "closed"
+    },
+    "done|close|by=operator|owner=operator": {
+      "reason": "refused: already done",
+      "refused": true,
+      "status": "done"
+    },
+    "done|close|by=operator|owner=self": {
+      "reason": "refused: already done",
+      "refused": true,
+      "status": "done"
+    },
+    "done|close|by=self|owner=operator": {
+      "reason": "refused: already done",
+      "refused": true,
+      "status": "done"
+    },
+    "done|close|by=self|owner=self": {
+      "reason": "refused: already done",
+      "refused": true,
+      "status": "done"
+    },
+    "done|close|by=system|owner=operator": {
+      "reason": "refused: already done",
+      "refused": true,
+      "status": "done"
+    },
+    "done|close|by=system|owner=self": {
+      "reason": "refused: already done",
+      "refused": true,
+      "status": "done"
+    },
+    "done|exhaust|by=operator|owner=operator": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|exhaust|by=operator|owner=self": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|exhaust|by=self|owner=operator": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|exhaust|by=self|owner=self": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|exhaust|by=system|owner=operator": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|exhaust|by=system|owner=self": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|fail|by=operator|owner=operator": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|fail|by=operator|owner=self": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|fail|by=self|owner=operator": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|fail|by=self|owner=self": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|fail|by=system|owner=operator": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|fail|by=system|owner=self": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|reopen|by=operator|owner=operator": {
+      "reason": "refused: operator may not reopen a done task",
+      "refused": true,
+      "status": "done"
+    },
+    "done|reopen|by=operator|owner=self": {
+      "reason": "refused: operator may not reopen a done task",
+      "refused": true,
+      "status": "done"
+    },
+    "done|reopen|by=self|owner=operator": {
+      "reason": "refused: self may not reopen a done task",
+      "refused": true,
+      "status": "done"
+    },
+    "done|reopen|by=self|owner=self": {
+      "reason": "refused: self may not reopen a done task",
+      "refused": true,
+      "status": "done"
+    },
+    "done|reopen|by=system|owner=operator": {
+      "reason": "refused: system may not reopen a done task",
+      "refused": true,
+      "status": "done"
+    },
+    "done|reopen|by=system|owner=self": {
+      "reason": "refused: system may not reopen a done task",
+      "refused": true,
+      "status": "done"
+    },
+    "done|start|by=operator|owner=operator": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|start|by=operator|owner=self": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|start|by=self|owner=operator": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|start|by=self|owner=self": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|start|by=system|owner=operator": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|start|by=system|owner=self": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|succeed|by=operator|owner=operator": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|succeed|by=operator|owner=self": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|succeed|by=self|owner=operator": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|succeed|by=self|owner=self": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|succeed|by=system|owner=operator": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "done|succeed|by=system|owner=self": {
+      "reason": "refused: done is terminal",
+      "refused": true,
+      "status": "done"
+    },
+    "exhausted|close|by=operator|owner=operator": {
+      "reason": "refused: already exhausted",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|close|by=operator|owner=self": {
+      "reason": "refused: already exhausted",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|close|by=self|owner=operator": {
+      "reason": "refused: already exhausted",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|close|by=self|owner=self": {
+      "reason": "refused: already exhausted",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|close|by=system|owner=operator": {
+      "reason": "refused: already exhausted",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|close|by=system|owner=self": {
+      "reason": "refused: already exhausted",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|exhaust|by=operator|owner=operator": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|exhaust|by=operator|owner=self": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|exhaust|by=self|owner=operator": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|exhaust|by=self|owner=self": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|exhaust|by=system|owner=operator": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|exhaust|by=system|owner=self": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|fail|by=operator|owner=operator": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|fail|by=operator|owner=self": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|fail|by=self|owner=operator": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|fail|by=self|owner=self": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|fail|by=system|owner=operator": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|fail|by=system|owner=self": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|reopen|by=operator|owner=operator": {
+      "reason": "reopened by operator",
+      "refused": false,
+      "status": "pending"
+    },
+    "exhausted|reopen|by=operator|owner=self": {
+      "reason": "reopened by operator",
+      "refused": false,
+      "status": "pending"
+    },
+    "exhausted|reopen|by=self|owner=operator": {
+      "reason": "refused: self may not reopen a exhausted task",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|reopen|by=self|owner=self": {
+      "reason": "refused: self may not reopen a exhausted task",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|reopen|by=system|owner=operator": {
+      "reason": "refused: system may not reopen a exhausted task",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|reopen|by=system|owner=self": {
+      "reason": "refused: system may not reopen a exhausted task",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|start|by=operator|owner=operator": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|start|by=operator|owner=self": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|start|by=self|owner=operator": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|start|by=self|owner=self": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|start|by=system|owner=operator": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|start|by=system|owner=self": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|succeed|by=operator|owner=operator": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|succeed|by=operator|owner=self": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|succeed|by=self|owner=operator": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|succeed|by=self|owner=self": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|succeed|by=system|owner=operator": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "exhausted|succeed|by=system|owner=self": {
+      "reason": "refused: exhausted is terminal",
+      "refused": true,
+      "status": "exhausted"
+    },
+    "failed|close|by=operator|owner=operator": {
+      "reason": "refused: already failed",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|close|by=operator|owner=self": {
+      "reason": "refused: already failed",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|close|by=self|owner=operator": {
+      "reason": "refused: already failed",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|close|by=self|owner=self": {
+      "reason": "refused: already failed",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|close|by=system|owner=operator": {
+      "reason": "refused: already failed",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|close|by=system|owner=self": {
+      "reason": "refused: already failed",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|exhaust|by=operator|owner=operator": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|exhaust|by=operator|owner=self": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|exhaust|by=self|owner=operator": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|exhaust|by=self|owner=self": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|exhaust|by=system|owner=operator": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|exhaust|by=system|owner=self": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|fail|by=operator|owner=operator": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|fail|by=operator|owner=self": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|fail|by=self|owner=operator": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|fail|by=self|owner=self": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|fail|by=system|owner=operator": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|fail|by=system|owner=self": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|reopen|by=operator|owner=operator": {
+      "reason": "reopened by operator",
+      "refused": false,
+      "status": "pending"
+    },
+    "failed|reopen|by=operator|owner=self": {
+      "reason": "reopened by operator",
+      "refused": false,
+      "status": "pending"
+    },
+    "failed|reopen|by=self|owner=operator": {
+      "reason": "refused: self may not reopen a failed task",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|reopen|by=self|owner=self": {
+      "reason": "refused: self may not reopen a failed task",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|reopen|by=system|owner=operator": {
+      "reason": "refused: system may not reopen a failed task",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|reopen|by=system|owner=self": {
+      "reason": "refused: system may not reopen a failed task",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|start|by=operator|owner=operator": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|start|by=operator|owner=self": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|start|by=self|owner=operator": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|start|by=self|owner=self": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|start|by=system|owner=operator": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|start|by=system|owner=self": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|succeed|by=operator|owner=operator": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|succeed|by=operator|owner=self": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|succeed|by=self|owner=operator": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|succeed|by=self|owner=self": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|succeed|by=system|owner=operator": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "failed|succeed|by=system|owner=self": {
+      "reason": "refused: failed is terminal",
+      "refused": true,
+      "status": "failed"
+    },
+    "pending|close|by=operator|owner=operator": {
+      "reason": "closed by operator",
+      "refused": false,
+      "status": "closed"
+    },
+    "pending|close|by=operator|owner=self": {
+      "reason": "closed by operator",
+      "refused": false,
+      "status": "closed"
+    },
+    "pending|close|by=self|owner=operator": {
+      "reason": "refused: self may not close a task owned by operator",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|close|by=self|owner=self": {
+      "reason": "closed by self",
+      "refused": false,
+      "status": "closed"
+    },
+    "pending|close|by=system|owner=operator": {
+      "reason": "refused: system may not close a task owned by operator",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|close|by=system|owner=self": {
+      "reason": "refused: system may not close a task owned by self",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|exhaust|by=operator|owner=operator": {
+      "reason": "refused: exhaust may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|exhaust|by=operator|owner=self": {
+      "reason": "refused: exhaust may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|exhaust|by=self|owner=operator": {
+      "reason": "refused: exhaust may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|exhaust|by=self|owner=self": {
+      "reason": "refused: exhaust may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|exhaust|by=system|owner=operator": {
+      "reason": "refused: exhaust may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|exhaust|by=system|owner=self": {
+      "reason": "refused: exhaust may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|fail|by=operator|owner=operator": {
+      "reason": "refused: fail may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|fail|by=operator|owner=self": {
+      "reason": "refused: fail may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|fail|by=self|owner=operator": {
+      "reason": "refused: fail may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|fail|by=self|owner=self": {
+      "reason": "refused: fail may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|fail|by=system|owner=operator": {
+      "reason": "refused: fail may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|fail|by=system|owner=self": {
+      "reason": "refused: fail may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|reopen|by=operator|owner=operator": {
+      "reason": "refused: operator may not reopen a pending task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|reopen|by=operator|owner=self": {
+      "reason": "refused: operator may not reopen a pending task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|reopen|by=self|owner=operator": {
+      "reason": "refused: self may not reopen a pending task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|reopen|by=self|owner=self": {
+      "reason": "refused: self may not reopen a pending task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|reopen|by=system|owner=operator": {
+      "reason": "refused: system may not reopen a pending task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|reopen|by=system|owner=self": {
+      "reason": "refused: system may not reopen a pending task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|start|by=operator|owner=operator": {
+      "reason": "started by operator",
+      "refused": false,
+      "status": "running"
+    },
+    "pending|start|by=operator|owner=self": {
+      "reason": "started by operator",
+      "refused": false,
+      "status": "running"
+    },
+    "pending|start|by=self|owner=operator": {
+      "reason": "started by self",
+      "refused": false,
+      "status": "running"
+    },
+    "pending|start|by=self|owner=self": {
+      "reason": "started by self",
+      "refused": false,
+      "status": "running"
+    },
+    "pending|start|by=system|owner=operator": {
+      "reason": "started by system",
+      "refused": false,
+      "status": "running"
+    },
+    "pending|start|by=system|owner=self": {
+      "reason": "started by system",
+      "refused": false,
+      "status": "running"
+    },
+    "pending|succeed|by=operator|owner=operator": {
+      "reason": "refused: succeed may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|succeed|by=operator|owner=self": {
+      "reason": "refused: succeed may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|succeed|by=self|owner=operator": {
+      "reason": "refused: succeed may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|succeed|by=self|owner=self": {
+      "reason": "refused: succeed may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|succeed|by=system|owner=operator": {
+      "reason": "refused: succeed may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "pending|succeed|by=system|owner=self": {
+      "reason": "refused: succeed may only be reported for a running task",
+      "refused": true,
+      "status": "pending"
+    },
+    "running|close|by=operator|owner=operator": {
+      "reason": "closed by operator",
+      "refused": false,
+      "status": "closed"
+    },
+    "running|close|by=operator|owner=self": {
+      "reason": "closed by operator",
+      "refused": false,
+      "status": "closed"
+    },
+    "running|close|by=self|owner=operator": {
+      "reason": "refused: self may not close a task owned by operator",
+      "refused": true,
+      "status": "running"
+    },
+    "running|close|by=self|owner=self": {
+      "reason": "closed by self",
+      "refused": false,
+      "status": "closed"
+    },
+    "running|close|by=system|owner=operator": {
+      "reason": "refused: system may not close a task owned by operator",
+      "refused": true,
+      "status": "running"
+    },
+    "running|close|by=system|owner=self": {
+      "reason": "refused: system may not close a task owned by self",
+      "refused": true,
+      "status": "running"
+    },
+    "running|exhaust|by=operator|owner=operator": {
+      "reason": "exhaust reported by operator",
+      "refused": false,
+      "status": "exhausted"
+    },
+    "running|exhaust|by=operator|owner=self": {
+      "reason": "exhaust reported by operator",
+      "refused": false,
+      "status": "exhausted"
+    },
+    "running|exhaust|by=self|owner=operator": {
+      "reason": "exhaust reported by self",
+      "refused": false,
+      "status": "exhausted"
+    },
+    "running|exhaust|by=self|owner=self": {
+      "reason": "exhaust reported by self",
+      "refused": false,
+      "status": "exhausted"
+    },
+    "running|exhaust|by=system|owner=operator": {
+      "reason": "exhaust reported by system",
+      "refused": false,
+      "status": "exhausted"
+    },
+    "running|exhaust|by=system|owner=self": {
+      "reason": "exhaust reported by system",
+      "refused": false,
+      "status": "exhausted"
+    },
+    "running|fail|by=operator|owner=operator": {
+      "reason": "fail reported by operator",
+      "refused": false,
+      "status": "failed"
+    },
+    "running|fail|by=operator|owner=self": {
+      "reason": "fail reported by operator",
+      "refused": false,
+      "status": "failed"
+    },
+    "running|fail|by=self|owner=operator": {
+      "reason": "fail reported by self",
+      "refused": false,
+      "status": "failed"
+    },
+    "running|fail|by=self|owner=self": {
+      "reason": "fail reported by self",
+      "refused": false,
+      "status": "failed"
+    },
+    "running|fail|by=system|owner=operator": {
+      "reason": "fail reported by system",
+      "refused": false,
+      "status": "failed"
+    },
+    "running|fail|by=system|owner=self": {
+      "reason": "fail reported by system",
+      "refused": false,
+      "status": "failed"
+    },
+    "running|reopen|by=operator|owner=operator": {
+      "reason": "refused: operator may not reopen a running task",
+      "refused": true,
+      "status": "running"
+    },
+    "running|reopen|by=operator|owner=self": {
+      "reason": "refused: operator may not reopen a running task",
+      "refused": true,
+      "status": "running"
+    },
+    "running|reopen|by=self|owner=operator": {
+      "reason": "refused: self may not reopen a running task",
+      "refused": true,
+      "status": "running"
+    },
+    "running|reopen|by=self|owner=self": {
+      "reason": "refused: self may not reopen a running task",
+      "refused": true,
+      "status": "running"
+    },
+    "running|reopen|by=system|owner=operator": {
+      "reason": "refused: system may not reopen a running task",
+      "refused": true,
+      "status": "running"
+    },
+    "running|reopen|by=system|owner=self": {
+      "reason": "refused: system may not reopen a running task",
+      "refused": true,
+      "status": "running"
+    },
+    "running|start|by=operator|owner=operator": {
+      "reason": "refused: only a pending task may start",
+      "refused": true,
+      "status": "running"
+    },
+    "running|start|by=operator|owner=self": {
+      "reason": "refused: only a pending task may start",
+      "refused": true,
+      "status": "running"
+    },
+    "running|start|by=self|owner=operator": {
+      "reason": "refused: only a pending task may start",
+      "refused": true,
+      "status": "running"
+    },
+    "running|start|by=self|owner=self": {
+      "reason": "refused: only a pending task may start",
+      "refused": true,
+      "status": "running"
+    },
+    "running|start|by=system|owner=operator": {
+      "reason": "refused: only a pending task may start",
+      "refused": true,
+      "status": "running"
+    },
+    "running|start|by=system|owner=self": {
+      "reason": "refused: only a pending task may start",
+      "refused": true,
+      "status": "running"
+    },
+    "running|succeed|by=operator|owner=operator": {
+      "reason": "succeed reported by operator",
+      "refused": false,
+      "status": "done"
+    },
+    "running|succeed|by=operator|owner=self": {
+      "reason": "succeed reported by operator",
+      "refused": false,
+      "status": "done"
+    },
+    "running|succeed|by=self|owner=operator": {
+      "reason": "succeed reported by self",
+      "refused": false,
+      "status": "done"
+    },
+    "running|succeed|by=self|owner=self": {
+      "reason": "succeed reported by self",
+      "refused": false,
+      "status": "done"
+    },
+    "running|succeed|by=system|owner=operator": {
+      "reason": "succeed reported by system",
+      "refused": false,
+      "status": "done"
+    },
+    "running|succeed|by=system|owner=self": {
+      "reason": "succeed reported by system",
+      "refused": false,
+      "status": "done"
+    }
+  },
+  "events": [
+    "start",
+    "succeed",
+    "fail",
+    "exhaust",
+    "close",
+    "reopen"
+  ],
+  "generated": "2026-07-30T01:05:04Z",
+  "owners": [
+    "self",
+    "operator"
+  ],
+  "states": [
+    "pending",
+    "running",
+    "done",
+    "failed",
+    "exhausted",
+    "closed"
+  ]
+}
