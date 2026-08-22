@@ -13,6 +13,7 @@ import Senses from './apps/Senses.jsx'
 import Tools from './apps/Tools.jsx'
 import Board from './apps/Board.jsx'
 import Memory from './apps/Memory.jsx'
+import Decisions from './apps/Decisions.jsx'
 import Room from './apps/Room.jsx'
 import Presence from './apps/Presence.jsx'
 import Librarians from './apps/Librarians.jsx'   // not Aux.jsx: 'aux' is a Windows reserved device name
@@ -74,8 +75,10 @@ export const APPS = [
     blurb: 'every tool she has, by family and by risk' },
   { id: 'board',  title: 'board',   icon: '📋', w: 560, h: 440, Component: Board, css: 'bd',
     blurb: 'notes, reminders, things either of you wants kept in view' },
-  { id: 'memory', title: 'memory',  icon: '🧠', w: 640, h: 480, Component: Memory, css: 'mem',
-    blurb: 'what she knows — live rows and retired ones' },
+  { id: 'memory', title: 'memory',  icon: '🧠', w: 700, h: 560, Component: Memory, css: 'mem',
+    blurb: 'what she knows — live rows and retired ones, and re-filing them' },
+  { id: 'decisions', title: 'decisions', icon: '⚖', w: 620, h: 540, Component: Decisions, css: 'dec',
+    blurb: 'what is waiting on you' },
   { id: 'music',  title: 'music',   icon: '♪', w: 560, h: 520, Component: Music, css: 'mus',
     dock: false, TitleChip: MusicChip,
     blurb: 'the record player — hers to reach for too' },

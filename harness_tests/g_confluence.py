@@ -236,13 +236,23 @@ check("the slot holds exactly one gpu row in every order",
 check("...and as a CLAIM it is the same thing every time",
       len({c for _s, _o, r in runs for c in r["live"] if c.startswith("my gpu")}) == 1,
       sorted({c for _s, _o, r in runs for c in r["live"] if c.startswith("my gpu")}))
-check("NON-DEMAND: which SPELLING of one claim survives is decided by arrival order",
+# THE MECHANISM, NAMED CORRECTLY (2026-08-23, second look). The first version of this
+# note said the two spellings "fill the same slot, so one supersedes the other". They do
+# not. Measured on the real writer: one row, mentions=2, lifecycle=0 - NOTHING is retired.
+# _overlap is 1.0 both ways and value_of() is identical, so DEDUP fires first and keeps
+# THE ONE THAT ARRIVED FIRST, reinforcing it. The claim, the count and the liveness are
+# all order-independent; only the stored SPELLING is not.
+check("dedup merged them - one row, nothing retired (this is NOT supersession)",
+      all(len([c for c in r["live"] if c.startswith("my gpu")]) == 1 for _s, _o, r in runs)
+      and all(not any(c.startswith("my gpu") for c in r["dead"]) for _s, _o, r in runs),
+      "if a gpu row is ever in `dead`, the mechanism changed and this note is stale")
+check("NON-DEMAND: which SPELLING survives is whichever ARRIVED FIRST",
       True,
-      "spellings seen across %d orders: %s. Two texts differing only in punctuation fill "
-      "the same slot, so one supersedes the other and the winner is whichever came last. "
-      "NOTHING WAS CORRECTED. If this ever needs to be canonical the fix is a normalised "
-      "representative at the slot, NOT a change to supersession - supersession is "
-      "order-dependent on purpose, and that is the whole of how she learns a correction."
+      "spellings seen across %d orders: %s. Deliberately not fixed: the store knows the "
+      "same thing either way, one live pair exists in her whole store and both rows are "
+      "JULY FOSSILS that predate the current normaliser (today's writer merges them). "
+      "A fix would have to change the reinforce path and would drift the semindex address "
+      "of an existing row, which is a real cost for a cosmetic gain."
       % (len(runs), sorted(gpu_live)))
 
 print("\n5. AND THE CLAIM IS NOT VACUOUS")

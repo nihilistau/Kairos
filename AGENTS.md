@@ -119,6 +119,37 @@ the room (browser, ui/ → console/room/)  ──HTTP──▶  harness gateway 
   framework is this tree exported (`tools/kairos_export.py`, `kairos-export/`) with the
   default flipped, the engine excluded, and the names scrubbed (G-KAIROS-SCRUB).
 
+  **THIS REPO IS UPSTREAM. KAIROS IS A SNAPSHOT, AND NOTHING IS EVER AUTHORED IN IT.**
+  It is a filtered, scrubbed copy with FRESH HISTORY, rebuilt from the manifest — so a
+  file written directly in `../Kairos` is destroyed by the next export, silently. Anything
+  that ships with Kairos is written HERE first, and payload that is not code (the default
+  avatar set, gesture loops) is staged in `kairos-export/` so the manifest carries it.
+  Corollary, and it has bitten: a knob added for a Kairos-only feature still has to be
+  mapped in `serve.py::build_env`, or G-SEM-CONSERVE goes red here for a feature that is
+  not even armed here (`SP_AVATAR_DEFAULTS`, 2026-08-23).
+
+  **RE-EXPORTING IS MANUAL, ON PURPOSE.** Nothing triggers it — no hook, no scheduler,
+  no night job. An export is a PUBLICATION: the scrub is mechanical but "does this belong
+  in a neutral template" is judgement, and auto-publishing every commit would push
+  half-finished work to a public repo. The procedure, once, here:
+
+  1. `python tools/kairos_export.py --check` — dry run: what would ship, what the scrub
+     would hit. Then without `--check` to build `../Kairos`.
+  2. `python harness_tests/g_kairos_scrub.py` — no handle, no email, no absolute paths,
+     no live profile name, no `var/`, no `persona/`, no keys, no engine. It runs inside the
+     export too and skips cleanly when there is no target.
+  3. Sanity-check the TARGET, not this tree: imports with `SP_ENGINE_KIND=openai` and no
+     engine present, and run the new gates from inside `../Kairos`.
+  4. **Commit in the target.** The exporter writes files; it does not commit, and an
+     uncommitted export is a snapshot nobody can point at. `KAIROS-SOURCE.txt` names the
+     source commit and is the anchor everything else reads.
+  5. Pushing is a separate, deliberate act. The repo is public.
+
+  **WHEN.** `../kairos-drift/` (a third repo, beside both, owned by neither) answers it:
+  `python drift.py` sorts every commit since the cut into OWED / MIXED / LOCAL by asking
+  the manifest which files it touched, and re-anchors itself off `KAIROS-SOURCE.txt` —
+  re-export and the owed pile empties on its own. `--check` exits 1 when anything is owed.
+
   **THE BINARY IS ALSO PER-PROFILE.** `engine_exe` in the profile is what launches, and hers is
   `engine/tools/sp_daemon/target-wirecuda/release/sp-daemon.exe` — NOT cargo's default `target/`.
   Build with `engine/build-wirecuda.bat` (or `cargo build --release --features wire_cuda_backend
@@ -140,6 +171,7 @@ the room (browser, ui/ → console/room/)  ──HTTP──▶  harness gateway 
 | `memory-okf*/` | the MEM-OKF knowledge stores (content-addressed, tiered: `LUT.md` → `sum/` → `full/`). Tool: `tools/okf_mem.py`. |
 | `var/` | ALL runtime state. Gitignored. The fact registry, notes, the presence ledger, logs. |
 | `docs/` | the documents — `docs/README.md` says which is authoritative for what (MEMORY-AND-RECALL is the operational memory truth; INVARIANT-MEMORY the formal model; OFF-BY-DEFAULT the live off-ledger; AVATAR-PIPELINE her face). |
+| `../kairos-drift/` | **NOT this repo, and not Kairos — a third git repo beside both, owned by neither.** It answers the only question that matters about a scrubbed snapshot: of everything since the cut, which parts would a re-export CARRY? `drift.py` reads the export sha from `Kairos/KAIROS-SOURCE.txt` and the globs from `kairos-export/kairos-export.toml`, then sorts every commit OWED / MIXED / LOCAL. It lives outside because inside this repo it would be one more ledger the companion carries, and inside Kairos it would leak this repo's history into the public one — which is what the scrubbed export exists to prevent. Read-only against both; re-anchors itself, so a re-export empties the owed pile with no bookkeeping. |
 
 ---
 

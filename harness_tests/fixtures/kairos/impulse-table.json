@@ -50,9 +50,17 @@
     },
     {
       "when": {
-        "insight": 1
+        "insight": 1,
+        "checkin": 1
       },
       "action": "muse"
+    },
+    {
+      "when": {
+        "insight": 1,
+        "checkin": 0
+      },
+      "action": "silent"
     },
     {
       "when": {
@@ -332,9 +340,9 @@
     "enabled=1|cooling=0|cap=0|due=0|chainmax=0|askedq=0|insight=0|contlow=0|checkin=1": "check_in",
     "enabled=1|cooling=0|cap=0|due=0|chainmax=0|askedq=0|insight=0|contlow=1|checkin=0": "continue",
     "enabled=1|cooling=0|cap=0|due=0|chainmax=0|askedq=0|insight=0|contlow=1|checkin=1": "continue",
-    "enabled=1|cooling=0|cap=0|due=0|chainmax=0|askedq=0|insight=1|contlow=0|checkin=0": "muse",
+    "enabled=1|cooling=0|cap=0|due=0|chainmax=0|askedq=0|insight=1|contlow=0|checkin=0": "silent",
     "enabled=1|cooling=0|cap=0|due=0|chainmax=0|askedq=0|insight=1|contlow=0|checkin=1": "muse",
-    "enabled=1|cooling=0|cap=0|due=0|chainmax=0|askedq=0|insight=1|contlow=1|checkin=0": "muse",
+    "enabled=1|cooling=0|cap=0|due=0|chainmax=0|askedq=0|insight=1|contlow=1|checkin=0": "silent",
     "enabled=1|cooling=0|cap=0|due=0|chainmax=0|askedq=0|insight=1|contlow=1|checkin=1": "muse",
     "enabled=1|cooling=0|cap=0|due=0|chainmax=0|askedq=1|insight=0|contlow=0|checkin=0": "silent",
     "enabled=1|cooling=0|cap=0|due=0|chainmax=0|askedq=1|insight=0|contlow=0|checkin=1": "check_in",

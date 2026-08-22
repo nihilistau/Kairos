@@ -19,6 +19,16 @@ async function get(path) {
 export const senses  = () => get('/v1/senses')
 export const tools   = () => get('/v1/tools')
 export const memory  = () => get('/v1/memory')
+/* CURATING HER MEMORY (2026-08-23). The panel was read-only and /ops.html was the only
+ * place to act. relabel keeps the row and moves only its LABELS - the text, the name,
+ * the timestamps, mentions and every breadcrumb stay, and the change appends a dated
+ * note to src so provenance() reads the history rather than a clean lie. */
+export const memoryAdd     = (fact, speaker) => post('/v1/memory/add', { fact, speaker })
+export const memoryForget  = (name) => post('/v1/memory/forget', { name })
+export const memoryRelabel = (b) => post('/v1/memory/relabel', b)
+/* HIS QUEUE (2026-08-23) - what is UNDECIDED, as against the ledger's what-is-off. */
+export const decisions     = () => get('/v1/decisions')
+export const decide        = (id, choice, note) => post('/v1/decisions/decide', { id, choice, note })
 /* THE BOARD. `all` asks for the retired rows too — `remove` is a TOMBSTONE in
  * harness/skills/notes.py, so a note he took down still exists and he should be
  * able to look at it. Same shape as the memory panel's live/retired split. */

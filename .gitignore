@@ -20,6 +20,6 @@ ui/node_modules/
 
 # the session-memory sidecar writes here (.remember/now.md, today-*.md, logs/).
 # It ships its OWN nested .gitignore, and relying on a file a tool creates is not a
-# guarantee: if it is ever missing, a transcript full of names and absolute paths
-# lands in a PUBLIC repo. Ignored at the root as well, belt and braces (2026-08-23).
+# guarantee: if it is ever missing, a transcript full of his name and absolute paths
+# lands in a repo. Ignored at the root as well, belt and braces (2026-08-23).
 .remember/
