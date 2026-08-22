@@ -184,6 +184,7 @@ def live_voice() -> dict:
         speed = 1.0
     return {"enabled": enabled, "method": method, "xai_voice": xai_voice,
             "speed": max(0.5, min(1.5, speed)),
+            "local_gguf": os.path.basename(VOX_GGUF or ""),      # the Voice section names its model (E)
             "speaking_as": ("xai:" + xai_voice) if method == "xai" else VOICE}
 
 

@@ -66,6 +66,11 @@ def check(name, cond, detail=""):
 
 
 from harness.kairos import reasons as R                                    # noqa: E402
+# SYNTHETIC CLOCKS (2026-08-22): a fresh TurnState's clocks default to impulse.BOOT_AT, the
+# real monotonic boot time, which would sit in this gate's small fixture times' FUTURE.
+# Pin the boot to t=1.0 here — non-zero, before every `now` below.
+import harness.kairos.impulse as _imp_pin  # noqa: E402
+_imp_pin.BOOT_AT = 1.0
 from harness.kairos.impulse import MUSE, SILENT, KairosConfig, TurnState   # noqa: E402
 from harness.kairos.impulse import decide, muse_nudge, note_user           # noqa: E402
 
@@ -159,8 +164,10 @@ CFG = KairosConfig(enabled=True, max_chain=2, cooldown_s=45.0, max_per_hour=6)
 st = TurnState()
 note_user(st, 1000.0)
 reason = R.from_commitment(NOTES, set())
-imp = decide(cfg=CFG, state=st, now=1010.0, reply_text="ok.", eot_margin=None,
-             insight=reason)
+# (2026-08-22: a musing waits for the room to be quiet — checkin_idle_s — like any other
+#  unprompted word, so the reason is offered after that floor, not 10 s after his turn)
+imp = decide(cfg=CFG, state=st, now=1000.0 + CFG.checkin_idle_s + 1.0, reply_text="ok.",
+             eot_margin=None, insight=reason)
 check("a reason speaks through MUSE, the channel that already existed",
       imp.action == MUSE, imp)
 st2 = TurnState(chain=2, last_user_at=1000.0)

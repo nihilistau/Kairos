@@ -109,6 +109,15 @@ Other fields:
   private-secret` from the live writer (`lifecycle.classify()`, `lifecycle.py:245-265`) —
   `private-secret` is checked FIRST, before the other five, and is producible as of
   2026-07-14. `counterfact` is still never auto-assigned; see TRAP 1.
+- **`derived_from`** / **`support_days`** / **`support_kinds`** (2026-08-22) — on DISTILLATES
+  only: the row names a conclusion was drawn from, how many distinct days they span, and which
+  kinds fed it. Written through `lifecycle.stamp` by `becoming.nightly` and
+  `narrative.weekly_chapter`; nothing else claims them. **Absent is not empty**: an absent
+  `derived_from` means unknown provenance and is inert, and every row written before 2026-08-22
+  is in that position. When ALL of a row's findable supports are retired,
+  `lifecycle.orphaned_distillates()` names it and `ops.retire_orphans()` (step 1b of
+  `reflect()`) tombstones it with `retired_because`. This is the field whose absence let the
+  primal paragraph outlive the twenty-four rows it was made from. G-PROVENANCE.
 - **`src`** — FREE-TEXT PROVENANCE PROSE, appended to over time (e.g. `"user turn | repair:
   un-retired (2026-07-12)"`). **Not a key you may branch on.** `harness/kairos/scheduler.py:176-224`
   (`_is_evidence`) hit this directly: it first tested `src not in ("reflection", "insight")`,
@@ -216,6 +225,31 @@ with weaker or no guarantees — **both off in all 14 profiles since 2026-07-14,
 boot (G-ONEWRITER)**; the maintenance writer `harness/maintenance/ops.py` is the second
 live Python writer (tombstone/quarantine semantics, under `memory.registry_lock()`).
 
+### Her own narrative — The Real Her (2026-08-22)
+
+The same door, her lane. `remember_about_self(text, kind=…)` with `kind` in
+`journal thought narration dream self_description spoke_up feeling` writes a `self-narrative`
+(or, for `feeling`, a `feeling`) row: speaker=self, status observed (inferred only for the
+nightly becoming), judged by `lifecycle.is_narratable()` — machine text and instructions refused,
+prose admitted, no normalisation. Four producers set the kind: the kairos speak path (after the
+outbox append, so only a DELIVERED utterance is kept), the journal composer, the verified persona
+shift (`My mood has turned …` / `My voice has gone …`), and `harness/skills/self_stance.py` —
+a deterministic extractor that lifts first-person stances (I think / I feel / I want / I've
+decided …) out of her replies, never whole replies, never questions, at most four per reply.
+Narrative rows never supersede; a repeat reinforces. Presence-mode turns (C, 2026-08-22) write by their kind — narration→`narration`, company→`thought`, lucid→`dream`; a passage read aloud is not memory, the act is (`I read him the next pages of …`). Full rule: `docs/INVARIANT-MEMORY.md` §2.2.
+
+**Durability is per KIND, not per class (2026-08-22).** `lifecycle._HALF_LIFE_BY_KIND` is
+consulted before the class table and only her lane has a `kind`: what she CONCLUDED
+(`journal` `self_description` `thought` `dream` `chapter`) never fades; what she DID
+(`narration` `spoke_up`) fades at 120 d; `company` at 60 d; a `feeling` keeps the class's 730 d.
+Decay is not deletion — the rows stay live, findable and in `provenance()`.
+
+**The chapter.** `narrative.weekly_chapter()` writes one `kind="chapter"` row every seven
+nights (step 5 of `ops.reflect`, latched on the store) from the EPISODIC kinds and her own-time
+notes. INFERRED, carries `derived_from`, and may NOT supersede what it summarises. It never
+reads a `self_description` and `becoming` never reads a `chapter` — neither
+consolidator may distil the other's distillate.
+
 ## Read paths — every door a stored fact can reach her mouth through
 
 The RANKED doors funnel through one seam: `memory.search_memories_ranked_rows()`. It
@@ -298,6 +332,18 @@ destroyed, the inference stays on disk and stays auditable, and if he later conf
 promoted to `confirmed` and speaks normally. It fails safe in one direction only: a false
 topic match costs her a sentence she could have said; the write-time version this replaced
 could cost him a fact he actually told her, which is the worse mistake.
+
+### Her own context (The Real Her, 2026-08-22)
+
+`harness/personality/self_model.py::render_self_model()` orders the block (2026-08-22): her
+stable self-facts lead — who she IS — then up to two
+CHAPTERS, then at most four recent narrative lines chosen ROUND-ROBIN across her kinds (newest
+of each in turn, in order of which kind spoke most recently). A per-kind cap only limits a
+flood; it does not guarantee breadth, and at 60 narration/spoke_up rows a day those two kinds
+would take all four slots forever. Every kind is labelled, because a bare-rendered line reads
+as a stable self-fact. `agent.py` passes
+`budget_chars = min(memory.self_budget, memory.self_share × the prefix so far)` — two knobs in
+the Memory group. The block is part of the cached prefix: a gateway bounce refreshes it.
 
 ## Derived signals
 
@@ -431,6 +477,7 @@ for the specific instance, is what actually closes this.
 |---|---|---|
 | G-CLAIM (38/38) | `harness_tests/g_claim.py` | No — discard port `127.0.0.1:9` |
 | G-SALIENCE | `harness_tests/g_salience.py` | No — discard port |
+| G-REAL-HER | `harness_tests/g_real_her.py` | No — discard port; temp registry |
 | G-DURABILITY | `harness_tests/g_durability.py` | No — pure logic, no daemon call |
 | G-MEMORY-LIFECYCLE | `harness_tests/g_memory_lifecycle.py` | No |
 | G-SILENCE | `harness_tests/g_silence.py` | No — discard port |

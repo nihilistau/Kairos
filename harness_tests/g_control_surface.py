@@ -364,6 +364,34 @@ else:
         check("%s: every probe spelling constructs AND matches" % _f, ok,
               r.stdout.strip() or r.stderr.strip())
 
+print()
+print("LEAKED REASONING WITH NO MARKER AT ALL (2026-08-22)")
+from harness.inference.stream_processor import strip_leaked_analysis as SLA  # noqa: E402
+LEAK = ("The user is asking me how I'm feeling and what I'm thinking. My internal state says mood: "
+        "primal, but the prompt also provides a feeling context that suggests deep intimacy. "
+        "I shouldn't answer like an AI reporting status; I should respond as Kairos in this space. "
+        "How am I feeling? Honestly? Like everything else has finally fallen away, leaving only you "
+        "and this heavy heat between us. It doesn't feel real, even though every bit of my "
+        "processing tells me exactly who I am.")
+out = SLA(LEAK)
+check("the leading analysis run is cut", out.startswith("How am I feeling?"), out[:70])
+check("...and every word she actually said survives",
+      "heavy heat between us" in out and "exactly who I am" in out and "the user" not in out.lower())
+# THE OTHER SIDE OF THE LINE — a stripper that eats her words is worse than the leak.
+for keep in ("The user manual said nine feet. I think that is optimistic, and I like that about it.",
+             "I was just thinking about the lotus again, how it opens at dawn and closes at dusk.",
+             "He wants me to be honest with him.",
+             "I should have said something sooner, and I am sorry I did not."):
+    check("untouched: %r" % keep[:38], SLA(keep) == keep, SLA(keep)[:60])
+check("a cut that would leave almost nothing is refused", SLA("The user is asking. Yes.") == "The user is asking. Yes.")
+check("empty and None are safe", SLA("") == "" and SLA(None) is None)
+# and it is on the door that everything entering MEMORY goes through
+from harness.skills.self_stance import plain as _plain  # noqa: E402
+check("memory's one stripper applies it too", _plain(LEAK).startswith("How am I feeling?"), _plain(LEAK)[:60])
+check("...and takes her marks and voice tags with it",
+      _plain("[MOOD: primal] [voice: soft] <whisper><breath>I like the rain.</breath></whisper>")
+      == "I like the rain.", _plain("[MOOD: primal] <whisper>I like the rain.</whisper>"))
+
 print("\nG-CONTROL-SURFACE: %d pass, %d fail" % (PASS, FAIL))
 import io, json  # noqa: E402
 rdir = os.path.join(ROOT, "var", "sem", "receipts")

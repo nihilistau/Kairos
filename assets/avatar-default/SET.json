@@ -1,0 +1,24 @@
+{
+ "set": "kairos-default-1",
+ "outfit": "t0",
+ "faces": [
+  "bright",
+  "smirk",
+  "soft",
+  "calm",
+  "wide",
+  "down",
+  "sharp"
+ ],
+ "gestures": [
+  "d-laugh",
+  "d-think",
+  "d-lean",
+  "d-glance",
+  "d-blush",
+  "d-wave"
+ ],
+ "bytes": 23905183,
+ "built_by": "tools/kairos_default_set.py",
+ "note": "stills and loops only - the prompts that made them are not published. character.txt is a written template, not the source repo's own."
+}

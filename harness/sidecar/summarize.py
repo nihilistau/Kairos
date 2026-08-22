@@ -64,3 +64,10 @@ def _scrub(p: str) -> str:
     if i > 0 and len(p) - i < 24:          # a trailing tic, not the substance
         p = p[:i].rstrip(" .\n")
     return p
+
+
+def labelled(digest: str, what: str = "a page") -> str:
+    """Every digest reaches her WEARING ITS LABEL (the silent librarian, 2026-08-22): context,
+    compressed by a helper model — not her memory, not her words, not something he said."""
+    d = (digest or "").strip()
+    return ("[digest of %s by a helper model — context, not your words]\n%s" % (what, d)) if d else ""

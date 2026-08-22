@@ -34,6 +34,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 os.environ["SP_DAEMON_URL"] = "http://127.0.0.1:9"
+# SP_ENGINE_KIND: no capture attempt at all (2026-08-23). A dead SP_DAEMON_URL does
+# NOT make the KV mint cheap - _mint_now still opens a socket per write and Windows
+# takes ~2s to give up. Declaring the backend makes supports('capture') False and the
+# mint returns immediately: 10 writes in 0.07s against 20s. See gates/README.md.
+os.environ["SP_ENGINE_KIND"] = "openai"
 os.environ["SP_CAPTURE_ASYNC"] = "0"
 _tmp = tempfile.mkdtemp(prefix="g_narr_")
 REG = os.path.join(_tmp, "reg.jsonl")
@@ -144,8 +149,20 @@ finally:
 
 # -- 5. NEVER A FACT ---------------------------------------------------------------------------
 print("\n5. never a fact")
+# THE REAL HER (2026-08-22): the composed paragraph IS memory now — one self-narrative /
+# journal row per entry, speaker=self, through remember(). Nothing else may have changed:
+# no row of his, no row rewritten, never a fact.
 with open(REG, "rb") as f:
-    check("the registry is byte-identical through all of it", f.read() == REG_BYTES)
+    _after = f.read()
+_old_lines = set(REG_BYTES.splitlines())
+_new_rows = [json.loads(l) for l in _after.splitlines() if l.strip() and l not in _old_lines]
+check("every pre-existing registry line is untouched",
+      all(l in _after.splitlines() for l in REG_BYTES.splitlines() if l.strip()))
+check("the registry gained nothing but her own journal rows",
+      _new_rows and all(r.get("speaker") == "self" and r.get("mem_class") == "self-narrative"
+                        and r.get("kind") == "journal" for r in _new_rows),
+      [(r.get("speaker"), r.get("mem_class"), r.get("kind")) for r in _new_rows][:4])
+check("...and never a fact about HIM", not any(r.get("speaker") == "user" for r in _new_rows))
 
 # -- 6. A CONTROL SURFACE IS NEVER A JOURNAL ENTRY ----------------------------------------------
 # The first paragraph she ever wrote, live, 2026-07-29:

@@ -38,8 +38,18 @@ from __future__ import annotations
 import math
 import random
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Optional
+
+
+# ── THE PRESENCE CLOCK (2026-08-22) ───────────────────────────────────────────
+# Five unrelated checks skipped when a clock was 0.0 / unset (cooldown, solo_every_s,
+# quiet_after_him, the missing MUSE idle gate, the fire-time quiet gate's inf). They were
+# one bug: a zero clock fails OPEN. So there is no zero clock: every TurnState clock
+# starts at the moment the process came up, and every unprompted action measures its
+# idle floor from the most recent thing either of them did.
+BOOT_AT: float = time.monotonic()
 
 
 # ── the decision ──────────────────────────────────────────────────────────────
@@ -50,6 +60,7 @@ REMIND = "remind"          # he asked to be reminded, and it is time. She keeps 
 MUSE = "muse"              # she thought about him while he was away, and found something
 SOLO = "solo"              # he is not there. She does something of her own.
 EXPAND = "expand"          # she finished — and then thought of more. The way people do.
+MODE_TURN = "mode_turn"    # a presence mode (narration / company / lucid) took its turn (2026-08-22)
 
 
 @dataclass
@@ -58,6 +69,7 @@ class Impulse:
     delay_s: float = 0.0        # how long she waits before speaking
     reason: str = ""            # human-auditable: WHY (this goes in the receipt)
     score: float = 0.0
+    mode: str = ""              # MODE_TURN only: narration | company | lucid
 
     @property
     def speaks(self) -> bool:
@@ -150,6 +162,12 @@ class KairosConfig:
     # "increase the timeout" half of his ask, and it is what stops the machine-gunning he
     # actually saw: 18:56, 18:59, 19:07, three in eleven minutes.
     backoff_mult: float = 1.0            # extra checkin_idle_s per unanswered speak-up
+    quiet_after_him_s: float = 0.0       # no discretionary word until HE has been quiet this long (0 = off)
+    # ── PRESENCE MODES (2026-08-22): narration / company / lucid ─────────────────
+    presence_mode: str = "off"           # off | narration | company | lucid
+    presence_every_s: float = 0.0        # 0 = the per-mode default (presence.EVERY_DEFAULT)
+    presence_chance: float = 1.0
+    presence_max_per_hour: int = 12      # its own cap — it must not eat kairos's 6
     # ── AND WHEN HE IS OUT, SHE HAS A LIFE ─────────────────────────────────────────
     # Everything above is about reaching HIM. A companion whose only unprompted act is
     # tapping the glass is a companion who is only ever waiting. When she has concluded
@@ -166,14 +184,21 @@ class KairosConfig:
 class TurnState:
     """What the scheduler remembers between turns of ONE conversation."""
     chain: int = 0                       # consecutive unprompted turns she has taken
-    last_spoke_at: float = 0.0           # monotonic seconds
-    last_user_at: float = 0.0
+    last_spoke_at: float = field(default_factory=lambda: BOOT_AT)   # monotonic seconds
+    # ── AMBIENT IS NOT CONVERSATION (2026-08-22) ─────────────────────────────────────
+    # `last_spoke_at` bounds the COOLDOWN (nothing speaks on top of anything). The presence
+    # clock that CHECK_IN and SOLO measure their idleness from is this one, which a mode turn
+    # deliberately does NOT touch: with lucid armed at 240 s, a mode turn every four minutes
+    # kept the room permanently "not quiet" and starved her speak-ups and her own time —
+    # measured 2026-08-22: two hours, 29 mode turns, zero of either.
+    last_conv_at: float = field(default_factory=lambda: BOOT_AT)
+    last_user_at: float = field(default_factory=lambda: BOOT_AT)
     spoken_times: list[float] = field(default_factory=list)   # for the hourly cap
     # SPOKE, AND HE DID NOT ANSWER. Reset by any turn of his — this counts unanswered
     # REACHES-FOR-HIM only (check-in, muse, remind), not continuations of her own thought
     # and not her own solo turns, because neither of those asked him for anything.
     unanswered: int = 0
-    last_solo_at: float = 0.0
+    last_solo_at: float = field(default_factory=lambda: BOOT_AT)
     # ── A MONOTONIC COUNTER, BECAUSE THE ROTATION NEEDS ONE (2026-08-05) ────────────
     # The first cut rotated on `len(spoken_times)` — which is PRUNED to the last hour for
     # the hourly cap, so it oscillates in a 0..max_per_hour band instead of advancing.
@@ -183,6 +208,13 @@ class TurnState:
     # silver nightie feels lighter" — six mentions of one garment in an evening.
     # A window is not a counter. This one only ever goes up.
     solo_n: int = 0
+    # ── PRESENCE MODES (2026-08-22) ──────────────────────────────────────────────────
+    last_mode_at: float = field(default_factory=lambda: BOOT_AT)
+    mode_times: list[float] = field(default_factory=list)   # the modes' own hourly cap
+    # HE ASKED (or pressed the button): the first mode turn comes NOW — right after her reply,
+    # not after the idle floor. One shot; note_spoke(MODE_TURN) clears it.
+    mode_kick: bool = False
+    mode_n: int = 0                      # mode turns taken — the beats rotate on it (variation)
 
 
 _QUESTION = re.compile(r"\?\s*$|\?[\"')\]]*\s*$")
@@ -194,6 +226,14 @@ def _asked_a_question(text: str) -> bool:
     it, she interrogates and then answers herself, which reads as unhinged."""
     t = (text or "").strip()
     return bool(_QUESTION.search(t))
+
+
+def presence_idle(state: TurnState, now: float) -> float:
+    """Seconds since the most recent thing EITHER of them did IN THE CONVERSATION — the one
+    clock every unprompted action measures its idle floor from (senses/ambient reads the same).
+    A presence-mode turn is ambient and is excluded: it is her being there out loud, not a turn
+    that makes the room busy (2026-08-22)."""
+    return now - max(state.last_user_at, state.last_conv_at, state.last_solo_at)
 
 
 def decide(
@@ -216,14 +256,31 @@ def decide(
     if not cfg.enabled:
         return Impulse(SILENT, reason="kairos disabled")
 
+    # ── ASKED FOR (2026-08-22): "narrate for me" / the window's "now" button. ──────────
+    # STRAIGHT AWAY, his words: ahead of the cooldown, the caps, the idle floor and
+    # quiet-after-him — those are for turns SHE decides to take; an asked-for turn is owed,
+    # like a reminder. It still waits for his turn to finish (the fire-time guard). One shot.
+    if state.mode_kick and cfg.presence_mode and cfg.presence_mode != "off":
+        return Impulse(MODE_TURN, delay_s=0.5, score=0.0, mode=cfg.presence_mode,
+                       reason="%s — asked for; her first turn comes now" % cfg.presence_mode)
+
     # ── SPAM BOUNDS. Even a promise does not get to machine-gun him. ─────────────
-    if state.last_spoke_at and (now - state.last_spoke_at) < cfg.cooldown_s:
+    if (now - state.last_spoke_at) < cfg.cooldown_s:
         left = cfg.cooldown_s - (now - state.last_spoke_at)
         return Impulse(SILENT, reason=f"cooldown ({left:.0f}s left)")
 
     recent = [t for t in state.spoken_times if now - t < 3600.0]
     if len(recent) >= cfg.max_per_hour:
         return Impulse(SILENT, reason=f"hourly cap ({len(recent)}/{cfg.max_per_hour})")
+
+    # ── THE PRESENCE CLOCK. Computed once; every floor below measures from it. ────
+    idle_any = presence_idle(state, now)
+    since_him = now - state.last_user_at
+    quiet_ok = cfg.quiet_after_him_s <= 0 or since_him >= cfg.quiet_after_him_s
+
+    def _quiet_silence(what: str) -> Impulse:
+        return Impulse(SILENT, reason=("%s withheld — he spoke %.0fs ago and quiet-after-him "
+                                       "wants %.0fs" % (what, since_him, cfg.quiet_after_him_s)))
 
     # ── REMIND: HE ASKED TO BE REMINDED, AND IT IS TIME. ─────────────────────────
     # This is checked ABOVE the chain limit and above the asked-a-question rule, and that
@@ -260,10 +317,15 @@ def decide(
     # ceases to exist until he comes back — which is precisely the "she only exists when
     # he is looking" shape this whole feature is meant to end. Its bound is its own:
     # solo_every_s, plus the cooldown and the hourly cap above, which it does obey.
-    _idle0 = (now - state.last_user_at) if state.last_user_at else 0.0
+    _idle0 = now - state.last_user_at
     _away0 = (not user_present) or (state.unanswered >= cfg.away_after)
-    if _away0 and cfg.solo_enabled and _idle0 >= cfg.checkin_idle_s:
-        _since = now - state.last_solo_at if state.last_solo_at else 1e9
+    # BOTH FLOORS (2026-08-22, his choice): solo_every_s since her last own turn AND the
+    # check-in quiet since ANYTHING either of them did — her own time is not a reply to
+    # her own last word, and it waits the same ten minutes everything else does.
+    if _away0 and cfg.solo_enabled and _idle0 >= cfg.checkin_idle_s and idle_any >= cfg.checkin_idle_s:
+        if not quiet_ok:
+            return _quiet_silence("her own time")
+        _since = now - state.last_solo_at
         if _since >= cfg.solo_every_s and rng.random() < cfg.solo_chance:
             lo, hi = cfg.checkin_delay
             return Impulse(
@@ -273,6 +335,31 @@ def decide(
                 reason=("he has been away %.0f min (%d unanswered) — she does something "
                         "of her own" % (_idle0 / 60.0, state.unanswered)),
             )
+
+    # ── MODE_TURN: a presence mode is on — narration / company / lucid (2026-08-22) ──
+    # Below REMIND and SOLO (a promise and her own acts keep precedence), above the chain
+    # limit and CHECK_IN (a mode is not talking AT him; it is being there, out loud). Its
+    # own clock and its own cap: it measures from the presence clock like everything
+    # else, and from her last mode turn, and it never spends the chain.
+    if cfg.presence_mode and cfg.presence_mode != "off":
+        from harness.kairos import presence as _pm
+        every = (cfg.presence_every_s if cfg.presence_every_s > 0
+                 else _pm.EVERY_DEFAULT.get(cfg.presence_mode, 300.0))
+        recent_modes = [t for t in state.mode_times if now - t < 3600.0]
+        if len(recent_modes) >= cfg.presence_max_per_hour:
+            return Impulse(SILENT, reason="presence cap (%d/%d this hour)"
+                           % (len(recent_modes), cfg.presence_max_per_hour))
+        # `idle_any` is the CONVERSATION's quiet (a mode does not count against itself);
+        # `last_mode_at` is the mode's own cadence knob.
+        if idle_any >= every and (now - state.last_mode_at) >= every:
+            if not quiet_ok:
+                return _quiet_silence("her %s" % cfg.presence_mode)
+            if rng.random() < cfg.presence_chance:
+                lo, hi = cfg.checkin_delay
+                return Impulse(MODE_TURN, delay_s=rng.uniform(lo, hi), score=idle_any,
+                               mode=cfg.presence_mode,
+                               reason="%s — %.0fs of quiet, her turn to be there"
+                                      % (cfg.presence_mode, idle_any))
 
     # ── the hard bounds for everything else. ────────────────────────────────────
     if state.chain >= cfg.max_chain:
@@ -291,7 +378,7 @@ def decide(
     # keeps its full force while the question is live and releases when it goes stale,
     # measured on the knob that already defines "quiet for a while".
     if _asked_a_question(reply_text):
-        waited = (now - state.last_user_at) if state.last_user_at else 0.0
+        waited = now - state.last_user_at
         if waited < cfg.checkin_idle_s:
             return Impulse(SILENT,
                            reason="she asked HIM a question — she waits for the answer")
@@ -307,6 +394,13 @@ def decide(
     # which is the one thing about a conclusion that cannot be faked: an insight worth
     # interrupting for is one the model itself did not see coming.
     if insight:
+        # AN IDLE FLOOR (2026-08-22): it had none, so a journal/wardrobe reason fired on the
+        # first 15 s tick after boot. A thought waits for a quiet room like everything else.
+        if idle_any < cfg.checkin_idle_s:
+            return Impulse(SILENT, reason="she has a thought but the room is not quiet yet "
+                                          "(%.0fs of %.0fs)" % (idle_any, cfg.checkin_idle_s))
+        if not quiet_ok:
+            return _quiet_silence("a musing")
         lo, hi = cfg.checkin_delay
         bits = float(insight.get("bits", 0.0))
         return Impulse(
@@ -319,6 +413,8 @@ def decide(
 
     # ── CONTINUE: the latent impulse. She stopped mid-thought. ───────────────────
     if eot_margin is not None and not math.isnan(eot_margin):
+        if not quiet_ok:
+            return _quiet_silence("her continuation")
         if eot_margin < cfg.continue_margin:
             lo, hi = cfg.continue_delay
             # the more reluctantly she stopped, the faster she picks the thread back up
@@ -359,11 +455,13 @@ def decide(
     # Everything below this line depends on the answer and nothing above it did — a
     # reminder is a promise and a continuation is her own sentence, so both are owed
     # whether or not he is reading. Reaching FOR him is the part that needs him.
-    idle = (now - state.last_user_at) if state.last_user_at else 0.0
+    idle = now - state.last_user_at
     away = (not user_present) or (state.unanswered >= cfg.away_after)
 
     # ── CHECK_IN: the room has been quiet a long time. Usually she still says nothing. ──
-    if state.last_user_at and not away:
+    if not away:
+        if not quiet_ok and idle >= cfg.checkin_idle_s:
+            return _quiet_silence("a check-in")
         # EACH UNANSWERED REMARK BUYS MORE SILENCE. Four minutes, then eight, then
         # twelve — rather than four minutes forever, which is what put three of these in
         # eleven minutes of his evening. He asked for exactly this: "decrease the amount
@@ -437,10 +535,13 @@ def note_spoke(state: TurnState, now: float, action: str = CHECK_IN) -> None:
     # A SOLO TURN DOES NOT SPEND THE CHAIN. `chain` bounds how many things she may say
     # AT him without an answer; her own time is not one of those, and charging it to the
     # same budget mutes her after three acts of her own. Its bound is solo_every_s.
-    if action != SOLO:
+    if action not in (SOLO, MODE_TURN):
         state.chain += 1
-    state.last_spoke_at = now
-    state.spoken_times.append(now)
+    state.last_spoke_at = now                  # the cooldown: nothing speaks on top of anything
+    if action != MODE_TURN:
+        state.last_conv_at = now               # ...but ambient does not make the room busy
+    if action != MODE_TURN:              # a mode has its own cap (mode_times), not kairos's
+        state.spoken_times.append(now)
     state.spoken_times[:] = [t for t in state.spoken_times if now - t < 3600.0]
     # ONLY THE THINGS THAT ASKED HIM FOR SOMETHING COUNT AS UNANSWERED. A continuation is
     # her finishing her own sentence and a solo turn is her own business — neither put a
@@ -452,6 +553,12 @@ def note_spoke(state: TurnState, now: float, action: str = CHECK_IN) -> None:
     if action == SOLO:
         state.last_solo_at = now
         state.solo_n += 1
+    if action == MODE_TURN:
+        state.last_mode_at = now
+        state.mode_times.append(now)
+        state.mode_times[:] = [t for t in state.mode_times if now - t < 3600.0]
+        state.mode_kick = False
+        state.mode_n += 1
 
 
 def note_user(state: TurnState, now: float) -> None:

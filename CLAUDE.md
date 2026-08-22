@@ -18,6 +18,7 @@ python harness_tests/g_claim.py
 python harness_tests/g_durability.py
 python harness_tests/g_memory_lifecycle.py
 python harness_tests/g_docs_true.py
+python harness_tests/g_real_her.py
 ```
 
 If you touched `harness/personality/`, `harness/mcp_server/` or the persona, add the six

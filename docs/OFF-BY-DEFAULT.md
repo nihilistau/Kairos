@@ -43,6 +43,12 @@ the moment these three flipped.
 | `task_bridge` + `agency_tasks` | A `category="task"` note is promoted to a real `TaskState` at the day boundary, worked, and the verdict written back to the note. Armed together on purpose: the bridge alone enqueues work nothing drains, and the drain alone drains an empty queue — which is what it did for its entire life until Phase 3, because `post_task()` had no caller anywhere in the tree. | **Ownership.** A note's `speaker` becomes the task's `owner`; `task_table.may_close` is what stops her closing what he asked for, and an unknown speaker defaults to `operator` (less authority for her, never more). Also watch that the first promotion is something he actually wanted promoted — the board is now load-bearing, so a casual note can become work. |
 | `delegate` (+ `SP_DELEGATE_WORKTREES`) | `delegate_code()` hands a goal to the Grok CLI in a worktree **this code creates**, runs the portable gate set inside it, and reports. She never merges. The diff verdict refuses anything outside `harness/ harness_tests/ docs/ profiles/ gates/ fixtures/`; the engine is read-only. Ran live end to end once before arming: worktree created, one docs file written, verdict CLEAN, 16 gates run, nothing merged, live tree byte-identical throughout. | (a) `--permission-mode auto` is the only headless mode that *executes* — more permissive than wanted, which is exactly why the diff verdict is the authority and not the flags. (b) `~/.grok/config.toml` sets `permission_mode = "always-approve"`; every call must keep passing `--permission-mode` explicitly. (c) `--worktree` is inert headless — if the code ever regresses to trusting that flag, isolation disappears **silently**. (d) The delegated gate set is the *portable* 16; `g_durability` and `g_onedoor` cannot run in a worktree because `var/memory/` is gitignored, so a delegated change is never checked against the live store. |
 
+**Armed 2026-08-23, on `fixtures/sem/aux-receipt.json`:**
+
+| Knob | What it does now | Watch for |
+|---|---|---|
+| `rank` + `aux_embed` + `tau_aux` (`SP_SEM_RANK` / `SP_SEM_AUX_EMBED` / `SP_SEM_TAU_AUX`) | A row may now be admitted at the recall seam by MEANING as well as by shared words: cosine >= 0.40 against its `aux-1024-v1` vector, from the CPU sidecar - the only real embedder this box has. Measured through the real seam on the same frozen 160-query corpus that set the bar: `seam_recall_at_1` 0.46 -> **0.53**, `decider_hit_rate` 0.06 -> **0.17** (what actually reaches her context), and **both** foreign-noise metrics **identical** to lexical. It was off for a month against four committed negatives - and the finding that changed it is that all four were measured against a bag-of-words index: `/v1/capture` refuses on the model MoE (ADR-013), so no `ep.l5` has been minted in three weeks and 253 of 253 recent rows carry `npos=0`. There was no semantic index to compete against. | (a) **tau is a real dial and the first answer was wrong.** A top-1-only calculation said 0.20; through the seam - which admits every row over tau - 0.20 injects an unrelated fact on 55% of foreign queries. 0.40 is the most recall for which nothing degrades. 0.35 buys 41% more true injections for one extra foreign injection in sixty. (b) **RAW cosine, never centered** - `centered_cosine` is an l5 fix and collapses this space to 0.29, worse than lexical. (c) **The query/document asymmetry**: `/v1/embed` works (~1.47 s) and `/v1/capture` does not, so the engine can embed a query and not a document; `query_embed` prefers aux while this is armed, and **if capture is ever fixed that order must be measured again**. (d) The doc side needs `semindex.backfill_aux` to have run, or the gate is live with nothing to match. |
+
 **Armed 2026-07-30 21:00, after the thinking-off receipt:**
 
 | Knob | What it does now | Watch for |
@@ -54,8 +60,42 @@ their feature the moment the profile sets a path, so no `true` ever appears for 
 to find. `SP_SEM_INDEX` (the S0 sidecar index — gate `harness_tests/g_sem_index.py`),
 `SP_SEM_SLOTS` (Phase C slot links feeding `verdict.competition()` on every recall — gate
 `harness_tests/g_sem_slot.py`), and `SP_SEM_LAW_LOG` (witness lines on seam divergence) are all
-SET on `companion` and therefore LIVE. Watch for: a knob of this shape can never be captured by
-a boolean ledger scan — if you add one, add its row here by hand in the same commit.
+SET on `companion`.
+
+> **MEASURED 2026-08-23, and the answer is better than the correction it replaces.**
+> `SP_SEM_SLOTS` is set, `var/memory/slots.jsonl` does not exist, and the scan has now
+> been RUN rather than merely owed. It proposed **nothing**.
+>
+> - **132 gap-zone pairs** on her live store (overlap exactly 1); frame proposed **0**.
+>   **110 of them (83%) stop at *no stative frame on one side*** — her testimony is
+>   narrative now (*Sam stayed up all night to work on...*), and the frame test needs
+>   `subject + copula + value`. The other 22 are correctly rejected as different subjects.
+>   The file was never missing a run; it was missing anything to put in it. Same shape as
+>   the dominance finding the same day: a mechanism built for ATTRIBUTIVE facts meeting a
+>   store that is mostly prose.
+> - **The oracle column is filled for the first time since 2026-07-14** (it read
+>   `absent (no daemon)` for five weeks). It got **the ladders pair itself wrong** — the
+>   one case this whole phase exists to close. Diagnosed: BOTH few-shot exemplars were
+>   *compatible* statements, so nothing taught the judge that two statements which
+>   DISAGREE are still about one subject — and by construction that is the only kind of
+>   pair the gap zone contains. One competing exemplar fixed it, measured like-for-like
+>   with the frame control identical across both runs: **0.5333/0.80 -> 0.6061/1.00**,
+>   better on every metric.
+> - **No single arm clears the pre-registered 0.80/0.80 bar.** frame gap 0.625/1.00;
+>   oracle 0.6061/1.00; frame+oracle-veto gap 0.625/1.00 (the veto changes nothing in the
+>   gap zone); aux cosine alone, best gap 0.75/0.90.
+> - **The COMPOSITION does: `frame AND aux_cos >= 0.70` -> gap 0.8182/0.90**, all-pairs
+>   0.8889/0.80. The first configuration in this repo's history to clear C2. It works
+>   because frame supplies recall 1.0 and the aux space supplies the DIMENSION the
+>   bag-of-words arms cannot see — every false positive is one shape: *beach/happy* vs
+>   *beach/tall*, *coffee/fussy* vs *coffee/allergic*, *month/broke* vs *month/busy*.
+>
+> **Still not armed, for two reasons and either would be enough.** `AUX_TAU = 0.70` was
+> chosen on the same 40 pairs it is scored against — that is fitting, even against a bar
+> registered in advance; it needs a second corpus. And it would do NOTHING on her live
+> store, because frame proposes zero there. The knob stays set so it starts working the
+> moment a file appears; the receipt (`fixtures/sem/pair-receipt.json`, four arms, all
+> generated by `harness_tests/sem_pair_score.py`) now says exactly why there isn't one.
 
 **What she is told about the hands** lives in `persona.md` ("Your hands, and how far they
 reach") — gitignored and operator-owned, so its substance is also recorded in
@@ -69,15 +109,19 @@ responsible for exactly one thing, which is whether she describes the outcome tr
 *(Section numbers 2, 3 and 4 are absent on purpose — those three graduated to the ARMED table
 above on 2026-07-30. The gaps are the record, and renumbering would erase it.)*
 
-### 1. `SP_SEM_DOMINATE` — Dickson subsumption as a supersede proposer *(recorded 2026-07-30; unchanged 2026-08-21)*
+### 1. `SP_SEM_DOMINATE` — Dickson subsumption as a supersede proposer *(recorded 2026-07-30; measured again 2026-08-23 — lost worse)*
 
 | | |
 |---|---|
 | **Code** | `harness/skills/dominance.py`, consulted in `memory.remember()` beside `find_superseded` |
-| **Gate** | `harness_tests/g_sem_dominate.py` — 62/62 |
+| **Gate** | `harness_tests/g_sem_dominate.py` — 73/73 |
 | **Why off** | **MEASURED AGAINST IT.** `harness_tests/fixtures/sem/dominate-receipt.json`: 84 live rows → 7 proposals, **4 good, 3 bad**. The bad three would each have tombstoned the wrong row, including "My cat Tuffy is female." proposing to retire "Sam is a cat person." |
 | **What would arm it** | A supersede-labelled corpus large enough for a real precision figure — seven hand-adjudicated pairs is not one — and a rate measured on it that beats exact-slot matching without retiring testimony. **No bar was invented to sit just under the current number**, deliberately. |
 | **Known failure mode** | Both remaining bad proposals are "a long row swallows a short one on a single shared content word". A minimum-content-overlap rule is the obvious next lever, but tuning it on seven examples is fitting, not fixing. |
+| **Second measurement, 2026-08-23: HER OWN LANE, and the hypothesis lost badly** | The guess was that her narrative would be dominance's BEST case — near-duplicate restatement is rife there (all four *good* pairs in the 2026-07-30 receipt were restatements) and retiring one of her own repeated lines is low-stakes where retiring his testimony is not. `fixtures/sem/dominate-self-receipt.json`, on her real store: **12 proposals over 27 rows — 0.44 per row against 0.083 on his facts, and TWELVE OF TWELVE WRONG.** Not one genuine duplicate. |
+| **Why it fails on prose specifically** | dominance's content carrier is `topic_of` plus names and numbers, built for ATTRIBUTIVE facts (*Sam owns a blue kettle*: a subject and an attribute). Her narrative is EXPRESSIVE PROSE with almost no attributive content — *[redacted]* reduces to roughly `{love}` — so any longer sentence containing *love* dominates it structurally. **The measured proposal is that *[redacted]* should retire *[redacted]*** The first half of the hypothesis was right; the second does not follow. Dominance cannot IDENTIFY a near-duplicate in her lane. It identifies *shares a content word and is longer* — on the material where being wrong costs the most. |
+| **Now defended, not incidental** | `remember()` already handed dominance nothing from her lane, as a consequence of *narrative accumulates*. It is now a rule with its evidence beside it and a **behavioural** gate (G-SEM-DOMINATE §10): with the knob forced ON, her second *I love* line must retire nothing, and the mutant that removes the exclusion really does tombstone *[redacted]* |
+| **What would change THIS verdict** | A content carrier that means something for prose, not a bigger structural signature. `aux-1024-v1` (armed 2026-08-23) is the obvious candidate: cosine over her own rows, measured against a hand-labelled set of real duplicates from her store. That set does not exist yet, and a bar invented to sit under a measurement is not a bar. |
 | **Note** | The layer itself is sound and the order is proven (reflexive, antisymmetric, transitive, tri-state, settles). What is unproven is whether its proposals are *good*. Off costs nothing: `find_subsumed` returns `[]` and every verdict is byte-identical (the G-SEM-CONSERVE law). |
 
 ### 5. `SP_SILENCE_ANSWER` — what has gone quiet, at answer time
@@ -92,15 +136,11 @@ above on 2026-07-30. The gaps are the record, and renumbering would erase it.)*
 | **Still worth watching** | The capture path produced 3 rows from one short conversation and **2 were junk** ("I am excited.", "as much I as I want to have some fun together."). Curation is a mop; the admission filter is the leak. |
 | **Already fixed here** | `person.silences()` now floors the span (two separate attended days) and the cadence (never sub-day) — a burst inside one conversation is not a rhythm. That cut five junk silences to one on the live store. |
 
-### 6. `SP_SEM_RANK` — semantic ranking at the recall seam *(recorded 2026-07-30; unchanged 2026-08-21)*
+### 6. semantic ranking at the recall seam — **ARMED 2026-08-23**
 
-| | |
-|---|---|
-| **Code** | `harness/skills/semindex.py` |
-| **Gate** | `harness_tests/g_sem_conserve.py` (conservation); scoreboard `harness_tests/sem_baseline.py` |
-| **Why off** | **MEASURED AGAINST IT, repeatedly.** Every contender is a committed negative: cosine 0.0167 precision, `W_c` hit 0.02 / foreign precision 0.00, the LLM judge declines everything, `frame_link` 0.625 against a 0.80 bar. |
-| **What would arm it** | Beating `harness_tests/fixtures/sem/baseline-receipt.json` — decider paraphrase hit rate **0.06** — on the frozen 160-query corpus. The rig is the asset; each new contender costs one scoreboard run. |
-| **Next contender** | Query→keyword expansion (association, not judgment — a different task shape from the judge that failed). |
+Moved to the ARMED table above. The row is kept, not deleted: it is the record of four
+contenders that lost, and of the reason the fifth won, which was not that it was
+cleverer.
 
 ### 6b. `SP_SEM_EXPAND` — query→keyword expansion from store co-occurrence
 
@@ -191,6 +231,60 @@ the ledger's own invariant: default-off in `build_env`, on only where a profile 
 | `SP_ENGINE_VISION` (`[engine].vision`) | **OFF by default.** Under the openai backend, sight sends the picture as a standard `image_url` content part instead of residual frames — only if the endpoint is multimodal. | Set it on a profile whose endpoint accepts image parts (LM Studio with a vision GGUF, vLLM with a VLM); `sight._describe` then routes through `get_client().chat`. |
 | `SP_ENGINE_MARGIN_APPROX` (`[engine].margin_approx`) | **OFF by default — an approximation, said so.** Without the daemon's `eot_margin` the kairos CONTINUE/EXPAND impulses are dark (REMIND / SOLO / MUSE / CHECK_IN live). On, a `finish_reason == "length"` reads as "cut off" (margin 0.0) — crude, no magnitude, the calibrated thresholds do not apply. | A measured look at how often a length-stop on the chosen endpoint is a real mid-thought cut; until then the honest default is dark. |
 | voice-in under `openai` | **OFF structurally.** The ear produces residual audio frames and a foreign endpoint has no door for them; `voice/service.py` says so as a reply instead of crashing. | `[engine].asr_url` → `/v1/audio/transcriptions` then a text turn — reserved, not built. |
+
+### 13. `presence.mode` — Narration / Company / Lucid Dream *(recorded 2026-08-22)*
+
+| | |
+|---|---|
+| **Code** | `harness/kairos/impulse.py` (`MODE_TURN`, below REMIND/SOLO, above CHECK_IN), `harness/kairos/presence.py` (the three registers, the cue, the whisper/soft wrap, the question trim), `harness/skills/library.py` (the shelf: `var/library/`, bookmarks as positions), the presence window (`ui/src/apps/Presence.jsx`) |
+| **Off means** | she speaks only as kairos allows — no mode turn, no reading aloud; the shelf tools still exist (`presence.read_tools`) |
+| **Arming condition** | his — the presence window's **narrate now / keep me company / dream now** buttons (or Settings → "Presence — her modes" → Mode), or simply asking her (`enter_mode` / `leave_mode` are her tools): an asked-for mode starts STRAIGHT AWAY — ahead of the idle floor and quiet-after-him — and then keeps its cadence; `company` is the softest first step; drop a `.txt` / `.md` / `.epub` into `var/library/` and hand it to her (or she picks it up herself) for reading |
+| **Guards that stay on** | the presence clock (A), quiet-after-him, its own hourly cap (12), `user_turn_active`, shutdown, `worth_saying` judged against her LAST MODE TURN (a dream repeated word for word is dropped); a mode never asks a question (trimmed at the seam) and never ends mid-line (`presence.finish` cuts back to the last full sentence) |
+| **Ambient is not conversation** (2026-08-22) | a mode turn does NOT count as the room being busy: it bounds the cooldown (nothing speaks on top of anything) but is excluded from the presence clock the OTHER actions measure. Measured before the fix: two hours with lucid armed at 240 s = 29 mode turns, **zero** speak-ups and **zero** of her own time. After: her own time and her speak-ups keep their own cadence alongside it |
+| **On a bounce** | an armed mode starts before he has spoken — the tick seeds a conversation from the day (forced; `kairos.seed_on_boot` is about her speaking first on her own) — but only once the prefix is HOT (`set_warm_ok`): she never starts a mode into a cold prefill |
+| **Per mode** | cadence `presence.every_<mode>_s` (240 / 600 / 300), length `presence.len_<mode>` (320 / 90 / 700 tokens); each turn rotates a BEAT (`presence.BEATS`), names what she said last time so she does not repeat it, and carries a fresh sampler seed |
+| **Watch for** | the hourly count; a mode turn landing inside his turn (it must not — G-PRESENCE-MODES §1/§5); `presence.voice` off = bubble only |
+| **Gate** | `python harness_tests/g_presence_modes.py` |
+
+### 14. `aux.auto_recall` — the candidate lane (parallel deep recall) *(recorded 2026-08-22)*
+
+| | |
+|---|---|
+| **Code** | `harness/server/app.py` `_start_lane` / `_lane_lines` (the pre-turn spine block), `harness/sidecar/archive.py::search_async` |
+| **Off means** | her `deep_recall` TOOL still works when she reaches for it; nothing searches the archive on its own |
+| **Arming condition** | the H-AUX-RECALL receipt (`harness_tests/h_aux_recall.py`, `gates/AUX-RECALL-<date>.md`) shows the lane finds moments the spine misses on a set of her real "do you remember" questions; then flip `aux.auto_recall` in the librarians window |
+| **Guards that stay on** | QONLY (only turns that ask), early exit at `aux.early_exit_hits` spine facts, a bounded 1.5 s join, a 0.30 score floor, at most two labelled moments, never a write |
+| **Gate** | `python harness_tests/g_aux_librarian.py` §6 |
+
+### 15. `sight.backend` — which eyes she uses *(recorded 2026-08-22; a CHOICE, not an off switch)*
+
+| | |
+|---|---|
+| **Code** | `harness/skills/sight.py` (`_describe` routes, `_scrub` shared, `sight_tools` arms), `harness/skills/sight_vl.py` (the aux chat door with an `image_url` part), the senses window's "eyes" row and chip |
+| **Default** | `engine` — today's behaviour byte-identical: the served model's frames into the engine, or the seam's `image_url` on a foreign endpoint, else "not available" |
+| **The other choices** | `aux_vl` — an LFM2.5-VL GGUF served by LM Studio (`sight.vl_model`); keeps the GPU the model's, costs one CPU/GPU VL call per look; needs the door up and a model chosen (the chip says `eyes: dark` otherwise). `openai` — the seam's `image_url` regardless |
+| **Why engine stays default** | the model's own vision tower is the one that knows her room; the VL door is the cheaper eye for the hourly look when the GPU is busy — his call, measured look by look |
+| **Gate** | `python harness_tests/g_sight_backends.py` |
+
+## DARK CODE — named, and given a deadline rather than a shrug
+
+`harness/skills/invariance.py` — 170 lines implementing Friedman FIN/USE §3.6.6 and
+FIN/USE* locality. **Nothing on a live path imports it.** Its only importers are its own gate
+(`g_sem_admissible.py`) and `sem_transforms.py`. It was named in the 2026-07-30 dark-code
+audit, and it is still dark at the third pass (2026-08-23).
+
+This is not an off-by-default knob — there is no knob. It is a module that describes the
+theory the rest of the SEM stack is built on and is consulted by none of it. Recorded here
+rather than silently kept, because that is the difference between a decision and a drawer.
+
+**The decision, dated:** it gets ONE use or it goes. The use it should have is the
+admissibility check on the frozen verdict table — `sem_enum.py` now computes a delta
+before every freeze and refuses one that changes a ruling, and "is the resulting table
+ADMISSIBLE in the FIN/USE sense" is exactly the question `invariance.py` exists to answer.
+**Arming condition:** wire it into `sem_enum.py --freeze` beside the delta, or `git rm` it
+(history keeps it, and `g_sem_admissible.py` goes with it). Deferred deliberately at the end
+of the 2026-08-23 pass rather than deleted in a hurry: a gated 170-line module is not
+something to remove without reading it, and reading it was not this session's work.
 
 ## What "off" must never mean
 

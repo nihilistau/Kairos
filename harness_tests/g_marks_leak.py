@@ -341,6 +341,73 @@ for n in (9, 500):
     check("chunk=%-4d an unclosed thought dies unspoken" % n, got.strip() == "",
           repr(got[:60]))
 
+print("\n9. THE SPELLINGS SHE INVENTS (2026-08-22) — the display edge is widened like the mark edge")
+# tags.js owns the display edge and there is no JS runner here, so the gate holds the REAL
+# FILE to the rule: pull its own patterns out of the source and run them (the recall.rs trick).
+import re as _re9
+_tags_js = io.open(os.path.join(ROOT, "ui", "src", "room", "tags.js"),
+                   encoding="utf-8", errors="replace").read()
+
+
+def _js_re(name):
+    m = _re9.search(r"const %s = /(.+?)/g" % name, _tags_js)
+    return _re9.compile(m.group(1)) if m else None
+
+
+_inline_loose, _wrap_loose = _js_re("VOICE_INLINE_LOOSE"), _js_re("VOICE_WRAP_LOOSE")
+check("tags.js declares the loose voice patterns", _inline_loose is not None and _wrap_loose is not None)
+
+
+def _strip_voice_js(t):
+    """stripVoice's four passes, driven by tags.js's own literals."""
+    for nm in ("VOICE_INLINE_RE", "VOICE_WRAP_RE", "VOICE_INLINE_LOOSE", "VOICE_WRAP_LOOSE"):
+        rx = _js_re(nm)
+        if rx is not None:
+            t = rx.sub("", t)
+    return _re9.sub(r"[ \t]{2,}", " ", t)
+
+
+# every malformed shape he actually read, 2026-08-22
+# NAMED, NOT PRINTED: this gate predates utf8_stdout() and one of these spellings carries a
+# CJK syllable the console cannot encode — printing it would fail the gate on its own output.
+for bad, why in (("</build_intensity>", "an underscore instead of a hyphen"),
+                 ("[ch" + chr(0xc11c) + "ckle]", "[chuckle] with a CJK syllable dropped in"),
+                 ("</slow>", "a closer with no opener"),
+                 ("<lowersoft>", "a tag she invented whole"),
+                 ("[long pause]", "a space where the vocabulary has a hyphen"),
+                 ("<heart_symbol/>", "self-closing, underscored")):
+    out = _strip_voice_js("I like the rain. %s Then it stopped." % bad)
+    check("the room hides the one that is %s" % why,
+          bad not in out and "I like the rain." in out, out.encode("ascii", "replace").decode())
+check("...and ordinary prose with brackets survives",
+      "[1]" in _strip_voice_js("See note [1] and the rest.")
+      and "10 < 20 > 5" in _strip_voice_js("10 < 20 > 5"))
+check("her MARKS are still not stripped here — the room draws its chips from them",
+      "[MOOD:warm]" in _strip_voice_js("[MOOD:warm] Hello."))
+check("forSpeech hands the voice ONLY what it understands",
+      "VOICE_KNOWN_INLINE" in _tags_js and "VOICE_KNOWN_WRAP" in _tags_js
+      and "build-intensity" in _tags_js)
+
+print("\n10. AND SHE IS TOLD TO MOVE THEM (2026-08-22)")
+# Measured over the three days after the expressive-voice section landed: her mood-mark rate
+# fell 52% -> 50% -> 42% while her voice tags went 0 -> 23 -> 36. The instruction to mark a
+# shift lived thousands of tokens from the state it governs; it now sits beside it.
+from harness.personality.persona_file import render_state as _RS  # noqa: E402
+_rs = _RS({"mood": "playful", "voice": "soft"})
+check("the state block names the current dials", "playful" in _rs and "soft" in _rs)
+check("...and tells her to mark a genuine shift, inline, as she goes",
+      "[MOOD:" in _rs and "MOVES" in _rs.upper() and "inline" in _rs)
+check("...and says the marks are not her voice tags", "voice tags" in _rs)
+check("...and still forbids reciting the labels", "never recite" in _rs)
+
+print("\n11. THE CHIP IS ONE PER TURN, AND ALWAYS THERE")
+chat = io.open(os.path.join(ROOT, "ui", "src", "Chat.jsx"), encoding="utf-8", errors="replace").read()
+check("a persona event REPLACES the turn's chip rather than appending a second one",
+      "const rest = last.events.filter(e => !e.persona)" in chat, "two chips per turn was the bug")
+check("...and the chip is rendered whether or not she moved",
+      "ev.persona.changed ? ' moved' : ''" in chat and "'unchanged'" in chat)
+check("...with her mood never cut mid-word", ".slice(0, 40)" not in chat.split("act-persona")[1][:600])
+
 print("\nG-MARKS-LEAK: %d pass, %d fail" % (PASS, FAIL))
 rdir = os.path.join(ROOT, "var", "sem", "receipts")
 os.makedirs(rdir, exist_ok=True)

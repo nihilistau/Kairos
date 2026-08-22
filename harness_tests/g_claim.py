@@ -34,6 +34,11 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ["SP_DAEMON_URL"] = "http://127.0.0.1:9"      # discard port: never needs a GPU
+# SP_ENGINE_KIND: no capture attempt at all (2026-08-23). A dead SP_DAEMON_URL does
+# NOT make the KV mint cheap - _mint_now still opens a socket per write and Windows
+# takes ~2s to give up. Declaring the backend makes supports('capture') False and the
+# mint returns immediately: 10 writes in 0.07s against 20s. See gates/README.md.
+os.environ["SP_ENGINE_KIND"] = "openai"
 _fd, _reg = tempfile.mkstemp(suffix=".jsonl")
 os.close(_fd)
 os.environ["SP_RECALL_REGISTRY"] = _reg

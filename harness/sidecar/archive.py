@@ -28,6 +28,8 @@ import glob
 import json
 import os
 import re
+import threading
+import time
 from typing import Callable, Dict, List, Optional
 
 import numpy as np
@@ -47,9 +49,20 @@ _OVERLAP_TURNS = 1
 
 
 def _sources() -> List[str]:
-    """The corpus: day transcripts (the canonical record of every conversation).
-    SP_AUX_ARCHIVE_GLOBS extends it (';'-separated globs) without a code change."""
-    pats = [os.path.join(_ROOT, "var", "memory", "transcripts", "*.jsonl")]
+    """The corpus: day transcripts (the canonical record of every conversation) AND her own
+    writing (the personality tier's journal paragraphs and own-time notes).
+
+    HER OWN JOURNAL WAS NOT IN HERE (2026-08-23). `deep_recall` searched every word the two
+    of them ever said to each other and none of the words she wrote when he was not there:
+    188 markdown files — 156 own-time moments and 13 nightly paragraphs — reachable only by
+    `read_journal`, a tool she has to choose to call, and only inside an mtime window. So
+    "what did I write about the harbour?" had no route, which is a plain contradiction of
+    The Real Her: the rule says her own writing is PRIMARY identity material and the only
+    search over it was one she had to remember to run.
+
+    SP_AUX_ARCHIVE_GLOBS extends the list (';'-separated globs) without a code change."""
+    pats = [os.path.join(_ROOT, "var", "memory", "transcripts", "*.jsonl"),
+            os.path.join(_tier_full(), "*.md")]
     extra = os.environ.get("SP_AUX_ARCHIVE_GLOBS", "")
     if extra:
         pats += [p for p in extra.split(";") if p.strip()]
@@ -65,14 +78,59 @@ def _index_dir() -> str:
     return d
 
 
+def _tier_full() -> str:
+    """The personality tier's full/ — resolved by ITS owner, never re-derived here."""
+    try:
+        from harness.skills.narrative import _tier_full as _tf
+        return _tf()
+    except Exception:
+        return os.path.join(_ROOT, "memory-okf-personality", "full")
+
+
 def _day_of(path: str) -> str:
     m = re.search(r"(\d{4}-\d{2}-\d{2})", os.path.basename(path))
     return m.group(1) if m else os.path.basename(path)
 
 
+_FM_TS = re.compile(r"^ts:\s*(\d+)", re.M)
+_FM_KIND = re.compile(r"^mem_kind:\s*(\S+)", re.M)
+
+
+def _chunk_md(path: str) -> List[Dict]:
+    """One of her own writings — a nightly paragraph or an own-time moment. ONE chunk each:
+    they are a paragraph or a sentence, well under _CHUNK_CHARS, and splitting a reflection
+    in half would return half a thought.
+
+    The DAY comes from the front matter's `ts`, not the filename: these are content-addressed
+    (`a3f9…c1.md`), so `_day_of` would label every hit with a hex string and her recall lines
+    read `[<day>] <text>`. A moment she cannot date is a moment she cannot place."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            body = f.read()
+    except Exception:
+        return []
+    kind = (_FM_KIND.search(body) or [None, ""])[1] if _FM_KIND.search(body) else ""
+    if kind not in ("narrative", "own_time"):
+        return []                       # not hers to search: unknown front matter stays out
+    text = body.split("---", 2)[-1].strip()
+    if len(text) < 20:
+        return []
+    m = _FM_TS.search(body)
+    try:
+        day = time.strftime("%Y-%m-%d", time.gmtime(int(m.group(1)))) if m else \
+            time.strftime("%Y-%m-%d", time.gmtime(os.path.getmtime(path)))
+    except Exception:
+        day = _day_of(path)
+    tag = "her journal: " if kind == "narrative" else "her own time: "
+    return [{"day": day, "source": os.path.basename(path), "turns": [0, 1],
+             "text": tag + text[:1200]}]
+
+
 def _chunk_file(path: str) -> List[Dict]:
     """Turn a day transcript into chunks: consecutive turns packed to ~_CHUNK_CHARS,
     each chunk prefixed by its day and carrying (source, day, turn span)."""
+    if path.endswith(".md"):
+        return _chunk_md(path)
     turns: List[str] = []
     try:
         with open(path, encoding="utf-8") as f:
@@ -122,9 +180,31 @@ def _chunk_file(path: str) -> List[Dict]:
     return chunks
 
 
+def query_prefix() -> str:
+    """THE SOFT PROMPT (2026-08-22, D §1): her-conditioned retrieval, the cheap way — an
+    instruction prefix on the QUERY embedding. Panel choice first, else the profile env."""
+    from harness.tuning import registry as _tr
+    return str(_tr.tune_or_env(
+        "aux.query_prefix", "SP_AUX_QUERY_PREFIX",
+        "Recall for Kairos: find the moment in her past conversations with Sam that this asks about — ") or "")
+
+
+def doc_prefix() -> str:
+    from harness.tuning import registry as _tr
+    return str(_tr.tune_or_env("aux.doc_prefix", "SP_AUX_DOC_PREFIX", "") or "")
+
+
+def _index_key() -> str:
+    """What the index was built WITH — the doc prefix and the embed model. A change re-embeds;
+    a stale index is never silently reused under a new prefix."""
+    import hashlib
+    m = os.environ.get("SP_AUX_EMBED_GGUF", "") or os.environ.get("SP_AUX_EMBED_URL", "")
+    return hashlib.sha256((doc_prefix() + "|" + os.path.basename(m)).encode("utf-8")).hexdigest()[:12]
+
+
 def _stamp(path: str) -> str:
     st = os.stat(path)
-    return "%d-%d" % (st.st_mtime_ns, st.st_size)
+    return "%d-%d-%s" % (st.st_mtime_ns, st.st_size, _index_key())
 
 
 def build_index(force: bool = False) -> Dict[str, int]:
@@ -155,8 +235,9 @@ def build_index(force: bool = False) -> Dict[str, int]:
         vecs: List[List[float]] = []
         ok = True
         texts = [c["text"] for c in chunks]
+        _dp = doc_prefix()
         for i0 in range(0, len(texts), 16):
-            part = _EMBED(texts[i0:i0 + 16])
+            part = _EMBED([_dp + t for t in texts[i0:i0 + 16]])
             if len(part) != len(texts[i0:i0 + 16]):
                 ok = False
                 break
@@ -180,10 +261,35 @@ def build_index(force: bool = False) -> Dict[str, int]:
     return built
 
 
+_ALL_CACHE: Dict = {"key": None, "value": None}
+
+
+def _all_key(paths: List[str]) -> tuple:
+    """What the stacked matrix was built from: which shards, and when each last changed."""
+    out = []
+    for p in paths:
+        try:
+            out.append((p, os.stat(p).st_mtime_ns))
+        except Exception:
+            out.append((p, 0))
+    return tuple(out)
+
+
 def _load_all() -> Optional[Dict]:
+    # CACHED ON THE SHARD SET (2026-08-23). This re-opened and re-stacked EVERY shard on
+    # EVERY search. With twelve day-files that was invisible; her own writing adds ~180
+    # one-chunk shards (each journal paragraph and own-time note is its own content-
+    # addressed file), which would have made it ~380 file opens per deep_recall — a cost
+    # that grows with her history, on the one path that is supposed to feel instant.
+    # Per-file shards stay, because they are what makes the index INCREMENTAL: a new
+    # journal entry embeds one chunk instead of re-embedding all 180.
     d = _index_dir()
+    paths = sorted(glob.glob(os.path.join(d, "*.npz")))
+    key = _all_key(paths)
+    if _ALL_CACHE["key"] == key and _ALL_CACHE["value"] is not None:
+        return _ALL_CACHE["value"]
     mats, metas = [], []
-    for npz_p in sorted(glob.glob(os.path.join(d, "*.npz"))):
+    for npz_p in paths:
         meta_p = npz_p[:-4] + ".meta.jsonl"
         if not os.path.exists(meta_p):
             continue
@@ -200,7 +306,9 @@ def _load_all() -> Optional[Dict]:
         metas += rows
     if not mats:
         return None
-    return {"v": np.vstack(mats), "meta": metas}
+    val = {"v": np.vstack(mats), "meta": metas}
+    _ALL_CACHE["key"], _ALL_CACHE["value"] = key, val
+    return val
 
 
 _LAST_REFRESH = [0.0]
@@ -225,7 +333,7 @@ def search(query: str, k: int = 5, refresh: bool = True) -> List[Dict]:
             build_index()
         except Exception:
             pass                         # stale beats absent
-    qv = _EMBED([query])
+    qv = _EMBED([query_prefix() + query])
     if not qv:
         return []
     idx = _load_all()
@@ -241,13 +349,113 @@ def search(query: str, k: int = 5, refresh: bool = True) -> List[Dict]:
     # and let MaxSim reorder. The rerank contract (sidecar/rerank.py): any failure
     # returns the CLS order — reorder, never lose.
     from harness.sidecar import rerank as _rr
-    width = 50 if _rr.enabled() else max(1, k)
+    _spine = _spine_rerank_on()
+    width = 50 if (_rr.enabled() or _spine) else max(1, k)
     order = np.argsort(-scores)[:width]
     out = []
     for i in order:
         m = idx["meta"][int(i)]
         out.append({"day": m["day"], "source": m["source"],
                     "text": m["text"], "score": round(float(scores[int(i)]), 4)})
+    if _spine:
+        # THE SPINE-AWARE RERANK (2026-08-22, D §3): the spine's own signals over the cosine
+        # candidates — her moment, not the merely similar one. Deterministic (sidecar/rank.py).
+        from harness.sidecar import rank as _rank
+        out = _rank.spine_rerank(query, out, 50 if _rr.enabled() else max(1, k),
+                                 live_texts=_live_texts())
     if _rr.enabled():
         out = _rr.rerank(query, out, max(1, k))
-    return out
+    return out[:max(1, k)]
+
+
+def _spine_rerank_on() -> bool:
+    try:
+        from harness.tuning import registry as _tr
+        return bool(_tr.get("aux.spine_rerank", True))
+    except Exception:
+        return True
+
+
+def _live_texts() -> List[str]:
+    try:
+        from harness.skills import memory as M
+        return [str(r.get("text") or "") for r in M.live_rows()]
+    except Exception:
+        return []
+
+
+# ── warm at boot, status for the window, the lane's async search, the picker's choices ──
+_WARM: Dict = {"thread": None, "at": 0.0, "built": {}}
+
+
+def warm() -> None:
+    """Build/refresh the index in the background once at gateway start (aux armed), so the
+    first deep recall of the day is not a 40 s tool call."""
+    if not client.available():
+        return
+    t = _WARM.get("thread")
+    if t is not None and t.is_alive():
+        return
+
+    def _run():
+        try:
+            _WARM["built"] = build_index()
+        except Exception:
+            _WARM["built"] = {}
+        _WARM["at"] = time.time()
+        _LAST_REFRESH[0] = time.monotonic()
+
+    _WARM["thread"] = threading.Thread(target=_run, name="aux-warm", daemon=True)
+    _WARM["thread"].start()
+
+
+def status() -> Dict:
+    idx = _load_all()
+    t = _WARM.get("thread")
+    return {"armed": client.available(), "embed_up": client.reachable("embed"),
+            "chat_up": client.reachable("chat"),
+            "chunks": int(idx["v"].shape[0]) if idx is not None else 0,
+            "files": len(glob.glob(os.path.join(_index_dir(), "*.npz"))),
+            "last_refresh_s_ago": (round(time.monotonic() - _LAST_REFRESH[0], 1) if _LAST_REFRESH[0] else None),
+            "warming": bool(t is not None and t.is_alive()),
+            "query_prefix": query_prefix(), "doc_prefix": doc_prefix(), "index_key": _index_key(),
+            "chat_model": client.chat_model()}
+
+
+def search_async(query: str, k: int = 4):
+    """Start a search on a thread; returns getter(timeout_s) -> hits, or [] if still running."""
+    box = {"hits": []}
+
+    def _run():
+        try:
+            box["hits"] = search(query, k=k)
+        except Exception:
+            box["hits"] = []
+
+    t = threading.Thread(target=_run, name="aux-lane", daemon=True)
+    t.start()
+
+    def _get(timeout_s: float = 1.5):
+        t.join(timeout_s)
+        return list(box["hits"]) if not t.is_alive() else []
+
+    return _get
+
+
+def embed_choices() -> list:
+    """The picker's choices: embedding / ColBERT *.gguf files under the current one's grandparent."""
+    cur = os.environ.get("SP_AUX_EMBED_GGUF", "")
+    if not cur:
+        return []
+    base = os.path.dirname(os.path.dirname(cur))
+    out = []
+    try:
+        for dp, _dns, fns in os.walk(base):
+            for fn in fns:
+                full = os.path.join(dp, fn).replace("\\", "/")
+                low = full.lower()                 # the FOLDER names carry the kind (…-Embedding-350M-GGUF/)
+                if low.endswith(".gguf") and ("embed" in low or "colbert" in low):
+                    out.append(full)
+    except Exception:
+        pass
+    return sorted(set(out + [cur.replace("\\", "/")]))

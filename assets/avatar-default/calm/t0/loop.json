@@ -1,0 +1,11 @@
+{
+ "kind": "loop",
+ "model": "grok (agent image tools)",
+ "reference_sha": "6fdb7d6aa0fd5b4d",
+ "source_sha": "f92341b66f9aebf8",
+ "at": 1785536594,
+ "set": "kairos-default-1",
+ "bundled": true,
+ "prompt_omitted": "bundled asset - the prompt is not published; see docs/SETUP.md",
+ "asset": "calm/t0/loop.webm"
+}

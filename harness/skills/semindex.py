@@ -26,6 +26,33 @@ Embedding spaces (the `model` tag):
               is off. Sidecars are model artifacts — geom_tag must match or the
               reader skips them. Hash-space remains the fallback when no sidecar
               is present.
+  aux-1024-v1 the CPU sidecar's LFM embedding (harness/sidecar/client.embed, the same
+              door the archive uses), 1024-dim, L2-normed.
+
+              WHY IT EXISTS (2026-08-23). l5-512-v1 IS UNOBTAINABLE ON THIS MODEL. The
+              route that mints ep.l5 refuses on the model MoE — "gemma4_decode_cuda:
+              gemma4-MoE not supported on this path (ADR-013)" — so 253 of 253 rows
+              written since 2026-08-19 carry npos=0 and there has not been one ep.l5 in
+              three weeks. The doc index was therefore 93% hash256 bag-of-words, which
+              means EVERY embedding contender this repo measured and rejected was
+              measured against a bag-of-words document index.
+
+              MEASURED on the frozen corpus (fixtures/sem/, 50 facts / 100 paraphrase /
+              60 foreign queries — the same rig that set the lexical bar):
+
+                                    recall@1   recall@3   foreign false-hit
+                  lexical baseline    0.4600     0.4600         0.5333
+                  aux @ tau 0.40      0.5300     0.5300         0.5333
+
+              More recall at IDENTICAL foreign noise. Through the real seam, and the
+              decider hit rate - what actually reaches her context - goes 0.06 -> 0.17.
+
+              RAW COSINE, NOT CENTERED, and this is load-bearing: centering on
+              space_mean() — which l5-space NEEDS — collapses this space to recall@1
+              0.2900, WORSE than lexical. The anisotropy centered_cosine was written for
+              is an l5 pathology, not a property of embeddings. Wiring the new space
+              through the existing centred branch "for consistency" would have shipped a
+              measured regression. G-SEM-RANK holds the branch.
 
 Address: addr_of(text) — sha256(norm(text))[:16], NORM IDENTICAL to tools/okf_mem.py
 addr_of (the MEM-OKF content address). One address vocabulary across stores, by design.
@@ -39,9 +66,15 @@ import threading
 
 MODEL_HASH = "hash256-v1"
 MODEL_L5 = "l5-512-v1"
-KNOWN_MODELS = (MODEL_HASH, MODEL_L5)
+MODEL_AUX = "aux-1024-v1"
+# ORDER IS PREFERENCE for load(): it keeps the LAST-ranked vector when a row carries
+# several. The QUERY side (query_embed) must land in whichever space the DOCUMENTS are
+# actually in, or every cosine is 0 — same-space-only is the one rule this file has. On
+# this model that is the aux space, and query_embed says why in full.
+KNOWN_MODELS = (MODEL_HASH, MODEL_AUX, MODEL_L5)
 _HASH_DIM = 256
 _L5_DIM = 512
+_AUX_DIM = 1024
 
 _LOCK = threading.RLock()
 _DROPPED = 0        # telemetry: silent mint failures (never an exception outward)
@@ -98,6 +131,56 @@ def read_ep_l5(out_dir: str):
         if not all(math.isfinite(v) for v in vec):
             return None
         return [round(v, 6) for v in vec]
+    except Exception:
+        return None
+
+
+def aux_enabled() -> bool:
+    """The aux doc/query space, armed by [sem].aux_embed -> SP_SEM_AUX_EMBED."""
+    return os.environ.get("SP_SEM_AUX_EMBED", "0") == "1"
+
+
+def aux_tau() -> float:
+    """The admission threshold for THE AUX SPACE. Its own knob, and it must be: SP_SEM_TAU
+    (0.60, chosen for l5's inflated raw cosines) admits nothing at all here.
+
+    0.40 IS MEASURED THROUGH THE REAL SEAM (harness_tests/sem_aux.py), not off a notebook.
+    A top-1-only calculation said 0.20 looked best; the seam admits EVERY row over tau, so
+    at 0.20 it also injected an unrelated fact on 55% of foreign queries — the "she recited
+    a memory nobody asked about" bug, bought back. Swept on the frozen corpus:
+
+        tau   recall@1  decider_hit  foreign_seam  foreign_inject
+        lex     0.4600       0.0600        0.5333          0.1333   <- the bar
+        0.25      0.83         0.62        0.6333          0.4
+        0.30      0.70         0.45        0.5333          0.2
+        0.35      0.58         0.24        0.5333          0.15
+        0.40      0.53         0.17        0.5333          0.1333   <- nothing is worse
+        0.50      0.47         0.07        0.5333          0.1333
+
+    0.40 is the MOST recall available for which NOT ONE metric degrades. 0.35 buys another
+    41% of true injections for one extra foreign injection in sixty; that is a real trade
+    and it is his to make, not one to smuggle into a default."""
+    try:
+        return float(os.environ.get("SP_SEM_TAU_AUX", "0.40"))
+    except Exception:
+        return 0.40
+
+
+def aux_embed(texts):
+    """Embed through the CPU sidecar. Returns a list of vectors, or None on any failure —
+    the caller degrades to hash-space, never raises, never blocks a turn. Never imports
+    the memory package; this is the derived side asking the librarian for a number."""
+    try:
+        if not aux_enabled():
+            return None
+        from harness.sidecar import client as _c
+        out = _c.embed(list(texts))
+        if not out or len(out) != len(list(texts)):
+            return None
+        for v in out:
+            if len(v) != _AUX_DIM or not all(math.isfinite(x) for x in v):
+                return None
+        return [[round(float(x), 6) for x in v] for v in out]
     except Exception:
         return None
 
@@ -163,9 +246,16 @@ def mint(fact: str, ts: str, out_dir: str = None) -> bool:
         # than excluding them from semantics forever. Same text ⇒ same addr, so the
         # degenerate key stays unambiguous.
         vec = read_ep_l5(out_dir) if out_dir else None
-        model = MODEL_L5 if vec is not None else MODEL_HASH
-        _append({"addr": addr_of(fact), "ts": ts or "", "model": model,
-                 "vec": vec if vec is not None else hash_embed(fact)})
+        model = MODEL_L5
+        if vec is None:
+            # the engine's L5 is unobtainable on the model MoE (see the header) — ask the
+            # CPU sidecar before falling to the bag-of-words floor
+            got = aux_embed([fact])
+            if got:
+                vec, model = got[0], MODEL_AUX
+        if vec is None:
+            vec, model = hash_embed(fact), MODEL_HASH
+        _append({"addr": addr_of(fact), "ts": ts or "", "model": model, "vec": vec})
         return True
     except Exception:
         _DROPPED += 1
@@ -251,17 +341,46 @@ _EMBED_HOLDOFF = 60.0       # not a timeout per recall — the seam runs every t
 
 
 def query_embed(query: str):
-    """(vec, model_tag) for a live query. Tries the daemon's /v1/embed (the engine's
-    l5_query_embed of the query text — the 88.5%-paraphrase selector) with a short
-    timeout; on ANY failure degrades to hash-space and holds off retries for a minute.
-    The tag rides along so the seam only ever compares same-space vectors: cosine
-    across spaces is noise."""
+    """(vec, model_tag) for a live query. The tag rides along so the seam only ever
+    compares same-space vectors: cosine across spaces is noise.
+
+    ORDER, and it is measured, not conventional (2026-08-23): the AUX space first when it
+    is armed, then the daemon's /v1/embed (the engine's l5_query_embed — the
+    88.5%-paraphrase selector) with a short timeout, then the hash floor. On ANY failure
+    it degrades and holds daemon retries off for a minute. The order is explained in full
+    at the branch below; the short version is that the engine can embed a QUERY and cannot
+    embed a DOCUMENT on this model, so an l5 query has almost nothing to match."""
     global _EMBED_DOWN_UNTIL
     import time as _time
     import urllib.request
-    # ENGINE-AGNOSTIC ORDER (2026-08-21): the daemon's L5 only when the backend HAS
-    # one; otherwise the sidecar's /v1/embeddings (hash-space tag — a different space,
-    # and the seam only compares same-space vectors); then the hash floor.
+    # ── THE ASYMMETRY THAT DECIDES THE ORDER (2026-08-23) ─────────────────────────────
+    # /v1/embed WORKS on the model MoE and answers in ~1.47 s. /v1/capture does NOT — it
+    # refuses (ADR-013), so no ep.l5 has been minted in three weeks. The engine can embed
+    # a QUERY and cannot embed a DOCUMENT. Asking it first would spend 1.47 s of every
+    # turn producing an l5 vector with 57 stale rows to match against, out of 229 live
+    # ones — a real per-turn cost for a gate that cannot fire. So when the aux space is
+    # armed it goes first: it is the only space with a COMPLETE document side on this
+    # model. If capture is ever fixed, measure again and revisit this order — that is
+    # what G-SEM-RANK's coverage check is for.
+    #
+    # AND IT COMES BEFORE THE BACKEND CHECK, NOT AFTER (caught the same day, by the gate
+    # speed-up of all things). The engine capability gate below returns the hash floor when
+    # the backend has no /v1/embed — and the aux space is a CPU SIDECAR that has nothing to
+    # do with the backend. With the aux branch after it, ANY foreign engine made the aux
+    # space unreachable: hash-space queries against an aux-space document index, every
+    # cosine 0, the whole gate silently dead. That is precisely Kairos's configuration,
+    # where aux is the ONLY space there is.
+    if aux_enabled():
+        got = aux_embed([query])
+        if got:
+            return got[0], MODEL_AUX
+        # AND IF THE SIDECAR IS DOWN, THE FLOOR — NOT the engine. Falling through to l5
+        # here would be worse on both counts at once: 1.47 s for a vector with 57 stale
+        # documents to match, against ~0 ms for a hash vector with 757. When the documents
+        # are in the aux space, an l5 query is not a degradation, it is a dead end.
+        return hash_embed(query), MODEL_HASH
+    # ENGINE-AGNOSTIC (2026-08-21): the daemon's L5 only when the backend HAS one; then
+    # the hash floor. Reached only when the aux space is not armed or its sidecar is down.
     try:
         from harness.inference.backends import supports as _sup
         _has_l5 = _sup("embed")
@@ -348,6 +467,51 @@ def backfill(registry_rows) -> dict:
     return {"minted": minted, "skipped": skipped, "refused": refused}
 
 
+def backfill_aux(registry_rows, batch: int = 32) -> dict:
+    """UPGRADE every live row that has no aux-space vector yet (2026-08-23).
+
+    An upgrade is an APPEND — the hash row stays on disk, exactly as the l5 upgrade path
+    works, because this file is append-only and tombstone-blind by construction. Batched
+    because the sidecar embeds a list far faster than one at a time (measured: 210 texts
+    in 6.1 s), and this runs over the whole store.
+
+    Idempotent: a row that already carries an aux vector is skipped. Requires enabled()
+    AND aux_enabled(); says which one is missing rather than returning a silent zero."""
+    if not enabled():
+        return {"upgraded": 0, "skipped": 0, "note": "SP_SEM_MINT off or SP_SEM_INDEX unset"}
+    if not aux_enabled():
+        return {"upgraded": 0, "skipped": 0, "note": "SP_SEM_AUX_EMBED off"}
+    have = set()
+    try:
+        with open(index_path(), encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    r = json.loads(line)
+                except Exception:
+                    continue
+                if r.get("model") == MODEL_AUX:
+                    have.add((r.get("addr"), r.get("ts") or ""))
+    except Exception:
+        pass
+    live = list(_live(registry_rows))
+    todo = [r for r in live if (addr_of(r["text"]), r.get("ts") or "") not in have]
+    upgraded = failed = 0
+    for i in range(0, len(todo), max(1, int(batch))):
+        chunk = todo[i:i + max(1, int(batch))]
+        vecs = aux_embed([r["text"] for r in chunk])
+        if not vecs:
+            failed += len(chunk)
+            continue
+        for r, v in zip(chunk, vecs):
+            _append({"addr": addr_of(r["text"]), "ts": r.get("ts") or "",
+                     "model": MODEL_AUX, "vec": v})
+            upgraded += 1
+    return {"upgraded": upgraded, "skipped": len(live) - len(todo), "failed": failed}
+
+
 if __name__ == "__main__":
     import sys
     reg_path = os.environ.get("SP_RECALL_REGISTRY", "")
@@ -357,6 +521,8 @@ if __name__ == "__main__":
             rows = [json.loads(x) for x in f if x.strip()]
     if "--backfill" in sys.argv:
         print(json.dumps(backfill(rows)))
+    if "--backfill-aux" in sys.argv:
+        print(json.dumps(backfill_aux(rows)))
     if "--verify" in sys.argv:
         bad = verify(rows)
         print(json.dumps({"bad": bad[:10], "count": len(bad)}))

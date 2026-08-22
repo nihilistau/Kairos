@@ -28,6 +28,11 @@ export function KnobControl({ k, busy, onSet }) {
       </select>
     )
   }
+  if (k.type === 'str') {
+    // a free-text knob (the first: presence.cue, 2026-08-22) — committed on blur like the numbers
+    return <input type="text" defaultValue={k.value || ''} disabled={dis} maxLength={200}
+                  onBlur={e => { if (e.target.value !== (k.value || '')) onSet(k.key, e.target.value) }} />
+  }
   return <input type="number" defaultValue={k.value} disabled={dis}
                 min={k.min ?? undefined} max={k.max ?? undefined}
                 step={k.step ?? undefined}

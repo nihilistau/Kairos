@@ -1,5 +1,6 @@
 import { usePoll, Body, Row } from './panel.jsx'
 import * as api from '../api.js'
+import { KnobGroups } from './knobs.jsx'
 
 /* SENSES — what she can actually receive, ruled from the committed capability
  * table. The "why not" line is the point of the panel: an absent sense must say
@@ -16,6 +17,13 @@ export default function Senses() {
           <h3>{d.capability.model}</h3>
           <Row k="hidden size" v={d.capability.hidden_size} />
           <Row k="sight" v={d.capability.sight ? 'yes' : 'no'} tone={d.capability.sight ? 'ok' : 'off'} />
+          {/* WHICH EYES (2026-08-22, E): engine / an LFM VL model on the aux door / the seam —
+              a picker; every look goes through the same door and the same scrub */}
+          <Row k="eyes" v={!d.eyes ? '—'
+                : d.eyes.backend === 'aux_vl' ? ('aux VL · ' + (d.eyes.vl_model || 'no model') + (d.eyes.door_up ? '' : ' · door dark'))
+                : d.eyes.backend === 'openai' ? 'the seam (image_url)'
+                : 'engine'}
+               tone={d.eyes && (d.eyes.backend !== 'aux_vl' || (d.eyes.vl_model && d.eyes.door_up)) ? 'ok' : 'off'} />
           <Row k="hearing" v={d.capability.hearing ? 'yes' : 'no'} tone={d.capability.hearing ? 'ok' : 'off'} />
           {!d.capability.hearing && <p className="why">{d.capability.why_no_hearing}</p>}
 
@@ -23,6 +31,11 @@ export default function Senses() {
           <Row k="enabled" v={String(d.ambient && d.ambient.enabled)} tone={d.ambient && d.ambient.enabled ? 'ok' : 'off'} />
           <Row k="every" v={Math.round(((d.ambient && d.ambient.interval_s) || 0) / 60) + ' min'} />
           <Row k="next in" v={d.ambient && d.ambient.next_in_s != null ? d.ambient.next_in_s + 's' : '—'} />
+
+          <details className="sns-eyes">
+            <summary>eyes settings</summary>
+            <KnobGroups only={['Sight — her eyes']} />
+          </details>
 
           <h4>capture</h4>
           <Row k="backends" v={Object.entries((d.capture && d.capture.backends) || {})
@@ -33,7 +46,7 @@ export default function Senses() {
       <Body state={v}>{d => (
         <>
           <h4>her voice</h4>
-          <Row k="backend" v={d.backend} tone={d.warm ? 'ok' : ''} />
+          <Row k="backend" v={d.backend + (d.live && d.live.method === 'local' && d.live.local_gguf ? ' · ' + d.live.local_gguf : '')} tone={d.warm ? 'ok' : ''} />
           <Row k="warm" v={String(d.warm)} tone={d.warm ? 'ok' : 'off'} />
           <Row k="cached lines" v={d.cached} />
         </>

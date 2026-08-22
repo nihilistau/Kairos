@@ -184,9 +184,18 @@ def ask_oracle(text_a: str, text_b: str):
     # drifting into prose on hard pairs (the first prompt got back 'The same person is
     # referred to in both' on the ladders pair; unparseable proposes nothing, so the
     # failure was safe — but a mute judge is a useless one).
+    # ── THE FEW-SHOT WAS UNREPRESENTATIVE OF THE TASK (2026-08-23) ──────────────────
+    # Both original exemplars were COMPATIBLE statements, so nothing in the prompt said
+    # that two statements which DISAGREE are still about one subject — and by
+    # construction that is the only kind of pair the gap zone contains. Measured on the
+    # live 26B: the ladders pair, THE case this whole phase exists to close, came back
+    # "different". Adding one competing exemplar (and saying it in a line) fixed exactly
+    # that: 4/5 -> 5/5 on the hand cases, ladders included, controls unchanged.
     prompt = ("Decide whether two statements are about the SAME specific subject. "
+              "Two statements that DISAGREE are still about the same subject.\n"
               "Reply with exactly one word, YES or NO.\n"
               "A: \"The shed door sticks in winter.\"  B: \"The shed door was repainted.\"  -> YES\n"
+              "A: \"The shed door sticks in winter.\"  B: \"The shed door opens smoothly now.\"  -> YES\n"
               "A: \"The shed door sticks in winter.\"  B: \"The car needs new tyres.\"  -> NO\n"
               "A: \"%s\"  B: \"%s\"  ->" % (text_a.strip(), text_b.strip()))
     try:

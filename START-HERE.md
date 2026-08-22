@@ -70,7 +70,7 @@ asserted, always said. 4. Her word never outranks his. 5. Verdicts are rulings o
 finite tables — prose and magnitudes never rule.
 
 *Sibling repos: [shannon-prime-lattice](https://github.com/nihilistau/shannon-prime-lattice)
-(the research ledger and papers); **Kairos** (the engine-agnostic framework, exported from this
+(the research ledger and papers); [**Kairos**](https://github.com/nihilistau/Kairos) (the engine-agnostic framework, exported from this
 tree by `python tools/kairos_export.py` from the manifest in `kairos-export/` — filtered, scrubbed,
 fresh history; `docs/BACKENDS.md` is the seam it rides on; `profiles/companion.toml` runs it here
 on :8810 beside her).*

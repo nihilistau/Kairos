@@ -14,6 +14,8 @@ import Tools from './apps/Tools.jsx'
 import Board from './apps/Board.jsx'
 import Memory from './apps/Memory.jsx'
 import Room from './apps/Room.jsx'
+import Presence from './apps/Presence.jsx'
+import Librarians from './apps/Librarians.jsx'   // not Aux.jsx: 'aux' is a Windows reserved device name
 import Music from './apps/Music.jsx'
 import Journal from './apps/Journal.jsx'
 import Files from './apps/Files.jsx'
@@ -22,13 +24,14 @@ import Stage from './apps/Stage.jsx'
 import Games from './apps/Games.jsx'
 import Wardrobe from './apps/Wardrobe.jsx'
 import Settings from './apps/Settings.jsx'
+import Setup from './apps/Setup.jsx'
 import Agency from './apps/Agency.jsx'
 import Research from './apps/Research.jsx'
 import Search from './apps/Search.jsx'
 import Voice from './apps/Voice.jsx'
 import Apps from './apps/Apps.jsx'
 import { VoiceChip, SearchChip, ResearchChip, WardrobeChip, StageChip,
-         MusicChip, GamesChip, RoomChip } from './apps/titleChips.jsx'
+         MusicChip, GamesChip, RoomChip, PresenceChip, AuxChip, SensesChip } from './apps/titleChips.jsx'
 
 /* CSS OWNERSHIP. `css` is the class-name prefix this app owns, and it is not
  * decoration — G-ROOM-CSS reads it. The ledger's first cut called a row `.led`,
@@ -53,6 +56,8 @@ export const APPS = [
     blurb: 'every window there is, and which of them live in this dock — change it live' },
   { id: 'settings', title: 'settings', icon: '⚙', w: 660, h: 620, Component: Settings, css: 'st',
     blurb: 'every knob, grouped — voice, search, research, kairos, the lot. live ones apply on the next call' },
+  { id: 'setup', title: 'setup', icon: '⚑', w: 660, h: 640, Component: Setup, css: 'su',
+    blurb: 'what is configured and what is not — your endpoint, your keys, her face, the model cards. reads only' },
   { id: 'voice', title: 'voice', icon: '🎙', w: 560, h: 460, Component: Voice, css: 'vc',
     TitleChip: VoiceChip,
     blurb: 'her voice — on/off, provider, who speaks. live, and a button to hear it' },
@@ -62,7 +67,8 @@ export const APPS = [
   { id: 'wardrobe', title: 'wardrobe', icon: '👗', w: 620, h: 560, Component: Wardrobe, css: 'wr',
     TitleChip: WardrobeChip,
     blurb: 'what she is wearing, what else she could be, and the moments she can show you' },
-  { id: 'senses', title: 'senses',  icon: '👁', w: 560, h: 460, Component: Senses, css: 'sns',
+  { id: 'senses', title: 'senses',  icon: '👁', w: 560, h: 520, Component: Senses, css: 'sns',
+    TitleChip: SensesChip,
     blurb: 'what she can see and hear, and what the room has looked like' },
   { id: 'tools',  title: 'tools',   icon: '🛠', w: 720, h: 520, Component: Tools, css: 'tl',
     blurb: 'every tool she has, by family and by risk' },
@@ -96,6 +102,12 @@ export const APPS = [
   { id: 'room',   title: 'the room',icon: '🏠', w: 560, h: 460, Component: Room, css: 'rm',
     TitleChip: RoomChip,
     blurb: 'her hourly notes on the room — the eye waits for quiet before it looks' },
+  { id: 'presence', title: 'presence', icon: '☾', w: 600, h: 560, Component: Presence, css: 'prs',
+    TitleChip: PresenceChip,
+    blurb: 'narration, company, lucid dream — her modes of being there out loud, and the shelf she reads from' },
+  { id: 'librarians', title: 'librarians', icon: '📚', w: 620, h: 560, Component: Librarians, css: 'lib',
+    TitleChip: AuxChip,
+    blurb: 'the quiet librarians — the small CPU models that embed, retrieve, judge and read for her; never her voice' },
 ]
 
 export const byId = (id) => APPS.find(a => a.id === id)

@@ -81,7 +81,11 @@ M._CACHE = None if hasattr(M, "_CACHE") else None
 block = render_self_model()
 check("her own facts are in the block", "thunderstorms" in block and "rain" in block, block)
 check("HIS facts are NOT — this block is about her", "Subaru" not in block, block)
-check("it is labelled so she knows what it is", block.startswith("About yourself"))
+# THE HEADER IS LOAD-BEARING (2026-08-22): under "About yourself (self-model):" she read the
+# block as a briefing and narrated it out loud. It says MEMORY, and says not to mention it.
+check("it is labelled so she knows what it is — memory, not instructions, never narrated",
+      block.startswith("Things you know about yourself")
+      and "not instructions" in block and "Never mention" in block, block[:120])
 
 print("\n2. a retired self-fact is NOT recited")
 write_rows([
@@ -163,7 +167,7 @@ os.environ["SP_PERSONA_DIR"] = os.path.join(SB, "nofrags")
 from harness.agent import load_agent_system  # noqa: E402
 prefix = load_agent_system()
 check("the block is present in the composed prefix",
-      "About yourself (self-model)" in prefix, prefix[:120])
+      "Things you know about yourself" in prefix, prefix[:120])
 check("...carrying the fact itself", "tin roof" in prefix)
 
 app = io.open(os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read()

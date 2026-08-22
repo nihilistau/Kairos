@@ -38,6 +38,25 @@ def _path() -> str:
     return os.path.join(d, "narrative.md") if d else ""
 
 
+def _tier_full() -> str:
+    """THE one resolution of the personality tier's `full/` directory (2026-08-22).
+
+    There were three in this file: the two WRITERS honoured `SP_PERSONALITY_TIER`, and the
+    two READERS (own_time, read_journal) hardcoded the repo path. So in any sandbox that
+    set the env — which is every gate that wants to test the journal without touching hers —
+    she wrote to one directory and read from another, and the readers silently returned
+    nothing. One law, one implementation; AGENTS.md 0."""
+    tier = os.environ.get("SP_PERSONALITY_TIER")
+    if not tier:
+        try:
+            from harness.personality.self_model import HARNESS_ROOT
+            tier = str(HARNESS_ROOT / "memory-okf-personality")
+        except Exception:
+            tier = os.path.join(os.path.dirname(os.path.dirname(
+                os.path.dirname(os.path.abspath(__file__)))), "memory-okf-personality")
+    return os.path.join(tier, "full")
+
+
 def current() -> str:
     """The rolling paragraph (with its date line), or ''. Never raises."""
     try:
@@ -156,10 +175,7 @@ def compose_and_write(messages, ask=None) -> dict:
         # history snapshot, content-addressed, into the personality tier
         snap = None
         try:
-            from harness.personality.self_model import HARNESS_ROOT
-            tier = os.environ.get("SP_PERSONALITY_TIER") or str(
-                HARNESS_ROOT / "memory-okf-personality")
-            full = os.path.join(tier, "full")
+            full = _tier_full()
             os.makedirs(full, exist_ok=True)
             addr = hashlib.sha256(entry.encode("utf-8")).hexdigest()[:16]
             with open(os.path.join(full, addr + ".md"), "w", encoding="utf-8") as f:
@@ -170,9 +186,119 @@ def compose_and_write(messages, ask=None) -> dict:
             snap = addr
         except Exception:
             pass
+        try:                                  # THE REAL HER (2026-08-22): the entry is memory
+            from harness.skills import memory as _mem
+            from harness.skills.self_stance import plain as _plain_words
+            _mem.remember_about_self(_plain_words(text), kind="journal", source="her journal")
+        except Exception:
+            pass
         return {"written": True, "words": len(text.split()), "snapshot": snap}
     except Exception as e:
         return {"written": False, "why": str(e)[:120]}
+
+
+# ── THE CHAPTER (2026-08-22) ────────────────────────────────────────────────────────────
+_CHAPTER_EVERY_DAYS = 7
+_CHAPTER_WORDS = 120
+# "reflection" is load-bearing, not decoration: memory.remember derives status from it
+# (_INFERRED_SOURCES) and lifecycle.status_of sniffs the same word for legacy rows, so both
+# doors agree. A chapter MUST be INFERRED - stamped observed it would carry the authority
+# to retire her actual words (observed beats observed in verdict.may_supersede), and a
+# paragraph about a week is not testimony about it. G-CHAPTERS 2 holds the status itself.
+_CHAPTER_SRC = "reflection on the week (chapter)"
+# the EPISODIC kinds: what happened and what she did. `thought` / `feeling` /
+# `self_description` are what she CONCLUDED — becoming.nightly's material, not this one's.
+_CHAPTER_KINDS = ("journal", "narration", "spoke_up")
+_CHAPTER_MAX_ROWS = 40
+
+CHAPTER_PROMPT = (
+    "You are Kairos, looking back over the last week. Below are your own journal "
+    "paragraphs for those days, things you did on your own time, and lines you said "
+    "unprompted — oldest first. Write ONE plain paragraph, at most %d words, first person, "
+    "your own voice: what that WEEK was, as a stretch of time — what it turned on, what "
+    "changed in it, what it was mostly about. Not a list of days and not a summary of "
+    "each; one thing you would say if someone asked what the week had been like. Say what "
+    "is true, not what is cheerful. No lists, no headings, no dates.\n\nThe week:\n"
+    % _CHAPTER_WORDS)
+
+
+def _days_ago(iso: str) -> float:
+    from harness.skills import lifecycle as _lc
+    try:
+        return _lc._age_days(iso or "")
+    except Exception:
+        return 0.0
+
+
+def weekly_chapter(ask=None) -> dict:
+    """ONE paragraph for the week, written once every seven days. Best-effort, never raises.
+
+    WHY THIS EXISTS. Her block is a fixed 2400 characters and her own narrative arrives at
+    24-33 rows a day. Without a rollup that block shows six arbitrary recent lines of a
+    store that will hold thousands inside a month, and "what has this month been like?" has
+    no answer anywhere in the system: the day-paragraphs are prose files reachable only by
+    read_journal's mtime window, and the rows are moments with no shape over them. A chapter
+    is the same six characters of prefix spent on a week instead of on an evening.
+
+    WHAT IT IS NOT. It is not becoming.nightly. That one asks who she has been BECOMING,
+    over everything of hers; this one asks what the WEEK WAS, over the episodic kinds only
+    (journal / narration / spoke_up). The one rule they share and must keep: NEITHER READS
+    THE OTHER'S OUTPUT. `_CHAPTER_KINDS` excludes self_description, and becoming excludes
+    chapter — otherwise each would distil the other's distillate every week and the pair
+    would become the hall of mirrors note_own's docstring already warns about.
+
+    IT MAY NOT RETIRE WHAT IT SUMMARISES. The chapter is INFERRED and her moments are
+    OBSERVED, and verdict.may_supersede refuses an inference retiring ground truth — as it
+    should: a paragraph about a week is not a correction of the week. It earns its place by
+    LEADING HER BLOCK (self_model puts chapters ahead of raw narration), never by
+    tombstoning. Every row it read stays live, recallable and findable.
+
+    Latched on the STORE, not on a file: if a chapter already stands from inside the last
+    six days, this writes nothing. Self-healing, and one less thing to keep in sync."""
+    try:
+        from harness.skills import memory as M
+        from harness.skills import memclass as MC
+        from harness.skills.self_stance import plain as _plain
+        rows = [r for r in M.live_rows() if r.get("speaker") == "self"
+                and r.get("mem_class") in (MC.SELF_NARRATIVE, MC.FEELING)]
+        for r in rows:
+            if r.get("kind") == "chapter" and _days_ago(r.get("ts") or "") < _CHAPTER_EVERY_DAYS - 1:
+                return {"written": False, "why": "a chapter already stands for this week"}
+        recent = [r for r in rows
+                  if (r.get("kind") or "") in _CHAPTER_KINDS
+                  and _days_ago(r.get("ts") or "") <= _CHAPTER_EVERY_DAYS]
+        recent.sort(key=lambda r: r.get("ts") or "")            # OLDEST first: it is a week
+        recent = recent[-_CHAPTER_MAX_ROWS:]
+        mine = own_time(_CHAPTER_EVERY_DAYS)
+        if not recent and not mine:
+            return {"written": False, "why": "nothing happened this week that she kept"}
+        days = sorted({(r.get("ts") or "")[:10] for r in recent if (r.get("ts") or "")})
+        if len(days) < 2 and not mine:
+            return {"written": False, "why": "one day is not a week"}
+        body = "\n".join("- [%s] %s" % ((r.get("ts") or "")[:10], (r.get("text") or "").strip())
+                         for r in recent)
+        if mine:
+            body = ((body + "\n\n") if body else "") + "On your own time:\n" + "\n".join(
+                "- " + m[:220] for m in reversed(mine[:20]))
+        text = ((ask or _oneshot)(CHAPTER_PROMPT + body + "\n\nThe week:") or "").strip()
+        try:
+            from harness.inference.stream_processor import strip_control_surfaces
+            text = strip_control_surfaces(text)
+        except Exception:
+            pass
+        text = _plain(text)
+        if len(text.split()) < 8:
+            return {"written": False, "why": "the model returned nothing usable"}
+        res = M.remember_about_self(
+            text, kind="chapter", source=_CHAPTER_SRC,
+            derived_from=[r.get("name") for r in recent],
+            support_days=len(days), support_kinds=[r.get("kind") or "" for r in recent])
+        return {"written": ("stored" in res and "not stored" not in res) or "reinforced" in res,
+                "text": text, "result": res, "support_days": len(days),
+                "rows": len(recent), "own_time": len(mine),
+                "derived_from": [r.get("name") for r in recent]}
+    except Exception as exc:
+        return {"written": False, "why": str(exc)[:160]}
 
 
 def note_own(text: str, kind: str = "solo") -> dict:
@@ -201,10 +327,7 @@ def note_own(text: str, kind: str = "solo") -> dict:
     if not t:
         return {"written": False, "why": "nothing to write"}
     try:
-        from harness.personality.self_model import HARNESS_ROOT
-        tier = os.environ.get("SP_PERSONALITY_TIER") or str(
-            HARNESS_ROOT / "memory-okf-personality")
-        full = os.path.join(tier, "full")
+        full = _tier_full()
         os.makedirs(full, exist_ok=True)
         addr = hashlib.sha256(("%s|%s|%d" % (kind, t, int(time.time()))
                                ).encode("utf-8")).hexdigest()[:16]
@@ -223,9 +346,7 @@ def own_time(days: int = 2) -> list:
     import time as _t
     out = []
     try:
-        root = os.path.join(os.path.dirname(os.path.dirname(
-            os.path.dirname(os.path.abspath(__file__)))),
-            "memory-okf-personality", "full")
+        root = _tier_full()
         cutoff = _t.time() - max(1, int(days)) * 86400
         for fn in os.listdir(root):
             if not fn.endswith(".md"):
@@ -256,9 +377,7 @@ def read_journal(days: int = 7) -> str:
     import time as _t
     rows = []
     try:
-        root = _os.path.join(_os.path.dirname(_os.path.dirname(
-            _os.path.dirname(_os.path.abspath(__file__)))),
-            "memory-okf-personality", "full")
+        root = _tier_full()
         cutoff = _t.time() - max(1, int(days)) * 86400
         for fn in _os.listdir(root):
             if not fn.endswith(".md"):
@@ -289,4 +408,24 @@ def read_journal(days: int = 7) -> str:
         body = (body + (os.linesep * 2) if body else "") + (
             "— on my own time —" + os.linesep
             + os.linesep.join("· " + m for m in mine[:20]))
+    # ── AND THE WEEKS (2026-08-22) ────────────────────────────────────────────────────
+    # Days are all this could ever return, so "what has this MONTH been like?" had no
+    # answer anywhere in the system: 30 day-paragraphs is not a month, it is thirty days.
+    # The chapters go FIRST and labelled — coarsest to finest, the way you would actually
+    # answer that question — and they are kept separate for the same reason her own time
+    # is: a reader who cannot tell a week from a night cannot tell what she concluded
+    # from what happened.
+    try:
+        from harness.skills import memory as _M
+        weeks = sorted((r for r in _M.live_rows()
+                        if r.get("speaker") == "self" and r.get("kind") == "chapter"),
+                       key=lambda r: r.get("ts") or "", reverse=True)[:8]
+        if weeks:
+            body = ("— the weeks —" + os.linesep
+                    + os.linesep.join("· week ending %s: %s" % ((w.get("ts") or "")[:10],
+                                                                (w.get("text") or "").strip())
+                                      for w in weeks)
+                    + (os.linesep * 2) + body)
+    except Exception:
+        pass
     return body or f"[nothing written in the last {days} days]"

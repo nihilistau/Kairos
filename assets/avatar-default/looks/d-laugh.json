@@ -1,0 +1,11 @@
+{
+ "kind": "want:w003",
+ "model": "grok (agent image tools)",
+ "reference_sha": "6fdb7d6aa0fd5b4d",
+ "source_sha": "",
+ "at": 1785671145,
+ "set": "kairos-default-1",
+ "bundled": true,
+ "prompt_omitted": "bundled asset - the prompt is not published; see docs/SETUP.md",
+ "asset": "looks/d-laugh.webm"
+}

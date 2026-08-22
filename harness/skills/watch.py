@@ -136,6 +136,16 @@ def check(note: dict, judge=None) -> dict:
             "results": real[:4]}
 
 
+def _watch_judge_armed() -> bool:
+    """Panel choice first (aux.judge_watch), else the profile env — registry.tune_or_env."""
+    try:
+        from harness.tuning import registry as _tr
+        v = _tr.tune_or_env("aux.judge_watch", "SP_AUX_WATCH_JUDGE", "0")
+        return v is True or str(v) == "1" or str(v).lower() == "true"
+    except Exception:
+        return os.environ.get("SP_AUX_WATCH_JUDGE", "0") == "1"
+
+
 def _pick_judge():
     """The sidecar judges watches when armed (SP_AUX_WATCH_JUDGE=1); the model stays
     the fallback the moment the sidecar is dark or gives no usable shape.
@@ -147,7 +157,7 @@ def _pick_judge():
     quote a line that actually appears in the search results. The 26B one-shot
     this replaces measured 6.6-78 s of GPU per poll; the 1.2B answers on CPU in
     about a second."""
-    if os.environ.get("SP_AUX_WATCH_JUDGE", "0") == "1":
+    if _watch_judge_armed():
         return _judge_sidecar
     return _judge
 

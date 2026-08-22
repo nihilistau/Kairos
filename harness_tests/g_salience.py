@@ -44,8 +44,14 @@ sys.path.insert(0, ROOT)
 _TMP = tempfile.mkdtemp()
 os.environ["SP_RECALL_REGISTRY"] = os.path.join(_TMP, "registry.jsonl")
 os.environ["SP_DAEMON_URL"] = "http://127.0.0.1:9"      # unreachable: no episode minting
+# SP_ENGINE_KIND: no capture attempt at all (2026-08-23). A dead SP_DAEMON_URL does
+# NOT make the KV mint cheap - _mint_now still opens a socket per write and Windows
+# takes ~2s to give up. Declaring the backend makes supports('capture') False and the
+# mint returns immediately: 10 writes in 0.07s against 20s. See gates/README.md.
+os.environ["SP_ENGINE_KIND"] = "openai"
 
 from harness.skills import lifecycle as lc      # noqa: E402
+from harness.skills import memclass as MC       # noqa: E402
 from harness.skills import memory as M          # noqa: E402
 
 PASS, FAIL = [], []
@@ -285,6 +291,63 @@ def main() -> int:
           lc.salience(dict(_undated, mentions=8)) > lc.salience(_undated),
           "8 mentions undated=%.4f vs 1=%.4f"
           % (lc.salience(dict(_undated, mentions=8)), lc.salience(_undated)))
+
+    print()
+    print("7. her own narrative outranks; what she CONCLUDED does not fade, her MOMENTS do")
+    _now = time.time()
+    _old = "2026-01-01T00:00:00Z"
+    _nar = {"text": "I spent the evening reading about tides", "mem_class": "self-narrative",
+            "speaker": "self", "mentions": 1, "ts": _old, "last_seen": _old}
+    _fact = {"text": "I own a blue kettle", "mem_class": "fact", "speaker": "self",
+             "mentions": 1, "ts": _old, "last_seen": _old}
+    check("a self-narrative row from January has not decayed (outranks a same-age fact by its weight)",
+          lc.salience(_nar, _now) > lc.salience(_fact, _now) * 1.3,
+          (lc.salience(_nar, _now), lc.salience(_fact, _now)))
+    _stamp_now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    _feel_old = dict(_nar, mem_class="feeling", text="I feel uneasy about the storm")
+    _feel_new = dict(_feel_old, ts=_stamp_now, last_seen=_stamp_now)
+    check("a feeling fades slowly (730 d half-life): months-old < fresh, but still above a plain fact",
+          lc.salience(_feel_old, _now) < lc.salience(_feel_new, _now)
+          and lc.salience(_feel_old, _now) > lc.salience(_fact, _now),
+          (lc.salience(_feel_old, _now), lc.salience(_feel_new, _now), lc.salience(_fact, _now)))
+
+
+    # -- TIERED PERMANENCE (2026-08-22, amended) ---------------------------------
+    # This section used to assert 'her narrative does not fade' flat, and that is the
+    # assumption the tier invalidates: self-narrative covers a journal she sat down and
+    # wrote AND an ambient line she said to nobody, and at 24-33 rows a day the second
+    # kind would bury the first in a fixed-size block, permanently. KIND now outranks
+    # CLASS in her lane. Decay is still not deletion - every row below is live, findable
+    # and in provenance(); it just stops elbowing.
+    _mid = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(_now - 240 * 86400))
+
+    def _sal(kind, ts):
+        return lc.salience({"text": "I noticed the harbour lights were on early",
+                            "mem_class": "self-narrative", "speaker": "self", "kind": kind,
+                            "mentions": 1, "ts": ts, "last_seen": ts}, _now)
+
+    for _k in ("journal", "self_description", "thought", "dream", "chapter"):
+        check("what she CONCLUDED does not fade: a %s from 240 days ago scores as fresh" % _k,
+              abs(_sal(_k, _mid) - _sal(_k, _stamp_now)) < 1e-6,
+              (_sal(_k, _mid), _sal(_k, _stamp_now)))
+    for _k in ("narration", "spoke_up"):
+        check("her MOMENTS fade: a %s from 240 days ago scores below a fresh one" % _k,
+              _sal(_k, _mid) < _sal(_k, _stamp_now) * 0.85,
+              (_sal(_k, _mid), _sal(_k, _stamp_now)))
+    check("...but a fresh moment still outranks a plain fact - the weight is untouched",
+          _sal("narration", _stamp_now) > lc.salience(dict(_fact, ts=_stamp_now,
+                                                           last_seen=_stamp_now), _now))
+    check("DECAY IS NOT DELETION: a faded moment still scores well above zero",
+          _sal("narration", _mid) > 0.5, _sal("narration", _mid))
+    check("HIS lane is untouched by the tier - no kind, so the class table rules",
+          lc._HALF_LIFE_BY_CLASS["fact"] == 365.0
+          and lc.salience(dict(_fact, kind=""), _now) == lc.salience(_fact, _now))
+    check("every narrative kind has chosen a tier (a new kind must too)",
+          set(lc._HALF_LIFE_BY_KIND) >= {k for k in MC.NARRATIVE_KINDS if k != 'feeling'},
+          sorted(set(MC.NARRATIVE_KINDS) - set(lc._HALF_LIFE_BY_KIND)))
+    check("...and a feeling is still the CLASS 730 d, not a kind override",
+          "feeling" not in lc._HALF_LIFE_BY_KIND
+          and lc._HALF_LIFE_BY_CLASS["feeling"] == 730.0)
 
     total = len(PASS) + len(FAIL)
     print(f"\nG-SALIENCE: {'PASS' if not FAIL else 'FAIL'} ({len(PASS)}/{total})")

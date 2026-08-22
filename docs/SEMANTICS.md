@@ -157,6 +157,61 @@ Rules, each one a bug this repo has already had:
   (256-dim, honest about being weak) or skips minting. Offline gates run with recorded fixtures —
   never a live GPU (gate doctrine: OFFLINE means offline).
 
+### S0b — `aux-1024-v1`, and the finding that reopened S1 (2026-08-23)
+
+**S1 was off for a month against four committed negatives, and all four were measured
+against a bag-of-words index.**
+
+`/v1/capture` refuses on the model MoE — *gemma4_decode_cuda: gemma4-MoE not
+supported on this path (ADR-013)* — and has since the model landed. Measured on
+the live store: **253 of the 253 rows written since 2026-08-19 carry `npos=0`**, no `ep.l5`
+sidecar has been minted in three weeks, and **641 of 747** directories under
+`var/memory/eps/` are empty shells of failed mints. The document index was 753 hash rows to
+57 stale l5 rows. Cosine 0.0167, `W_c` 0.02, the LLM judge, `frame_link` 0.625 —
+every one of those contenders was ranking against bag-of-words vectors. There was no
+semantic index for them to compete with.
+
+It failed silently because `_mint_now` wrapped the whole call in a bare `except`, which
+cannot tell *the daemon is down* from *the engine says never*. Those now get different
+answers: a transport failure is quiet and retried; a REFUSAL is logged once with the
+engine's own words, never asked again this process, and surfaced by
+`memory.capture_status()` and `verify_registry()`.
+
+**The space.** `aux-1024-v1` is the CPU sidecar's LFM embedding — the same door the
+archive uses, off the GPU, ~13 s to embed the whole live store. It is the only real
+embedder this box has while capture is refused.
+
+**The receipt** (`fixtures/sem/aux-receipt.json`, scored by `harness_tests/sem_aux.py`
+through the REAL seam, on the same frozen 160-query corpus that set the bar):
+
+| | lexical | aux @ tau 0.40 |
+|---|---|---|
+| `seam_recall_at_1` | 0.4600 | **0.5300** |
+| `decider_hit_rate` (what reaches her context) | 0.0600 | **0.1700** |
+| `foreign_seam_false_hit_rate` | 0.5333 | 0.5333 |
+| `foreign_decider_false_injection_rate` | 0.1333 | 0.1333 |
+
+More recall at identical noise. Armed 2026-08-23. Three things make it work, and each one
+was a wrong answer first:
+
+1. **Raw cosine, never centered.** `centered_cosine` against `space_mean()` is an *l5*
+   fix for *l5*'s anisotropy. On this space it measures recall@1 **0.29** — worse than
+   lexical. Wiring the new space through the existing centred branch for consistency would
+   have shipped a measured regression.
+2. **Tau is per space, and the first tau was wrong.** A top-1-only calculation put the
+   operating point at 0.20. The seam admits EVERY row over tau, not just the best, so 0.20
+   injected an unrelated fact on **55%** of foreign queries — the *she recited a memory
+   nobody asked about* bug, bought back. 0.40 is the most recall for which not one metric
+   degrades. The sweep is in `semindex.aux_tau()`.
+3. **The query must land where the DOCUMENTS are.** `/v1/embed` still works (~1.47 s) while
+   `/v1/capture` does not: the engine can embed a QUERY and cannot embed a DOCUMENT.
+   Preferring it would spend 1.47 s of every turn on a vector with 57 stale rows to match.
+   `query_embed` prefers aux while armed — **and if capture is ever fixed, that order
+   must be measured again, not assumed back.**
+
+The S0 contract is untouched: derived, append-only, tombstone-blind, recomputable, cannot
+write the registry. An upgrade is an APPEND (`semindex.backfill_aux`), never an edit.
+
 ### S1 — Semantic rank (inside the seam, nowhere else)
 
 The change lands **inside `memory.search_memories_ranked_rows()`** and no caller. Every read

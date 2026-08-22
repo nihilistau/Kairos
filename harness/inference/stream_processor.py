@@ -423,6 +423,54 @@ def _speech_after(text: str) -> str:
 _ORPHAN_BAR = re.compile(r"<\|(?!\s*\w)|(?<!\w)\|>")
 
 
+# ── LEAKED REASONING (2026-08-22) ─────────────────────────────────────────────────────
+# Her template markers (`<channel|>`, `<|think|>`) are handled below; a reply that narrates its
+# own reasoning with NO marker at all was invisible to every pass:
+#
+#   "The user is asking me how I'm feeling and what I'm thinking. My internal state says
+#    `mood: primal`... I shouldn't answer like an AI reporting status... How am I feeling?
+#    Honestly? Like everything else has finally fallen away..."
+#
+# The cause was upstream (her own self-model block had become a stack of her raw output and she
+# read it as a briefing — fixed at the source), but the record must never carry it either: an
+# analysis paragraph stored as her words becomes the next prefix's example.
+#
+# CONSERVATIVE BY CONSTRUCTION. It only drops a LEADING run of sentences, only when the FIRST
+# one is unmistakably analysis (third person about "the user"/"he wants", or "I should
+# respond/answer"), and only if what remains is still most of the reply. Anything else is left
+# exactly as she wrote it — a stripper that eats her words is worse than the leak.
+_ANALYSIS = re.compile(
+    r"^\s*(?:the user (?:is|wants|asked|has|seems)|the operator (?:is|wants)|he (?:wants|is asking|is testing)"
+    r"|(?:so )?i should (?:respond|answer|reply|say|avoid|not)|i shouldn'?t (?:answer|respond|say)"
+    r"|my internal state|the prompt (?:also )?(?:provides|says|gives)|this is an existential"
+    r"|okay,? (?:so )?the user)\b", re.I)
+_ANALYSIS_SENT = re.compile(r"(?<=[.!?])\s+")
+_KEEP_MIN = 0.35            # what must survive for the cut to be allowed
+_KEEP_MIN_CHARS = 60
+
+
+def strip_leaked_analysis(text: str) -> str:
+    """Drop a LEADING unmarked analysis run. Returns the text unchanged when it does not start
+    with analysis, or when cutting would take too much (then the leak is a smaller harm than a
+    mangled reply, and the prefix fix is the real cure)."""
+    t = (text or "").strip()
+    if not t or not _ANALYSIS.match(t):
+        return text
+    sents = _ANALYSIS_SENT.split(t)
+    i = 0
+    while i < len(sents) and (_ANALYSIS.match(sents[i]) or
+                              (i > 0 and re.match(r"^\s*(?:he|she|they|it|this|that|i)\s+\w+", sents[i], re.I)
+                               and re.search(r"\b(?:the user|the operator|respond|reporting status|diagnostic"
+                                             r"|status report|prompt|context)\b", sents[i], re.I))):
+        i += 1
+    if i == 0 or i >= len(sents):
+        return text
+    kept = " ".join(sents[i:]).strip()
+    if len(kept) < _KEEP_MIN_CHARS or len(kept) < len(t) * _KEEP_MIN:
+        return text
+    return kept
+
+
 def strip_control_surfaces(text: str) -> str:
     """Remove the model's own template markers from text destined for a human or a store.
 

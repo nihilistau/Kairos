@@ -45,7 +45,17 @@ os.environ["SP_RECALL_REGISTRY"] = os.path.join(_TMP, "registry.jsonl")
 # (The 120s inline capture on the memory-write hot path is a real finding and has its own task.
 # It is not this gate's job to work around it — it is this gate's job not to DEPEND on it.)
 os.environ["SP_DAEMON_URL"] = "http://127.0.0.1:9"   # discard port: always refused, instantly
+# SP_ENGINE_KIND: no capture attempt at all (2026-08-23). A dead SP_DAEMON_URL does
+# NOT make the KV mint cheap - _mint_now still opens a socket per write and Windows
+# takes ~2s to give up. Declaring the backend makes supports('capture') False and the
+# mint returns immediately: 10 writes in 0.07s against 20s. See gates/README.md.
+os.environ["SP_ENGINE_KIND"] = "openai"
 
+# SYNTHETIC CLOCKS (2026-08-22): a fresh TurnState's clocks default to impulse.BOOT_AT, the
+# real monotonic boot time, which would sit in this gate's small fixture times' FUTURE.
+# Pin the boot to t=1.0 here — non-zero, before every `now` below.
+import harness.kairos.impulse as _imp_pin  # noqa: E402
+_imp_pin.BOOT_AT = 1.0
 from harness.kairos import impulse as I        # noqa: E402
 from harness.kairos import scheduler as S      # noqa: E402
 from harness.model.person import PersonModel   # noqa: E402
@@ -77,7 +87,9 @@ def main() -> int:
 
     st = I.TurnState()
     I.note_user(st, 1000.0)
-    imp = I.decide(cfg=cfg, state=st, now=1000.1, reply_text="Sure.",
+    # (2026-08-22: a musing waits for the room to be quiet — checkin_idle_s — like every
+    #  other unprompted word; "a reason to speak" is judged after that floor)
+    imp = I.decide(cfg=cfg, state=st, now=1000.0 + cfg.checkin_idle_s + 1.0, reply_text="Sure.",
                    eot_margin=None, insight=insight)
     check("a surprising conclusion IS a reason to speak",
           imp.speaks and imp.action == I.MUSE, imp.reason)

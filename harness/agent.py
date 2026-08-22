@@ -197,7 +197,16 @@ def load_agent_system() -> str:
             try:
                 from harness.personality.self_model import render_self_model, SELF_TIER
                 root = os.environ.get("SP_SELF_MODEL_ROOT") or SELF_TIER
-                sm = render_self_model(root)
+                # THE REAL HER (2026-08-22): her narrative leads the block, under a budget
+                # and a SHARE of the prefix so far (the guard against narrative loops)
+                try:
+                    from harness.tuning import registry as _tr
+                    _b = int(_tr.get("memory.self_budget", 2400) or 0)
+                    _share = float(_tr.get("memory.self_share", 0.5) or 0.0)
+                except Exception:
+                    _b, _share = 2400, 0.5
+                _rest = sum(len(p or "") for p in parts)
+                sm = render_self_model(root, budget_chars=max(0, min(_b, int(_share * max(_rest, 1)))))
                 if sm:
                     parts.append(sm)
             except Exception:
@@ -262,6 +271,22 @@ def default_tools() -> List[ToolSpec]:
     if os.environ.get("SP_AUX", "0") == "1":
         from harness.sidecar.tools import DEEP_RECALL_TOOLS
         tools = tools + DEEP_RECALL_TOOLS
+    # ── HER MODES (2026-08-22, his ask: "she should be able to activate the modes when asked")
+    try:
+        from harness.kairos.presence import PRESENCE_TOOLS
+        tools = tools + PRESENCE_TOOLS
+    except Exception:
+        pass
+    # ── THE SHELF (2026-08-22, presence modes): she may pick a book up on her own time ──
+    # var/library/ — pick_up_book / put_down_book / books_on_the_shelf; behind a live knob
+    # (presence.read_tools, default on) so the set can be trimmed if selection suffers.
+    try:
+        from harness.tuning import registry as _tr_lib
+        if bool(_tr_lib.get("presence.read_tools", True)):
+            from harness.skills.library import LIBRARY_TOOLS
+            tools = tools + LIBRARY_TOOLS
+    except Exception:
+        pass
     return [ToolSpec.from_callable(fn) for fn in tools]
 
 
