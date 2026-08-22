@@ -38,6 +38,16 @@ from harness.kairos import impulse as I          # noqa: E402
 from harness.kairos import scheduler as S        # noqa: E402
 from harness.tuning import registry as tune      # noqa: E402
 
+# SYNTHETIC CLOCKS (2026-08-23): a fresh TurnState's clocks default to impulse.BOOT_AT,
+# the real monotonic boot time (a1ecf2a — "a zero clock fails OPEN"), which sits in the
+# FUTURE of the small fixtures below (100.0, 5000.0 ...) and silenced every decision with
+# a nonsense cooldown. Pin the boot to t=1.0 for this process: non-zero, so the
+# no-zero-clock rule is still exercised, and before every `now` this gate uses. Same pin
+# as g_kairos_latch / g_kairos_presence / g_kairos_reasons, which a1ecf2a updated; this
+# gate was one of the five it missed.
+import harness.kairos.impulse as _imp_pin  # noqa: E402
+_imp_pin.BOOT_AT = 1.0
+
 PASS, FAIL = [], []
 
 

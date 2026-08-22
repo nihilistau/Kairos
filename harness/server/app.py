@@ -1283,6 +1283,19 @@ def blocking_completion(body: Dict[str, Any]) -> Dict[str, Any]:
 # ──── PK2 §U: read-only introspection surfaces for the operator UI ─────────
 # The console needs to SHOW the new subsystems (memory, task queue, persona). These are
 # small JSON endpoints the UI polls; all read-only except persona POST (the editor).
+def _decisions_json() -> Dict[str, Any]:
+    """The operator's queue. NOT her memory and not the ledger: what is UNDECIDED, for a
+    decider, as against what is off and why, for a reader."""
+    try:
+        from harness.skills import decisions as _dec
+        rows = _dec.items()
+        return {"ok": True, "open": [r for r in rows if r["status"] == "open"],
+                "decided": [r for r in rows if r["status"] == "decided"][-40:],
+                "path": _dec.path()}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:200], "open": [], "decided": []}
+
+
 def _memory_json() -> Dict[str, Any]:
     """The fact registry as JSON rows for the operator's memory pane.
 
@@ -1300,6 +1313,10 @@ def _memory_json() -> Dict[str, Any]:
                 "text": lc.strip_prefix(_text(e)),        # drop the legacy "The user said: "
                 "speaker": e.get("speaker", ""),
                 "mem_class": e.get("mem_class", ""),
+                # her lane's second label (2026-08-23): the panel cannot re-file what it
+                # cannot see, and `kind` is what decides durability now
+                # (lifecycle._HALF_LIFE_BY_KIND), not mem_class alone.
+                "kind": e.get("kind", ""),
                 "lifecycle": e.get("lifecycle", 0),
                 "src": e.get("src", ""),
                 "ts": e.get("ts", ""),
@@ -3761,6 +3778,18 @@ def _run_stdlib(host: str, port: int) -> None:
                         res = ops.add(body.get("fact", ""), body.get("speaker", "user"))
                     elif p == "/v1/memory/forget":
                         res = ops.forget(body.get("name", ""))
+                    elif p == "/v1/memory/relabel":
+                        # HIS JUDGEMENT, RECORDED (2026-08-23). Vocabulary-checked in
+                        # ops.relabel; the row keeps its text, name, timestamps, mentions
+                        # and every breadcrumb, and the change appends a dated note to src.
+                        res = ops.relabel(body.get("name", ""),
+                                          speaker=body.get("speaker"),
+                                          mem_class=body.get("mem_class"),
+                                          kind=body.get("kind"))
+                    elif p == "/v1/decisions/decide":
+                        from harness.skills import decisions as _dec
+                        res = _dec.decide(body.get("id", ""), body.get("choice", ""),
+                                          body.get("note", ""))
                     elif p == "/v1/persona/set/mood":
                         from harness.personality.tools import adjust_mood
                         res = {"ok": True, "result": adjust_mood(body.get("mood", ""))}
@@ -4489,6 +4518,7 @@ def _run_stdlib(host: str, port: int) -> None:
                 "/v1/health/gates": lambda: __import__(
                     "harness.control.ledger", fromlist=["x"]).gate_health(),
                 "/v1/memory": _memory_json,      # PK2 §U1 memory-browser data
+                "/v1/decisions": _decisions_json,
                 "/v1/tasks": _tasks_json,        # PK2 §U1 task-queue data
                 "/v1/persona": _persona_get,     # PK2 §P1 persona editor (load)
                 "/v1/persona/state": _persona_state,  # ADR-006 personality chip

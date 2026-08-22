@@ -15,6 +15,18 @@ bounce/restart like before. make them knobs defaulted to off."):
 Both DEFAULT OFF: shipping defaults are the polite direction, arming is his call
 (the room's tuning panel, no restart needed — the scheduler reads tune per fire).
 
+WHERE THE GATE LIVES, AND WHAT IT COVERS NOW (2026-08-23). a1ecf2a moved the decision
+out of the scheduler and into impulse.decide(), and this gate's section 3 was reading
+scheduler.py's SOURCE for the old literal — so it went red on a code move while the
+behaviour was intact. Section 3 now drives the real decide(), armed and off, per action.
+
+AND ONE THING GENUINELY CHANGED, NOT JUST MOVED: rule 1 above says "her own time" is
+deliberately NOT gated, and the moved check sits in the SOLO branch too, so today it is.
+The knob ships 0.0 (off), so nothing observable differs by default — but the code and
+the operator rule above disagree, and the SOLO row in section 3 is where that is
+asserted rather than assumed. If the 2026-08-20 rule stands, the fix is one line in
+impulse.py (drop `if not quiet_ok` from the SOLO branch) and one row here.
+
     python harness_tests/g_kairos_quiet.py
 """
 from __future__ import annotations
@@ -86,17 +98,96 @@ sched_src = open(os.path.join(ROOT, "harness", "kairos", "scheduler.py"),
 i_quiet = sched_src.find("quiet_after_him_s")
 i_judge = sched_src.find("pregate")
 i_gen = sched_src.find("text = (generate(nudge, called)")
-check("the quiet gate exists in the scheduler", i_quiet > 0)
+# The knob still reaches the scheduler (live_config reads it per fire, no restart), and
+# decide() — which now holds the gate — is still consulted before anything is paid for.
+check("the knob reaches the scheduler", i_quiet > 0)
 check("...ahead of the sidecar pre-judge (free before cheap before expensive)",
       0 < i_quiet < i_judge)
 check("...and ahead of generate()", 0 < i_quiet < i_gen)
-gate_block = sched_src[i_quiet - 800:i_quiet + 900]
-check("it gates exactly the discretionary four",
-      "CHECK_IN, CONTINUE, EXPAND, MUSE" in gate_block)
-check("REMIND is not in the gated set", "REMIND" not in gate_block.split("(CHECK_IN")[1][:40]
-      if "(CHECK_IN" in gate_block else False)
-check("SOLO is not in the gated set", "SOLO" not in gate_block.split("(CHECK_IN")[1][:40]
-      if "(CHECK_IN" in gate_block else False)
+i_decide = sched_src.find("decide(")
+check("the policy is consulted before any model call", 0 < i_decide < i_gen)
+# ── WHAT IS GATED, ASKED OF THE POLICY RATHER THAN OF A FILE (2026-08-23) ───────────
+# These three checks used to read scheduler.py's source and look for the literal
+# "CHECK_IN, CONTINUE, EXPAND, MUSE" in an 1700-character window around the knob name.
+# a1ecf2a moved the decision INTO impulse.decide() (the commit title says so: "quiet-
+# after-him decided in the policy"), the literal went with it, and all three went red
+# while the behaviour they describe was intact — a gate reporting the location of a
+# thing rather than the truth of it. Same class as the source-window probe that made
+# G-KAIROS-TABLE red for eighteen days.
+#
+# So: drive the real decide() into each branch and ask what it does. A code move cannot
+# break this, and a POLICY change — the thing the gate is actually for — still does.
+#
+# THE PAIRED RUN IS THE POINT. Asserting silence proves nothing on its own: every one of
+# these worlds could be silent for some unrelated bound. Each row is run TWICE, with the
+# knob armed and with it off (0.0, the shipping default), and the assertion is that the
+# knob is what changed the answer.
+from harness.kairos.impulse import (  # noqa: E402
+    CHECK_IN, CONTINUE, EXPAND, MUSE, REMIND, SILENT, SOLO,
+    KairosConfig, TurnState, decide,
+)
+
+
+class _Roll:
+    """The rolls are coins this gate is not about; make them all land yes."""
+    def random(self):
+        return 0.0
+
+    def uniform(self, a, b):
+        return a
+
+
+NOW = 100_000.0
+
+
+def _world(**kw):
+    """He spoke 300 s ago: past the 240 s check-in bar, inside a 600 s quiet-after-him.
+    Every clock the policy reads is set — a defaulted one is impulse.BOOT_AT, which is
+    the trap the other four gates in this repair fell into."""
+    st = TurnState(last_spoke_at=NOW - 10_000.0, last_user_at=NOW - 300.0,
+                   last_conv_at=NOW - 300.0, last_solo_at=NOW - 10_000.0)
+    for k, v in kw.items():
+        setattr(st, k, v)
+    return st
+
+
+def _cfg(quiet_s):
+    return KairosConfig(enabled=True, cooldown_s=45.0, checkin_idle_s=240.0,
+                        checkin_chance=1.0, solo_every_s=900.0, solo_chance=1.0,
+                        quiet_after_him_s=quiet_s)
+
+
+# (name, the action it produces with the knob OFF, kwargs for decide/state)
+ROWS = [
+    ("a check-in", CHECK_IN, {}, {"eot_margin": None, "reply_text": "done."}),
+    ("her continuation", CONTINUE, {}, {"eot_margin": -20.0, "reply_text": "and then"}),
+    ("an expansion", EXPAND, {}, {"eot_margin": -13.0, "reply_text": "done."}),
+    ("a musing", MUSE, {}, {"eot_margin": None, "reply_text": "done.",
+                            "insight": {"bits": 9.0, "text": "a conclusion"}}),
+    # HER OWN TIME. The 2026-08-20 rule in this gate's own docstring says solo is NOT
+    # gated; a1ecf2a's move placed the check in this branch too. The knob ships 0.0, so
+    # the divergence is inert by default — but it IS a divergence, and this row is where
+    # it is visible rather than assumed. Flagged for the operator 2026-08-23.
+    ("her own time", SOLO, {"unanswered": 2}, {"eot_margin": None, "reply_text": "done."}),
+]
+
+for label, free_action, st_kw, kw in ROWS:
+    off = decide(cfg=_cfg(0.0), state=_world(**st_kw), now=NOW, rng=_Roll(), **kw)
+    on = decide(cfg=_cfg(600.0), state=_world(**st_kw), now=NOW, rng=_Roll(), **kw)
+    check("%s happens when quiet-after-him is OFF" % label,
+          off.action == free_action, "got %s — %s" % (off.action, off.reason))
+    check("...and the knob is what withholds it",
+          on.action == SILENT and "withheld" in on.reason,
+          "got %s — %s" % (on.action, on.reason))
+
+# ── AND IT NEVER GATES A PROMISE ────────────────────────────────────────────────────
+# The one rule with no exception: he asked to be reminded. A reminder withheld because
+# he has been talking is a reminder that arrives after the appointment.
+due = decide(cfg=_cfg(600.0), state=_world(), now=NOW, rng=_Roll(),
+             eot_margin=None, reply_text="done.",
+             due_notes=[{"title": "call the clinic"}])
+check("REMIND is never gated — a promise outranks his quiet",
+      due.action == REMIND, "got %s — %s" % (due.action, due.reason))
 check("it measures HIM across ALL sessions (global max of last_user_at)",
       "max((st.last_user_at" in sched_src)
 

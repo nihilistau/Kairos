@@ -1272,3 +1272,34 @@ body.resizing, body.resizing * { user-select: none !important; cursor: inherit; 
 .su-fmt, .su-knob { font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase;
                     padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line);
                     opacity: .7; margin-left: 6px; }
+
+/* ── memory: re-filing a row (2026-08-23) ─────────────────────────────────────────── */
+/* The panel was read-only; these are the controls that let him act from it. Scoped
+   under .mem so nothing here can reach another window (G-ROOM-CSS 4). */
+.mem-tools { display: flex; gap: 6px; margin: 6px 0 10px; }
+.mem-tools input { flex: 1; min-width: 0; }
+.mem .t { cursor: pointer; }
+.mem-open { outline: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+.mem .mem-edit { margin-left: auto; font-size: 9px; opacity: .7; }
+.mem-edit-box { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+                margin: 6px 0 2px; font-size: 10px; }
+.mem-edit-box label { display: flex; gap: 4px; align-items: center; opacity: .8; }
+.mem-edit-box select { font-size: 10px; }
+.mem .c-kind { opacity: .75; }
+
+/* ── decisions: what is waiting on him (2026-08-23) ───────────────────────────────── */
+.dec { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
+.dec-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.dec-title { font-weight: 600; }
+.dec-kind { font-size: 9px; padding: 0 6px; border-radius: 99px; border: 1px solid var(--line); }
+.dec-kind.dec-k-once  { color: var(--gold); }
+.dec-kind.dec-k-route { color: var(--cyan); }
+.dec-kind.dec-k-note  { opacity: .6; }
+.dec-area { font-size: 9px; opacity: .6; }
+.dec-body { margin: 6px 0; opacity: .9; line-height: 1.45; }
+.dec-detail { margin: 6px 0; padding: 6px 8px; background: var(--panel-2, rgba(255,255,255,.03));
+              border-radius: 6px; font-size: 10px; white-space: pre-wrap; overflow-x: auto; }
+.dec-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.dec-actions input { flex: 1; min-width: 120px; }
+.dec-choice { font-size: 9px; padding: 0 6px; border-radius: 99px; color: var(--cyan); }
+.dec-done { opacity: .55; }

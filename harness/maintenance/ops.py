@@ -493,6 +493,73 @@ def add(fact: str, speaker: str = "user") -> dict[str, Any]:
     return {"ok": not res.startswith("not stored"), "result": res, "stats": stats()}
 
 
+RELABEL_FIELDS = ("speaker", "mem_class", "kind")
+
+
+def relabel(name: str, speaker: str = None, mem_class: str = None,
+            kind: str = None) -> dict[str, Any]:
+    """THE OPERATOR RE-FILES A ROW (2026-08-23). His judgement, recorded, never silent.
+
+    The classifier is a heuristic and the author lane is set by which door a producer
+    used; both are wrong sometimes, and until now the only remedy was to retire a true
+    row and re-add it, which loses its mentions, its first_seen and its provenance. This
+    changes the LABEL and keeps the row.
+
+    Four rules, and they are the whole of why this is safe:
+      - VOCABULARY ONLY. `mem_class` must be in memclass.CLASSES and `kind` in
+        NARRATIVE_KINDS (or ""), so the panel cannot invent a class the verdict table has
+        never seen. `speaker` is user|self.
+      - NOTHING IS DESTROYED. The text, the name, the timestamps, mentions, recalled and
+        every breadcrumb are untouched. Only the labels move.
+      - IT SAYS SO ON THE ROW. Every change appends a dated note to `src`, the same way
+        every maintenance pass in this file already does, so `provenance()` reads the
+        history rather than a clean lie. `src` is prose and nothing branches on it.
+      - ONE WRITER. Under `_reg_lock`, through `_write`, exactly like add/forget.
+
+    A relabel CAN move the row to a signature cell the frozen verdict table does not
+    hold. That is fine and by design: an unmapped cell is KEPT and counted (verdict.py),
+    and G-SEM-TABLE reads the witness log, so the operator's judgement shows up as a hole
+    to close rather than as silence."""
+    from harness.skills import memclass as MC
+    name = (name or "").strip()
+    want = {"speaker": speaker, "mem_class": mem_class, "kind": kind}
+    want = {k: v for k, v in want.items() if v is not None}
+    if not name or not want:
+        return {"ok": False, "error": "need a row name and at least one label"}
+    if "speaker" in want and want["speaker"] not in ("user", "self"):
+        return {"ok": False, "error": "speaker must be user or self"}
+    if "mem_class" in want and want["mem_class"] not in MC.CLASSES:
+        return {"ok": False, "error": "unknown mem_class %r" % want["mem_class"]}
+    if "kind" in want and want["kind"] and want["kind"] not in MC.NARRATIVE_KINDS:
+        return {"ok": False, "error": "unknown kind %r" % want["kind"]}
+    changed, before = {}, {}
+    with _reg_lock():
+        rows = _rows()
+        hit = next((r for r in rows if r.get("name") == name), None)
+        if hit is None:
+            return {"ok": False, "error": "no row named %r" % name}
+        for f, v in want.items():
+            old = hit.get(f, "")
+            if (old or "") == (v or ""):
+                continue
+            before[f] = old
+            changed[f] = v
+            if v:
+                hit[f] = v
+            else:
+                hit.pop(f, None)
+        if changed:
+            note = " | operator relabel %s: %s" % (
+                time.strftime("%Y-%m-%d", time.gmtime()),
+                ", ".join("%s %s->%s" % (f, before[f] or "(none)", changed[f] or "(none)")
+                          for f in sorted(changed)))
+            hit["src"] = (hit.get("src") or "") + note
+            _write(rows)
+        text = lc.strip_prefix(hit.get("text", ""))
+    return {"ok": True, "name": name, "changed": changed, "was": before, "text": text[:160],
+            "stats": stats()}
+
+
 def retire_orphans() -> dict[str, Any]:
     """A CONCLUSION DOES NOT OUTLIVE ITS EVIDENCE (2026-08-22).
 

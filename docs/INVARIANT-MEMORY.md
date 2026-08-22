@@ -411,12 +411,14 @@ What is true, and is now held:
 
 **And the one real leak, with its witness.** Replaying 140 of her real asserted claims under
 four shuffles gave identical row counts every time, and every divergence was a pair like
-`"my gpu is an rtx 2060"` against `"my gpu is an rtx 2060."` — the same claim, differing
-only in punctuation, filling the same slot, so one "corrects" the other and arrival order
-picks the survivor. **Nothing was corrected.** Asserted as a named non-demand rather than
+`"my gpu is an rtx 2060"` against `"my gpu is an rtx 2060."`. NAMED CORRECTLY on a second
+look: this is **dedup**, not supersession — `_overlap` is 1.0 both ways and `value_of()` is
+identical, so the pair merges into ONE row with `mentions=2` and **nothing is retired**. The
+claim, the count and the liveness are order-independent; only the stored SPELLING is not,
+and it is whichever ARRIVED FIRST. Asserted as a named non-demand rather than
 left absent: a non-demand written down is a decision, one merely absent is a gap nobody has
 looked at. If it ever needs to be canonical the fix is a normalised representative at the
-slot, **not** a change to supersession.
+slot. Deliberately NOT fixed: one live pair exists in the whole store and both rows are July fossils that predate the current normaliser, so today's writer already merges them; a fix would change the reinforce path and drift an existing row's semindex address for a cosmetic gain.
 
 **The board and the field.** The verdict table went 29 → 36 cells the same day, and the
 delta receipt says why it is safe: **+7 added, 0 removed, 0 changed** — pure coverage, no

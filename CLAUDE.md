@@ -10,6 +10,10 @@ codebase keeps getting hit by (AGENTS.md §0).**
 - What proves it still works: `gates/GATE-INDEX.md`.
 - What is deliberately off: `docs/OFF-BY-DEFAULT.md`.
 - The math core (`core/`) is a different repo's `CLAUDE.md`; do not read its status as kairos status.
+- **Kairos is a SNAPSHOT of this tree, never a place to write.** A file authored in
+  `../Kairos` is destroyed by the next export. Anything that ships with it is written
+  here; the re-export is manual and the procedure is in AGENTS.md §2.
+  `../kairos-drift/` says how far behind the snapshot is (`python drift.py`).
 
 Before you say you are done (offline, no GPU):
 

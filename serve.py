@@ -786,6 +786,10 @@ def build_env(c: dict) -> dict:
         # landed and nothing mapped it, so no profile could say where the books are and
         # G-SEM-CONSERVE had been red on the unmapped reader. Empty = var/library, as before.
         "SP_LIBRARY_DIR": (mem.get("library_dir") or "").replace("/", "\\"),
+        # the operator's decision queue (2026-08-23): what is UNDECIDED, as against the
+        # ledger's what-is-off. Empty = beside the registry, which is what every sandbox
+        # wants for free. NOT her memory: decisions.py cannot import the memory package.
+        "SP_DECISIONS": (mem.get("decisions") or "").replace("/", "\\"),
         # P1a: the kairos exe has no frontend_mockups beside it; the daemon
         # serves THE kairos console (its charter home) via the env override.
         # THE LABEL THAT LIED (2026-07-29): the model path reached the daemon only as
@@ -906,6 +910,11 @@ def build_env(c: dict) -> dict:
         # profile can move them; unmapped they simply did not exist).
         "SP_AVATAR_DIR": c.get("paths", {}).get("avatar_dir")
                          or os.path.join(VAR, "room", "avatar"),
+        # the bundled default set (2026-08-23, his avatar_seed work). Mapped so the
+        # closure holds - G-SEM-CONSERVE went red on it the moment it landed. Empty =
+        # assets/avatar-default, which is avatar_seed's own default, so behaviour is
+        # unchanged; rename the profile key if [paths] is the wrong home for it.
+        "SP_AVATAR_DEFAULTS": (c.get("paths", {}).get("avatar_defaults") or ""),
         "SP_LEDGER_FILE": c.get("paths", {}).get("ledger_file")
                           or os.path.join(VAR, "room", "ledger.json"),
         # (defaults below copied from the READERS — match.py/engine.py/scenarios.py all

@@ -36,6 +36,9 @@ cells, bounded negation, no existential demands), quantified over all 512:
                                                       a STALE question — him quiet past the
                                                       check-in bar — releases the floor,
                                                       per the 2026-08-01 release, 77d5bcb)
+    FORALL cells: insight, room not quiet            -> silent   (a thought waits for a
+                                                      quiet room like everything else;
+                                                      2026-08-22, a1ecf2a)
     FORALL cells: speaks                             -> enabled and not cooling and not cap
                                                       (no path around the spam bounds)
     FORALL cells: chainmax and not due               -> silent   (his turn buys her budget)
@@ -77,7 +80,17 @@ PRECEDENCE = [
     # saying the old rule — so this gate was red from 2026-08-01 to 2026-08-19 with
     # nobody watching. The policy was reviewed; the table now says what decide() says.
     {"when": {"askedq": 1, "checkin": 0}, "action": I.SILENT},
-    {"when": {"insight": 1}, "action": I.MUSE},
+    # A THOUGHT WAITS FOR A QUIET ROOM (2026-08-22, a1ecf2a — REVIEWED 2026-08-23).
+    # MUSE had no idle floor: "it had none, so a journal/wardrobe reason fired on the
+    # first 15 s tick after boot." It now checks presence_idle against checkin_idle_s —
+    # the same bar CHECK_IN uses, which is the `checkin` coordinate here — and RETURNS
+    # SILENT rather than falling through, so insight=1 into a busy room is a ruling of
+    # its own and not an absence. That is why this is two rows and not a narrowed one:
+    # the second row is load-bearing, and without it `contlow` would wrongly claim the
+    # cell. Same shape as the 77d5bcb entry above: decide() changed, the artifact and
+    # this list did not, and the gate went red until someone read it.
+    {"when": {"insight": 1, "checkin": 1}, "action": I.MUSE},
+    {"when": {"insight": 1, "checkin": 0}, "action": I.SILENT},
     {"when": {"contlow": 1}, "action": I.CONTINUE},
     {"when": {"checkin": 1}, "action": I.CHECK_IN},
     {"when": {}, "action": I.SILENT},                # nothing to add
@@ -109,6 +122,18 @@ def run_cell(bits):
         chain=cfg.max_chain if d["chainmax"] else 0,
         last_spoke_at=(now - 10.0) if d["cooling"] else 0.0,       # 10 < cooldown 45
         last_user_at=(now - 300.0) if d["checkin"] else (now - 10.0),  # 300 >= idle 240
+        # ── EVERY CLOCK THE POLICY READS IS SET HERE (2026-08-23) ──────────────────
+        # These two were left to default, and since a1ecf2a a fresh TurnState's clocks
+        # default to impulse.BOOT_AT — the real monotonic boot time, which lands in this
+        # fixture's FUTURE and made presence_idle() NEGATIVE on all 512 cells. Every
+        # idle-floored ruling collapsed to silent at once. A gate whose entire claim is
+        # that a cell DETERMINES the world cannot leave a coordinate to a module global
+        # read at construction time; the other kairos gates pin BOOT_AT, and this one
+        # sets the clocks, which is the stronger version of the same fix.
+        # presence_idle() = now - max(last_user_at, last_conv_at, last_solo_at), so both
+        # ride the conversation clock the `checkin` coordinate already names.
+        last_conv_at=(now - 300.0) if d["checkin"] else (now - 10.0),
+        last_solo_at=(now - 300.0) if d["checkin"] else (now - 10.0),
         spoken_times=[now - 200.0 - i for i in range(cfg.max_per_hour)] if d["cap"] else [],
     )
     return I.decide(
@@ -203,6 +228,14 @@ def main():
           any(a == I.CHECK_IN
               for _, a in cells(enabled=1, cooling=0, cap=0, chainmax=0,
                                 askedq=1, due=0, checkin=1)))
+    check("FORALL insight into a BUSY room -> silent (a thought waits for quiet)",
+          all(a == I.SILENT
+              for _, a in cells(enabled=1, cooling=0, cap=0, due=0,
+                                insight=1, checkin=0)))
+    check("...and a quiet room lets the same thought through",
+          any(a == I.MUSE
+              for _, a in cells(enabled=1, cooling=0, cap=0, due=0, chainmax=0,
+                                askedq=0, insight=1, checkin=1)))
     check("FORALL chainmax and not due -> silent (his turn buys her budget)",
           all(a == I.SILENT
               for _, a in cells(enabled=1, cooling=0, cap=0, chainmax=1, due=0)))
