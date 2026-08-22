@@ -17,3 +17,9 @@ ui/node_modules/
 !harness_tests/_gate.py
 *.7z
 .env
+
+# the session-memory sidecar writes here (.remember/now.md, today-*.md, logs/).
+# It ships its OWN nested .gitignore, and relying on a file a tool creates is not a
+# guarantee: if it is ever missing, a transcript full of names and absolute paths
+# lands in a PUBLIC repo. Ignored at the root as well, belt and braces (2026-08-23).
+.remember/
