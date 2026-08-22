@@ -1,0 +1,31 @@
+# character.txt - the ONE description every generated image is anchored to.
+#
+# THIS IS A TEMPLATE. It describes the reference portrait that ships with Kairos
+# (_reference.png) so that a first generation lands on the same person as the bundled
+# set. Replace BOTH files together - your own _reference.png and your own words here -
+# and everything the generator makes from then on is yours. Changing one without the
+# other is how a wardrobe fills up with fifty different women.
+#
+# Lines beginning with # are stripped before the prompt is built.
+
+An AI companion's avatar portrait. Semi-realistic digital painting: mostly real,
+slightly stylised. Painterly realism rather than photography, and not flat anime.
+Confident brushwork, visible painted edges, high contrast.
+
+Her: a woman in her mid-to-late twenties. Dark, near-black hair, wavy and a little
+messy, loose strands falling across one eye and along the jaw. Dark eyes, direct.
+Fine features, a natural flush across the cheeks and nose.
+
+Wearing: layered fine silver chains at the throat - a close choker and a longer one
+with a small pendant. A sheer dark mesh top over a fitted black bodice; near-future
+but worn-in - clothing that moves and drapes rather than costume armour.
+
+Skin reads soft: real texture, warmth under the surface, light wrapping around the
+cheekbone and collarbone. Fabric catches light at its edges and hangs with weight.
+
+Behind her: a rain-streaked city at night, thrown far out of focus - vertical rain
+and blurred window light, near-monochrome. The scene is greyscale except her skin,
+which keeps its warmth. Strong rim light along the hair and shoulder.
+
+Portrait orientation, head and upper body. No border, no frame, no text, no
+watermark. Present rather than posed - she is looking at someone she knows.

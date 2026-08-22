@@ -81,9 +81,13 @@ export default function Chat({ onMood }) {
     try {
       for await (const ev of api.chat(history, { image_b64: attached, signal: abort.current.signal })) {
         setTurns(h => {
-          const last = h[h.length - 1]
+          // A NEW OBJECT, NEVER A MUTATED ONE (2026-08-22): under React.StrictMode an
+          // updater runs twice, so `last.content +=` doubled deltas and `last.events`
+          // took every act chip twice (index keys then collided). Build the new turn.
+          const prev = h[h.length - 1]
+          const last = { ...prev, events: prev.events ? [...prev.events] : [] }
           if (ev.delta) {
-            last.content += ev.delta
+            last.content = (prev.content || '') + ev.delta
             const mk = extractTags(last.content).marks.filter(m => m.kind === 'mood')
             if (mk.length && onMood) onMood(mk[mk.length - 1].value)
             // SPEAK AS SHE WRITES: every sentence that has closed goes to the voice now,
@@ -92,9 +96,20 @@ export default function Chat({ onMood }) {
             spokenText = forSpeech(last.content)
             spoken.current = speech.feed(spokenText, spoken.current)
           }
-          else if (ev.tool || ev.image || ev.persona || ev.looking) last.events = [...(last.events || []), ev]
-          else if (ev.error) last.content += `\n[error: ${ev.error}]`
-          return [...h.slice(0, -1), { ...last }]
+          // ONE PERSONA CHIP PER TURN, ALWAYS (2026-08-22). The gateway emits her state at the
+          // top of a turn AND the verified shift after it: rendering both wore two chips, one
+          // stale — but rendering only the SHIFT took away the state readout he actually reads
+          // her by, and on a turn where nothing moved there was no chip at all. So: keep ONE,
+          // let a later event replace an earlier one, and let the chip say whether it moved.
+          else if (ev.persona) {
+            const rest = last.events.filter(e => !e.persona)
+            const prevP = last.events.find(e => e.persona)
+            last.events = [...rest, { persona: { ...(prevP ? prevP.persona : {}), ...ev.persona } }]
+          }
+          else if (ev.final) last.content = ev.final          // the analysis guard's final word
+          else if (ev.tool || ev.image || ev.looking) last.events = [...last.events, ev]
+          else if (ev.error) last.content = (prev.content || '') + `\n[error: ${ev.error}]`
+          return [...h.slice(0, -1), last]
         })
         scroll()
       }
@@ -139,14 +154,15 @@ export default function Chat({ onMood }) {
           // `at` is the scheduler's own stamp, not the moment the poll happened to
           // notice. She may have spoken three minutes before this tick drained it, and
           // showing the drain time would put her words at the wrong point in his evening.
-          kind: m.kind, why: m.reason, at: m.at,
+          kind: m.kind, mode: m.mode, speak: m.speak, why: m.reason, at: m.at,
         }))])
         const last = messages[messages.length - 1]
         const mk = extractTags(last.text).marks.filter(m => m.kind === 'mood')
         if (mk.length && onMood) onMood(mk[mk.length - 1].value)
         // SHE SPEAKS UNPROMPTED OUT LOUD TOO — a check-in that only appears as text is
         // half a check-in when the room has a voice.
-        messages.forEach(m => speech.say(forSpeech(m.text)))
+        // (a presence-mode turn with presence.voice off says speak:false — bubble only)
+        messages.forEach(m => { if (m.speak !== false) speech.say(forSpeech(m.text)) })
         scroll()
       } catch (_) { /* gateway down: the room still works, she just cannot speak first */ }
     }
@@ -197,6 +213,9 @@ export default function Chat({ onMood }) {
                    : t.kind === 'remind' ? 'reminding you'
                    : t.kind === 'muse'   ? 'been thinking'
                    : t.kind === 'solo'   ? 'her own time'
+                   : t.kind === 'mode'   ? (t.mode === 'lucid' ? 'dreaming'
+                                            : t.mode === 'company' ? 'keeping you company'
+                                            : 'narrating')
                    : 'spoke up'}
                 </span>
               ) : null}
@@ -233,9 +252,22 @@ export default function Chat({ onMood }) {
                     <div className="act-img-full">{String(ev.image.seen || ev.image.error || '')}</div>
                   </details>
                 ) : ev.persona ? (
-                  <span key={j} className="act act-persona">
-                    <b>{ev.persona.field || 'persona'}</b>
-                    <span className="act-out">{String(ev.persona.value || '').slice(0, 40)}</span>
+                  /* the gateway sends {"persona": state} — the flat mood/voice/traits dict
+                     (app.py's persona events). There is no .field/.value; rendering those
+                     produced a chip that said only "persona" (his report, 2026-08-22). */
+                  /* her MOOD first and never cut mid-word (2026-08-22: "mood: prim"); the
+                     rest of the state is in the title. */
+                  <span key={j} className={'act act-persona' + (ev.persona.changed ? ' moved' : '')}
+                        title={Object.entries(ev.persona)
+                          .filter(([k, v]) => v && k !== 'changed')
+                          .map(([k, v]) => k + ': ' + (Array.isArray(v) ? v.join(' ') : v)).join(' · ')
+                          + (ev.persona.changed ? ' — she moved this turn' : ' — unchanged this turn')}>
+                    <b>{ev.persona.changed ? '◆ mood' : 'mood'}</b>
+                    <span className="act-out">
+                      {[ev.persona.mood ? String(ev.persona.mood) : '',
+                        ev.persona.voice ? 'voice: ' + String(ev.persona.voice) : '']
+                        .filter(Boolean).join(' · ') || 'unchanged'}
+                    </span>
                   </span>
                 ) : ev.looking ? (
                   <span key={j} className="act act-look">

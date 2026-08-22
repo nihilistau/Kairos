@@ -100,10 +100,41 @@ REGISTRY = {
         "note": "her own capabilities/identity as OKF concepts; recited faithfully "
                 "on purpose — she does not paraphrase who she is",
     },
+    # ── THE REAL HER (2026-08-22) ───────────────────────────────────────────────────────
+    # Her own narrative — what she said unprompted, her journal, how she describes her
+    # time and her changes — is primary identity material (narrative identity: the self
+    # is the story it keeps telling). Two classes; the seven KINDS ride on the row's
+    # `kind` field, never as classes (seven classes = seven near-identical verdict cells).
+    "self-narrative": {
+        "delivery": "system",
+        "producers": ["kairos.speak", "narrative.compose_and_write", "app.persona_shift",
+                      "self_stance.extract", "becoming.nightly", "narrative.weekly_chapter"],
+        "note": "what she said/thought/journaled/did, in her voice; kinds: journal thought "
+                "narration dream self_description spoke_up chapter. DURABILITY IS PER KIND, "
+                "not per class (lifecycle._HALF_LIFE_BY_KIND, 2026-08-22): what she concluded "
+                "never fades, her moments fade at 120 d. Decay is not deletion.",
+    },
+    "feeling": {
+        "delivery": "system",
+        "producers": ["app.persona_shift", "self_stance.extract"],
+        "note": "how she feels in the moment; slow decay (730 d); kind: feeling",
+    },
 }
 
 # ── derived views (the ONLY things consumers should touch) ─────────────────────────────
 CLASSES = frozenset(REGISTRY)
+SELF_NARRATIVE = "self-narrative"
+FEELING = "feeling"
+# THE CHAPTER (2026-08-22) is a KIND, not a class: a week of her days rolled into one
+# paragraph, written once a week by narrative.weekly_chapter from the day-paragraphs and
+# her own-time notes, carrying derived_from. It exists because her block is a fixed 2400
+# chars and her narration arrives at 24-33 rows a day: without a rollup the block shows six
+# arbitrary recent lines of a store that will hold thousands. A chapter is the same six
+# characters spent on a week instead of an evening. It may NOT supersede the rows it
+# summarises — it is inferred, they are observed, and verdict.may_supersede refuses that —
+# so it earns its place by LEADING THE BLOCK, not by retiring anything.
+NARRATIVE_KINDS = ("journal", "thought", "narration", "dream", "self_description",
+                   "spoke_up", "feeling", "chapter")
 
 
 def delivery_for(mem_class: str) -> str:

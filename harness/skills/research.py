@@ -274,22 +274,37 @@ class SidecarResearcher(Researcher):
             return Answer(text="the pages fetched said nothing usable on this",
                           ok=False, provenance="local sidecar research",
                           question=question, seconds=time.time() - t0)
-        synthesis = _aux.chat(
+        # THE SILENT LIBRARIAN (2026-08-22, D §2): the helper model EXTRACTS — claims with
+        # their sources, and what the pages do not settle — and she writes the answer. Its
+        # prose never becomes Answer.text; a reply that is not the JSON shape is a failure.
+        ex = _aux.chat_json(
             [{"role": "user", "content":
-              "Question: %s\n\nNotes from %d web pages (each labelled with its "
-              "URL):\n\n%s\n\nWrite a direct, factual answer to the question from "
-              "these notes ONLY. Name which source supports each main claim. If "
-              "the notes disagree or fall short, say so plainly — never fill the "
-              "gap." % (question, len(notes), "\n\n".join(notes))}],
-            max_tokens=700, model=model)
-        if not synthesis:
-            return Answer(text="the sidecar went dark mid-synthesis", ok=False,
+              "Question: %s\n\nNotes from %d web pages (each labelled with its URL):\n\n%s\n\n"
+              "Extract the claims that answer the question, each with the URL that supports it "
+              "(a list of objects with keys text and source); list what the notes do NOT settle "
+              "under gaps. Extract only — do not write an answer."
+              % (question, len(notes), "\n\n".join(notes))}],
+            keys=["claims", "gaps"], max_tokens=700, model=model)
+        if not ex or not isinstance(ex.get("claims"), list) or not ex["claims"]:
+            return Answer(text="the sidecar returned no usable extracts", ok=False,
                           provenance="local sidecar research", question=question,
                           seconds=time.time() - t0)
-        return Answer(text=synthesis,
-                      provenance="local research — %d web pages read and "
-                                 "synthesized by a small helper model on CPU"
-                                 % len(read),
+        lines = []
+        for c in ex["claims"][:12]:
+            if isinstance(c, dict):
+                t = str(c.get("text") or c.get("claim") or "").strip()
+                s = str(c.get("source") or c.get("url") or "").strip()
+            else:
+                t, s = str(c).strip(), ""
+            if t:
+                lines.append("- %s%s" % (t, (" [%s]" % s) if s else ""))
+        gaps = [str(g).strip() for g in (ex.get("gaps") or []) if str(g).strip()][:6]
+        body = ("EXTRACTS (a helper model pulled these from the pages — write the answer "
+                "yourself from them; say what is not settled):\n" + "\n".join(lines)
+                + (("\nNOT SETTLED:\n" + "\n".join("- " + g for g in gaps)) if gaps else ""))
+        return Answer(text=body,
+                      provenance="local research — %d web pages read; extracts by a small helper "
+                                 "model on CPU, the answer is yours to write" % len(read),
                       confidence="medium", question=question,
                       seconds=time.time() - t0, sources=read)
 

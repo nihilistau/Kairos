@@ -37,7 +37,13 @@ _DEFAULT_ACTIONS = "check_in,solo,expand,muse"
 
 
 def enabled() -> bool:
-    return os.environ.get("SP_KAIROS_JUDGE", "0") == "1"
+    """Panel choice first (aux.judge_kairos), else the profile env — registry.tune_or_env."""
+    try:
+        from harness.tuning import registry as _tr
+        v = _tr.tune_or_env("aux.judge_kairos", "SP_KAIROS_JUDGE", "0")
+        return v is True or str(v) == "1" or str(v).lower() == "true"
+    except Exception:
+        return os.environ.get("SP_KAIROS_JUDGE", "0") == "1"
 
 
 def gated_actions() -> set:

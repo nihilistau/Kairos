@@ -185,7 +185,8 @@ def web_search(query: str) -> str:
                     digest = _auxsum.read_long(full, question=query)
             except Exception:
                 digest = ""
-            hits[0]["extract"] = digest[:900] if digest else extract[:700]
+            hits[0]["extract"] = (_auxsum.labelled(digest, "the page")[:900] if digest
+                                  else extract[:700])   # the silent librarian: labelled, never bare
     lines = []
     for h in hits:
         block = f"- {h['title']}\n  {h['snippet'][:180]}\n  {h['url']}"

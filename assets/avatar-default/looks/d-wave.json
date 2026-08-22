@@ -1,0 +1,11 @@
+{
+ "kind": "want-loop:w028",
+ "model": "grok-imagine-image-2.0 / grok-imagine-video-1.5 (xai api)",
+ "reference_sha": "6fdb7d6aa0fd5b4d",
+ "source_sha": "af57e1945b92f0d1",
+ "at": 1787309206,
+ "set": "kairos-default-1",
+ "bundled": true,
+ "prompt_omitted": "bundled asset - the prompt is not published; see docs/SETUP.md",
+ "asset": "looks/d-wave.webm"
+}

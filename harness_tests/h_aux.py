@@ -50,6 +50,9 @@ os.environ["SP_AUX"] = "1"
 check("SP_AUX=1 => aux is on", client.available())
 # point the transport at a port nothing listens on: every verb must go empty
 os.environ["SP_AUX_EMBED_URL"] = "http://127.0.0.1:9"
+# 2026-08-22 (D): the query now wears a soft-prompt prefix by default; this gate's stub embedder is
+# hash-shaped, so the prefix would turn its scripted misses into accidental hits — bare queries here.
+os.environ["SP_AUX_QUERY_PREFIX"] = ""
 os.environ["SP_AUX_CHAT_URL"] = "http://127.0.0.1:9"
 check("embed([]) is []", client.embed([]) == [])
 check("embed vs dead server is [] (not an exception, not a guess)",

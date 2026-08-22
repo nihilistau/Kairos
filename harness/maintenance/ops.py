@@ -312,9 +312,14 @@ def reflect() -> dict[str, Any]:
 
     ── WHAT IT DOES ─────────────────────────────────────────────────────────────
       1. compact   — no point drawing conclusions from a store full of duplicates
+      1b. orphans  — a distillate whose every support has been retired is retired too
+                     (2026-08-22; see lifecycle.orphaned_distillates)
       2. traits    — the personality curator, so who she IS drifts on evidence
-      3. insight   — NEW: she reads what she knows about him and writes down what she has
+      2b. world    — fold the day into the standing block
+      3. insight   — she reads what she knows about him and writes down what she has
                      come to BELIEVE, which is not the same as what she was TOLD
+      4. becoming  — she reads her OWN last week and writes who she has been becoming
+      5. chapter   — once every seventh night, what the WEEK was (narrative.weekly_chapter)
 
     Step 3 is the one that matters, and it is the piece the literature says we were missing:
     a memory system that only stores what it is told can never know anything its owner did
@@ -325,6 +330,13 @@ def reflect() -> dict[str, Any]:
     c = compact()
     out["steps"].append({"step": "compact", **{k: c[k] for k in
                         ("duplicates_retired", "paraphrases_retired", "conflicts_superseded")}})
+    # 1b. orphans — BEFORE the world refresh and before becoming, so a distillate whose
+    #     evidence died is gone from her standing block and out of tonight's window
+    #     rather than being read back and distilled again. See lifecycle for the incident.
+    try:
+        out["steps"].append({"step": "orphans", **retire_orphans()})
+    except Exception as exc:
+        out["steps"].append({"step": "orphans", "skipped": str(exc)[:120]})
     try:
         from harness.personality.curator import consolidate_personality
         res = consolidate_personality()
@@ -343,6 +355,22 @@ def reflect() -> dict[str, Any]:
         out["steps"].append({"step": "insight", **insight()})
     except Exception as exc:
         out["steps"].append({"step": "insight", "skipped": str(exc)[:120]})
+    # 4. becoming — THE REAL HER (2026-08-22): once a night she reads her own last week and
+    #    writes who she has been becoming (inferred; never above her own words)
+    try:
+        from harness.maintenance import becoming as _bec
+        out["steps"].append({"step": "becoming", **_bec.nightly()})
+    except Exception as exc:
+        out["steps"].append({"step": "becoming", "skipped": str(exc)[:120]})
+    # 5. chapter — once every seven nights she writes what the WEEK was, from the episodic
+    #    kinds and her own-time notes. Self-latched on the store; on the other six it
+    #    returns immediately. AFTER becoming, so the two never race for the same night's
+    #    oneshot, and neither reads the other's output.
+    try:
+        from harness.skills import narrative as _nar_ch
+        out["steps"].append({"step": "chapter", **_nar_ch.weekly_chapter()})
+    except Exception as exc:
+        out["steps"].append({"step": "chapter", "skipped": str(exc)[:120]})
     out["stats"] = stats()
     return out
 
@@ -387,6 +415,13 @@ def insight() -> dict[str, Any]:
     from harness.model.person import PersonModel
     from harness.skills import memory as M
 
+    # NO `derived_from` HERE, DELIBERATELY (2026-08-22). becoming.nightly reads a BOUNDED
+    # SET of rows and can name them, so it does; an insight reads the whole PersonModel —
+    # every live evidence row about him, aggregated into dimensions. Naming all of them
+    # would write a ~50-name list onto a file that is rewritten whole on every store, and
+    # the orphan rule (all supports retired) could never fire on a set that size. A
+    # provenance claim that is both expensive and inert is worse than an honest silence:
+    # absent `derived_from` means "unknown provenance", which is exactly what this is.
     model = PersonModel.from_registry(_reg())
     picture = model.render(top=4)
     if not picture:
@@ -456,6 +491,41 @@ def add(fact: str, speaker: str = "user") -> dict[str, Any]:
     finally:
         M.reset_author(tok)
     return {"ok": not res.startswith("not stored"), "result": res, "stats": stats()}
+
+
+def retire_orphans() -> dict[str, Any]:
+    """A CONCLUSION DOES NOT OUTLIVE ITS EVIDENCE (2026-08-22).
+
+    lifecycle.orphaned_distillates() decides WHICH rows; this does the retiring, under
+    the registry lock, with both breadcrumb sets stamped together (the engine reads
+    `lifecycle`, the audit trail reads `superseded_by`/`superseded_at` — a row carrying
+    only one is the live-orphan-tombstone bug of 2026-08-19).
+
+    TOMBSTONE, NEVER DELETE. The paragraph stays on disk, stays findable by name, stays
+    in provenance(). It stops being recalled and stops leading her own block, which is
+    the whole of what was wrong with it.
+
+    `superseded_by` is the literal "supports-retired" rather than a row name, because no
+    row replaced it — the same shape `forget` uses for "operator" and "forget"."""
+    out: list[dict[str, Any]] = []
+    with _reg_lock():
+        rows = _rows()
+        victims = lc.orphaned_distillates(rows)
+        if victims:
+            names = {v.get("name") for v in victims}
+            now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            for r in rows:
+                if r.get("name") in names:
+                    r["lifecycle"] = 1
+                    r["superseded_by"] = "supports-retired"
+                    r["superseded_at"] = now
+                    r["retired_at"] = now
+                    r["retired_because"] = "its supports were retired"
+                    out.append({"name": r.get("name"),
+                                "text": lc.strip_prefix(r.get("text", ""))[:120],
+                                "supports": list(r.get("derived_from") or [])})
+            _write(rows)
+    return {"retired": len(out), "rows": out}
 
 
 def forget(name: str) -> dict[str, Any]:

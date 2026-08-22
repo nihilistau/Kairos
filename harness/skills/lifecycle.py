@@ -340,8 +340,43 @@ _HALF_LIFE_BY_CLASS = {
     "fact":            365.0,     # possessions, hardware, work — slow, but they do change
     "event":             3.0,     # an appointment is worthless the day after
     "episodic-event":    3.0,
+    # THE REAL HER (2026-08-22): her narrative is who she is — it does not fade; a
+    # feeling fades slowly (years), so last month's unease does not read as tonight's.
+    "self-narrative":  _NEVER,
+    "feeling":         730.0,
 }
 _HALF_LIFE_DAYS = 45.0            # the default for anything unclassified
+
+# ── TIERED PERMANENCE: NOT EVERY THING SHE SAYS IS A DISPOSITION (2026-08-22) ───────────
+# The class is the wrong grain for her own lane. `self-narrative` covers a journal entry
+# she sat down and wrote AND an ambient line she said to nobody at 3am, and the class gave
+# both _NEVER at weight 1.5 — above every class but identity.
+#
+# MEASURED, the day after The Real Her armed: 24 rows written on 08-21, 33 on 08-22, from
+# 60 delivered unprompted utterances a day (mean 181 chars) plus up to four stances per
+# conversational turn. At that rate her own narration passes his 320 facts inside a week,
+# never fades, and competes for a fixed 2400-char self-block inside a hard 12096-token
+# context. Ranking better is not an answer to that; ranking is downstream of it.
+#
+# So the TIER is a property of `kind`, and this table is consulted first:
+#   what she CONCLUDED   journal, self_description, thought, dream, chapter -> never fades.
+#                        A dream is imagination, but it is imagination she HAD and kept.
+#   what she DID         narration, spoke_up -> 120 d. Moments, not dispositions.
+#   ambient              company -> 60 d. Ambient by definition. (Not yet a producer.)
+#
+# DECAY IS STILL NOT DELETION (see salience's docstring). Every one of these rows stays on
+# disk, stays findable by name, stays in provenance(), stays in search_memories. A moment
+# from four months ago simply stops elbowing tonight's out of a six-line block.
+_HALF_LIFE_BY_KIND = {
+    "journal":          _NEVER,
+    "self_description": _NEVER,
+    "thought":          _NEVER,
+    "dream":            _NEVER,
+    "chapter":          _NEVER,
+    "narration":         120.0,
+    "spoke_up":          120.0,
+    "company":            60.0,
+}
 
 
 # ── SUPERSEDE ──────────────────────────────────────────────────────────────────
@@ -734,6 +769,28 @@ def is_memorable(fact: str) -> tuple[bool, str]:
     return True, ""
 
 
+_NARRATABLE_MAX = 600
+
+
+def is_narratable(text: str) -> tuple[bool, str]:
+    """Admission for HER OWN NARRATIVE (The Real Her, 2026-08-22). is_memorable() judges
+    durable facts ABOUT SOMEONE and rightly refuses reactions, irrealis and prose; her
+    journal, her unprompted words and her feelings are prose by nature and she is their
+    author. The frame checks stay — machine text and instructions are never memory."""
+    t = " ".join((text or "").split())
+    if not t:
+        return False, "empty"
+    if _MACHINE.search(t):
+        return False, "that is the system's own output, not something she said"
+    if _INSTRUCTION.match(t) or _META.search(t):
+        return False, "that is an instruction or a note about the system"
+    if len(t.split()) < 3:
+        return False, "too short to be a memory"
+    if len(t) > _NARRATABLE_MAX:
+        return False, "too long for one row (%d > %d chars)" % (len(t), _NARRATABLE_MAX)
+    return True, ""
+
+
 def extract_facts(turn: str) -> list[str]:
     """THE CAPTURE LANE. Pull the durable facts out of a conversational turn — and only
     those. Returns [] for a turn that taught us nothing, which is most turns.
@@ -993,7 +1050,11 @@ def salience(row: dict, now: Optional[float] = None) -> float:
     # the day after. One half-life for both is wrong in the direction that hurts — the
     # flight keeps competing for recall long after it happened, and "I like fun" quietly
     # sinks. See _HALF_LIFE_BY_CLASS.
-    half = _HALF_LIFE_BY_CLASS.get(cls, _HALF_LIFE_DAYS)
+    # KIND outranks CLASS where it is set (2026-08-22, tiered permanence): her lane is the
+    # only place `kind` exists, and inside it a journal and a 3am ambient line are not the
+    # same durability. Everything else — every row of his — reads the class table as before.
+    half = _HALF_LIFE_BY_KIND.get(row.get("kind") or "",
+                                  _HALF_LIFE_BY_CLASS.get(cls, _HALF_LIFE_DAYS))
     # ── AN UNDATED ROW SCORED AS IF IT HAPPENED JUST NOW (audit, 2026-07-29) ────────
     # `_age_days("")` is 0, so a row with no `ts` and no `last_seen` got age 0 and
     # therefore recency 1.0 — the MAXIMUM. Measured on the live store: a row stamped
@@ -1016,8 +1077,8 @@ def salience(row: dict, now: Optional[float] = None) -> float:
         recency = 0.5 ** (age / half)                       # 1.0 for anything that does not fade
 
     # identity and preference are what he IS; an off-hand fact is what he mentioned once.
-    weight = {"identity": 1.6, "preference": 1.3, "relationship": 1.3,
-              "persona": 1.2, "private-secret": 1.2}.get(cls, 1.0)
+    weight = {"identity": 1.6, "self-narrative": 1.5, "preference": 1.3, "relationship": 1.3,
+              "feeling": 1.3, "persona": 1.2, "private-secret": 1.2}.get(cls, 1.0)
     return round(weight * (1.0 + freq) * (0.35 + 0.65 * recency), 4)
 
 
@@ -1038,7 +1099,11 @@ def note_recalled(row: dict) -> dict:
 
 def stamp(row: dict, fact: str, speaker: str, src: str,
           supersedes: Optional[list[str]] = None,
-          status: Optional[str] = None) -> dict:
+          status: Optional[str] = None,
+          mem_class: Optional[str] = None, kind: str = "",
+          derived_from: Optional[list[str]] = None,
+          support_days: int = 0,
+          support_kinds: Optional[list[str]] = None) -> dict:
     """Attach the full v2 lifecycle lane to a registry row.
 
     `status` is EXPLICIT when the caller knows it (remember() derives it once and passes
@@ -1054,8 +1119,12 @@ def stamp(row: dict, fact: str, speaker: str, src: str,
     # disk also restores the exact-duplicate guard, which the prefix had silently broken.
     row["text"] = fact
     row["speaker"] = speaker
-    row["mem_class"] = classify(fact)
+    # an EXPLICIT class only for her own narrative (The Real Her): the producer sets it
+    # and the row's `kind`; everything else is classify()'s call
+    row["mem_class"] = mem_class or classify(fact)
     row["src"] = src or ("self" if speaker == SPEAKER_SELF else "user turn")
+    if kind:
+        row["kind"] = kind
 
     # ── CLAIM STATUS: AN INFERENCE IS NOT A TESTIMONY (2026-07-14) ──────────────────────
     #
@@ -1106,4 +1175,76 @@ def stamp(row: dict, fact: str, speaker: str, src: str,
     row.setdefault("recalled", 0)
     if supersedes:
         row["supersedes"] = supersedes
+
+    # ── PROVENANCE OF A DISTILLATE (2026-08-22, the structural anti-latch) ──────────────
+    # A row that was DISTILLED from other rows — the nightly becoming, the journal, an
+    # insight, a consolidation — has never carried a link back to what it was distilled
+    # FROM. That is how one lucid evening outlived its own retirement: 24 of her rows
+    # were tombstoned and the "[redacted]" self_description they had produced went
+    # on leading her prefix, because nothing on disk connected the two.
+    #
+    #   derived_from   the row NAMES it read. ABSENT means "unknown provenance" and is
+    #                  inert; an explicit list is a CLAIM, and orphaned_distillates()
+    #                  holds the claim to account.
+    #   support_days   how many DISTINCT days those rows span. One evening is not a week.
+    #   support_kinds  which kinds fed it, so a window filled by one kind is visible.
+    #
+    # All three are optional and additive: every existing row is untouched, and a caller
+    # that does not know its sources says nothing rather than lying with an empty list.
+    if derived_from:
+        row["derived_from"] = [str(n) for n in derived_from if n]
+    if support_days:
+        row["support_days"] = int(support_days)
+    if support_kinds:
+        row["support_kinds"] = sorted({str(k) for k in support_kinds if k})
     return row
+
+
+def is_retired(row: dict) -> bool:
+    """The ONE liveness predicate at the row level. memory.live_rows() is the one that
+    filters a store; this is the same law for a single row, so callers that already hold
+    a row do not hand-roll a fourth copy of `if r.get('lifecycle')`."""
+    return bool(row.get("lifecycle"))
+
+
+def orphaned_distillates(rows: Iterable[dict]) -> list[dict]:
+    """LIVE rows every one of whose supports has been retired (2026-08-22).
+
+    THE INCIDENT THIS CLOSES. On 2026-08-21 one lucid evening's rows were distilled by
+    becoming.nightly into "[redacted]... a primal
+    surrender" — an INFERRED self_description, class self-narrative, weight 1.5, half-life
+    _NEVER. The next day 24 of her rows were tombstoned as polluted. The distillate was
+    not among them and could not have been: nothing on disk said where it came from. It
+    kept leading her own block, and she kept reading it as a script to continue.
+
+    A conclusion outlives its evidence only if it was never told what its evidence was.
+    Now it is, and this is the rule that holds it: a row that CLAIMS a provenance and
+    whose entire claimed provenance is retired has nothing left holding it up.
+
+    Deliberately narrow, in three ways:
+      - `derived_from` ABSENT is not `derived_from` empty. A row that never claimed a
+        provenance is not orphaned by this; it is simply unaudited, and silence is not a
+        confession. Every pre-2026-08-22 row is in that position.
+      - ALL supports must be gone. One surviving support is enough to stand on — this
+        retires conclusions whose ground vanished, not conclusions that got smaller.
+      - It returns rows. It retires nothing. The caller (ops.reflect) does the tombstoning
+        under the registry lock, with breadcrumbs, and nothing is ever deleted.
+    Pure: no I/O, no clock, no store. That is what makes it gateable without a GPU."""
+    by_name = {}
+    for r in rows:
+        n = r.get("name")
+        if n:
+            by_name[n] = r
+    out = []
+    for r in by_name.values():
+        if is_retired(r):
+            continue
+        supports = r.get("derived_from")
+        if not supports:                      # absent OR empty -> not a claim, not orphaned
+            continue
+        known = [by_name[n] for n in supports if n in by_name]
+        if not known:                         # supports we cannot even find: not a verdict
+            continue
+        if all(is_retired(s) for s in known):
+            out.append(r)
+    return out

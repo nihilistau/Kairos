@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
@@ -73,7 +74,9 @@ class Knob:
     # "sp" = the Rust sp-daemon only — the room shows the chip and the knob is moot under a
     # foreign endpoint (eot_bias has no wire field there; see InferenceConfig.SP_ONLY).
     engine: str = ""
-
+    # DYNAMIC CHOICES (2026-08-22, the aux model pickers): a callable returning the live
+    # list (what the door serves right now); schema() resolves it and falls back to `choices`.
+    choices_fn: Any = None
 
 KNOBS: list[Knob] = [
     # ── KAIROS: when she speaks unprompted ────────────────────────────────────────
@@ -87,7 +90,7 @@ KNOBS: list[Knob] = [
     # stop-vs-continue margin the forward already computed, the policy is SILENT by
     # default, and every bound (chain limit, cooldown, hourly cap, never-after-a-question)
     # is checked before she is even consulted. She speaks when she was CUT OFF mid-thought,
-    # and — after 240s of quiet, on a 35% roll — when the room has gone still.
+    # and — after 600s of quiet, on a 35% roll — when the room has gone still.
     Knob("kairos.enabled", "Kairos — speaking unprompted", "Enabled", "bool", True,
          "Master switch. Off = she only ever speaks when spoken to. On = she may finish a "
          "thought she was cut off in, and may check in after a long silence — bounded by "
@@ -124,9 +127,10 @@ KNOBS: list[Knob] = [
          "Absolute ceiling on unprompted messages per hour, whatever else says.",
          min=0, max=60, step=1),
     Knob("kairos.checkin_idle_s", "Kairos — speaking unprompted", "Check-in after idle (s)",
-         "float", 240.0,
+         "float", 600.0,
          "How long the room must be quiet before she may say something unprompted "
-         "out of the blue (as opposed to finishing a cut-off thought).",
+         "out of the blue (10 min by default, 2026-08-22 — his ask; as opposed to "
+         "finishing a cut-off thought).",
          min=30.0, max=3600.0, step=30.0),
     Knob("kairos.checkin_chance", "Kairos — speaking unprompted", "Check-in chance", "float", 0.35,
          "Even once it has gone quiet, she usually still says nothing. 0 = never check in.",
@@ -211,13 +215,117 @@ KNOBS: list[Knob] = [
          "something up, follows a thought — instead of only waiting. Shown as an action, "
          "not as a message to him."),
     Knob("kairos.solo_every_s", "Kairos — her own time", "At most one of her own every",
-         "float", 900.0,
-         "Seconds between her own turns. She is living, not grinding the GPU.",
+         "float", 1800.0,
+         "Seconds between her own turns (30 min by default, 2026-08-22 — his ask). She is "
+         "living, not grinding the GPU.",
          min=120.0, max=7200.0, step=60.0),
     Knob("kairos.solo_chance", "Kairos — her own time", "Chance she feels like it",
          "float", 0.5,
          "Even with the time free she does not always feel like doing something. 0 = never.",
          min=0.0, max=1.0, step=0.05),
+    # ── PRESENCE MODES (2026-08-22, his ask): narration / company / lucid dream ──────
+    # Zero-interaction voice companionship. A mode is a kairos ACTION (impulse.MODE_TURN)
+    # that waits its turn — the presence clock, quiet-after-him, its own hourly cap — and
+    # speaks through the room's voice. Ships OFF; arming is his (docs/OFF-BY-DEFAULT.md).
+    Knob("presence.mode", "Presence — her modes", "Mode", "enum", "off",
+         "off = she speaks only as kairos allows. narration = she lives her own evening out loud; "
+         "company = soft presence, a few true words; lucid = a whisper in the dark — tenderness, a "
+         "small story, or reading to you. Each waits for quiet (the presence clock) and for "
+         "quiet-after-you, and obeys its own hourly cap.",
+         choices=["off", "narration", "company", "lucid"]),
+    # THREE CADENCES, NOT ONE (his ask, 2026-08-22): narration, company and a dream are three
+    # different things; one knob for three variables made no sense.
+    Knob("presence.every_narration_s", "Presence — her modes", "Narration: at most one every (s)", "int", 240,
+         "Seconds of quiet between narration turns.", min=30, max=3600, step=30),
+    Knob("presence.every_company_s", "Presence — her modes", "Company: at most one every (s)", "int", 600,
+         "Seconds of quiet between company turns — the sparsest by design.", min=30, max=3600, step=30),
+    Knob("presence.every_lucid_s", "Presence — her modes", "Lucid dream: at most one every (s)", "int", 300,
+         "Seconds of quiet between dream turns.", min=30, max=3600, step=30),
+    # LENGTH, per mode (his ask, 2026-08-22): the ceiling in tokens; the nudge asks her to land
+    # inside it and FINISH the thought, and a turn that still hits the ceiling is cut back to
+    # its last full sentence rather than mid-line.
+    Knob("presence.len_narration", "Presence — her modes", "Narration: length (tokens)", "int", 320,
+         "How long a narration turn may run.", min=40, max=2000, step=20),
+    Knob("presence.len_company", "Presence — her modes", "Company: length (tokens)", "int", 90,
+         "How long a company turn may run — a few true words.", min=40, max=2000, step=20),
+    Knob("presence.len_lucid", "Presence — her modes", "Lucid dream: length (tokens)", "int", 700,
+         "How long a dream may run — at least double a narration by default.", min=40, max=2000, step=20),
+    Knob("presence.chance", "Presence — her modes", "Chance she takes the turn", "float", 1.0,
+         "1 = a mode on is a mode on. Lower it if you want her sparser.", min=0.0, max=1.0, step=0.05),
+    Knob("presence.max_per_hour", "Presence — her modes", "Cap per hour", "int", 12,
+         "Her modes' own ceiling — separate from kairos's.", min=1, max=60, step=1),
+    Knob("presence.intimate", "Presence — her modes", "Intimate variants", "bool", False,
+         "The closer, softer version of each mode's prompt."),
+    Knob("presence.voice", "Presence — her modes", "Speak mode turns aloud", "bool", True,
+         "Off = they land as bubbles only (voice.enabled still rules everything)."),
+    Knob("presence.cue", "Presence — her modes", "Cue (optional)", "str", "",
+         "An atmospheric hint she reads as context, not as an order: 'rain against the windows'. "
+         "Empty = she assembles one from the hour, her mood, her own time and the book in hand."),
+    Knob("presence.read_chance", "Presence — her modes", "Chance she reads instead", "float", 0.35,
+         "In narration or lucid, the chance a turn is the next passage of the book she has picked "
+         "up (var/library/). 0 = never reads.", min=0.0, max=1.0, step=0.05),
+    Knob("presence.read_chunk_chars", "Presence — her modes", "Passage length (chars)", "int", 700,
+         "How much of the book one reading turn covers.", min=200, max=2400, step=100),
+    Knob("presence.read_tools", "Presence — her modes", "Her shelf tools", "bool", True,
+         "pick_up_book / put_down_book / books_on_the_shelf — so she can choose on her own time."),
+    # ── AUX — THE QUIET LIBRARIANS (2026-08-22, sub-project D) ────────────────────────
+    # The LFM2.5 CPU helpers: they embed, retrieve, judge, compress, parse — never her voice.
+    # Boot defaults live in [aux] (serve.py's one door); live knobs read through the
+    # override-only bridge (registry.tune_or_env) so the profile still rules an untouched panel.
+    Knob("aux.enabled", "Aux — the quiet librarians", "Aux sidecars armed", "bool", False,
+         "The master arm for the CPU helpers (deep recall, page reading, judging). Profile-owned: "
+         "SP_AUX in [aux].enabled.", scope="profile", env="SP_AUX"),
+    Knob("aux.chat_model", "Aux — the quiet librarians", "Judge / extract model", "enum",
+         "liquidai/lfm2.5-1.2b-instruct",
+         "The small instruct model on the chat door (LM Studio). Choices are what the door "
+         "lists right now; the profile's is the boot default.",
+         choices=["liquidai/lfm2.5-1.2b-instruct"],
+         choices_fn=lambda: __import__("harness.sidecar.client", fromlist=["x"]).list_models()),
+    Knob("aux.embed_model", "Aux — the quiet librarians", "Embedding model (restart)", "enum", "",
+         "The GGUF the embed sidecar is launched with at boot ([aux].embed_gguf). Choices are the "
+         "embedding / ColBERT *.gguf files beside the current one.", scope="profile",
+         env="SP_AUX_EMBED_GGUF",
+         choices_fn=lambda: __import__("harness.sidecar.archive", fromlist=["x"]).embed_choices()),
+    Knob("aux.query_prefix", "Aux — the quiet librarians", "Query soft-prompt", "str",
+         "Recall for Kairos: find the moment in her past conversations with Sam that this asks about — ",
+         "Prepended to every deep-recall query before it is embedded — the cheap, her-conditioned "
+         "version of a soft prompt. Live; empty = bare query."),
+    Knob("aux.doc_prefix", "Aux — the quiet librarians", "Document prefix (re-embeds)", "str", "",
+         "Prepended to every transcript chunk at index time. Changing it re-embeds the archive on "
+         "the next refresh (the index stamp carries its hash)."),
+    Knob("aux.spine_rerank", "Aux — the quiet librarians", "Spine-aware rerank", "bool", True,
+         "Re-score deep-recall candidates with the spine's own signals — lexical overlap, recency, "
+         "and whether the moment backs a fact she holds. Off = raw cosine order (A/B)."),
+    Knob("aux.auto_recall", "Aux — the quiet librarians", "Candidate lane (parallel deep recall)", "bool", False,
+         "On turns that ask something, search every past conversation IN PARALLEL with her recall; "
+         "drop it unread when she already has enough; otherwise staple up to two labelled moments "
+         "to the recall note. Candidates, never authority. Ships off."),
+    Knob("aux.early_exit_hits", "Aux — the quiet librarians", "Early exit at N spine hits", "int", 3,
+         "When the spine already found this many facts, the lane's result is dropped unread.",
+         min=1, max=10, step=1),
+    Knob("aux.rerank", "Aux — the quiet librarians", "ColBERT rerank (dark)", "bool", False,
+         "Late-interaction rerank over the top-50; needs its own llama-server (--pooling none). "
+         "Arming condition in OFF-BY-DEFAULT §11.", scope="profile", env="SP_AUX_RERANK"),
+    Knob("aux.judge_kairos", "Aux — the quiet librarians", "Pre-judge her unprompted turns", "bool", False,
+         "The 1.2B rules 'worth a turn?' BEFORE the model generates (fail-open; reminders never gated)."),
+    Knob("aux.judge_watch", "Aux — the quiet librarians", "Judge watches on CPU", "bool", True,
+         "The watch poll's YES/NO on the sidecar; the model stays the fallback."),
+    # ── SIGHT — HER EYES (2026-08-22, sub-project E): which eyes she uses is a picker ────
+    Knob("sight.backend", "Sight — her eyes", "Eyes", "enum", "engine",
+         "engine = the served model's own vision (frames into the engine; on a foreign endpoint "
+         "the seam's image_url if it can). aux_vl = an LFM2.5-VL model on the aux chat door (LM "
+         "Studio) — the 2060 stays hers. openai = the seam's image_url regardless. Every look — "
+         "look_at, take_photo, take_screenshot, the hourly eye — goes through the same door and "
+         "the same scrub.", choices=["engine", "aux_vl", "openai"]),
+    Knob("sight.vl_model", "Sight — her eyes", "VL model (aux door)", "enum", "",
+         "The vision model id on the aux chat door; choices are what the door lists with vl/vision "
+         "in the name. Empty = aux_vl is not available.", choices=[""],
+         choices_fn=lambda: __import__("harness.skills.sight_vl", fromlist=["x"]).vl_choices()),
+    Knob("sight.vl_max_tokens", "Sight — her eyes", "VL description budget (tokens)", "int", 220,
+         "The ceiling for a description on the VL door (the engine path keeps senses.look_tokens).",
+         min=40, max=1200, step=20),
+    Knob("sight.vl_detail", "Sight — her eyes", "VL detail", "enum", "auto",
+         "image_url.detail where the door honours it.", choices=["auto", "low", "high"]),
     # ── THE ROOM ON A TIMER, AND HOW TO STOP IT WITHOUT A RESTART (2026-08-03) ────
     # The hourly eye was armed by SP_AMBIENT alone, so the only way to stop it was to
     # bounce the stack — and a camera is the one thing you most want to stop NOW. This is a
@@ -525,6 +633,14 @@ KNOBS: list[Knob] = [
          "How strong a match a memory needs before she brings it up. Lower = she recalls "
          "more, and more loosely.",
          min=0.0, max=1.0, step=0.02, scope="profile", env="SP_SEM_TAU"),
+    # ── THE REAL HER (2026-08-22): her own narrative leads her own context ──────────
+    Knob("memory.self_budget", "Memory", "Her own context (chars)", "int", 2400,
+         "How much of the system prefix her OWN narrative may take — journal, what she said "
+         "unprompted, how she feels, how she has been changing (The Real Her, 2026-08-22).",
+         min=0, max=12000, step=200),
+    Knob("memory.self_share", "Memory", "Her own context (max share)", "float", 0.5,
+         "Cap on the share of the prefix her self block may take, whatever the budget — the "
+         "guard against narrative loops.", min=0.0, max=1.0, step=0.05),
     # ── VOICE (2026-08-21, operator: "voice settings and controls in the GUI...
     # all live toggles"). LIVE scope: tts.py reads these through tune.get() on
     # every synthesize, so the toggle takes effect on her next sentence — no
@@ -540,6 +656,9 @@ KNOBS: list[Knob] = [
          "Which built-in xAI voice speaks. Cached audio is keyed per voice, so "
          "switching never serves the old voice.",
          choices=["ara", "eve", "luna", "carina", "iris", "celeste", "rex", "leo"]),
+    Knob("voice.local_gguf", "Voice", "Local voice model (restart)", "str", "",
+         "The local chain's GGUF (SP_TTS_GGUF in the profile) — shown here so the Voice section "
+         "names its model like Sight and Aux do.", scope="profile", env="SP_TTS_GGUF"),
     Knob("voice.speed", "Voice", "Pace", "float", 1.0,
          "How fast she speaks through the xAI voice (1.0 = natural). Live: the next "
          "sentence honours it. Her [pause]/<slow> tags ride on top of this.",
@@ -577,6 +696,9 @@ def _load() -> dict:
 def _clamp(k: Knob, v: Any) -> Any:
     if k.type == "bool":
         return bool(v)
+    if k.type == "str":                   # a free-text knob (presence.cue, 2026-08-22): bounded
+        # line breaks folded, but spacing KEPT — a prefix like "passage: " needs its trailing space
+        return re.sub(r"[\r\n\t]+", " ", str(v if v is not None else ""))[:200]
     if k.type == "int":
         v = int(round(float(v)))
     elif k.type == "float":
@@ -605,6 +727,19 @@ def chosen(key: str) -> Any:
     if kn and key in vals:
         return _clamp(kn, vals[key])
     return None
+
+
+def tune_or_env(key: str, env_key: str, default):
+    """OVERRIDE-ONLY bridge (the tts.py pattern, ONE copy from 2026-08-22): the store
+    answers only if the operator chose in the panel; otherwise the boot env (the profile)
+    rules. A knob DEFAULT that answered here would override the profile on every box."""
+    try:
+        v = chosen(key)
+        if v is not None:
+            return v
+    except Exception:
+        pass
+    return os.environ.get(env_key, default)
 
 
 def get(key: str, fallback: Any = None) -> Any:
@@ -668,6 +803,13 @@ def schema() -> dict:
     out = []
     for k in KNOBS:
         d = asdict(k)
+        d.pop("choices_fn", None)               # a callable is not JSON; resolve it instead
+        if k.choices_fn is not None:
+            try:
+                live = list(k.choices_fn() or [])
+                d["choices"] = sorted(set(live + list(k.choices)), key=str)
+            except Exception:
+                d["choices"] = list(k.choices)
         d["value"] = get(k.key)
         d["overridden"] = k.key in vals
         # ── A PROFILE KNOB REPORTS THE VALUE THAT IS ACTUALLY IN FORCE ────────────────

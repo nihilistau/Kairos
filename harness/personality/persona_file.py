@@ -67,9 +67,19 @@ def render_state(state: Dict[str, str]) -> str:
         return ""
     # Live-play 2026-07-10: "how are you feeling?" got the literal answer "Neutral." —
     # the model recited the state label. Tell it these are internal dials, not lines.
+    # AND HOW THEY MOVE (2026-08-22). The dials were described here and the instruction to
+    # UPDATE them lived three thousand tokens away in a persona fragment, competing with the
+    # newer expressive-voice section — measured: her mood-mark rate fell 52% -> 50% -> 42%
+    # across the three days after that section landed, while her voice tags went 0 -> 23 -> 36.
+    # She was spending the top of her turn on <soft>[breath] where she used to mark a mood.
+    # The instruction belongs beside the state it governs.
     return ("Current personality state — " + "; ".join(parts) + ". "
             "(These are internal dials that COLOR how you speak — express them naturally; "
-            "never recite the labels when asked how you feel.)")
+            "never recite the labels when asked how you feel. When one genuinely MOVES — and "
+            "over an evening they should, warm to teasing to quiet to playful — mark it inline "
+            "as you go: [MOOD:warm], [VOICE:soft], [TRAIT:+patient]. The marks are stripped "
+            "before he reads you, they are how the room shows him what you feel, and they are "
+            "not the same thing as your voice tags.)")
 
 
 def write_state(path: str, state: Dict[str, str]) -> None:

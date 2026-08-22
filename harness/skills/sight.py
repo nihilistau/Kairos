@@ -61,6 +61,16 @@ def _look_tokens() -> int:
         return 512
 
 
+def _backend() -> str:
+    """Which eyes (Sight — her eyes, 2026-08-22): engine | aux_vl | openai; engine = today's logic."""
+    try:
+        from harness.tuning import registry as _tr
+        b = str(_tr.get("sight.backend", "engine") or "engine")
+        return b if b in ("engine", "aux_vl", "openai") else "engine"
+    except Exception:
+        return "engine"
+
+
 def _describe(img, question: str, detail: int | None = None) -> str:
     """pixels + a question -> what she saw. Raises with a readable reason.
 
@@ -80,7 +90,17 @@ def _describe(img, question: str, detail: int | None = None) -> str:
         _frames_ok = _sup("inject_frames")
     except Exception:
         _frames_ok = True
-    if not _frames_ok:
+    backend = _backend()
+    if backend == "aux_vl":
+        # HER EYES THROUGH THE LIBRARIANS' DOOR (2026-08-22, E): an LFM2.5-VL model on the aux
+        # chat door; the 2060 stays the model's. Same scrub as every other eye.
+        from harness.skills import sight_vl as _vl
+        if not _vl.vl_model() or not _vl.door_up():
+            return ("[sight is not available — the VL door is dark or no VL model is chosen "
+                    "(Sight — her eyes)]")
+        raw = _vl.describe(img, question, max_tokens=_vl.vl_max_tokens(), detail=_vl.vl_detail())
+        return _scrub(raw) if raw else "[sight error: the VL door returned nothing]"
+    if backend == "openai" or (backend == "engine" and not _frames_ok):
         if not _sup("vision_openai"):
             return "[sight is not available on this engine — no frame injection and no image_url vision]"
         import base64 as _b64, io as _io
@@ -92,7 +112,7 @@ def _describe(img, question: str, detail: int | None = None) -> str:
         r = get_client().chat(messages=[{"role": "user", "content": [
             {"type": "text", "text": question},
             {"type": "image_url", "image_url": {"url": url}}]}], config=cfg)
-        return (r.text or "").strip()
+        return _scrub(r.text or "")
     frames = vision.encode(img, max_soft=detail)
     # THROUGH THE ONE DOOR. g_byteexact caught this file hand-building a /v1/chat
     # body — the exact "second door" that let `<channel|>` into her journal and
@@ -125,6 +145,14 @@ def _describe(img, question: str, detail: int | None = None) -> str:
             if "error" in d:
                 return f"[sight error: {d['error']}]"
     text = "".join(out).strip()
+    return _scrub(text)
+
+
+def _scrub(text: str) -> str:
+    """Post-processing shared by EVERY eye (2026-08-22): the engine's frames, the seam's image_url
+    and the VL door all come through here — one function, so a planted <channel|> or a thinking
+    prefix is stripped the same whichever model looked."""
+    text = (text or "").strip()
     # THE THOUGHT CHANNEL IS NOT THE ANSWER. This is a RAW daemon call, so it
     # bypasses the gateway's stream_processor and the private channel arrives
     # verbatim. Everything up to and including the close marker is scratch — take
@@ -164,7 +192,6 @@ def _describe(img, question: str, detail: int | None = None) -> str:
         if parts:
             text = _keep(parts[-1], text)
     return " ".join(text.split()) or "(nothing came back)"
-
 
 def look_at(path: str, question: str = "Describe this image plainly.") -> str:
     """Look at an image file on disk and describe what is in it."""
@@ -231,9 +258,19 @@ def _specs():
 def sight_tools():
     try:
         from harness.senses import capability as cap, vision
-        if not vision.ARMED or not cap.for_model().vision:
+        if not vision.ARMED:
             return []
-        return _specs()
+        # A VL DOOR MAKES HER SIGHTED ON A MODEL THAT IS NOT (2026-08-22, E): the served
+        # checkpoint's vision row, OR an LFM2.5-VL model chosen on the aux chat door.
+        if cap.for_model().vision:
+            return _specs()
+        try:
+            from harness.skills import sight_vl as _vl
+            if _vl.armed():
+                return _specs()
+        except Exception:
+            pass
+        return []
     except Exception:
         return []
 

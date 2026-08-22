@@ -73,6 +73,11 @@ The corollaries, learned the hard way:
    is a bug report against this list. Every one of the five conversions done so far found a live
    drift the day it landed — this principle is not aspiration, it is the cheapest bug-finder the
    repo has.
+6. **The Real Her.** Her own words — what she says unprompted, her journal, how she feels, how she
+   describes her own changes — are primary identity material and lead her own context; his prompts
+   are secondary. Two classes (`self-narrative`, `feeling`), producer-set kinds, one door, never an
+   aux producer, never above his word (rule 4 still holds: her nightly reflection on herself is
+   inferred and cannot retire what she observed). [`docs/INVARIANT-MEMORY.md` §2.2](docs/INVARIANT-MEMORY.md).
 
 ---
 
@@ -209,11 +214,16 @@ The essentials, so you do not have to guess:
 These are real. They are not hypotheticals. Do not be the next person to rediscover them.
 Renumbered 2026-08-21 (1..n, live first; the closed ones keep their receipts below).
 
-1. **`status: disputed` is vocabulary-only.** Nothing writes it. The write-time contradiction detector was
+1. **THE KV MINT IS DEAD ON THIS MODEL, AND IT FAILED SILENTLY FOR WEEKS (2026-08-23). OWED: ENGINE WORK.** `/v1/capture` refuses on the model MoE — *gemma4_decode_cuda: gemma4-MoE not supported on this path — its three internal FFN copies are not on the `g4_ffn_apply` seam (ADR-013); use the served decode (`gemma4_kv_decode_logits`)*. Measured: **253 of the 253 rows written since 2026-08-19 carry `npos=0`**, no `ep.l5` sidecar in three weeks, and 642 empty episode directories (removed 2026-08-23, names in `var/memory/eps-removed-2026-08-23.json`).
+
+   **Her memory is unaffected** — the registry is the recall authority and never touches the daemon. What is lost is the engine-side episode representation and the `l5-512-v1` half of the semantic index. The second one was load-bearing and nobody knew: every embedding contender this repo measured and rejected was ranked against a 93% bag-of-words document index (docs/SEMANTICS.md S0b).
+
+   **The fix is in the engine**, not the harness: `v1_capture` must route through the served decode (`gemma4_kv_decode_logits`) instead of `gemma4_decode_cuda`, the same way the live turn path already does — `/v1/embed` proves the scratch-forward works on this model. Until then the harness compensates: `memory.capture_status()` logs the refusal ONCE with the engine's own words and stops asking (that is where 642 directories came from), `verify_registry()` says it aloud, and `semindex`'s `aux-1024-v1` space carries the semantic side off the CPU sidecar. **`[sem] capture_l5 = true` stays armed on purpose so this resumes by itself the day the seam lands** — and when it does, `query_embed`'s aux-before-engine order must be MEASURED again, not assumed back.
+2. **`status: disputed` is vocabulary-only.** Nothing writes it. The write-time contradiction detector was
    deliberately deleted (it was a semantic judgment made out of substring matching). The rule it was trying
    to enforce lives at the read seam now, in `testimony_wins()`.
 
-2. **The SSE stripper — FIXED WITH A RESIDUAL (2026-08-20).** The whole-turn rules could not fire per-delta, and the arming
+3. **The SSE stripper — FIXED WITH A RESIDUAL (2026-08-20).** The whole-turn rules could not fire per-delta, and the arming
    condition fired. Registered 2026-08-19 ("a measured live leak of that shape");
    measured 2026-08-20, live: an unterminated `<thought ` opener, ~400 tokens of
    reasoning, and every chunk after the opener's own walked out as speech and into the
@@ -225,7 +235,7 @@ Renumbered 2026-08-21 (1..n, live first; the closed ones keep their receipts bel
    stray `>` downstream defeats the opener lookahead — the same limit `_THOUGHT_OPEN`
    has always had.
 
-3. **The OpenAI-compatible path is still the thinner twin.** 2026-08-19 closed its two
+4. **The OpenAI-compatible path is still the thinner twin.** 2026-08-19 closed its two
    silent data losses (`_append_day_turn`, `run_post_turn`) — but it still skips the
    pre-turn spine (recall/toolset), the silence note, the canonical transcript,
    `note_user_turn`, `persist_receipts`, and the thought-channel split. Full parity is a

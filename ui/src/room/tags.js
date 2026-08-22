@@ -96,14 +96,34 @@ const GESTURE_RE = /\[([A-Z][A-Z0-9_]{1,31})\]/g
  * the TTS edge, this strips every shape at the display edge. `forSpeech` keeps them. */
 const VOICE_INLINE_RE = /\[([a-z][a-z-]{0,23})\]/g
 const VOICE_WRAP_RE = /<\/?([a-z][a-z-]{0,23})>/g
+/* ── AND THE SPELLINGS SHE INVENTS (2026-08-22) ────────────────────────────────────
+ * The pair above matches the VOCABULARY's shape — lowercase and hyphens — so the
+ * malformed ones she actually writes walked straight onto his screen: `</build_intensity>`
+ * (underscore), `[ch서ckle]` (a syllable the sampler dropped in), `</slow>` with no opener,
+ * `<lowersoft>` invented whole. This is the same widening the MARK mirror already got:
+ * the display edge strips every VOICE-tag-SHAPED span, known or not, while `forSpeech`
+ * keeps only the ones the voice actually understands. */
+const VOICE_INLINE_LOOSE = /\[[a-z][^\][<>\n]{0,31}\]/g
+const VOICE_WRAP_LOOSE = /<\/?[a-z][^<>\n]{0,31}\/?>/g
 export function stripVoice(text) {
   return String(text || '').replace(VOICE_INLINE_RE, '').replace(VOICE_WRAP_RE, '')
+    .replace(VOICE_INLINE_LOOSE, '').replace(VOICE_WRAP_LOOSE, '')
     .replace(/[ \t]{2,}/g, ' ')
 }
 /* What the voice should be handed: her marks ([MOOD:] etc.) and invented gestures gone,
- * her voice tags KEPT. The display path is extractTags(text).text, which drops both. */
+ * her KNOWN voice tags KEPT — a spelling the voice does not understand is not speech and
+ * is not read aloud either (2026-08-22; the server's TTS edge filters the same way). */
+const VOICE_KNOWN_INLINE = new Set(['pause', 'long-pause', 'hum-tune', 'laugh', 'chuckle',
+  'giggle', 'cry', 'tsk', 'tongue-click', 'lip-smack', 'breath', 'inhale', 'exhale', 'sigh'])
+const VOICE_KNOWN_WRAP = new Set(['soft', 'whisper', 'loud', 'build-intensity',
+  'decrease-intensity', 'higher-pitch', 'lower-pitch', 'slow', 'fast', 'sing-song',
+  'singing', 'emphasis'])
 export function forSpeech(text) {
-  return extractTags(text, { keepVoice: true }).text
+  const t = extractTags(text, { keepVoice: true }).text
+  return String(t || '')
+    .replace(/\[([^\][<>\n]{1,31})\]/g, (m, n) => (VOICE_KNOWN_INLINE.has(n) ? m : ''))
+    .replace(/<\/?([^<>\n]{1,31})>/g, (m, n) => (VOICE_KNOWN_WRAP.has(String(n).replace(/^\//, '')) ? m : ''))
+    .replace(/[ \t]{2,}/g, ' ')
 }
 
 const KIND = { mood: 'mood', voice: 'voice', trait: 'trait',

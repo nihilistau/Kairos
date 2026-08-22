@@ -65,6 +65,12 @@ from harness.kairos.impulse import (                   # noqa: E402
 
 CFG = KairosConfig(enabled=True, max_chain=2, cooldown_s=45.0, max_per_hour=6,
                    checkin_idle_s=240.0, checkin_chance=1.0)
+# THE FIXTURES BELOW USE SMALL SYNTHETIC CLOCKS (100.0, 5000.0 ...). Since 2026-08-22 a
+# fresh TurnState's clocks default to impulse.BOOT_AT (the real monotonic boot time), which
+# would sit in these fixtures' FUTURE. Pin the boot to t=1.0 for this process: non-zero
+# (so the no-zero-clock rule is exercised) and before every `now` a section uses.
+import harness.kairos.impulse as _imp  # noqa: E402
+_imp.BOOT_AT = 1.0
 ALWAYS = random.Random(0)
 
 
@@ -74,9 +80,16 @@ class Sure(random.Random):
         return 0.0
 
 
-def d(state, now, reply="ok.", insight=None, margin=None):
-    return decide(cfg=CFG, state=state, now=now, reply_text=reply,
+def d(state, now, reply="ok.", insight=None, margin=None, cfg=None):
+    return decide(cfg=cfg or CFG, state=state, now=now, reply_text=reply,
                   eot_margin=margin, insight=insight, rng=Sure())
+
+
+from dataclasses import replace as _dc_replace  # noqa: E402
+# Two unanswered remarks make her conclude he is away, and her OWN TIME then outranks the
+# chain limit by design (SOLO sits above it). The chain-limit checks are about MUSE, so
+# they run with her own time off — otherwise they would be testing SOLO's placement.
+CFG_NOSOLO = _dc_replace(CFG, solo_enabled=False)
 
 
 print("1. SHE CAN SPEAK FIRST AFTER A RESTART")
@@ -135,6 +148,10 @@ check("...and it has a shelf life, so a cold thought is not delivered hours late
 # found in. Drive tick_once with a reflection that arrives once and see it survive.
 _held = {"text": "Sam has been quieter this week.", "bits": 4.0}
 _real_reflect, _real_cfg = S.reflect_tick, S.live_config
+# seed() stamps last_user_at with the REAL monotonic clock; the ticks below ride on the
+# same clock (offset), or the presence clock would read her last turn as in the future.
+import time as _time_l  # noqa: E402
+_M = _time_l.monotonic()
 _calls = {"n": 0}
 
 
@@ -149,10 +166,10 @@ try:
     S._PENDING_INSIGHT.clear()
     S._LAST.clear()
     S._STATE.clear()
-    S.tick_once(now=5000.0)
+    S.tick_once(now=_M + 5000.0)
     check("a thought that arrives at a bad moment is HELD, not binned",
           S._PENDING_INSIGHT.get("text") == _held["text"], dict(S._PENDING_INSIGHT))
-    S.tick_once(now=5015.0)          # reflect_tick now returns None, as the cooldown does
+    S.tick_once(now=_M + 5015.0)     # reflect_tick now returns None, as the cooldown does
     check("...and is still there on the next beat, when it could not be recomputed",
           S._PENDING_INSIGHT.get("text") == _held["text"], dict(S._PENDING_INSIGHT))
     # AND IT IS ACTUALLY READ BACK. Stashing a thought and never offering it again is the
@@ -162,7 +179,7 @@ try:
     S.seed("room", "Earlier I was saying…", lambda nudge: "")
     S.live_config = lambda: KairosConfig(enabled=True, max_chain=2, cooldown_s=0.0,
                                          max_per_hour=6, checkin_idle_s=240.0)
-    S.tick_once(now=5030.0)
+    S.tick_once(now=_M + 5030.0)
     for _t in list(S._TIMERS.values()):
         _t.cancel()
     check("...and on a beat when nothing blocks her, the HELD thought is what she speaks",
@@ -174,8 +191,8 @@ try:
     S._STATE.clear()
     _calls["n"] = 0
     S.live_config = lambda: KairosConfig(enabled=True, max_chain=0)
-    S.tick_once(now=6000.0)
-    S.tick_once(now=6000.0 + 1801.0)
+    S.tick_once(now=_M + 6000.0)
+    S.tick_once(now=_M + 6000.0 + 1801.0)
     check("...and is dropped once it goes stale rather than delivered cold",
           not S._PENDING_INSIGHT, dict(S._PENDING_INSIGHT))
 finally:
@@ -185,25 +202,27 @@ finally:
 st = TurnState()
 note_user(st, 2000.0)
 INSIGHT = {"text": "Sam has been quieter this week.", "bits": 4.0}
+# (2026-08-22: a thought waits for the room to be quiet — checkin_idle_s — like every
+#  other unprompted word; "nothing blocks it" now includes that floor)
 check("a surprising thought speaks when nothing blocks it",
-      d(st, 2010.0, insight=INSIGHT).action == MUSE)
-note_spoke(st, 2010.0)
-note_spoke(st, 2100.0)                       # chain now at the limit
+      d(st, 2000.0 + CFG.checkin_idle_s + 1, insight=INSIGHT).action == MUSE)
+note_spoke(st, 2250.0)
+note_spoke(st, 2300.0)                       # chain now at the limit
 check("...and is correctly withheld once she is at the chain limit — the case that "
-      "used to DESTROY it", d(st, 2200.0, insight=INSIGHT).action == SILENT)
+      "used to DESTROY it", d(st, 2600.0, insight=INSIGHT, cfg=CFG_NOSOLO).action == SILENT)
 
 print("\n4. THE FOLLOW-ON HE ASKED FOR IS PERMITTED, AND STILL BOUNDED")
 st = TurnState()
 note_user(st, 3000.0)
 note_spoke(st, 3010.0)                       # she spoke once, unprompted
-check("she may follow on from herself once",
-      d(st, 3010.0 + CFG.cooldown_s + 1, insight=INSIGHT).action == MUSE)
-note_spoke(st, 3060.0)
+check("she may follow on from herself once (after the quiet floor)",
+      d(st, 3010.0 + CFG.checkin_idle_s + 1, insight=INSIGHT).action == MUSE)
+note_spoke(st, 3260.0)
 check("...but not a third time — she waits for him",
-      d(st, 3200.0, insight=INSIGHT).action == SILENT)
-note_user(st, 3300.0)
+      d(st, 3600.0, insight=INSIGHT, cfg=CFG_NOSOLO).action == SILENT)
+note_user(st, 3700.0)
 check("his turn buys her a fresh budget", st.chain == 0)
-check("...and she may speak again", d(st, 3310.0, insight=INSIGHT).action == MUSE)
+check("...and she may speak again", d(st, 3700.0 + CFG.checkin_idle_s + 1, insight=INSIGHT).action == MUSE)
 check("the cooldown still holds inside a chain",
       d(TurnState(chain=0, last_spoke_at=3300.0, last_user_at=3000.0), 3310.0,
         insight=INSIGHT).action == SILENT)
@@ -248,6 +267,66 @@ try:
           callable(S._LAST["rp"][1]))
 finally:
     S.live_config = _real_cfg2
+
+
+print("\n5. THE PRESENCE CLOCK — no zero clock fails open (2026-08-22)")
+from harness.kairos.impulse import (REMIND, SOLO, EXPAND, CONTINUE,   # noqa: E402
+                                    presence_idle, BOOT_AT)
+_CFG5 = KairosConfig(enabled=True, max_chain=2, cooldown_s=45.0, max_per_hour=6,
+                     checkin_idle_s=600.0, checkin_chance=1.0, solo_enabled=True,
+                     solo_every_s=1800.0, solo_chance=1.0, quiet_after_him_s=300.0,
+                     continue_margin=-18.5, expand_margin=-12.0, expand_chance=1.0,
+                     away_after=2)
+
+
+def d5(state, now, **kw):
+    kw.setdefault("reply_text", "ok.")
+    kw.setdefault("eot_margin", None)
+    return decide(cfg=_CFG5, state=state, now=now, rng=Sure(), **kw)
+
+
+fresh = TurnState()                                   # a cold boot: nothing set by anyone
+check("a fresh TurnState's clocks are the boot time, not 0.0",
+      fresh.last_user_at == BOOT_AT and fresh.last_spoke_at == BOOT_AT
+      and fresh.last_solo_at == BOOT_AT, (fresh.last_user_at, BOOT_AT))
+check("presence_idle() on a fresh state measures from boot",
+      abs(presence_idle(fresh, BOOT_AT + 10.0) - 10.0) < 1e-6)
+t0 = BOOT_AT
+# MUSE with a reason on the first tick: used to fire with no idle gate at all
+check("MUSE on the first tick after boot is SILENT (idle floor)",
+      d5(TurnState(), t0 + 15.0, insight={"text": "a wardrobe arrival", "bits": 9.0}).action == SILENT)
+check("...and speaks once the floor has passed",
+      d5(TurnState(), t0 + 601.0, insight={"text": "a wardrobe arrival", "bits": 9.0}).action == MUSE)
+# SOLO: both floors — 30 min since her last AND 10 min since anything
+away = TurnState(); away.unanswered = 2
+check("SOLO needs 10 min of quiet even when he is away",
+      d5(away, t0 + 300.0, user_present=False).action == SILENT)
+check("...and 30 min since her last own turn",
+      d5(away, t0 + 1200.0, user_present=False).action == SILENT)
+check("...both floors passed: SOLO",
+      d5(away, t0 + 1801.0, user_present=False).action == SOLO)
+# REMIND keeps only the cooldown floor, measured from a clock that is never 0
+check("a due reminder 5 s after boot waits out the cooldown",
+      d5(TurnState(), t0 + 5.0, due_notes=[{"id": "n1", "title": "pills"}]).action == SILENT)
+check("...and fires after it",
+      d5(TurnState(), t0 + 46.0, due_notes=[{"id": "n1", "title": "pills"}]).action == REMIND)
+# quiet_after_him in the POLICY, for SOLO too (a floor LONGER than the idle floor, so the
+# quiet rule — not the idle rule — is the thing that answers)
+from dataclasses import replace as _replace  # noqa: E402
+_CFG5Q = _replace(_CFG5, quiet_after_him_s=900.0)
+spoke = TurnState(); spoke.unanswered = 2; spoke.last_user_at = t0 + 3000.0
+_r = decide(cfg=_CFG5Q, state=spoke, now=t0 + 3700.0, reply_text="ok.", eot_margin=None,
+            user_present=False, rng=Sure())
+check("SOLO honours quiet_after_him_s in decide() (idle 700 s ok, he spoke 700 s ago < 900)",
+      _r.action == SILENT and "quiet" in _r.reason, (_r.action, _r.reason))
+spoke2 = TurnState(); spoke2.last_user_at = t0 + 3000.0
+_r2 = decide(cfg=_CFG5Q, state=spoke2, now=t0 + 3700.0, reply_text="ok.", eot_margin=None,
+             user_present=True, rng=Sure())
+check("CHECK_IN the same", _r2.action == SILENT and "quiet" in _r2.reason, (_r2.action, _r2.reason))
+# the first-use cooldown skip is gone: last_spoke_at is never falsy
+c = TurnState(); c.last_spoke_at = t0
+check("cooldown applies on the first use after boot (no falsy skip)",
+      "cooldown" in d5(c, t0 + 10.0, due_notes=[{"id": "n2", "title": "x"}]).reason)
 
 S._LAST.clear()
 S._STATE.clear()

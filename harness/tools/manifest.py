@@ -53,6 +53,7 @@ GROUPS = {
     "bridged":      "from an external MCP server that declared no group",
     "memory":       "what she knows and how she keeps it",
     "board":        "the shared notes, reminders and watches",
+    "presence":     "her modes of being there out loud, and the shelf she reads from (var/library/)",
     "conversation": "past sessions, provenance, what was said",
     "sight":        "her eyes — camera, screen, images",
     "compute":      "running code and tests",
@@ -111,6 +112,12 @@ FACTS: Dict[str, ToolFacts] = {
     "skip_track":   ToolFacts("music", "write"),
     "queue_track":  ToolFacts("music", "write", note="adds without interrupting"),
     "read_journal": ToolFacts("memory", "read", note="HER journal — she could not read her own past until now"),
+    # the shelf (presence modes, 2026-08-22): var/library/, a bookmark per book, never the text
+    "enter_mode":          ToolFacts("presence", "write", note="narration / company / lucid, when he asks — her first turn comes right after the reply"),
+    "leave_mode":          ToolFacts("presence", "write"),
+    "pick_up_book":        ToolFacts("presence", "write", arms="presence.read_tools", note="picks a book off var/library/ to read from on her own time"),
+    "put_down_book":       ToolFacts("presence", "write", arms="presence.read_tools"),
+    "books_on_the_shelf":  ToolFacts("presence", "read", arms="presence.read_tools"),
 
     "read_conversation":    ToolFacts("conversation", "read"),
     "recall_conversations": ToolFacts("conversation", "read"),

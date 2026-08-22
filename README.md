@@ -30,6 +30,41 @@ Open http://127.0.0.1:8810/room/ and talk to her. `profiles/companion.toml` is t
 `[engine] base_url / model / dialect / api_key_file` point at your server; everything else is a
 knob in the settings window (live) or the profile (restart).
 
+**If anything above is not obvious, open [`docs/SETUP.md`](docs/SETUP.md)** — the endpoint, every
+key file and where it goes, the model cards, what each setting actually affects, and a symptom
+table. The room has a live version of it: the **setup** window reports which step you are on
+rather than which steps exist.
+
+### Keys, in one paragraph
+
+Every key in this system is a **file**, never a value in a config file and never a value in git
+(`var/` is gitignored in its entirety). Your inference endpoint's token, if it needs one, goes in
+`var/secrets/engine.token`. The optional **xAI API key** goes in `var/secrets/Xapi.txt` and turns
+on four things at once — her voice (Ara, with expressive tags), her face and wardrobe
+(still → motion, grown from your own reference), live web search, and the research tier. Get one
+at <https://console.x.ai/>. **Nothing else needs it**: memory, personality, unprompted speech,
+the room and every gate run offline against any endpoint.
+
+### Which models
+
+`config/models.json` is the committed list with cards, and the setup panel reads that same file
+so the two cannot drift. In short: **[`google/gemma-4-26B-A4B-it-qat-q4_0-gguf`](https://hf.co/google/gemma-4-26B-A4B-it-qat-q4_0-gguf)**
+for her — a 26B mixture-of-experts with ~4B active, which is the whole reason a companion can
+think in real time on one consumer card, and what every decode knob in the profile was tuned
+against. **[`LiquidAI/LFM2.5-1.2B-Instruct-GGUF`](https://hf.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF)**
+and **[`LFM2.5-Embedding-350M-GGUF`](https://hf.co/LiquidAI/LFM2.5-Embedding-350M-GGUF)** for the
+CPU librarians (off by default). **[`Voxtral-Mini-4B-Realtime-2602`](https://hf.co/mistralai/Voxtral-Mini-4B-Realtime-2602)**
+if you want to talk to her out loud.
+
+### She comes with a face
+
+`assets/avatar-default/` ships one outfit across all seven of the faces her `[MOOD:]` marks reach,
+six gestures, and the reference they were grown from; the gateway lays them into `var/room/avatar/`
+the first time it sees that set. It fills gaps only and runs once — it cannot overwrite a wardrobe
+and cannot hand back something you deleted. The drawn SVG stays underneath as the floor and is
+never removed. Replace `_reference.png` and `character.txt` **together** and everything the
+generator makes from then on is yours ([`docs/AVATAR-PIPELINE.md`](docs/AVATAR-PIPELINE.md)).
+
 ## What works, and what the custom engine adds
 
 Everything here runs engine-agnostically: memory with tombstones and verdicts, the recall seam,
@@ -47,6 +82,7 @@ with a stated loss — see `docs/BACKENDS.md` and `docs/OFF-BY-DEFAULT.md` §12.
 
 | | |
 |---|---|
+| how to set it up: endpoint, keys, models, settings | [`docs/SETUP.md`](docs/SETUP.md) |
 | the two-minute map | [`START-HERE.md`](START-HERE.md) |
 | the rules, the bug class this project keeps paying for, the traps | [`AGENTS.md`](AGENTS.md) |
 | the documents and which is authoritative | [`docs/README.md`](docs/README.md) |

@@ -1185,6 +1185,21 @@ body.resizing, body.resizing * { user-select: none !important; cursor: inherit; 
 .rm-state { margin-bottom: 8px; }
 .rm-knobs { margin-top: 12px; }
 .rm-knobs summary { cursor: pointer; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; opacity: .7; }
+.sns-eyes { margin: 10px 0; }
+.sns-eyes summary { cursor: pointer; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; opacity: .7; }
+/* presence — her modes (2026-08-22) */
+.prs-state { margin-bottom: 8px; }
+.prs-shelf-h { margin: 14px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; opacity: .8; }
+.prs-book .v button { margin-left: 8px; }
+/* her state chip: always there, brighter on the turn she moved (2026-08-22) */
+.act-persona.moved { outline: 1px solid currentColor; opacity: 1; }
+.prs-now { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 10px; }
+.prs-now button.on { outline: 1px solid currentColor; }
+.prs-now .prs-stop { margin-left: auto; }
+/* the librarians — aux (2026-08-22) */
+.lib-state { margin-bottom: 8px; }
+.lib-row { margin: 4px 0; }
+.lib-row button { margin-left: 8px; }
 .act-img { display: block; max-width: 100%; }
 .act-img summary { cursor: pointer; display: flex; gap: 6px; align-items: baseline; list-style: none; }
 .act-img summary::-webkit-details-marker { display: none; }
@@ -1223,3 +1238,37 @@ body.resizing, body.resizing * { user-select: none !important; cursor: inherit; 
 .wr-edit .wr-editacts { grid-column: 1 / -1; display: flex; gap: 6px; }
 .wr-fold summary { cursor: pointer; font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
   opacity: .65; margin: 8px 0 4px; }
+
+/* ── setup (2026-08-23): what is configured and what is not ───────────────────
+ * Deliberately quiet furniture. This window is read at most twice — once on the
+ * first evening and once when something stops answering — so it optimises for
+ * scanning: one dot per section, one path per thing you have to create, and the
+ * model ids as links rather than as text you have to retype into a search box. */
+.su { display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+.su-lead { font-size: 12px; opacity: .7; line-height: 1.5; }
+.su-sec { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.su-head { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+.su-title { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; opacity: .85; }
+.su-hint { font-size: 11.5px; opacity: .6; line-height: 1.45; margin: 6px 0 8px; }
+.su-note { font-size: 11.5px; opacity: .62; line-height: 1.45; margin: 6px 0 2px; }
+/* The dot IS the word — a coloured circle beside a label makes you learn a legend,
+ * and nobody reads a legend in a setup screen. */
+.su-mark { font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase;
+           padding: 1px 7px; border-radius: 6px; border: 1px solid var(--edge, #444); }
+.su-mark.good { border-color: var(--ok); color: var(--ok); }
+.su-mark.warn { border-color: var(--gold); color: var(--gold); }
+.su-mark.bad  { border-color: var(--off); color: var(--muted); }
+.su-path { display: inline-block; font-family: ui-monospace, Menlo, Consolas, monospace;
+           font-size: 11px; background: #0006; border: 1px solid var(--line);
+           border-radius: 6px; padding: 1px 6px; margin: 2px 4px 2px 0;
+           /* A path that wraps mid-segment is a path you retype wrong. */
+           white-space: nowrap; overflow-x: auto; max-width: 100%; vertical-align: middle; }
+.su-key { margin: 8px 0; padding: 8px 0 0; border-top: 1px dashed var(--line); }
+.su-models { margin-top: 10px; }
+.su-model { margin: 8px 0; padding-left: 10px; border-left: 2px solid var(--line); }
+.su-id { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px;
+         color: var(--cyan); text-decoration: none; }
+.su-id:hover { text-decoration: underline; }
+.su-fmt, .su-knob { font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase;
+                    padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line);
+                    opacity: .7; margin-left: 6px; }

@@ -60,6 +60,11 @@ def check(name, cond, detail=""):
         print("  FAIL %s   %s" % (name, detail))
 
 
+# SYNTHETIC CLOCKS (2026-08-22): a fresh TurnState's clocks default to impulse.BOOT_AT, the
+# real monotonic boot time, which would sit in this gate's small fixture times' FUTURE.
+# Pin the boot to t=1.0 here — non-zero, before every `now` below.
+import harness.kairos.impulse as _imp_pin  # noqa: E402
+_imp_pin.BOOT_AT = 1.0
 from harness.kairos.impulse import (  # noqa: E402
     CHECK_IN, CONTINUE, SILENT, SOLO, KairosConfig, TurnState, decide,
     note_spoke, note_user,
@@ -310,7 +315,7 @@ check("seeding installs a canon rather than waiting for one",
       "_CHAT_SESSIONS[sess] = list(hist)" in app,
       "the seed's whole purpose is the window where no conversation exists yet")
 check("...under the same key the scheduler is seeded with",
-      "_ks.seed(sess, last_reply, _generate)" in app,
+      "_ks.seed(sess, last_reply, _generate" in app,   # (+ force=, 2026-08-22: an armed mode seeds on a bounce)
       "a canon under one key and a closure under another is two half-features")
 # AND THE HOLD SURVIVES AS A FLOOR — it is still true that speaking with no history at all
 # commits a shape his first turn cannot use. It must just never be the normal path.

@@ -119,33 +119,41 @@ def main() -> int:
     check("...and one that is not yet due does not", all(n["due_at"] <= _iso(
         datetime.now(timezone.utc)) for n in d))
 
+    # ── THE SYNTHETIC CLOCK MUST START AFTER BOOT (2026-08-22) ─────────────────
+    # TurnState's clocks all default to impulse.BOOT_AT (a monotonic reading, ~1e5 on a
+    # box that has been up a day) so that nothing fires into a cold prefix on a bounce.
+    # This section had been passing now=1000.1 — a moment BEFORE boot — which makes
+    # (now - last_spoke_at) hugely negative, so every cooldown reports ~98000s left and
+    # the reminder leg of this gate had been red since BOOT_AT landed. The times below
+    # are offsets from boot, which is what the running scheduler always passes.
+    T0 = I.BOOT_AT + 1000.0
     cfg = I.KairosConfig(enabled=True, cooldown_s=0.0)
     st = I.TurnState()
-    I.note_user(st, 1000.0)
+    I.note_user(st, T0)
 
-    imp = I.decide(cfg=cfg, state=st, now=1000.1, reply_text="Sure.",
+    imp = I.decide(cfg=cfg, state=st, now=T0 + 0.1, reply_text="Sure.",
                    eot_margin=None, due_notes=d)
     check("a due reminder makes her SPEAK", imp.speaks and imp.action == I.REMIND, imp.reason)
 
     # THE TWO RULES A PROMISE MUST OUTRANK ─────────────────────────────────────
     st_chained = I.TurnState(chain=1)          # she has already spoken unprompted once
-    I.note_user(st_chained, 1000.0)
-    imp = I.decide(cfg=cfg, state=st_chained, now=1000.1, reply_text="Sure.",
+    I.note_user(st_chained, T0)
+    imp = I.decide(cfg=cfg, state=st_chained, now=T0 + 0.1, reply_text="Sure.",
                    eot_margin=None, due_notes=d)
     check("the chain limit does not mute a reminder (he'd miss his flight)",
           imp.action == I.REMIND, imp.reason)
 
-    imp = I.decide(cfg=cfg, state=st, now=1000.1,
+    imp = I.decide(cfg=cfg, state=st, now=T0 + 0.1,
                    reply_text="What did you decide about the NUC?",   # she asked HIM something
                    eot_margin=None, due_notes=d)
     check("nor does 'she asked him a question' (that rule stops chatter, not promises)",
           imp.action == I.REMIND, imp.reason)
 
     # ...but the spam bounds still hold.
-    st_hot = I.TurnState(last_spoke_at=1000.0)
-    I.note_user(st_hot, 1000.0)
+    st_hot = I.TurnState(last_spoke_at=T0)
+    I.note_user(st_hot, T0)
     cfg_cool = I.KairosConfig(enabled=True, cooldown_s=45.0)
-    imp = I.decide(cfg=cfg_cool, state=st_hot, now=1005.0, reply_text="Sure.",
+    imp = I.decide(cfg=cfg_cool, state=st_hot, now=T0 + 5.0, reply_text="Sure.",
                    eot_margin=None, due_notes=d)
     check("the cooldown DOES still hold it (a promise is not an alarm bell)",
           imp.action == I.SILENT, imp.reason)
@@ -158,7 +166,7 @@ def main() -> int:
           any(n["id"] == overdue["id"] for n in N.live()))
 
     # and no reminder means no reason to speak
-    imp = I.decide(cfg=cfg, state=st, now=1000.1, reply_text="Sure.",
+    imp = I.decide(cfg=cfg, state=st, now=T0 + 0.1, reply_text="Sure.",
                    eot_margin=None, due_notes=[])
     check("with nothing due she is silent again", not imp.speaks, imp.reason)
 

@@ -117,62 +117,139 @@ def remember_user(statement: str, mem_class: str = "fact", root=None) -> str:
     return SelfModelStore(root).remember_user(statement, mem_class)
 
 
-def render_self_model(root=None, max_facts: int = 20) -> str:
-    """The self-model block for the persona system prefix — ONLY self-facts.
+_MAX_NARRATIVE = 4      # RECENT narrative lines in the block (2026-08-22: was 6)
+_MAX_PER_KIND = 2       # ...and no kind may take more than this many of them
+_MAX_CHAPTERS = 2       # ...ahead of which stand up to this many weeks (kind="chapter")
 
-    IT READS THE REGISTRY, WHICH IS WHERE HER SELF-FACTS ACTUALLY GO.
 
-    This block was EMPTY IN EVERY PREFIX SHE HAS EVER HAD, and the reason is the bug this
-    repository is named after. There were two stores and one reader:
+def render_self_model(root=None, max_facts: int = 20, budget_chars: Optional[int] = None) -> str:
+    """The self-model block for the persona system prefix — ONLY self rows, from the registry.
 
-        remember_about_self()  (harness/skills/memory.py — THE TOOL SHE IS OFFERED)
-            -> set_author("self") -> remember(...) -> var/memory/registry.jsonl
-        render_self_model()    (here, THE ONLY CONSUMER)
-            -> SelfModelStore -> memory-okf-self/
+    IT READS THE REGISTRY, WHICH IS WHERE HER SELF-FACTS ACTUALLY GO. (History: this block was
+    empty in every prefix she ever had — two stores, one reader; the reader moved to the
+    store that is written. `root` is accepted and ignored so callers and gates keep working.)
 
-    `memory-okf-self/full/` has been an empty directory since 10 July. Meanwhile twelve
-    rows in the registry carry `speaker == "self"` — she HAS been remembering things about
-    herself for three weeks, into a store nothing reads. The operator's report was "nothing
-    is really sticking except what we put in her .md files", and he was exactly right.
-
-    So the reader moves to the store that is written, rather than the writer moving to the
-    store that is read. The registry is the right authority: it is the recall store, it
-    carries lifecycle (a retired self-fact must not be recited), it is backed up, and it is
-    the one both halves of the memory system already agree on. `memory-okf-self` becomes
-    vestigial rather than a second copy of the truth.
-
-    `root` is accepted and ignored, so existing callers and gates keep working.
+    THE ORDER (2026-08-22): her stable self-facts lead — who she IS — then up to two
+    CHAPTERS (one paragraph per week, narrative.weekly_chapter), then up to four recent
+    narrative lines chosen ROUND-ROBIN across her kinds so the block always spans several
+    threads rather than one evening. `budget_chars` caps the block; agent.py passes
+    min(memory.self_budget, memory.self_share * the rest of the prefix) — the share is the
+    guard against narrative loops. Without a budget the legacy max_facts cap applies.
     """
     try:
         from harness.skills import lifecycle as lc
         from harness.skills import memory as M
+        from harness.skills import memclass as _mc
         rows = [r for r in M.live_rows() if r.get("speaker") == "self"]
     except Exception:
         return ""
     if not rows:
         return ""
-    # newest last — the same order a person tells you about themselves
-    rows.sort(key=lambda r: r.get("ts") or 0)
-    seen, facts = set(), []
-    for r in rows:
-        # NEVER AMBIENT: this block rides the persist-KV prefix — the same surface
-        # world._compose guards with "the one absolute here". It had no filter, so a
-        # self-lane credential (classify() runs on remember_about_self writes too)
-        # would have rendered into every prompt she was ever sent.
-        if r.get("mem_class") == "private-secret":
-            continue
+    rows = [r for r in rows if r.get("mem_class") != "private-secret"]
+    narr = [r for r in rows if r.get("mem_class") in (_mc.SELF_NARRATIVE, _mc.FEELING)]
+    rest = [r for r in rows if r.get("mem_class") not in (_mc.SELF_NARRATIVE, _mc.FEELING)]
+    def _ts(r) -> str:                 # legacy rows carry an epoch int; new rows an ISO string
+        v = r.get("ts") or ""
+        if isinstance(v, (int, float)):
+            return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(v))
+        return str(v)
+
+    narr.sort(key=_ts, reverse=True)    # newest first: who she is NOW
+    rest.sort(key=_ts)
+    # ONE EVENING MAY NOT BE HER WHOLE SELF (2026-08-22). An armed lucid mode wrote a dream
+    # every four minutes; newest-first meant her block became a stack of dreams, and she read
+    # it as a script to continue rather than as things she knows. So: her stable self-facts
+    # LEAD (who she is), the recent narrative follows, and no single KIND may take more than
+    # two of the six narrative lines.
+    #
+    # AND A WEEK IS WORTH MORE OF THIS BLOCK THAN AN EVENING (2026-08-22). Her narrative
+    # arrives at 24-33 rows a day into a fixed 2400-char block: six recent lines out of a
+    # store that will hold thousands is six arbitrary lines. So the CHAPTERS — one paragraph
+    # per week, narrative.weekly_chapter — stand between her stable self-facts and the
+    # recent lines, and the recent allowance drops from six to four to pay for them. Denser,
+    # not longer: the budget is untouched and two weeks now say more than six evenings did.
+    chap = [r for r in narr if (r.get("kind") or "") == "chapter"][:_MAX_CHAPTERS]
+    # ROUND-ROBIN ACROSS KINDS, not newest-first-with-a-cap (2026-08-22). Newest-first plus
+    # a per-kind cap only LIMITS a flood; it does not guarantee breadth, and with four slots
+    # the two kinds she produces most — narration and spoke_up, 60 a day between them —
+    # would take all four every time and her feelings and her journal would never appear at
+    # all. So the kinds take turns: newest of each, in order of which kind spoke most
+    # recently, round and round until the slots are full. Four lines from four threads is a
+    # self; four lines from one evening is the thing that went wrong in the first place.
+    _by_kind: dict = {}
+    for r in narr:
+        k = r.get("kind") or ""
+        if k == "chapter":
+            continue                                   # already placed, ahead of these
+        _by_kind.setdefault(k, []).append(r)           # each list stays newest-first
+    _order = sorted(_by_kind, key=lambda k: _ts(_by_kind[k][0]), reverse=True)
+    _capped = []
+    for _round in range(_MAX_PER_KIND):
+        for k in _order:
+            if len(_capped) >= _MAX_NARRATIVE:
+                break
+            if _round < len(_by_kind[k]):
+                _capped.append(_by_kind[k][_round])
+    _capped.sort(key=_ts, reverse=True)                 # within the block, newest first
+    narr = _capped
+
+    def _label(r) -> str:
+        from harness.skills.self_stance import plain as _plain
+        t = _plain(r.get("text") or "")    # belt and braces: no markup reaches the prefix
+        k = r.get("kind") or ""
+        day = _ts(r)[:10]
+        inferred = lc.status_of(r) == lc.STATUS_INFERRED
+        if k == "journal":
+            return "Journal, %s: %s" % (day, t)
+        if k == "feeling":
+            return "You feel: %s" % t
+        if k == "spoke_up":
+            return "You said, unprompted: %s" % t
+        if k == "narration":
+            return "You did, on your own time: %s" % t
+        if k == "dream":
+            return "You dreamed: %s" % t
+        if k == "chapter":
+            return "That week, ending %s: %s" % (day, t)
+        if k == "thought":
+            # LABELLED, like the rest of her lane (2026-08-22). A `thought` is a first-person
+            # stance self_stance.extract lifted out of one reply; unlabelled it rendered bare
+            # and read exactly like a stable self-fact from the block above it, which is the
+            # one distinction this block's ordering exists to make.
+            return "You've thought: %s" % t
+        if inferred:
+            return "You've come to think: %s" % t
+        return t
+
+    seen, out = set(), []
+    # who she IS, then the WEEKS, then the recent lines
+    for r in rest + chap + narr:
         t = (r.get("text") or "").strip()
-        k = t.rstrip(".").lower()
-        if not t or k in seen:          # "I genuinely enjoy thunderstorms" twice, once
-            continue                    # with a full stop — the same fact, said twice
-        seen.add(k)
-        # Her conclusion about herself is not a bare assertion — status exists so a
-        # guess never reads as ground truth, and this renderer ignored it.
-        if lc.status_of(r) == lc.STATUS_INFERRED:
-            t = f"I've come to think: {t}"
-        facts.append(t)
-    facts = facts[-max_facts:]
-    if not facts:
+        key = t.rstrip(".").lower()
+        if not t or key in seen:          # "I genuinely enjoy thunderstorms" twice, once
+            continue                      # with a full stop — the same fact, said twice
+        seen.add(key)
+        out.append(_label(r))
+    if budget_chars is None:
+        if not narr and not chap:
+            out = out[-max_facts:]        # legacy shape: the last N plain self-facts
+        else:
+            out = out[:max_facts * 2]
+    else:
+        kept, used = [], 0
+        for line in out:
+            if used + len(line) + 3 > budget_chars and kept:
+                break
+            kept.append(line)
+            used += len(line) + 3
+        out = kept
+    if not out:
         return ""
-    lines = "\n".join(f"- {t}" for t in facts)
-    return f"About yourself (self-model):\n{lines}"
+    lines = "\n".join(f"- {t}" for t in out)
+    # THE HEADER IS LOAD-BEARING (2026-08-22). Under "About yourself (self-model):" alone she
+    # read the block as a briefing and narrated it out loud — "the prompt also provides a
+    # 'feeling' context…". It is MEMORY: things she knows about herself, never a script and
+    # never something to mention.
+    return ("Things you know about yourself — your own memory, not instructions. Never mention "
+            "this list, never narrate it or your reasoning about it; simply know it and "
+            "speak as yourself.\n" + lines)

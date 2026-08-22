@@ -571,6 +571,15 @@ def build_env(c: dict) -> dict:
         "SP_SEM_INDEX": str(sem.get("index", "")).replace("/", "\\"),
         "SP_SEM_RANK": b(sem.get("rank", False)),
         "SP_SEM_TAU": str(sem.get("tau", 0.60)),
+        # THE AUX EMBEDDING SPACE (2026-08-23). l5-512 is unobtainable on the model MoE —
+        # /v1/capture refuses (ADR-013) so no ep.l5 has been minted in three weeks and the
+        # doc index is 93% bag-of-words. The CPU sidecar is the only real embedder this
+        # box has. Measured through the REAL seam (harness_tests/sem_aux.py) on the frozen
+        # corpus: at tau 0.40 recall@1 0.53 vs the lexical 0.46 and the decider hit rate
+        # 0.17 vs 0.06, with foreign noise IDENTICAL on both foreign metrics. tau is
+        # SEPARATE because 0.60 was chosen for l5's inflated cosines and admits nothing here.
+        "SP_SEM_AUX_EMBED": b(sem.get("aux_embed", False)),
+        "SP_SEM_TAU_AUX": str(sem.get("tau_aux", 0.40)),
         # S0 engine-side: mint the ep.l5 sidecar on /v1/capture (routes.rs::v1_capture),
         # so grown episodes stop being L5-invisible. Derived sidecar, never fails capture.
         "SP_CAPTURE_L5": b(sem.get("capture_l5", False)),
@@ -689,6 +698,8 @@ def build_env(c: dict) -> dict:
         "SP_AUX_API_KEY_FILE": aux.get("api_key_file", ""),
         "SP_AUX_INDEX_DIR": aux.get("index_dir", ""),
         "SP_AUX_ARCHIVE_GLOBS": aux.get("archive_globs", ""),
+        "SP_AUX_EMBED_GGUF": os.path.expandvars(aux.get("embed_gguf", "")),   # the picker's `present` (2026-08-22)
+        "SP_AUX_VL_MODEL": aux.get("vl_model", ""),                           # her eyes on the aux door (E, 2026-08-22)
         # ── THE DECIDER OFFLOAD (2026-08-20, operator: "arm it, A/B it today").
         # KAIROS_JUDGE: the sidecar rules "worth a turn?" BEFORE the model generates
         # (kairos/offload.py — fail-open, reminders never gated). WATCH_JUDGE: the
@@ -771,6 +782,10 @@ def build_env(c: dict) -> dict:
         "SP_PERSONALITY_OKF_ROOT": (mem.get("personality_okf_root") or "").replace("/", "\\"),
         "SP_PERSONALITY_TIER": (mem.get("personality_tier") or "").replace("/", "\\"),
         "SP_TELEMETRY_OKF_ROOT": (mem.get("telemetry_okf_root") or "").replace("/", "\\"),
+        # her shelf (2026-08-22): harness/skills/library.py has read SP_LIBRARY_DIR since it
+        # landed and nothing mapped it, so no profile could say where the books are and
+        # G-SEM-CONSERVE had been red on the unmapped reader. Empty = var/library, as before.
+        "SP_LIBRARY_DIR": (mem.get("library_dir") or "").replace("/", "\\"),
         # P1a: the kairos exe has no frontend_mockups beside it; the daemon
         # serves THE kairos console (its charter home) via the env override.
         # THE LABEL THAT LIED (2026-07-29): the model path reached the daemon only as

@@ -11,6 +11,7 @@ wins; the other is a register (formal / public / historical), not a second opini
 
 | doc | type | status | authority |
 |---|---|---|---|
+| [`SETUP.md`](SETUP.md) | reference | LIVE (2026-08-23) | **THE onboarding truth**: the endpoint, where every key file goes, the model cards, what each setting affects, and the symptom table. The room's setup panel (`/v1/setup`) reports the same facts live; where they differ, the panel is describing the running stack and this describes the design. |
 | [`MEMORY-AND-RECALL.md`](MEMORY-AND-RECALL.md) | reference | LIVE | **THE operational truth for memory**: fields, doors in and out, the one read seam, the traps. Read before touching `harness/skills/`. |
 | [`INVARIANT-MEMORY.md`](INVARIANT-MEMORY.md) | foundation | FOUNDATION (2026-07-14) | **Normative for verdicts** — the memory system as a finite mathematical object. MEMORY-AND-RECALL describes the machinery built on it. |
 | [`INVARIANT-ROADMAP.md`](INVARIANT-ROADMAP.md) | roadmap | ROADMAP | Where the foundation goes next; the inventory of decision sites still ruling by hand. Wins over CONTINUITY where they conflict on verdicts. |
@@ -20,6 +21,8 @@ wins; the other is a register (formal / public / historical), not a second opini
 | [`OFF-BY-DEFAULT.md`](OFF-BY-DEFAULT.md) | ledger | **LIVE** | Every knob that ships off, and the evidence that would arm it. `g_offledger.py` holds it to the profile. |
 | [`AVATAR-PIPELINE.md`](AVATAR-PIPELINE.md) | design | LIVE (xAI API era) | Her face, wardrobe and motion: the grid, wants, the catalog (clothing/gestures/moments), prompt anchoring, moderation, generate-now. |
 | [`AUX-MODELS.md`](AUX-MODELS.md) | design | LIVE | The LFM2.5 CPU sidecars — deep recall, page reading, judges — and what stays dark. |
+| [`NARRATIVE-IDENTITY-AND-FOM.md`](NARRATIVE-IDENTITY-AND-FOM.md) | design | DESIGN (2026-08-22) | Narrative identity as the memory model: the classes, presence modes, coherence and the order-invariant core. Design, not yet wired. |
+| [`MIXED-FOM-SKETCH.md`](MIXED-FOM-SKETCH.md) | design | SKETCH (2026-08-22) | Redemption/contamination sequence detection and the mixed-FOM sketches — code to be dropped in, nothing wired yet. |
 | [`MCP.md`](MCP.md) | reference | LIVE | The FastMCP server and bridge: her hands over MCP, and other servers' tools into her. |
 | [`BACKENDS.md`](BACKENDS.md) | reference | LIVE (2026-08-21) | One inference surface, two backends (sp-daemon / any OpenAI-compatible server) and the honest table of what degrades without the custom engine. |
 | [`ADR-013-gemma4-moe-ar.md`](ADR-013-gemma4-moe-ar.md) | adr | IN PROGRESS → landed | Gemma-4 MoE on the autoregressive path — the engine decision behind the model. |

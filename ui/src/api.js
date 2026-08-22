@@ -111,6 +111,9 @@ export const gateHealth  = () => get('/v1/health/gates')
 /* HER FACE. Returns which faces have art and what the ceiling allows — never a tier,
  * because the client is not permitted to name one. */
 export const avatar = () => get('/v1/avatar')
+// WHAT IS SET UP AND WHAT IS NOT (2026-08-23). Read-only; the server never
+// returns the contents of a key file, only whether one is there.
+export const setup  = () => get('/v1/setup')
 
 /* THE STACK. `restart` reloads the model (~2-3 min); `restart_gateway` bounces only the
  * gateway (~20s) and leaves the daemon and its warm prefix alone. */
@@ -121,6 +124,15 @@ export const systemWrite = (b) => post('/v1/system', b)
  * `roleplayWrite({op:'exit'})` takes no scene id on purpose: a stop that needs the
  * right argument is not a stop. */
 export const roleplay      = () => get('/v1/roleplay')
+/* PRESENCE (2026-08-22): her modes' state + the shelf; the two shelf verbs. */
+export const presence        = () => get('/v1/presence')
+export const presencePutDown = () => post('/v1/presence/put_down', {})
+export const presencePickUp  = (title) => post('/v1/presence/pick_up', { title })
+export const presenceEnter   = (mode) => post('/v1/presence/enter', { mode })
+export const presenceLeave   = () => post('/v1/presence/leave', {})
+/* THE LIBRARIANS (2026-08-22): the aux doors, the index, the pickers. */
+export const aux             = () => get('/v1/aux')
+export const auxRebuild      = () => post('/v1/aux/rebuild', {})
 export const roleplayWrite = (b) => post('/v1/roleplay', b)
 
 /* THE BOARD. One call returns every match and its public state — the answer to a

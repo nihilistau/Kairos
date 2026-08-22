@@ -75,7 +75,9 @@ def main() -> int:
     state_ok = ("Current personality state" in s and "voice: dry, warm" in s
                 and "mood: neutral" in s and "traits: curious, candid" in s)
     header_stripped = "## Personality state" not in s   # the raw block header must not leak in
-    selfmodel_ok = "About yourself (self-model)" in s and "read and write memories" in s
+    # the block's header changed 2026-08-22 (it read as a briefing and she narrated it);
+    # what this gate cares about is that the self-model block IS in the composed prefix
+    selfmodel_ok = "Things you know about yourself" in s and "read and write memories" in s
     print(f"prose_ok={prose_ok} state_ok={state_ok} header_stripped={header_stripped} self_model_ok={selfmodel_ok}")
 
     # live edit: the model/system changes mood via write_state -> next load reflects it

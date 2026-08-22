@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import time
 import urllib.request
 from typing import List, Optional
 
@@ -25,7 +27,14 @@ def _chat_url() -> str:
 
 
 def chat_model() -> str:
-    return os.environ.get("SP_AUX_CHAT_MODEL", "liquidai/lfm2.5-1.2b-instruct")
+    """The judge/extract model on the chat door — the panel's choice if he made one, else the
+    profile (registry.tune_or_env, 2026-08-22)."""
+    try:
+        from harness.tuning import registry as _tr
+        return str(_tr.tune_or_env("aux.chat_model", "SP_AUX_CHAT_MODEL",
+                                   "liquidai/lfm2.5-1.2b-instruct") or "liquidai/lfm2.5-1.2b-instruct")
+    except Exception:
+        return os.environ.get("SP_AUX_CHAT_MODEL", "liquidai/lfm2.5-1.2b-instruct")
 
 
 def _api_key() -> str:
@@ -55,6 +64,44 @@ def _post(url: str, body: dict, timeout: int, auth: bool = False) -> Optional[di
             return json.loads(r.read().decode("utf-8", "replace"))
     except Exception:
         return None
+
+
+def _get(url: str, timeout: int = 5, auth: bool = False) -> Optional[dict]:
+    headers = {}
+    if auth:
+        k = _api_key()
+        if k:
+            headers["Authorization"] = "Bearer " + k
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8", "replace"))
+    except Exception:
+        return None
+
+
+_MODELS_CACHE: dict = {"at": 0.0, "ids": []}
+
+
+def list_models(ttl_s: float = 60.0) -> List[str]:
+    """The chat door's model ids (LM Studio /v1/models), cached; [] when dark."""
+    if _MODELS_CACHE["ids"] and time.monotonic() - _MODELS_CACHE["at"] < ttl_s:
+        return list(_MODELS_CACHE["ids"])
+    d = _get(_chat_url() + "/v1/models", auth=True)
+    ids: List[str] = []
+    try:
+        ids = [m["id"] for m in (d or {}).get("data", []) if m.get("id")]
+    except Exception:
+        ids = []
+    _MODELS_CACHE.update(at=time.monotonic(), ids=ids)
+    return list(ids)
+
+
+def reachable(door: str) -> bool:
+    """Is the door answering right now? ("embed" | "chat")"""
+    if door == "embed":
+        return _get(_embed_url() + "/health") is not None
+    return _get(_chat_url() + "/v1/models", auth=True) is not None
 
 
 def available() -> bool:
@@ -95,11 +142,48 @@ def chat(messages: List[dict], max_tokens: int = 256, temperature: float = 0.0,
         return ""
 
 
+_FENCE = re.compile(r"^```[a-zA-Z]*\s*|\s*```$")
+
+
+def chat_json(messages: List[dict], keys: List[str], max_tokens: int = 256,
+              temperature: float = 0.0, model: str = "") -> Optional[dict]:
+    """STRUCTURED OUTPUT ONLY — the silent librarian (2026-08-22). The last user message is
+    suffixed with a JSON-only instruction naming the keys; the reply is parsed and validated;
+    ANY failure is None (callers fall back to their pre-aux behaviour, never to prose)."""
+    if not messages or not keys:
+        return None
+    msgs = [dict(m) for m in messages]
+    msgs[-1]["content"] = (str(msgs[-1].get("content", "")) +
+                           "\n\nReply with ONE JSON object and nothing else, with exactly these keys: "
+                           + ", ".join('"%s"' % k for k in keys) + ".")
+    out = chat(msgs, max_tokens=max_tokens, temperature=temperature, model=model)
+    if not out:
+        return None
+    t = _FENCE.sub("", out.strip()).strip()
+    i, j = t.find("{"), t.rfind("}")
+    if i < 0 or j <= i:
+        return None
+    try:
+        d = json.loads(t[i:j + 1])
+    except Exception:
+        return None
+    if not isinstance(d, dict) or any(k not in d for k in keys):
+        return None
+    return d
+
+
 def judge(question: str) -> Optional[bool]:
-    """A one-word YES/NO ruling from the small model. None = the sidecar could not
-    answer (dead, or the reply was neither word) — callers MUST treat None as
-    'no ruling' and fall back to whatever they did before aux existed. A judge
-    that guesses on failure is how a recall filter dies."""
+    """A YES/NO ruling from the small model. None = the sidecar could not answer (dead, or
+    the reply was neither) — callers MUST treat None as 'no ruling' and fall back to whatever
+    they did before aux existed. JSON first (the silent-librarian shape), the one-word ask as
+    the fallback for a model that ignores the JSON instruction."""
+    d = chat_json([{"role": "user", "content": question}], keys=["answer"], max_tokens=24)
+    if d is not None:
+        a = str(d.get("answer", "")).strip().lower()
+        if a.startswith("yes"):
+            return True
+        if a.startswith("no"):
+            return False
     out = chat([{"role": "user",
                  "content": question + "\n\nAnswer with exactly one word: YES or NO."}],
                max_tokens=8)
@@ -109,3 +193,5 @@ def judge(question: str) -> Optional[bool]:
     if word.startswith("NO"):
         return False
     return None
+
+

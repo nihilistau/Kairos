@@ -18,7 +18,7 @@ export function usePoll(fn, ms = 0) {
     if (!ms) return () => { alive = false }
     const t = setInterval(run, ms)
     return () => { alive = false; clearInterval(t) }
-  }, [])
+  }, [fn, ms])   // re-subscribe when the poller changes (2026-08-22) — `[]` froze the first fn
   // A panel that WRITES needs to re-read without waiting for the next tick —
   // otherwise saving a file appears to do nothing for fifteen seconds.
   // Note the error branch keeps the last good `data`: a transient failed poll

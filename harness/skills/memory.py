@@ -19,6 +19,7 @@ import queue
 import re
 import threading
 import time
+import urllib.error
 import urllib.request
 from typing import List
 
@@ -124,6 +125,36 @@ def _mint_is_async() -> bool:
     return os.environ.get("SP_CAPTURE_ASYNC", "1") == "1"
 
 
+# ── THE ENGINE MAY REFUSE, AND IT DID, SILENTLY, FOR WEEKS (2026-08-23) ────────────────
+# MEASURED on the live store: 253 of the 253 rows written since 2026-08-19 carry npos=0 and
+# no minted_at — not one KV episode. 641 of the 747 directories under var/memory/eps/ are
+# EMPTY. Zero ep.l5 sidecars in three weeks. The cause, straight from the route:
+#
+#   gemma4_decode_cuda: gemma4-MoE not supported on this path — its three internal FFN
+#   copies are not on the g4_ffn_apply seam (ADR-013); use the served decode
+#
+# /v1/capture cannot run on the model MoE and has not since the model landed. Her MEMORY is
+# unaffected — the registry is the recall authority and never touches the daemon — but the
+# engine-side episode representation is empty for everything recent, and so is the L5 half
+# of the semantic index. That second consequence is the load-bearing one: EVERY embedding
+# contender this repo measured and rejected was measured against a 93%-hash document index.
+#
+# It failed silently because the whole call sat under a bare `except: return 0, False`,
+# which cannot tell "the daemon is down" from "the engine says never". Those need different
+# answers, and now they get them:
+#   transport failure   -> quiet, retried on the next fact, exactly as before.
+#   a REFUSAL with a body -> logged ONCE with the engine's own words, and not asked again
+#                            this process. Retrying a structural no, per fact, forever, is
+#                            how 641 empty directories happen.
+_CAPTURE_REFUSED = {"why": "", "at": 0.0, "n": 0}
+
+
+def capture_status() -> dict:
+    """Why the KV mint is not running, if it is not. Read by _registry_health so the number
+    reaches a surface instead of sitting in a stat nobody prints."""
+    return dict(_CAPTURE_REFUSED)
+
+
 def _mint_now(daemon: str, fact: str, out_dir: str):
     """The blocking capture. Still used when async is off (gates that want determinism) and by the
     background worker, which is the only place it belongs.
@@ -137,6 +168,9 @@ def _mint_now(daemon: str, fact: str, out_dir: str):
             return 0, False
     except Exception:
         pass
+    if _CAPTURE_REFUSED["why"]:
+        _CAPTURE_REFUSED["n"] += 1        # counted, not retried: the engine already said no
+        return 0, False
     try:
         body = json.dumps({"text": fact, "out_dir": out_dir}).encode()
         req = urllib.request.Request(
@@ -145,8 +179,26 @@ def _mint_now(daemon: str, fact: str, out_dir: str):
             j = json.loads(r.read().decode())
         npos = int(j.get("npos", 0))
         return npos, (bool(j.get("ok", False)) or npos > 0)
-    except Exception:
+    except urllib.error.HTTPError as exc:
+        # THE ENGINE ANSWERED, AND THE ANSWER WAS NO. Its body says why; say it once.
+        why = ""
+        try:
+            why = str((json.loads(exc.read().decode()) or {}).get("error", ""))[:400]
+        except Exception:
+            why = "HTTP %s" % getattr(exc, "code", "?")
+        if why and not _CAPTURE_REFUSED["why"]:
+            _CAPTURE_REFUSED.update(why=why, at=time.time(), n=1)
+            try:
+                import logging
+                logging.getLogger("harness.memory").warning(
+                    "[memory] /v1/capture REFUSED by the engine; rows will carry npos=0 and "
+                    "no ep.l5 until this is fixed. Not asked again this process. Engine said: %s",
+                    why)
+            except Exception:
+                pass
         return 0, False
+    except Exception:
+        return 0, False                   # transport: quiet, and tried again next time
 
 
 def _mint_drain():
@@ -301,11 +353,20 @@ def list_memories() -> str:
     return "\n".join(f"{i + 1}. {lc.render(e)}" for i, e in enumerate(eps))
 
 
-def remember(fact: str, source: str = "") -> str:
+def remember(fact: str, source: str = "", *, kind: str = "", mem_class: str = "",
+             derived_from: "list[str] | None" = None, support_days: int = 0,
+             support_kinds: "list[str] | None" = None) -> str:
     """Store a fact in long-term memory. Pass the COMPLETE fact as a full standalone sentence
     (e.g. "The user's favorite color is teal", not just "teal") so it is meaningful on its own later.
     `source` (optional) records WHERE the fact came from (e.g. "user turn", "consolidator",
-    "operator") for the MEM-OKF v2 provenance lane — recallable via provenance()."""
+    "operator") for the MEM-OKF v2 provenance lane — recallable via provenance().
+    `kind` / `mem_class` (keyword-only; The Real Her, 2026-08-22): ONLY for her own
+    narrative — honoured when the author is self and mem_class is self-narrative or
+    feeling; otherwise ignored and the fact goes through the ordinary admission.
+    `derived_from` / `support_days` / `support_kinds` (2026-08-22): for DISTILLATES only —
+    the row names this conclusion was drawn from and how broad that window was. Set by the
+    harness's own consolidating producers (becoming, the journal, insight, the
+    consolidator); the model never passes them. See lifecycle.orphaned_distillates."""
     p = _reg_path()
     if not p:
         return "[no registry configured]"
@@ -321,11 +382,29 @@ def remember(fact: str, source: str = "") -> str:
     # "do you REMEMBER what sex you are?") and the slot is wrong ("remember my gpu", not
     # "user::gpu", so it never superseded the real GPU row). Every guard below must see the CLAIM,
     # not the wrapper. See lifecycle.normalize_fact.
+    _raw = fact                         # her narrative is judged and kept AS SAID (below)
     fact = lc.normalize_fact(fact)
 
-    ok, why = lc.is_memorable(fact)
-    if not ok:
-        return f"not stored — {why}"
+    # ── THE REAL HER (2026-08-22): her narrative is admitted as HERS, by its own rule ──
+    # A producer (the kairos speak path, the journal, a verified persona shift, the
+    # stance extractor, the nightly becoming) names the class and the kind; the author
+    # must be self. Outside her lane the explicit class means nothing.
+    from harness.skills import memclass as _mc
+    _self_narr = (_AUTHOR.get() == "self" and mem_class in (_mc.SELF_NARRATIVE, _mc.FEELING)
+                  and kind in _mc.NARRATIVE_KINDS)
+    if _self_narr:
+        # NOT normalized: normalize_fact() strips an imperative wrapper ("remember ...")
+        # off a fact HE states; her journal line is not an instruction, and stripping it
+        # also hid a tool receipt from the machine-text check (G-REAL-HER §1).
+        fact = " ".join(_raw.split())
+        ok, why = lc.is_narratable(fact)
+        if not ok:
+            return f"not stored — {why}"
+    else:
+        mem_class, kind = "", ""
+        ok, why = lc.is_memorable(fact)
+        if not ok:
+            return f"not stored — {why}"
     # ── THE IDENTITY FIREWALL (2026-07-12) ──────────────────────────────────────
     # She answered "what is your name?" with "My name is Kairos." — correctly — and then
     # stored that sentence HERE, in the USER store. It was stamped speaker=user, classed
@@ -450,7 +529,9 @@ def remember(fact: str, source: str = "") -> str:
     status = (lc.STATUS_INFERRED
               if any(s in (source or "") for s in _INFERRED_SOURCES)
               else lc.STATUS_OBSERVED)
-    retired = lc.find_superseded(fact, speaker, existing, status=status)
+    # narrative ACCUMULATES — a new feeling or journal line never retires an older one;
+    # only tombstoning does (The Real Her, 2026-08-22). Everything else supersedes as before.
+    retired = [] if _self_narr else lc.find_superseded(fact, speaker, existing, status=status)
 
     # ── DOMINANCE PROPOSES; find_superseded AND verdict DISPOSE (docs/SEMANTICS.md §S2.1) ──
     # find_superseded fires only on an EXACT attribute_key match, so it cannot see this pair:
@@ -471,7 +552,23 @@ def remember(fact: str, source: str = "") -> str:
     # there is no second place to forget it.
     from harness.skills import dominance as _dom
     _seen = {id(r) for r in retired}
-    for _r in _dom.find_subsumed(fact, speaker, existing, status=status):
+    # ── AND HER LANE IS EXCLUDED ON A MEASUREMENT, NOT ONLY ON DOCTRINE (2026-08-23) ──────
+    # "Narrative accumulates" is the rule; this is the evidence that the rule is also the
+    # only safe engineering. fixtures/sem/dominate-self-receipt.json: SP_SEM_DOMINATE run
+    # read-only over her 27 live narrative rows proposes 12 retirements — 0.44 per row
+    # against 0.083 on his facts — and TWELVE OF TWELVE ARE WRONG, all the same way.
+    # dominance's content carrier is topic_of plus names and numbers, built for ATTRIBUTIVE
+    # facts ("Sam owns a blue kettle": a subject and an attribute). Her narrative is
+    # EXPRESSIVE PROSE with almost no attributive content — "[redacted]" reduces to
+    # roughly {love} — so any longer sentence containing "love" dominates it structurally,
+    # and "[redacted]" is proposed to retire "[redacted]"
+    #
+    # The hypothesis that lost was that her lane would be dominance's BEST case, because
+    # near-duplicate restatement is rife there and retiring one of her own repeated lines is
+    # low-stakes. The first half is true. The second does not follow: dominance cannot
+    # IDENTIFY a near-duplicate in her lane, it identifies "shares a content word and is
+    # longer" — on the material where being wrong costs the most. G-SEM-DOMINATE §10.
+    for _r in ([] if _self_narr else _dom.find_subsumed(fact, speaker, existing, status=status)):
         if id(_r) not in _seen:
             retired.append(_r)
             _seen.add(id(_r))
@@ -484,7 +581,9 @@ def remember(fact: str, source: str = "") -> str:
         "sig_bits": "0" * 64,
     }
     lc.stamp(line, fact, speaker, source, supersedes=[r.get("name", "") for r in retired],
-             status=status)
+             status=status, mem_class=(mem_class or None), kind=kind,
+             derived_from=derived_from, support_days=support_days,
+             support_kinds=support_kinds)
 
     # INTEROP (load-bearing): the DAEMON already excludes superseded episodes from the
     # live recall set — but it keys on the integer `lifecycle` field (recall.rs:587,
@@ -620,13 +719,25 @@ def _self_names() -> set:
     return vals
 
 
-def remember_about_self(fact: str) -> str:
+def remember_about_self(fact: str, *, kind: str = "", source: str = "self",
+                        derived_from: "list[str] | None" = None, support_days: int = 0,
+                        support_kinds: "list[str] | None" = None) -> str:
     """Store a fact about YOURSELF (Kairos) — your own traits, your history, what you
     think or have come to believe. Use this for things true of YOU, not of the user.
-    e.g. remember_about_self("I find astronomy genuinely moving") — NOT the user's facts."""
+    e.g. remember_about_self("I find astronomy genuinely moving") — NOT the user's facts.
+    (`kind`/`source` and the provenance arguments are set by the harness's own producers
+    for her narrative — journal, thought, narration, dream, self_description, spoke_up,
+    feeling, chapter; you need not pass any of them.)"""
+    from harness.skills import memclass as _mc
     tok = set_author("self")
     try:
-        return remember(fact, source="self")
+        if kind in _mc.NARRATIVE_KINDS:
+            cls = _mc.FEELING if kind == "feeling" else _mc.SELF_NARRATIVE
+            return remember(fact, source=source, kind=kind, mem_class=cls,
+                            derived_from=derived_from, support_days=support_days,
+                            support_kinds=support_kinds)
+        return remember(fact, source=source, derived_from=derived_from,
+                        support_days=support_days, support_kinds=support_kinds)
     finally:
         _AUTHOR.reset(tok)
 
@@ -822,6 +933,12 @@ def search_memories_ranked_rows(query: str, k: int = 5, min_overlap: float = 0.2
             sem_idx = sx.load_cached()
             if sem_idx:
                 qvec, qmodel = sx.query_embed(query)
+                # TAU IS PER SPACE (2026-08-23). SP_SEM_TAU=0.60 was set for l5's inflated
+                # raw cosines; the aux space's paraphrase median is 0.293 and its measured
+                # operating point is 0.20, so the shared threshold would admit nothing at
+                # all and the whole gate would look "safe" by being dead.
+                if qmodel == sx.MODEL_AUX:
+                    sem_tau = sx.aux_tau()
                 if qvec is not None and qmodel == sx.MODEL_L5:
                     # ONCE, not per candidate row: space_mean() stats the index file
                     # and takes a lock on every call, and the loop below ran it for
@@ -1138,6 +1255,10 @@ def _target_and_rank(query: str, hits):
         # an identity question wants the identity row, not everything containing "name"
         if "name" in qt and e.get("mem_class") == "identity":
             s += 0.30
+        # THE REAL HER (2026-08-22): asked about HER (day / feelings / thoughts), her own
+        # narrative is the answer's shape — a small nudge on top of its salience weight
+        if target == lc.SPEAKER_SELF and e.get("mem_class") in ("self-narrative", "feeling"):
+            s += 0.15
 
         # ── SALIENCE: THE PRIOR (2026-07-13) ────────────────────────────────────
         # What the match score CANNOT know: that he has told her this five times, or that
@@ -1246,6 +1367,15 @@ def _registry_health():
     stats = {"path": p, "rows": rows, "parsed": len(eps), "malformed": malformed,
              "exact_dups": exact_dups, "near_dups": near, "unminted": no_ep,
              "no_provenance": no_prov}
+    # `unminted` has been in this dict since it was written and has never reached a surface
+    # or the verdict, which is how 253 consecutive unminted rows went unnoticed. The REASON
+    # rides along now — when the engine has refused, that string is the whole diagnosis.
+    # The verdict is deliberately NOT changed: 'needs-compaction' means compact() would help,
+    # and compact() cannot mint an episode. A refusal is news, not a chore.
+    _cap = capture_status()
+    if _cap.get("why"):
+        stats["capture_refused"] = _cap["why"]
+        stats["capture_skipped"] = _cap.get("n", 0)
     status = "ok" if (malformed == 0 and exact_dups == 0) else "needs-compaction"
     if key is not None:
         _HEALTH_CACHE["key"], _HEALTH_CACHE["value"] = key, (stats, status)
@@ -1263,11 +1393,18 @@ def verify_registry() -> str:
     s, status = _registry_health()
     if s is None:
         return "[no registry configured]"
-    return (f"registry {s['path']}: rows={s['rows']} parsed={s['parsed']} "
-            f"malformed={s['malformed']} exact_dups={s['exact_dups']} "
-            f"near_dups={s['near_dups']} unminted={s['unminted']} "
-            f"no_provenance={s['no_provenance']} "
-            f"-> {'OK' if status == 'ok' else 'NEEDS COMPACTION'}")
+    out = (f"registry {s['path']}: rows={s['rows']} parsed={s['parsed']} "
+           f"malformed={s['malformed']} exact_dups={s['exact_dups']} "
+           f"near_dups={s['near_dups']} unminted={s['unminted']} "
+           f"no_provenance={s['no_provenance']} "
+           f"-> {'OK' if status == 'ok' else 'NEEDS COMPACTION'}")
+    if s.get("capture_refused"):
+        out += (f"{os.linesep}  KV MINT IS OFF - the engine refused /v1/capture: "
+                f"{s['capture_refused']}{os.linesep}"
+                f"  {s['unminted']} rows carry no episode and no ep.l5. The registry is "
+                f"unaffected (it is the recall authority); the engine-side episode "
+                f"representation and the L5 half of the semantic index are.")
+    return out
 
 
 def compact_registry() -> str:

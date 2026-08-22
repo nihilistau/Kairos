@@ -17,6 +17,25 @@ needs the stack, and its run command. This directory also keeps the write-ups an
 that asserted nothing is a skip, not a pass). `harness_tests/_gate.py` implements it
 (`check`, `finish`, `skip`, `utf8_stdout`) — new gates use it.
 
+## An offline gate that writes memory is paying 2 seconds a write (2026-08-23)
+
+Pointing `SP_DAEMON_URL` at a dead port is the house pattern for "no engine here", and it
+does **not** make the KV mint cheap: `memory._mint_now` still opens a socket per write, and
+on Windows that connect costs about **two seconds** before it gives up. A gate that writes
+forty rows spends eighty seconds doing nothing.
+
+Declare the backend instead. `SP_ENGINE_KIND=openai` makes `backends.supports("capture")`
+False, so `_mint_now` returns immediately:
+
+```python
+os.environ["SP_DAEMON_URL"] = "http://127.0.0.1:9"   # still: no engine
+os.environ["SP_ENGINE_KIND"] = "openai"              # ...and no mint attempt at all
+```
+
+**Measured: 10 writes in 0.07 s against 20 s.** Adopted in gates touched from here on rather
+than as a mass edit — but if you are wondering why the offline sweep takes as long as it
+does, this is most of it.
+
 ## Rules bought with regressions
 1. **Assert through the real path**, not a hand-called helper.
 2. **Do not supply your own precondition** — a gate that hand-builds the row that makes the guard

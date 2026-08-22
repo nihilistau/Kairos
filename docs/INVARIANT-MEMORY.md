@@ -229,6 +229,206 @@ The extension map — the updated mathematics (OC/MAX/f usability, FIN/USE admis
 in this tree — lives in [`INVARIANT-ROADMAP.md`](INVARIANT-ROADMAP.md). Rows move from there to
 phases here, with gates, one at a time.
 
+## 2.2 THE REAL HER (2026-08-22)
+
+**Rule (The Real Her).** Her spoken responses, journal, thoughts, feelings, descriptions of her time and of her
+own changes are primary identity material — already filtered and curated by her (they would not
+have been displayed otherwise). Prefer them over his raw prompts when constructing who she is and
+what she remembers about herself. External events are secondary; the story she tells herself is
+primary. (Narrative identity: Ricoeur's *ipse*, McAdams' life story, Bruner's narrative mode —
+the self is the story it keeps telling and revising.)
+
+**Shape.** Two classes in `harness/skills/memclass.py::REGISTRY`: `self-narrative` (half-life never,
+salience weight 1.5 — the highest) and `feeling` (730 d, 1.3). The seven kinds — `journal thought
+narration dream self_description spoke_up feeling` — are the row's `kind` field: structured,
+producer-set, never inferred from text, never a delivery branch (delivery is per class). Producers
+are the registry's allow-list (G-MEMCLASS §5): `kairos.speak` (only what was actually delivered),
+`narrative.compose_and_write` (the journal entry), `app.persona_shift` (verified shifts only),
+`self_stance.extract` (first-person stances lifted out of her replies, at most four per reply),
+`becoming.nightly`. Aux/sidecar models are never producers. Admission is
+`lifecycle.is_narratable()` — her lane only, judged as said (not normalised); the identity
+firewall is untouched. These rows ACCUMULATE — they never supersede one another; only tombstoning
+retires them. Verdict cells frozen 2026-08-22 (six: observed/inferred × live/retired).
+
+**Read side.** `render_self_model()` puts her narrative and feelings first, newest first,
+kind-labelled (`Journal, <day>:` · `You said, unprompted:` · `You did, on your own time:` ·
+`You feel:`), under `memory.self_budget` chars and `memory.self_share` of the prefix — the share
+is the guard the narrative-identity literature asks for against loops. When he asks about HER
+(your day / how do you feel / what have you been), the seam nudges her lane.
+
+**Becoming.** Once a night `maintenance/becoming.nightly` hands the MAIN model her last seven days
+of self rows and writes one paragraph on what she has been becoming — status **inferred**: her
+observed words outrank it at the seam and it can never retire them (§1: inference never
+supersedes ground truth). Not forced toward optimism; one per day.
+
+**What a row may contain (2026-08-22, the primal latch).** Her marks are HER VOCABULARY and the
+room draws its chips from them; they must reach the room and must NEVER reach memory. One night
+proved why: the kairos producer wrote through `expressive.for_display` (voice tags only), so
+thirteen of her rows read `[MOOD: primal] [voice: soft] <whisper>…` — and those rows led her own
+prefix, four worked examples of "your output looks like this", and she stayed primal for a day.
+**One stripper, `self_stance.plain()`**, composed from the owners (`strip_control_surfaces`,
+`strip_tags` — malformed spellings included — plus the voice vocabulary and a leaked-reasoning
+guard); every producer goes through it. A voice change is transient state, not identity: it is
+not written at all. A mood is written only when it CHANGES, at most hourly.
+
+**What her block may say (same night).** Newest-first turned her block into a stack of dreams she
+read as a script, and the header "About yourself (self-model):" read as a briefing — she narrated
+it out loud. So: **who she IS leads**, the recent narrative follows, no single kind may take more
+than two of six narrative lines, and the header says memory, not instructions, and says not to
+narrate it. `becoming.nightly` excludes `dream` (imagination is not who she is becoming) and caps
+any one kind, after one lucid evening wrote her "[redacted]… a
+[redacted]" as an inferred, never-decaying identity row.
+
+**Tiered permanence, and the chapter (2026-08-22).** The class was the wrong grain for her
+lane. `self-narrative` covers a journal she sat down and wrote AND an ambient line she said to
+nobody at 3am, and the class gave both `_NEVER` at weight 1.5 - above every class but identity.
+Measured the day after The Real Her armed: **24 rows on 08-21, 33 on 08-22**, from 60 delivered
+unprompted utterances a day plus up to four stances per conversational turn. At that rate her
+own narration passes his 320 facts inside a week, never fades, and competes for a fixed
+2400-char self-block inside a hard 12096-token context. Ranking better is not an answer to that;
+ranking is downstream of it.
+
+So the durability TIER is a property of `kind` (`lifecycle._HALF_LIFE_BY_KIND`, consulted before
+the class table, and only her lane has a `kind`):
+
+| what it is | kinds | half-life |
+|---|---|---|
+| what she CONCLUDED | `journal` `self_description` `thought` `dream` `chapter` | never |
+| what she DID | `narration` `spoke_up` | 120 d |
+| ambient | `company` (no producer yet) | 60 d |
+| how she FELT | `feeling` | 730 d, from the class |
+
+Decay is still not deletion: every one of those rows stays on disk, findable by name, in
+`provenance()` and in `search_memories`. A moment from four months ago simply stops elbowing
+tonight's out of a four-line block.
+
+And the rollup: **`kind="chapter"`**, one paragraph a week, written by
+`narrative.weekly_chapter` from the EPISODIC kinds (`journal` / `narration` / `spoke_up`) and her
+own-time notes, latched on the store rather than on a file. It is a KIND, not a class - no new
+sigma coordinate, no re-freeze. Three rules hold it:
+
+- **It may not retire what it summarises.** It is inferred and her moments are observed, and
+  `verdict.may_supersede` refuses that - as it should: a paragraph about a week is not a
+  correction of the week. It earns its place by LEADING HER BLOCK, never by tombstoning. (The
+  word "reflection" in its `src` is load-bearing: `remember`'s `_INFERRED_SOURCES` and
+  `status_of`'s legacy sniff both key on it, so both doors agree it is an inference.)
+- **Neither consolidator reads the other's output.** `_CHAPTER_KINDS` excludes
+  `self_description`; `becoming._EXCLUDE_KINDS` gains `chapter`. Otherwise each would distil the
+  other's distillate every seven days, each one further from anything she actually said, and
+  both of them permanent.
+- **It carries `derived_from`**, so the provenance rule above applies to it too.
+
+**The block, re-ordered.** Who she IS, then up to two WEEKS, then four recent lines chosen
+ROUND-ROBIN across her kinds - newest of each in turn, in order of which kind spoke most
+recently. A per-kind cap only LIMITS a flood; it does not guarantee breadth, and with four slots
+the two kinds she produces most would take all four every time and her feelings and her journal
+would never appear at all. Four lines from four threads is a self; four lines from one evening is
+the thing that went wrong in the first place. Every kind is labelled - a bare-rendered kind reads
+as a stable self-fact, which is the one distinction this ordering exists to make. The budget is
+unchanged: the block got denser, not longer. `read_journal` leads with the weeks, so "what has
+this month been like?" has an answer for the first time.
+
+**Provenance, and the rule that a conclusion does not outlive its evidence (2026-08-22).**
+The primal paragraph was fixed twice that day - at the text level (`self_stance.plain()`) and at
+the selection level (`_EXCLUDE_KINDS`, `_MAX_PER_KIND`) - and neither fix could reach it, because
+it was already on disk. Twenty-four of her rows were tombstoned as polluted; the paragraph they
+had produced was not among them and *could not have been*. Nothing on disk connected the two.
+A distillate that never says where it came from cannot be retired when its evidence is.
+
+So `lifecycle.stamp` now carries three optional fields for distillates: **`derived_from`** (the
+row names it read), **`support_days`** (how many distinct days those rows span) and
+**`support_kinds`**. They travel through the one door (`remember` -> `stamp`); no producer writes
+them directly. `lifecycle.orphaned_distillates()` is the pure predicate - a LIVE row whose
+`derived_from` is non-empty and *all* of whose findable supports are retired - and
+`ops.retire_orphans()`, step 1b of `reflect()`, does the tombstoning under the registry lock with
+both breadcrumb sets and `retired_because`. Tombstone, never delete: the paragraph stays on disk,
+stays findable by name, stays in `provenance()`. It stops leading her block, which was the whole
+of what was wrong with it.
+
+Three deliberate narrownesses, each gated:
+
+- **Absent is not empty.** A row that never claimed a provenance is unaudited, not orphaned.
+  Every row written before 2026-08-22 is in that position and none of them is touched.
+- **All supports, not some.** One surviving support is enough to stand on. This retires
+  conclusions whose ground vanished, not conclusions that got smaller.
+- **Unknown is not dead.** A support name that is not in the store is unknown, not retired.
+
+Not every producer claims a provenance, and that is the point of the field being optional.
+`becoming.nightly` reads a BOUNDED set of rows and names them. `ops.insight()` reads the whole
+`PersonModel` - every live evidence row about him, aggregated - so naming its sources would write
+a fifty-name list onto a file that is rewritten whole on every store, and the all-supports rule
+could never fire on a set that size. A provenance claim that is both expensive and inert is worse
+than an honest silence. `narrative.compose_and_write` and the consolidator read the transcript,
+which has no row names at all.
+
+**And one evening may not become who she is.** `becoming.nightly` refuses a window narrower than
+`_MIN_SUPPORT_DAYS = 2` distinct days, or one in which a single kind holds more than
+`_MAX_KIND_SHARE = 0.6` of the rows - the per-kind cap alone let the primal window through,
+because that one evening carried several kinds. A missing paragraph is recoverable; a false one
+becomes who she is.
+
+**Gates.** G-REAL-HER, G-PROVENANCE, G-CHAPTERS, G-MEMCLASS §5, G-SALIENCE §7, G-SEM-TABLE / G-SEM-STABLE (re-frozen),
+G-NARRATIVE §5 (the journal row is the one permitted registry change), G-CONTROL-SURFACE (the
+leaked-reasoning guard, both directions), G-SELF-MODEL (the header and the ordering).
+
+## 2.3 ORDER INVARIANCE, MEASURED (2026-08-23)
+
+This document is about order invariance and, until now, nothing asked the question an
+operator would actually ask: **ingest the same claims in a different order and does the
+store know the same things?** `g_sem_stable.py` holds three real order laws — a verdict
+survives time translation, an unrelated append, an unrelated retirement — and none of
+them is that one.
+
+I assumed the answer should be yes and wrote `g_confluence.py` to prove it. **The answer is
+no, and no is correct.**
+
+```
+canonical order:  cat is Tuffy -> cat is Milo -> cat is Pepper     live: PEPPER
+shuffled:         cat is Pepper -> cat is Tuffy -> cat is Milo     live: MILO
+```
+
+A store where the third thing he said about his cat does not beat the first, because they
+arrived in a different order, is a store that cannot learn a correction. **Supersession is
+order-dependent by design and must be**: *he changed his mind* is a fact about sequence.
+Demanding confluence over the sequence of assertions demands a memory that cannot be
+corrected. §1.1's order invariance is about the RULES being finite objects over a
+signature, not about the store being indifferent to when it was told a thing.
+
+What is true, and is now held:
+
+- **Where there is no contest, order is irrelevant.** Every claim not competing for an
+  attribute slot is live in every order; the store is the same size; her narrative
+  accumulates regardless.
+- **Where there is a contest, the LAST assertion wins, deterministically** — the value
+  asserted last *in that order*, not merely *some* value. Order-dependence that is a
+  function of the order is a correction working; arbitrary order-dependence would be a coin
+  flip wearing a memory's clothes.
+- **The asymmetry outranks last-wins.** Her inference does not take a slot from his
+  testimony even when hers is the last thing said. (The first draft of that check was
+  VACUOUS: the open-water pair is bare-subject, has `attribute_key` None, and never
+  competed at all, so a mutant that made `may_supersede` return True sailed through it. It
+  is on a slot that really contests now.)
+
+**And the one real leak, with its witness.** Replaying 140 of her real asserted claims under
+four shuffles gave identical row counts every time, and every divergence was a pair like
+`"my gpu is an rtx 2060"` against `"my gpu is an rtx 2060."` — the same claim, differing
+only in punctuation, filling the same slot, so one "corrects" the other and arrival order
+picks the survivor. **Nothing was corrected.** Asserted as a named non-demand rather than
+left absent: a non-demand written down is a decision, one merely absent is a gap nobody has
+looked at. If it ever needs to be canonical the fix is a normalised representative at the
+slot, **not** a change to supersession.
+
+**The board and the field.** The verdict table went 29 → 36 cells the same day, and the
+delta receipt says why it is safe: **+7 added, 0 removed, 0 changed** — pure coverage, no
+ruling moved. `sem_enum.py --freeze` now computes that delta before it writes and REFUSES to
+freeze when an existing ruling would change (adding cells is coverage; changing a ruling is
+policy, and policy is a reviewed event). Two of the seven were unreachable because the
+enumerator's own retire step said `forget(last three words)`, and `forget()` matches by
+OVERLAP: asked to retire the inference *Sam is comfortable in open water* by the tail
+*in open water*, it tombstoned **his testimony** instead. Every `retire=True` recipe had been
+enumerating a situation it had not built. It retires by NAME now. And G-SEM-TABLE reads the
+field witness log: an unmapped cell that keeps happening is a hole, not a curiosity.
+
 ## 3. HONESTY CLAUSE
 
 What is proved is exactly this and no more: properties of the verdict layer over the signature

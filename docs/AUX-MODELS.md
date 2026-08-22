@@ -93,22 +93,40 @@ Measured on this machine (CPU, Q8_0 embedder): query embed ~150 ms; corpus build
 ~3.6 s/chunk one-time (≈880 chunks ≈ 50 min for the full history, then incremental);
 search itself is a matmul over a few thousand rows — microseconds.
 
-## 4. Knobs (all through serve.py's one door; ledger rows in OFF-BY-DEFAULT §10)
+## 4. The framework — the settings section `Aux — the quiet librarians` (2026-08-22)
 
-| Knob | Profile key | Meaning |
+One section, the same knob framework as everything else (`harness/tuning/registry.py`): boot
+defaults in the profile's `[aux]` block through serve.py's one door; live knobs read through the
+override-only bridge (`registry.tune_or_env`) so an untouched panel still obeys the profile. The
+window is **librarians** (📚) in the room; its chip says `embed ✓ chat ✓ · N` / `embed dark` / `off`.
+
+| Knob | Scope | Meaning |
 |---|---|---|
-| `SP_AUX` | `aux.enabled` | master arm; off = every caller pre-aux |
-| `SP_AUX_EMBED_URL` | `aux.embed_url` | embedding door (default :8811) |
-| `SP_AUX_CHAT_URL` | `aux.chat_url` | instruct door (default :1234) |
-| `SP_AUX_CHAT_MODEL` | `aux.chat_model` | default `liquidai/lfm2.5-1.2b-instruct` |
-| `SP_AUX_API_KEY_FILE` | `aux.api_key_file` | bearer token FILE (repo is public; the token itself never enters env or git) |
-| `SP_AUX_INDEX_DIR` | `aux.index_dir` | archive index home (default `var/aux/archive`) |
-| `SP_AUX_ARCHIVE_GLOBS` | `aux.archive_globs` | extra `;`-separated corpus globs |
-| — | `aux.autostart` | serve.py spawns the embed sidecar |
-| — | `aux.llama_server`, `aux.embed_gguf`, `aux.embed_ctx`, `aux.embed_threads` | sidecar launch parameters |
+| `aux.enabled` (`SP_AUX`, `[aux].enabled`) | profile | the master arm; off = every caller keeps its pre-aux behaviour |
+| `aux.chat_model` (`SP_AUX_CHAT_MODEL`) | live | the judge / extract model on the chat door; the picker's choices are what LM Studio lists right now (`client.list_models()`, cached 60 s) |
+| `aux.embed_model` (`SP_AUX_EMBED_GGUF`, `[aux].embed_gguf`) | profile (restart) | the GGUF the embed sidecar is launched with; choices = the embedding / ColBERT `.gguf` files beside it |
+| `aux.query_prefix` | live | **the soft prompt** — prepended to every deep-recall query before embedding; her-conditioned retrieval, the cheap way; empty = bare |
+| `aux.doc_prefix` | live | prepended to every chunk at index time; the index stamp carries its hash, so a change re-embeds on the next refresh |
+| `aux.spine_rerank` | live | the hybrid re-score (`sidecar/rank.py`): cosine + 0.25·lexical overlap + 0.10·recency (90 d) + 0.15·testimony bond (the chunk backs a live fact); off = raw cosine (A/B) |
+| `aux.auto_recall` | live, **off** | the candidate lane: on turns that ask, the archive is searched IN PARALLEL with the spine; dropped unread at `aux.early_exit_hits` spine facts; else up to two labelled moments join the recall note (OFF-BY-DEFAULT §14) |
+| `aux.early_exit_hits` | live | the lane's early exit (default 3) |
+| `aux.rerank` (`SP_AUX_RERANK`) | profile | the ColBERT stage — dark (OFF-BY-DEFAULT §11) |
+| `aux.judge_kairos`, `aux.judge_watch` | live | the two judges (were `SP_KAIROS_JUDGE` / `SP_AUX_WATCH_JUDGE`; the profile still carries the boot default) |
+| **`sight.backend`** (section `Sight — her eyes`) | live | which eyes: `engine` (the served model's own vision / the seam's image_url on a foreign endpoint — today's logic, the default) · `aux_vl` (an LFM2.5-VL GGUF on the aux chat door — the 2060 stays hers) · `openai` (the seam's image_url regardless); every look (`look_at`, `take_photo`, `take_screenshot`, the hourly eye) goes through `sight._describe` and ONE scrub (`sight._scrub`) |
+| `sight.vl_model` (`SP_AUX_VL_MODEL`, `[aux].vl_model`) | live | the VL model id on the door; choices = the door's ids with `vl`/`vision` in the name; a VL door ARMS her sight tools on a checkpoint without a vision row |
+| `sight.vl_max_tokens`, `sight.vl_detail` | live | the VL description budget; `image_url.detail` where honoured |
+| `SP_AUX_EMBED_URL` / `SP_AUX_CHAT_URL` / `SP_AUX_API_KEY_FILE` / `SP_AUX_INDEX_DIR` / `SP_AUX_ARCHIVE_GLOBS`, `[aux].autostart/llama_server/embed_ctx/embed_threads` | profile | the doors, the token FILE, the index home, extra corpus globs, the sidecar launch |
 
-Gate: `harness_tests/h_aux.py` (offline; stubbed embedder drives the real chunker,
-index math, tool text, and the dark-sidecar contract).
+**The silent-librarian rule, in code** (`client.chat_json`): every aux judgement/extraction is
+structured output only — JSON with named keys, validated, `None` on any failure; `judge()` is
+JSON-first with the one-word fallback. `research.py` returns **extracts** (claims + sources, gaps)
+and the model writes the answer; every `read_long` digest reaches her through `summarize.labelled()`
+("context, not your words"). The archive **warms** at gateway start (`archive.warm()`), and the
+window's *rebuild index* button calls the same.
+
+Gates: `harness_tests/g_aux_librarian.py` (offline, a fake sidecar on the wire; 52 checks);
+`harness_tests/h_aux.py` (offline; the dark-sidecar contract, aux never writes memory);
+`harness_tests/h_aux_recall.py` (LIVE; the recall set four ways, receipts in `gates/AUX-RECALL-*.md`).
 
 ## 5. Roadmap — designed, not yet wired (each needs its own receipt)
 
@@ -121,12 +139,15 @@ index math, tool text, and the dark-sidecar contract).
    cadence in var/daemon.log.
 2. **ColBERT rerank** — `LFM2.5-ColBERT-350M-Q8_0.gguf` is on disk. Late interaction
    needs per-token vectors (llama-server `--pooling none`), MaxSim in numpy, rerank
-   of the embedding stage's top-50. Arming condition: a measured case where CLS
-   retrieval returns the wrong moment in the top-4 and ColBERT fixes it — build the
-   eval from her real "do you remember" queries, not synthetic ones.
-3. **Registry-assist recall** — embed registry rows too, as a *candidate generator*
-   for the existing ranked recall (never a replacement for the seam; the verdicts
-   still rule). Arming condition: a measured recall miss the lexical path cannot fix.
+   of the embedding stage's top-50. Still dark (`aux.rerank`). Arming condition: a measured
+   case where the shipped stage (soft-prompted query + spine rerank, 2026-08-22) returns
+   the wrong moment in the top-4 and ColBERT fixes it — `h_aux_recall.py` is the eval;
+   fill its set from her real "do you remember" queries, not synthetic ones.
+3. **The candidate lane** — LANDED 2026-08-22 as `aux.auto_recall` (off): the archive
+   searched in parallel with the spine's recall, dropped unread when the spine already has
+   enough, else up to two labelled moments join the note — candidates, never authority.
+   Arming condition: the H-AUX-RECALL receipt shows the lane finds moments the spine misses
+   on the fixture. Registry rows as embedding candidates (3b) remain designed, not wired.
 4. **Research/search breadth** — `research.py` map/reduce through the 2.6B
    (tool-trained, 128K context) for multi-page reading; the model gets the synthesis.
 5. **Consolidation prefilter** — the nightly consolidator reads whole days through

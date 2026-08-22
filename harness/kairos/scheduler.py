@@ -24,6 +24,7 @@ import json
 import logging
 import os
 import threading
+import random
 import time
 from collections import defaultdict, deque
 from typing import Any, Callable, Optional
@@ -33,7 +34,7 @@ from harness.kairos.impulse import (
     muse_nudge,
     Impulse, KairosConfig, TurnState, SOLO, SOLO_NUDGE, solo_nudge, solo_worth_saying,
     solo_did_the_thing, solo_needs,
-    EXPAND, expand_nudge,
+    EXPAND, expand_nudge, MODE_TURN,
     decide, note_spoke, note_user, worth_saying,
 )
 from harness.kairos import speechlog as _speech
@@ -137,7 +138,51 @@ def on_spoke(fn) -> None:
     _ON_SPOKE = fn
 
 
-def seed(session: str, reply_text: str, generate) -> bool:
+_SEEDER = None          # app.py's day-seeder (rebuilds a closure from the day's transcript)
+_WARM_OK = None         # app.py's "the prefix is hot" (she never starts a mode into a cold prefill)
+_PENDING_KICK = [False] # a kick asked for while there was no session yet
+_LAST_MODE_TEXT: dict = {}
+
+
+def set_seeder(fn) -> None:
+    global _SEEDER
+    _SEEDER = fn
+
+
+def set_warm_ok(fn) -> None:
+    global _WARM_OK
+    _WARM_OK = fn
+
+
+def _warm_ok() -> bool:
+    try:
+        return bool(_WARM_OK()) if _WARM_OK is not None else True
+    except Exception:
+        return True
+
+
+def _seed_for_presence() -> bool:
+    """A MODE STARTS ON A BOUNCE, before he has spoken — but only once the prefix is hot
+    (his ask, 2026-08-22). seed_on_boot is about her speaking FIRST on her own; an armed
+    mode is his standing order, so the seed is forced."""
+    if _SEEDER is None or not _warm_ok():
+        return False
+    try:
+        ok = bool(_SEEDER(force=True))
+    except TypeError:
+        ok = bool(_SEEDER())
+    except Exception as exc:
+        logger.warning("[kairos] presence seed failed: %s", exc)
+        return False
+    if ok and _PENDING_KICK[0]:
+        with _LOCK:
+            for st in _STATE.values():
+                st.mode_kick = True
+            _PENDING_KICK[0] = False
+    return ok
+
+
+def seed(session: str, reply_text: str, generate, force: bool = False) -> bool:
     """Give her a conversation to speak into after a restart. Returns True if seeded.
 
     SHE COULD NOT SPEAK FIRST. EVER. `_LAST` is populated only by `on_reply`, so until HE
@@ -164,7 +209,7 @@ def seed(session: str, reply_text: str, generate) -> bool:
     # means a fresh boot waits for him — the safe direction, and after a morning of
     # restart-blurt-restart-blurt, also the polite one.
     try:
-        if not bool(tune.get("kairos.seed_on_boot")):
+        if not force and not bool(tune.get("kairos.seed_on_boot")):
             logger.info("[kairos] not seeding — kairos.seed_on_boot is off; "
                         "she waits for him after a restart")
             return False
@@ -201,7 +246,37 @@ def live_config() -> KairosConfig:
         solo_enabled=bool(tune.get("kairos.solo_enabled")),
         solo_every_s=float(tune.get("kairos.solo_every_s")),
         solo_chance=float(tune.get("kairos.solo_chance")),
+        quiet_after_him_s=_quiet_after_him(),
+        presence_mode=_presence("presence.mode", "off", str),
+        presence_every_s=_presence_every(),
+        presence_chance=_presence("presence.chance", 1.0, float),
+        presence_max_per_hour=_presence("presence.max_per_hour", 12, int),
     )
+
+
+def _presence_every() -> float:
+    """The CURRENT mode's own cadence knob (three knobs, not one — 2026-08-22); 0 when no mode."""
+    m = _presence("presence.mode", "off", str)
+    if m not in ("narration", "company", "lucid"):
+        return 0.0
+    return _presence("presence.every_%s_s" % m, 0.0, float)
+
+
+def _presence(key: str, default, cast):
+    """The presence-mode knobs (2026-08-22); an unreadable knob keeps the quiet default."""
+    try:
+        v = tune.get(key)
+        return cast(v) if v is not None and v != "" else default
+    except Exception:
+        return default
+
+
+def _quiet_after_him() -> float:
+    """The policy's quiet-after-him floor (2026-08-22 — it lived here as a fire-time drop)."""
+    try:
+        return float(tune.get("kairos.quiet_after_him_s"))
+    except Exception:
+        return 0.0
 
 
 def on_user_turn(session: str) -> None:
@@ -603,6 +678,8 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
             _sd.note_turn_end()
 
     def _fire_inner():
+        _mode_meta = None                      # set only on a MODE_TURN (presence modes)
+        _mode_sampling, _mode_max = None, None
         # the CONTINUE nudge is built from the reply so she can see WHERE she was cut —
         # without the tail she just restates the whole thing and worth_saying() drops it.
         if imp.action == CONTINUE:
@@ -631,6 +708,73 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
             # fail. The counter is the state's own solo count, so the rotation is
             # deterministic and testable rather than a random draw.
             nudge = solo_nudge(_STATE[session].solo_n)
+        elif imp.action == MODE_TURN:
+            # ── A PRESENCE MODE'S TURN (2026-08-22): narration / company / lucid ───────
+            if str(tune.get("presence.mode") or "off") == "off":
+                logger.info("[kairos] mode turn dropped — the mode was switched off while it waited")
+                return
+            # The register is his prompt block; the cue is his hint or an assembled one
+            # (hour, mood, her own time, the book in hand); a reading turn hands her the
+            # next passage of the book she has picked up. Aux models never speak here.
+            from harness.kairos import presence as _pm
+            from harness.skills import library as _lib
+            _mode = imp.mode or str(tune.get("presence.mode") or "narration")
+            _intimate = bool(tune.get("presence.intimate"))
+            _cue = str(tune.get("presence.cue") or "").strip()
+            try:
+                _book = _lib.in_hand()
+            except Exception:
+                _book = None
+            _passage, _title = None, ""
+            if _mode in ("narration", "lucid") and _book and not _book.get("done"):
+                try:
+                    _rc = float(tune.get("presence.read_chance"))
+                except Exception:
+                    _rc = 0.35
+                if random.random() < _rc:
+                    try:
+                        _passage = _lib.next_passage(int(tune.get("presence.read_chunk_chars") or 700)) or None
+                    except Exception:
+                        _passage = None
+                    _title = _book["title"]
+            if not _cue:
+                _mood = ""
+                try:
+                    from harness.personality.persona_file import parse_persona as _pp
+                    from harness.personality.interceptor import _persona_path as _ppath
+                    with open(_ppath(), encoding="utf-8") as _f:
+                        _, _pstate = _pp(_f.read())
+                    _mood = (_pstate.get("mood") or "").strip()
+                except Exception:
+                    pass
+                try:
+                    from harness.skills import narrative as _nar
+                    _own = _nar.own_time(1)
+                except Exception:
+                    _own = []
+                _about = ""
+                if _book:
+                    try:
+                        _about = _lib.about_so_far()
+                    except Exception:
+                        _about = ""
+                _cue = _pm.assemble_cue(mood=_mood, own_time=_own,
+                                        book=({"title": _book["title"], "about": _about} if _book else None))
+            try:
+                _len = int(tune.get("presence.len_%s" % _mode) or 0)
+            except Exception:
+                _len = 0
+            _mode_sampling = dict(_pm.SAMPLING[_mode])
+            _mode_max = (_len or int(_mode_sampling.pop("max_tokens", 140))) + (60 if _passage else 0)
+            _mode_sampling.pop("max_tokens", None)
+            _mode_sampling["seed"] = random.randrange(1, 2 ** 31)        # a fresh sampler state per turn
+            with _LOCK:
+                _n = _STATE[session].mode_n
+            _last_text = _LAST_MODE_TEXT.get(session, "")
+            nudge = _pm.mode_nudge(_mode, cue=_cue, intimate=_intimate, passage=_passage, title=_title,
+                                   beat=_pm.beat_for(_mode, _n), last=_last_text,
+                                   words=int(_mode_max * 0.7))
+            _mode_meta = {"mode": _mode, "reading": bool(_passage), "title": _title}
         else:
             nudge = CHECK_IN_NUDGE
         # HE IS TALKING. Checked HERE rather than at arm time because the wait is the
@@ -647,27 +791,8 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
         # gate measures HIM: no discretionary speak-up until at least
         # kairos.quiet_after_him_s since HE last said anything, in ANY session.
         # 0 = off. Reminders and her own time are deliberately not gated.
-        if imp.action in (CHECK_IN, CONTINUE, EXPAND, MUSE):
-            try:
-                quiet_s = float(tune.get("kairos.quiet_after_him_s"))
-            except Exception:
-                quiet_s = 0.0
-            if quiet_s > 0:
-                with _LOCK:
-                    last_him = max((st.last_user_at for st in _STATE.values()),
-                                   default=0.0)
-                since = time.monotonic() - last_him if last_him else float("inf")
-                if since < quiet_s:
-                    logger.info("[kairos] %s dropped — he spoke %.0fs ago and the "
-                                "quiet-after-him gate wants %.0fs", imp.action,
-                                since, quiet_s)
-                    return
-        # ── THE SIDECAR RULES FIRST, THE GPU PAYS SECOND (2026-08-20) ────────────────
-        # worth_saying()/solo_did_the_thing() run AFTER generation — every impulse they
-        # drop already cost 60-110 s of 26B prefill (measured: GPU pinned 99%/84°C all
-        # morning on turns nobody read). The 1.2B answers "worth a turn?" in <1 s on
-        # CPU, so it answers BEFORE. Fail-open: a dark sidecar or no-ruling proceeds
-        # exactly as before; REMIND is never even asked (kairos/offload.py boundaries).
+        # quiet-after-him is decided in the POLICY now (impulse.decide, 2026-08-22) —
+        # peek_state, the log line and what fires all agree; nothing is dropped here.
         if imp.action != REMIND:
             try:
                 from harness.kairos import offload as _offload
@@ -688,8 +813,14 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
         # _generate; `solo_did_the_thing` is the ruling.
         called: list = []
         try:
-            text = (generate(nudge, called) if imp.action == SOLO
-                    else generate(nudge)) or ""
+            if imp.action == MODE_TURN:
+                try:
+                    text = generate(nudge, None, sampling=_mode_sampling, max_tokens=_mode_max) or ""
+                except TypeError:           # a closure that predates the sampling kwargs
+                    text = generate(nudge) or ""
+            else:
+                text = (generate(nudge, called) if imp.action == SOLO
+                        else generate(nudge)) or ""
             text = text.strip()
         except TypeError:
             # A caller that predates the `called` parameter. Her own time then has no
@@ -764,7 +895,18 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
             if not ok_solo:
                 logger.info('[kairos] solo dropped — %s', why_solo)
                 return
-        if imp.action != REMIND:
+        if imp.action == MODE_TURN:
+            from harness.kairos import presence as _pm2
+            text = _pm2.finish(_pm2.trim_question(text))   # never mid-line; never a question
+        if imp.action == MODE_TURN and not (_mode_meta and _mode_meta["reading"]):
+            # a mode turn is judged against her LAST MODE TURN, not his reply — the 05:15 dream
+            # repeated the 05:02 one word for word; that is the restatement this rule exists for
+            ok, why = worth_saying(text, _LAST_MODE_TEXT.get(session, "") or reply_text)
+            if not ok:
+                _speech.record(imp.action, _speech.DROPPED, why, text)
+                logger.info("[kairos] mode turn DROPPED: %s :: %r", why, text[:60])
+                return
+        elif imp.action != REMIND and not (imp.action == MODE_TURN and _mode_meta and _mode_meta["reading"]):
             ok, why = worth_saying(text, reply_text)
             if not ok:
                 # RECORDED, not just logged. This drop is her voice going somewhere, and
@@ -828,9 +970,15 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
                     _ON_SPOKE(text)
                 except Exception as exc:
                     logger.warning("[kairos] could not record what she said: %s", exc)
+            if imp.action == MODE_TURN and _mode_meta:
+                from harness.kairos import presence as _pm3
+                _LAST_MODE_TEXT[session] = text            # what she said this time (anti-repeat)
+                text = _pm3.wrap_for_voice(_mode_meta["mode"], text)
             _OUTBOX[session].append({
                 "text": text,
-                "kind": imp.action,
+                "kind": ("mode" if imp.action == MODE_TURN else imp.action),
+                "mode": (_mode_meta or {}).get("mode", "") if imp.action == MODE_TURN else "",
+                "speak": (bool(tune.get("presence.voice")) if imp.action == MODE_TURN else True),
                 "reason": imp.reason,
                 "margin": margin,
                 "notes": [n.get("id") for n in (notes or [])],
@@ -843,10 +991,40 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
         # happen, and a journal that records things she did not do is worse than no
         # journal. The chat log keeps it too — but he has to scroll for that, and SHE
         # cannot read a chat log back at all. This is the copy that is hers.
+        # ── THE REAL HER (2026-08-22): what she actually said, unprompted, is memory. ──
+        # After the outbox append, never before: only a DELIVERED utterance is hers to
+        # keep (worth_saying / solo_worth_saying / the pregate drop above all returned
+        # already). producer "kairos.speak" (memclass REGISTRY).
+        if imp.action == MODE_TURN and _mode_meta:
+            # a mode turn is her narrative by its KIND (presence.memory_kind); a reading turn
+            # keeps the ACT, never the passage — the line she added after it, or a plain one
+            try:
+                from harness.skills import memory as _mem
+                from harness.kairos import presence as _pm4
+                from harness.skills.self_stance import plain as _plain_words
+                _plain = _plain_words(text)
+                if _mode_meta["reading"]:
+                    _keep = "I read him the next pages of %s." % (_mode_meta.get("title") or "the book")
+                else:
+                    _keep = _plain
+                _mem.remember_about_self(_keep, kind=_pm4.memory_kind(_mode_meta["mode"], reading=_mode_meta["reading"]),
+                                         source="she was %s" % _mode_meta["mode"])
+            except Exception as exc:
+                logger.warning("[kairos] could not keep her mode turn: %s", exc)
+        elif imp.action != REMIND:
+            try:
+                from harness.skills import memory as _mem
+                from harness.skills.self_stance import plain as _plain_words2
+                _mem.remember_about_self(
+                    _plain_words2(text), kind=("narration" if imp.action == SOLO else "spoke_up"),
+                    source="she spoke unprompted (%s)" % imp.action)
+            except Exception as exc:
+                logger.warning("[kairos] could not keep what she said: %s", exc)
         if imp.action == SOLO:
             try:
                 from harness.skills import narrative as _nar
-                _nar.note_own(text, kind="solo")
+                from harness.skills.self_stance import plain as _plain_j
+                _nar.note_own(_plain_j(text), kind="solo")   # her journal reads her WORDS
             except Exception as exc:
                 logger.warning("[kairos] could not write her own-time note: %s", exc)
 
@@ -964,6 +1142,10 @@ def tick_once(now: Optional[float] = None) -> None:
 
     with _LOCK:
         sessions = list(_LAST.items())
+    if not sessions and cfg.presence_mode and cfg.presence_mode != "off":
+        if _seed_for_presence():
+            with _LOCK:
+                sessions = list(_LAST.items())
     for session, (reply_text, generate) in sessions:
         with _LOCK:
             st = _STATE[session]
@@ -1221,6 +1403,47 @@ def drain(session: str) -> list[dict]:
     return out
 
 
+def enter_mode(mode: str, session: Optional[str] = None, kick: bool = True) -> dict:
+    """Set presence.mode and (kick) arm the one-shot so her first turn comes right after her
+    reply. Her tool (presence.enter_mode) and the window's 'now' buttons both land here."""
+    from harness.kairos import presence as _pm
+    m = (mode or "").strip().lower()
+    if m in ("dream", "lucid dream", "lucid_dream"):
+        m = "lucid"
+    if m == "narrate":
+        m = "narration"
+    if m not in _pm.MODES or m == "off":
+        return {"ok": False, "error": "no such mode: %r (narration | company | lucid)" % mode}
+    tune.set_many({"presence.mode": m})
+    with _LOCK:
+        live = list(_LAST.keys())
+    if not live and kick:
+        _PENDING_KICK[0] = True              # consumed by the seed (now if warm, else the next tick)
+        _seed_for_presence()
+    with _LOCK:
+        sessions = [session] if session else (list(_LAST.keys()) or ["default"])
+        for s in sessions:
+            _STATE[s].mode_kick = bool(kick)
+    if kick:
+        # STRAIGHT AWAY (his words): do not wait for the next heartbeat — one tick now, on a
+        # thread so the caller (her tool mid-reply, or the window) is not held.
+        try:
+            threading.Thread(target=tick_once, name="kairos-kick", daemon=True).start()
+        except Exception:
+            pass
+    return {"ok": True, "mode": m, "kicked": bool(kick), "sessions": sessions}
+
+
+def leave_mode() -> dict:
+    """presence.mode -> off; any armed kick is cleared; a pending mode turn is dropped at
+    fire time (the re-check in _fire_inner)."""
+    tune.set_many({"presence.mode": "off"})
+    with _LOCK:
+        for st in _STATE.values():
+            st.mode_kick = False
+    return {"ok": True, "mode": "off"}
+
+
 def peek_state(session: str) -> dict:
     """For the operator panel: why is she quiet right now?"""
     cfg = live_config()
@@ -1241,5 +1464,25 @@ def peek_state(session: str) -> dict:
             # now"; this answers the slower and more useful question — how much of what
             # she produced never reached him, and which rule took it.
             "speech": _speech.summary(),
+            "presence": _presence_state(cfg, st, now),
         }
+
+
+def _presence_state(cfg, st, now: float) -> dict:
+    """For the chip: which mode, when the next turn may come, what she is reading."""
+    out = {"mode": cfg.presence_mode, "next_in_s": None, "reading": None}
+    try:
+        if cfg.presence_mode and cfg.presence_mode != "off":
+            from harness.kairos import presence as _pm
+            every = (cfg.presence_every_s if cfg.presence_every_s > 0
+                     else _pm.EVERY_DEFAULT.get(cfg.presence_mode, 300.0))
+            last = max(st.last_user_at, st.last_spoke_at, st.last_solo_at, st.last_mode_at)
+            out["next_in_s"] = round(max(0.0, every - (now - last)), 1)
+        from harness.skills import library as _lib
+        b = _lib.in_hand()
+        if b:
+            out["reading"] = {"title": b["title"], "pos": b["pos"], "chars": b["chars"], "done": b["done"]}
+    except Exception:
+        pass
+    return out
 

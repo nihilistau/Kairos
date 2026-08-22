@@ -1,0 +1,114 @@
+{
+ "_": [
+  "models.json — the models this stack was built and measured against, with their cards.",
+  "",
+  "WHY A FILE AND NOT PROSE. The setup panel and docs/SETUP.md were going to carry two",
+  "copies of one list, and the copy nobody re-checked would be the one somebody followed",
+  "(AGENTS.md §0). This is the list; the panel reads it through /v1/setup and the doc",
+  "points here. Nothing in the running stack loads a model FROM here — the profile does",
+  "that. This is a recommendation, and it says so.",
+  "",
+  "It is also the one file the export scrub is told to leave alone: every rule that",
+  "generalises the operator's own model would rewrite the very ids that make this useful.",
+  "",
+  "`role` is what the model does in this stack; `note` is the honest reason to pick it."
+ ],
+ "updated": "2026-08-23",
+ "engine": {
+  "role": "her — the model that answers /v1/chat/completions",
+  "note": "A 26B mixture-of-experts with ~4B active: the quality of a mid-size dense model at the speed and VRAM of a small one, which is what makes a companion that thinks in real time possible on one consumer GPU. Anything OpenAI-compatible works; this is what the decode knobs in profiles/companion.toml were tuned on.",
+  "recommended": [
+   {
+    "id": "google/gemma-4-26B-A4B-it",
+    "card": "https://hf.co/google/gemma-4-26B-A4B-it",
+    "format": "safetensors",
+    "note": "the instruction-tuned weights. For vLLM, TGI, or transformers."
+   },
+   {
+    "id": "google/gemma-4-26B-A4B-it-qat-q4_0-gguf",
+    "card": "https://hf.co/google/gemma-4-26B-A4B-it-qat-q4_0-gguf",
+    "format": "gguf",
+    "note": "Google's own quantisation-aware-trained q4_0. The best quality-per-byte of the 4-bit builds; load this in LM Studio or llama-server if you have ~16 GB to give it."
+   },
+   {
+    "id": "unsloth/gemma-4-26B-A4B-it-GGUF",
+    "card": "https://hf.co/unsloth/gemma-4-26B-A4B-it-GGUF",
+    "format": "gguf",
+    "note": "the full quant ladder, Q2 through F16 — start here if the QAT build does not fit."
+   },
+   {
+    "id": "google/gemma-4-26B-A4B",
+    "card": "https://hf.co/google/gemma-4-26B-A4B",
+    "format": "safetensors",
+    "note": "the base (not instruction-tuned). For fine-tuning, not for talking to."
+   }
+  ]
+ },
+ "sidecars": {
+  "role": "the librarians — small CPU models that embed, retrieve, judge and read for her",
+  "note": "Never her voice. They run on the CPU beside the engine so that recall, page-reading and yes/no judging cost no GPU time. All of [aux] ships OFF; docs/AUX-MODELS.md is the ledger of what each one does and what stays dark.",
+  "recommended": [
+   {
+    "id": "LiquidAI/LFM2.5-1.2B-Instruct-GGUF",
+    "card": "https://hf.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF",
+    "format": "gguf",
+    "knob": "[aux].chat_model",
+    "note": "the chat sidecar: deep recall, reading a fetched page down to what was asked, yes/no judging. Q8_0 is ~1.3 GB and answers in well under a second on CPU."
+   },
+   {
+    "id": "LiquidAI/LFM2.5-1.2B-Instruct",
+    "card": "https://hf.co/LiquidAI/LFM2.5-1.2B-Instruct",
+    "format": "safetensors",
+    "knob": "[aux].chat_model",
+    "note": "the same model unquantised, if you serve it through vLLM instead."
+   },
+   {
+    "id": "LiquidAI/LFM2.5-Embedding-350M-GGUF",
+    "card": "https://hf.co/LiquidAI/LFM2.5-Embedding-350M-GGUF",
+    "format": "gguf",
+    "knob": "[aux].embed_gguf",
+    "note": "the embedding sidecar — the semantic half of recall. Without it (or the sp-daemon's own L5) embeddings fall back to a hash space, which is honest but blunt."
+   },
+   {
+    "id": "LiquidAI/LFM2.5-ColBERT-350M-GGUF",
+    "card": "https://hf.co/LiquidAI/LFM2.5-ColBERT-350M-GGUF",
+    "format": "gguf",
+    "knob": "[aux].colbert_url",
+    "note": "late-interaction rerank. OFF by default and measured before it is armed — see docs/SEMANTICS.md for the experiment that a plain cosine rank won."
+   }
+  ]
+ },
+ "voice_in": {
+  "role": "the ear — speech to text, if you want to talk to her out loud",
+  "note": "Optional. [engine].asr_url points at any /v1/audio/transcriptions endpoint; the sp-daemon backend can also take audio frames natively.",
+  "recommended": [
+   {
+    "id": "mistralai/Voxtral-Mini-4B-Realtime-2602",
+    "card": "https://hf.co/mistralai/Voxtral-Mini-4B-Realtime-2602",
+    "format": "safetensors",
+    "note": "streaming ASR, 4B. The realtime variant is the one worth having — batch ASR makes a conversation feel like a form submission."
+   },
+   {
+    "id": "handy-computer/Voxtral-Mini-4B-Realtime-2602-gguf",
+    "card": "https://hf.co/handy-computer/Voxtral-Mini-4B-Realtime-2602-gguf",
+    "format": "gguf",
+    "note": "the same, quantised, for a CPU or a small card."
+   }
+  ]
+ },
+ "hosted": {
+  "role": "the optional paid surface — her voice out, her pictures, live search",
+  "note": "ONE key, four features, all of them off until the key file exists. Nothing in the memory system, the personality, the room or the gates needs it: an offline Kairos is a complete Kairos, minus a face she can grow and a voice that is not a local synth.",
+  "provider": {
+   "name": "xAI",
+   "keys": "https://console.x.ai/",
+   "key_file": "var/secrets/Xapi.txt",
+   "features": [
+    {"what": "her voice", "model": "grok tts (voice: ara)", "knob": "[tts].method = \"xai\""},
+    {"what": "her face and wardrobe", "model": "grok-imagine-image-2.0 / grok-imagine-video-1.5", "knob": "[xai].image_model / video_model"},
+    {"what": "live web search", "model": "the xAI live-search API", "knob": "[search].backend = \"xai\""},
+    {"what": "the research tier", "model": "grok-4-1-fast", "knob": "[research].enabled"}
+   ]
+  }
+ }
+}
