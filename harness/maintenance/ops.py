@@ -179,6 +179,11 @@ def _compact_locked() -> dict[str, Any]:
                 if inter / len(a) >= 0.9 and inter / len(b) >= 0.9:
                     older["lifecycle"] = 1               # the NEWER one wins
                     older["superseded_by"] = r.get("name", "")
+                    # superseded_at on EVERY retirement branch (2026-08-24, H2): the
+                    # duplicate and slot-conflict branches stamped it and this one did
+                    # not, so a paraphrase tombstone had no date on when it died.
+                    older["superseded_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                                           time.gmtime())
                     paraphrases += 1
                     continue
             k1 = lc.attribute_key(rt, rsp)
@@ -227,7 +232,14 @@ def cleanup(dry: bool = False) -> dict[str, Any]:
 
 
 def _cleanup_locked(dry: bool = False) -> dict[str, Any]:
-    rows = _rows()
+    # MALFORMED LINES ARE RETURNED, NOT DROPPED (2026-08-24 audit, A1). This read
+    # _rows() — which silently discards what does not parse — and then _write(keep),
+    # so a malformed line was VAPORISED by the one maintenance pass whose docstring
+    # says "REVERSIBLE: everything lands in quarantine.jsonl". _compact_locked, forty
+    # lines up, had already learned to quarantine them (2026-08-19); this pass had
+    # not. Same file, one doctrine, held in one of two passes — AGENTS.md §0 verbatim.
+    # Gate: G-COMPACT §7 (mutant: swap back to _rows() and it goes red by name).
+    rows, malformed = _rows_and_malformed()
     bak = None if dry else _backup()
     keep, junk, rescued = [], [], []
     seen = {lc.strip_prefix(r.get("text") or r.get("topic") or "").strip().lower()
@@ -275,18 +287,23 @@ def _cleanup_locked(dry: bool = False) -> dict[str, Any]:
 
         junk.append({**r, "quarantine_reason": why})
 
-    if junk and not dry:
-        q = os.path.join(os.path.dirname(_reg()), "quarantine.jsonl")
-        with open(q, "a", encoding="utf-8") as f:
-            for r in junk:
-                r["quarantined_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-                f.write(json.dumps(r, ensure_ascii=False) + "\n")
-        _write(keep)
+    if not dry:
+        # Through _quarantine() — the helper existed and this block hand-rolled the
+        # same append inline (2026-08-24, H3). Two spellings of "nothing leaves the
+        # disk" is how one of them forgets the timestamp, or the reason, or the file.
+        if malformed:
+            _quarantine([{"raw": ln, "quarantine_reason": "malformed line (cleanup)"}
+                         for ln in malformed])
+        if junk:
+            _quarantine(junk)
+        if junk or malformed:
+            _write(keep)
 
     from collections import Counter
     why = Counter(r.get("quarantine_reason", "?")[:44] for r in junk)
     return {"ok": True, "dry_run": dry, "backup": bak,
             "quarantined": len(junk), "kept": len(keep) - len(rescued),
+            "malformed_quarantined": len(malformed),
             "rescued": len(rescued), "rescued_facts": rescued[:12],
             "quarantined_sample": [r.get("text", "")[:60] for r in junk[:12]],
             "reasons": dict(why.most_common(6)), "restorable": True}
@@ -337,20 +354,62 @@ def reflect() -> dict[str, Any]:
         out["steps"].append({"step": "orphans", **retire_orphans()})
     except Exception as exc:
         out["steps"].append({"step": "orphans", "skipped": str(exc)[:120]})
+    # 1c. slots — the Phase C same-subject scan, NIGHTLY at last (2026-08-24 audit, B3:
+    #     slots.scan was reachable only via `python -m harness.skills.slots`, so the
+    #     sidecar could only grow when somebody remembered the incantation). Armed by
+    #     PRESENCE exactly like the read side (SP_SEM_SLOTS path set = armed; unset =
+    #     one skipped line). FRAME-REVIEW ONLY, deliberately: frame proposals land
+    #     `pending` for his curate review (--review/--confirm) — machine recall, human
+    #     precision, the shipped configuration slots.py's own C2 receipt argues for —
+    #     while the oracle proposer writes auto-confirmed "same" verdicts and costs a
+    #     GPU one-shot per pair, neither of which belongs in an unattended pass.
+    #     Best-effort: a failure here is a skipped line, never a broken night.
     try:
-        from harness.personality.curator import consolidate_personality
-        res = consolidate_personality()
-        out["steps"].append({"step": "personality", "result": str(res)[:160]})
+        from harness.skills import slots as _slots
+        if _slots.enabled():
+            out["steps"].append({"step": "slots",
+                                 **_slots.scan(_rows(), proposers=("frame-review",))})
+        else:
+            out["steps"].append({"step": "slots", "skipped": "SP_SEM_SLOTS unset"})
     except Exception as exc:
-        out["steps"].append({"step": "personality", "skipped": str(exc)[:120]})
+        out["steps"].append({"step": "slots", "skipped": str(exc)[:120]})
+    # 2 + 2b. THE SHARED NIGHTLY STEPS HONOUR THEIR KNOBS AND RUN ONCE (2026-08-24
+    # audit, A6 + H8). agency.consolidate_current has always gated the personality
+    # curator on SP_PERSONALITY (it writes persona.md) and the narrative/world fold on
+    # SP_WORLD — and THIS pass ran both unconditionally, so the knobs did not mean what
+    # harness/server/knobs.py says they mean ("Personality state + self-model in the
+    # prefix" / "The standing world in her prefix"): off, the curator still rewrote
+    # persona.md every night through this door. And the night job (app.py day-boundary)
+    # calls consolidate_current THEN reflect() in one process, so with the knobs on the
+    # curator and world.refresh each ran TWICE a night on the same day's evidence.
+    # agency.ran_today() is the dedupe — marked by the first runner, asked here.
+    from harness.control import agency as _ag
+    if os.environ.get("SP_PERSONALITY", "0") != "1":
+        out["steps"].append({"step": "personality", "skipped": "off (SP_PERSONALITY != 1)"})
+    elif _ag.ran_today("personality"):
+        out["steps"].append({"step": "personality",
+                             "skipped": "consolidate_current already ran it today"})
+    else:
+        try:
+            from harness.personality.curator import consolidate_personality
+            res = consolidate_personality()
+            out["steps"].append({"step": "personality", "result": str(res)[:160]})
+        except Exception as exc:
+            out["steps"].append({"step": "personality", "skipped": str(exc)[:120]})
     # N2: the nightly op has no transcript (the idle scheduler writes the narrative);
     # it DOES fold whatever the day accumulated into the standing world.
-    try:
-        from harness.skills.world import refresh
-        refresh()
-        out["steps"].append({"step": "world_refresh", "ok": True})
-    except Exception as exc:
-        out["steps"].append({"step": "world_refresh", "skipped": str(exc)[:120]})
+    if os.environ.get("SP_WORLD", "0") != "1":
+        out["steps"].append({"step": "world_refresh", "skipped": "off (SP_WORLD != 1)"})
+    elif _ag.ran_today("world"):
+        out["steps"].append({"step": "world_refresh",
+                             "skipped": "consolidate_current already ran it today"})
+    else:
+        try:
+            from harness.skills.world import refresh
+            refresh()
+            out["steps"].append({"step": "world_refresh", "ok": True})
+        except Exception as exc:
+            out["steps"].append({"step": "world_refresh", "skipped": str(exc)[:120]})
     try:
         out["steps"].append({"step": "insight", **insight()})
     except Exception as exc:
@@ -371,6 +430,17 @@ def reflect() -> dict[str, Any]:
         out["steps"].append({"step": "chapter", **_nar_ch.weekly_chapter()})
     except Exception as exc:
         out["steps"].append({"step": "chapter", "skipped": str(exc)[:120]})
+    # THE RECEIPT (2026-08-24 audit, B2). Zero `chapter` rows existed after two nights
+    # of this pass, the dry mechanism proved healthy through a stub ask, and the reason
+    # could not be recovered because these step results were returned to callers that
+    # log only the step NAMES — a red nobody reads. Every self-writing step now leaves
+    # its own why in the log, so the next silent night is a one-grep diagnosis.
+    import logging as _lg_r
+    for _st in out["steps"]:
+        if _st.get("step") in ("becoming", "chapter", "insight"):
+            _lg_r.getLogger(__name__).info(
+                "[reflect] %s: %s", _st.get("step"),
+                {k: (str(v)[:120]) for k, v in _st.items() if k != "step"})
     out["stats"] = stats()
     return out
 

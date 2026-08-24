@@ -153,9 +153,10 @@ export default function Portrait({ mood, thinking }) {
       <div className="por-foot">
         <span className="por-mood">{mood || '—'}</span>
         {wearing ? <span className="por-wear" title={wearing.about}>{wearing.words}</span> : null}
-        {wd && wd.clamped ? <span className="por-held" title={
-          'she chose ' + ((wd.tier_words[wd.wanted] || {}).wearing || wd.wanted) +
-          ' — your ceiling is holding it'}>held</span> : null}
+        {/* the "held by your ceiling" badge left 2026-08-24 (audit R4): resolve()
+            returns clamped:false as a CONSTANT since tiers stopped being a ladder —
+            this branch could never render, and it was the last reader of the
+            tier_words back-compat key the server was waiting to delete. */}
         {clip ? (
           <button className="por-stop" title="take it down"
                   onClick={() => api.wardrobeSet({ clip: '', by: 'him' }).then(setWd)}>×</button>

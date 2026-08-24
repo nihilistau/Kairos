@@ -1,7 +1,12 @@
 ---
 type: design
 title: "SEMANTICS — the SEM stack (S0–S4)"
-status: PHASE 2 MEASURED (2026-07-14); S0 index live, S1 rank default-off with the receipt
+status: PHASE 2 MEASURED (2026-07-14); S0 index live. S1 rank was default-off with the
+        receipt until 2026-08-23, when §S0b ARMED it on `aux-1024-v1` — seam recall@1
+        0.46 -> 0.53, decider hit 0.06 -> 0.17, both foreign-noise metrics unchanged.
+        `/v1/capture`'s refusal, which that finding rests on, was fixed the same day and
+        the l5/l5 re-measurement it made due was run and lost (l5 0.10) — both corrected
+        in place in §S0b, 2026-08-25.
 ---
 
 # SEMANTICS.md — the SEM stack (S0–S4)
@@ -162,14 +167,29 @@ Rules, each one a bug this repo has already had:
 **S1 was off for a month against four committed negatives, and all four were measured
 against a bag-of-words index.**
 
-`/v1/capture` refuses on the model MoE — *gemma4_decode_cuda: gemma4-MoE not
-supported on this path (ADR-013)* — and has since the model landed. Measured on
-the live store: **253 of the 253 rows written since 2026-08-19 carry `npos=0`**, no `ep.l5`
+`/v1/capture` **refused** on the model MoE — *gemma4_decode_cuda: gemma4-MoE not
+supported on this path (ADR-013)* — from the day the model landed until 2026-08-23. Measured on
+the live store while it was refusing: **253 of the 253 rows written since 2026-08-19 carry `npos=0`**, no `ep.l5`
 sidecar has been minted in three weeks, and **641 of 747** directories under
 `var/memory/eps/` are empty shells of failed mints. The document index was 753 hash rows to
 57 stale l5 rows. Cosine 0.0167, `W_c` 0.02, the LLM judge, `frame_link` 0.625 —
 every one of those contenders was ranking against bag-of-words vectors. There was no
 semantic index for them to compete with.
+
+> **CORRECTED 2026-08-25, and the refusal above is history rather than status: `/v1/capture`
+> WORKS on the model, and has since 2026-08-23.** The MoE FFN seam landed the same night this
+> section was written (`3ee6333`, plus two CUDA lifetime bugs that were never about MoE) —
+> her memories mint real episodes again, `ep.k` / `ep.v` / `ep.mf` / `ep.q` and **`ep.l5`**,
+> the last of which had not been written in three weeks. Receipt:
+> [`ENGINE-SESSION-2026-08-23.md`](ENGINE-SESSION-2026-08-23.md); the 247 owed episodes were
+> backfilled the same day ([`../gates/EPISODE-BACKFILL-2026-08-23.md`](../gates/EPISODE-BACKFILL-2026-08-23.md),
+> L5 coverage 21% → 95%). **The finding above survives the correction and is not weakened by
+> it**: the four contenders WERE measured against a bag-of-words floor, because at the time
+> they were measured there was no document index to compete with. That is why S1 was reopened,
+> and it stays the reason. What the fix changed is which space then had to prove itself — see
+> the note under point 3 below, and the l5 space's first real measurement in
+> [`../gates/SEM-L5-VS-AUX-2026-08-23.md`](../gates/SEM-L5-VS-AUX-2026-08-23.md) (l5 0.10
+> against aux's 0.53 — measured, not assumed).
 
 It failed silently because `_mint_now` wrapped the whole call in a bare `except`, which
 cannot tell *the daemon is down* from *the engine says never*. Those now get different
@@ -178,8 +198,11 @@ engine's own words, never asked again this process, and surfaced by
 `memory.capture_status()` and `verify_registry()`.
 
 **The space.** `aux-1024-v1` is the CPU sidecar's LFM embedding — the same door the
-archive uses, off the GPU, ~13 s to embed the whole live store. It is the only real
-embedder this box has while capture is refused.
+archive uses, off the GPU, ~13 s to embed the whole live store. It was the only real
+embedder this box had while capture was refused — and it stayed the armed one after capture
+came back, on a measurement rather than on inertia: the l5 space, scored for the first time
+once there were fresh `ep.l5` rows to score, came in at **0.10 against aux's 0.53**
+(2026-08-23, [`../gates/SEM-L5-VS-AUX-2026-08-23.md`](../gates/SEM-L5-VS-AUX-2026-08-23.md)).
 
 **The receipt** (`fixtures/sem/aux-receipt.json`, scored by `harness_tests/sem_aux.py`
 through the REAL seam, on the same frozen 160-query corpus that set the bar):
@@ -203,11 +226,34 @@ was a wrong answer first:
    injected an unrelated fact on **55%** of foreign queries — the *she recited a memory
    nobody asked about* bug, bought back. 0.40 is the most recall for which not one metric
    degrades. The sweep is in `semindex.aux_tau()`.
-3. **The query must land where the DOCUMENTS are.** `/v1/embed` still works (~1.47 s) while
-   `/v1/capture` does not: the engine can embed a QUERY and cannot embed a DOCUMENT.
-   Preferring it would spend 1.47 s of every turn on a vector with 57 stale rows to match.
-   `query_embed` prefers aux while armed — **and if capture is ever fixed, that order
-   must be measured again, not assumed back.**
+3. **The query must land where the DOCUMENTS are.** As written on 2026-08-23: `/v1/embed`
+   worked (~1.47 s) while `/v1/capture` did not, so the engine could embed a QUERY and not a
+   DOCUMENT. Preferring it would have spent 1.47 s of every turn on a vector with 57 stale
+   rows to match. `query_embed` prefers aux while armed — **and if capture is ever fixed,
+   that order must be measured again, not assumed back.**
+
+   > **THAT DEBT CAME DUE THE SAME DAY, AND IT WAS PAID — recorded here 2026-08-25 because
+   > this bullet was still describing the asymmetry as live.** Capture came back on
+   > 2026-08-23 (see the correction above) and the backfill gave 259 of her 274 live rows an
+   > `ep.l5` vector, so the stated reason for preferring aux at query time — *there is nothing
+   > on the document side to match* — stopped holding within hours. The re-measurement the
+   > clause demanded was then actually run, l5 query against l5 documents through the REAL
+   > seam, on the same frozen corpus:
+   > [`../gates/SEM-L5-VS-AUX-2026-08-23.md`](../gates/SEM-L5-VS-AUX-2026-08-23.md) —
+   > **l5 `seam_recall@1` 0.10, against lexical 0.46 and aux 0.53.** `query_embed`'s order is
+   > therefore **re-earned rather than inherited**, which is the whole thing this escape hatch
+   > was written to prevent, and the correct reading of the bullet above is now *"aux wins on
+   > quality"* and no longer *"aux wins because the alternative is empty"*.
+   >
+   > It was worth running for a second reason: the same measurement caught a regression the
+   > backfill had just created. `load()` kept one row per `(addr, ts)` with later-in-
+   > `KNOWN_MODELS` winning, and the tuple was ordered by when each space was ADDED
+   > (`HASH, AUX, L5`) — harmless while l5 was empty, and the instant it filled, her document
+   > index silently swapped to the space that measures 0.10 (`aux wins 274 → 19`,
+   > `l5 wins 53 → 308`). Nothing failed; she would simply have got quietly worse at
+   > remembering. Corrected to `(HASH, L5, AUX)` — precedence by MEASURED quality, in
+   > agreement with `query_embed` — and verified by mutation. **An assumed-back ordering would
+   > not have been caught by anything.**
 
 The S0 contract is untouched: derived, append-only, tombstone-blind, recomputable, cannot
 write the registry. An upgrade is an APPEND (`semindex.backfill_aux`), never an edit.

@@ -143,6 +143,37 @@ check("an inferred one is framed as her conclusion",
       "come to think" in block.split("quiet mornings")[0].rsplit("- ", 1)[-1]
       if "quiet mornings" in block else False, block)
 
+print("\n4d. HER OWN WORD OUTRANKS HER OWN GUESS IN HER OWN BLOCK (H6, 2026-08-25)")
+# The renderer read live_rows(testimony=False) — an undocumented default on a
+# MODEL-FACING surface, so a self-inference could take standing-context floor space on a
+# topic her own self-observation already covered: "I am terrified of open water" and
+# "I seem comfortable in open water" in one prefix, every turn. testimony_wins is
+# speaker-scoped, so flipping it True silences exactly that and nothing else — his rows
+# never enter this block, so his word silences nothing of hers here. Storage untouched:
+# the inference stays on disk, auditable, promotable. Mutant: flip render_self_model
+# back to live_rows() and the second check goes red by name.
+write_rows([
+    {"text": "I am terrified of open water", "speaker": "self", "lifecycle": 0,
+     "mem_class": "preference", "status": "observed", "ts": 70},
+    {"text": "I seem comfortable in open water", "speaker": "self", "lifecycle": 0,
+     "mem_class": "preference", "status": "inferred", "ts": 71},
+])
+block = render_self_model()
+check("her self-OBSERVATION takes the floor", "terrified of open water" in block, block)
+check("her covered self-INFERENCE does not speak over it",
+      "comfortable in open water" not in block, block)
+# ...and an inference on a topic she has NOT spoken to still appears (fails safe in the
+# quiet direction only — an uncovered conclusion is still hers to hold in the block).
+write_rows([
+    {"text": "I am terrified of open water", "speaker": "self", "lifecycle": 0,
+     "mem_class": "preference", "status": "observed", "ts": 72},
+    {"text": "I seem drawn to quiet mornings", "speaker": "self", "lifecycle": 0,
+     "mem_class": "preference", "status": "inferred", "ts": 73},
+])
+block = render_self_model()
+check("an UNCOVERED self-inference still reaches the block",
+      "quiet mornings" in block, block)
+
 print("\n5. ONE DOOR — both tools land in the same store")
 src_sm = io.open(os.path.join(ROOT, "harness", "personality", "self_model.py"),
                  encoding="utf-8").read()
@@ -152,8 +183,10 @@ check("...and the renderer no longer reads the OKF self tier",
       "SelfModelStore(root).self_facts()" not in src_sm)
 check("the registry is read through memory's own reader, not a second parser",
       "from harness.skills import memory as M" in src_sm
-      and "M.live_rows()" in src_sm)     # live_rows: the shared tombstone predicate
-                                         # (was M._load() + a private lifecycle filter)
+      and "M.live_rows(testimony=True)" in src_sm)
+                                         # live_rows: the shared tombstone predicate
+                                         # (was M._load() + a private lifecycle filter;
+                                         # testimony=True since 2026-08-25 — §4d above)
 
 print("\n6. AND IT REACHES THE PREFIX")
 # The renderer working is a different claim from the block being in what she is SENT.

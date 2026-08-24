@@ -107,6 +107,11 @@ class SPDaemonClient:
         # KAIROS: the last turn's continuation impulse from the daemon's `kairos` SSE
         # event ({"eot_margin", "n_gen", "eot_bias"}), or None when SP_KAIROS is off.
         self.last_kairos: Optional[Dict[str, Any]] = None
+        # CONTEXT: what the last call had to drop to fit under pmax, or None. Same shape
+        # of contract as last_kairos above and read the same way (app.py), because it is
+        # the same kind of fact: something the engine did to this turn that the room has
+        # to be able to say out loud. harness/inference/context.py owns the rule.
+        self.last_trim: Optional[Dict[str, Any]] = None
         self._client = httpx.Client(timeout=timeout) if httpx else None
         # THE SEAM, NAMED (2026-08-21): every backend says what it is and what it can
         # do; the sp-daemon can do everything (harness/inference/backends).
@@ -135,6 +140,32 @@ class SPDaemonClient:
 
         cfg = config or InferenceConfig()
         body = cfg.to_sp_chat(prompt=prompt, messages=messages, prompt_tokens=prompt_tokens)
+        # ── THE CEILING, COUNTED (2026-08-23) ────────────────────────────────────────
+        # Past pmax the daemon declines the prefill and returns an EMPTY stream in 11 ms,
+        # which the room used to render as her having nothing to say. THIS is the door
+        # every caller reaches the engine through — the turn, its tool rounds, the kairos
+        # continuation, the speak-up — so counting here is counting once. See
+        # harness/inference/context.py for the whole incident and the estimator's receipt.
+        # STICKY UNTIL CONSUMED, not reset per call (2026-08-24 audit, T8). This reset
+        # ran at the top of EVERY chat_stream call — and a turn is several calls (tool
+        # rounds), so a trim in round 0 was erased by round 2 and the room was never
+        # told. The consumer (app.py's `_run`) reads it once per TURN and clears it;
+        # a per-call reset here was the wrong lifetime for a per-turn fact. (Two truly
+        # concurrent turns can still race the one slot — the client is process-wide —
+        # which is the same singleton limit last_kairos has always had; noted, not
+        # solved, because the honest fix is a per-turn receipt object.)
+        if body.get("messages"):
+            from harness.inference import context as _ctx
+            fitted, _trim = _ctx.fit(body["messages"],
+                                     reply_headroom=int(body.get("max_tokens") or 0)
+                                     or _ctx.DEFAULT_REPLY_HEADROOM)
+            if _trim:
+                body["messages"] = fitted
+                self.last_trim = _trim
+                logger.warning("[SPDaemonClient] CONTEXT TRIM: dropped %d older message(s) "
+                               "to fit pmax — est %d -> %d of %d budget",
+                               _trim["dropped"], _trim["before"], _trim["after"],
+                               _trim["budget"])
         logger.info("[SPDaemonClient] -> daemon: keys=%s eot_bias=%s max_tokens=%s temp=%s rep=%s msgs=%d",
                     sorted(body.keys()), body.get("eot_bias"), body.get("max_tokens"),
                     body.get("temperature"), body.get("repetition_penalty"),
@@ -175,6 +206,36 @@ class SPDaemonClient:
                         (body.get("messages") or [{}])[-1].get("role", "?"))
         except Exception:
             pass                       # instrumentation must never break a turn
+
+        # ── SP_DUMP_PROMPT (2026-08-24): the exact message list, per call ────────────
+        # The daemon says `PERSIST-KV: rewind(15) refused` every turn: the prompt diverges
+        # from the committed cache by 15-55 tokens and the SWA undo-journal is cleared at
+        # commit, so nothing under REWIND_BOUND can be rewound either. Only drop == 0
+        # takes the cheap path.
+        #
+        # WHICH 15 TOKENS was not answerable from any log. This writes the outgoing list
+        # so two consecutive calls can be diffed and the rewrite NAMED rather than
+        # guessed at. Off unless the variable is set; a dump that can break a turn is
+        # worse than no dump, so everything here is inside the same try.
+        try:
+            _dump = os.environ.get("SP_DUMP_PROMPT", "")
+            if _dump:
+                os.makedirs(_dump, exist_ok=True)
+                _have = sorted(f for f in os.listdir(_dump) if f.endswith(".json"))
+                # BOUNDED (2026-08-24). Each dump is the whole prompt — ~32 KB — and a
+                # night of kairos turns would leave hundreds. A diagnostic that fills
+                # the disk it is diagnosing is not a diagnostic. Keep the last 60.
+                for _old in _have[:-60]:
+                    try:
+                        os.remove(os.path.join(_dump, _old))
+                    except OSError:
+                        pass
+                _n = (int(_have[-1][1:4]) + 1) if _have else 0
+                with open(os.path.join(_dump, "p%03d.json" % _n), "w",
+                          encoding="utf-8") as _f:
+                    json.dump(body.get("messages") or [], _f, ensure_ascii=False, indent=1)
+        except Exception:
+            pass
 
         text_parts: List[str] = []
         chat_id: Optional[int] = None

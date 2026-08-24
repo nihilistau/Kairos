@@ -61,6 +61,12 @@ class OpenAIClient:
         self.timeout = timeout
         self.default_model = default_model or _env("SP_ENGINE_MODEL", "")
         self.last_kairos: Optional[Dict[str, Any]] = None
+        # ALWAYS None here, and that is the honest answer rather than a missing attribute.
+        # The context trim (harness/inference/context.py) is a fact about the sp-daemon's
+        # pmax — a fixed position ceiling with no truncation of its own. A foreign endpoint
+        # has its own window and its own policy for overrunning it, and inventing a trim
+        # on its behalf would be this harness lying about someone else's engine.
+        self.last_trim: Optional[Dict[str, Any]] = None
         self.supports = caps_for("openai", _env("SP_ENGINE_DIALECT"),
                                  _env("SP_ENGINE_VISION", "0") == "1")
         self._open: Dict[int, Any] = {}          # chat_id -> the live response (for abort)

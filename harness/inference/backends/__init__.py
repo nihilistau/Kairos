@@ -9,6 +9,8 @@ SPDaemonClient surface:
     abort(chat_id) -> bool                metrics() -> dict        health() -> bool
     subscribe_events(want=, timeout=) -> Generator[StreamEvent]
     last_kairos: dict | None              kind: str               supports: frozenset[str]
+    last_trim: dict | None                what the last call dropped to fit pmax (sp only;
+                                          always None on openai — see that file's note)
 
 `kind` is "sp" (the Rust sp-daemon — everything) or "openai" (any /v1/chat/completions
 server: llama.cpp, vLLM, LM Studio, a cloud). `supports` is the honest list of what the

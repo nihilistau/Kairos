@@ -51,7 +51,8 @@ revisited. The fix is measurement and composition, not another rule.**
 
 - **persona.md IS a living system prompt.** Prose voice + a machine state block (mood / voice /
   traits) that SHE mutates — spontaneously via `[MOOD:]/[VOICE:]/[TRAIT:±]` tags (parsed,
-  stripped, persisted by the priority-72 interceptor) and deliberately via four advertised
+  stripped and persisted by personality/interceptor.py's recognisers at the post-turn
+  spine; the old priority-72 pipeline interceptor was deleted 2026-08-24 — audit B4a) and deliberately via four advertised
   tools (`adjust_mood`, `set_voice`, `set_trait`, `remember_self`), spine-verified with
   receipts and a live UI event.
 - **NIGHTSHIFT curates her.** `consolidate_personality` extracts the session's shifts, prunes

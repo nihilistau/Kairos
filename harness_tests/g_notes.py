@@ -30,7 +30,18 @@ from harness.skills import notes as N            # noqa: E402
 from harness.skills import note_tools as T       # noqa: E402
 from harness.skills import lifecycle as lc       # noqa: E402
 from harness.skills.duetime import parse_due     # noqa: E402
-from harness.kairos import impulse as I          # noqa: E402
+from harness.kairos import impulse as I
+# SYNTHETIC CLOCKS (2026-08-22, converged on the house idiom 2026-08-23): a fresh
+# TurnState's clocks default to impulse.BOOT_AT, the real monotonic boot time (a1ecf2a
+# — "a zero clock fails OPEN"), which sits in the FUTURE of the small fixtures below
+# and silenced the whole reminder leg with a nonsense cooldown (~98000s left). Pin the
+# boot to t=1.0 for this process: non-zero, so the no-zero-clock rule is still exercised,
+# and before every `now` this gate uses. THE SAME PIN as g_kairos_latch / _presence /
+# _reasons / _policy / _tick / g_tuning — one idiom, seven gates. This gate was the
+# seventh a1ecf2a left behind and was first fixed by offsetting the fixture instead;
+# two answers to one question is the thing AGENTS.md 0 is about, so it converged.
+import harness.kairos.impulse as _imp_pin  # noqa: E402
+_imp_pin.BOOT_AT = 1.0          # noqa: E402
 
 PASS, FAIL = [], []
 
@@ -47,9 +58,27 @@ def _iso(dt):
 def main() -> int:
     print("G-NOTES - the board, and the promise.\n")
 
+    # ── A STRANDED .tmp IS EVIDENCE, NOT LITTER (2026-08-25; H4's second lane) ──
+    # memory._save_all got the rescue on 2026-08-24 and its own comment said "shared
+    # with notes._write_all ... or the doctrine holds in one of two lanes and thus
+    # neither" — this plants the crash leftover BEFORE the first board write, so the
+    # first real _write_all below must quarantine it instead of open(tmp,"w")-ing over
+    # the only record of what a dying process was about to commit. Checked after the
+    # first add. Mutant: drop rescue_stray_tmp() from notes._write_all and the
+    # quarantine check goes red by name.
+    _stranded = N._store() + ".tmp"
+    os.makedirs(os.path.dirname(_stranded), exist_ok=True)
+    with open(_stranded, "w", encoding="utf-8") as _f:
+        _f.write('{"title": "the dying process\'s candidate board"}\n')
+
     # ── STORE ───────────────────────────────────────────────────────────────────
     N.set_author(N.SPEAKER_USER)
     a = N.add("Buy a 3090 if stock returns", body="He is on a 2060 6GB", category="idea")
+    import glob as _glob
+    _strays = _glob.glob(_stranded + ".stranded-*")
+    check("a stranded notes .tmp is QUARANTINED by the first write, contents intact",
+          _strays and "dying process" in open(_strays[0], encoding="utf-8").read(),
+          _strays or "the crash leftover was clobbered")
     check("a note goes on the board", bool(a["id"]) and a["category"] == "idea")
     check("...stamped with WHO put it there", a["speaker"] == "user", a["speaker"])
     check("...and coloured by category", a["colour"] == N.CATEGORY_COLOUR["idea"])
@@ -119,14 +148,7 @@ def main() -> int:
     check("...and one that is not yet due does not", all(n["due_at"] <= _iso(
         datetime.now(timezone.utc)) for n in d))
 
-    # ── THE SYNTHETIC CLOCK MUST START AFTER BOOT (2026-08-22) ─────────────────
-    # TurnState's clocks all default to impulse.BOOT_AT (a monotonic reading, ~1e5 on a
-    # box that has been up a day) so that nothing fires into a cold prefix on a bounce.
-    # This section had been passing now=1000.1 — a moment BEFORE boot — which makes
-    # (now - last_spoke_at) hugely negative, so every cooldown reports ~98000s left and
-    # the reminder leg of this gate had been red since BOOT_AT landed. The times below
-    # are offsets from boot, which is what the running scheduler always passes.
-    T0 = I.BOOT_AT + 1000.0
+    T0 = 1000.0
     cfg = I.KairosConfig(enabled=True, cooldown_s=0.0)
     st = I.TurnState()
     I.note_user(st, T0)

@@ -31,6 +31,15 @@ from harness.inference.inference_config import InferenceConfig
 
 logger = logging.getLogger(__name__)
 
+# THE BUDGET'S LAST RESORT (2026-08-24 audit, S4). Both tool loops read
+# agent.tool_budget_s from the tuning registry and both fell back to a hand-copied
+# 150.0 if the registry failed to import — the number the registry itself moved OFF
+# because it was measured to break the feature ("150 s bought ONE round ... the
+# opposite of the request, and invisible without reading the log"). A fallback that
+# reverts to the measured-bad value on an import error is a regression with a fuse.
+# One constant, the registry's own number, both loops.
+TOOL_BUDGET_FALLBACK_S = 400.0
+
 # Gemma-native: the model wraps calls in a ```tool_code fenced block (Python-style
 # calls), and results return in ```tool_output. This is what Gemma is trained to emit.
 # We also accept the legacy <tool …>{json}</tool> form as a fallback.
@@ -588,15 +597,19 @@ def run_with_tools(
     # not on the path she uses when he is asleep.
     #
     # Same knob, deliberately. Two dials for one budget is how they drift.
-    max_seconds: float = 0.0,     # 0 = read agent.tool_budget_s
+    max_seconds: float = 0.0,     # 0 = read agent.tool_budget_s (fallback: TOOL_BUDGET_FALLBACK_S)
     on_tool: Optional[Callable[[str, dict, str], None]] = None,
     system_prefix: str = "",
+    prebuilt_system: "tuple|None" = None,
 ) -> str:
     """Run an ephemeral tool-calling loop and return the final assistant text.
 
     CALLED BY: the CLI coder, agent reply paths.
     EMITS: ``on_tool(name, args, result)`` per call.
     `system_prefix` (e.g. an identity/behaviour prompt) is merged into the single system turn.
+    `prebuilt_system` is agent.system_bundle()'s (content, index) — passed by the
+    default-toolset caller so this loop serves the SAME cached, versioned prefix as the
+    streaming path (2026-08-24 audit: three builders of one prompt became one).
     """
     client = client or get_client()
     cfg = config or InferenceConfig()
@@ -606,14 +619,17 @@ def run_with_tools(
     # but because a system prompt that differs between paths diverges the persist-KV cache
     # at token 0 and re-prefills the whole conversation. That bug cost 111 seconds a turn
     # last time; it is not going to be reintroduced by a personality fix.
-    try:
-        from harness.agent import voice_coda as _coda
-        _suffix = _coda()
-    except Exception:
-        _suffix = ""
-    sys_content, tool_index = build_tool_system(tools, extra_tools or [],
-                                                system_prefix=system_prefix,
-                                                system_suffix=_suffix)
+    if prebuilt_system is not None:
+        sys_content, tool_index = prebuilt_system
+    else:
+        try:
+            from harness.agent import voice_coda as _coda
+            _suffix = _coda()
+        except Exception:
+            _suffix = ""
+        sys_content, tool_index = build_tool_system(tools, extra_tools or [],
+                                                    system_prefix=system_prefix,
+                                                    system_suffix=_suffix)
     system = {"role": "system", "content": sys_content}
 
     convo = list(messages)
@@ -627,7 +643,7 @@ def run_with_tools(
             from harness.tuning import registry as _tn
             max_seconds = float(_tn.get("agent.tool_budget_s"))
         except Exception:
-            max_seconds = 150.0
+            max_seconds = TOOL_BUDGET_FALLBACK_S
     import time as _time
     _loop_started = _time.time()
     _out_of_time = False
@@ -720,6 +736,12 @@ def run_with_tools(
             spec = resolve_tool(tool_index, name)
             result = spec.call(*args, **kwargs) if spec else \
                 unknown_tool_note(tool_index, name)
+            # every call, by name, at the call site — the twin of agent.py's line
+            # (2026-08-24 audit, standing item 4)
+            logger.info("[tools] tool %s(%s) -> %.80s", name,
+                        ", ".join([repr(a) for a in args]
+                                  + ["%s=%r" % kv for kv in kwargs.items()])[:120],
+                        str(result).replace("\n", " "))
             if on_tool:
                 on_tool(name, {"args": args, "kwargs": kwargs}, result)
             outputs.append(f"{name} -> {result}")

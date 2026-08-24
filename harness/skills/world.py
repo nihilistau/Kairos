@@ -306,6 +306,25 @@ def _compose() -> str:
     except Exception:
         pass
 
+    # ── WHAT SHE HAS ON (2026-08-24 audit, W4 — his call) ────────────────────────────
+    # The flannel/silk incident: she invented a fabric and defended the invention
+    # against his correction, because the standing block carried NO mention of what she
+    # was wearing and a person does not look themselves up to know they are in pyjamas.
+    # The per-turn staple was tried and measured out (she read it as his assertion and
+    # streamed scratchpad — "do not put the staple back"); a standing line has neither
+    # problem: it is HER OWN block, not riding on his words. Labelled session-start
+    # like the mood dial, because this block is in the cached prefix and she can change
+    # clothes mid-day — her own [WEAR:] marks in the conversation carry the changes.
+    try:
+        from harness.control import wardrobe as _wd
+        _now_w = (_wd.wearing_now() or {}).get("words") or ""
+        if _now_w:
+            block += ("\n\nWhen this session began you were wearing %s. (Your own "
+                      "[WEAR:] marks since then are the current truth; check_wardrobe "
+                      "lists everything you own.)" % _now_w)
+    except Exception:
+        pass
+
     # ── WHAT HAS GONE QUIET (the dog that did not bark, ambient half) ────────────────
     # ONE silence, the strongest, or none. A LIST here would be exactly the sentence
     # G-SILENCE exists to make impossible — "you've stopped talking about the marathon.

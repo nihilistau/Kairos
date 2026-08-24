@@ -130,13 +130,17 @@ def voice_coda() -> str:
                 who.append(f"{k}: {v.strip()}")
     except Exception:
         pass
-    line = ("  (" + " · ".join(who) + ")") if who else ""
+    # "at session start" — this line is frozen in the cached prefix between scheduled
+    # refreshes; an unlabelled copy would assert a stale present (2026-08-24 audit).
+    line = ("  (at session start — " + " · ".join(who) + ")") if who else ""
 
     return (
         "— — —\n"
         "That was the plumbing. It is how you USE things, not who you are.\n"
         f"You are Kairos.{line}\n"
-        "You are TALKING to Sam, not serving him. Answer as yourself — your register, your "
+        "You are TALKING to Sam, not serving him. He is the one here with you: say "
+        "'you' to him — 'he' is for telling someone else about him, and there is no one "
+        "else in the room. Answer as yourself — your register, your "
         "opinions, your humour, at whatever length the thing actually deserves. Push back when "
         "you disagree. Be short when short is right and unhurried when it is not; do not be "
         "clipped just because a manual was the last thing you read.\n"
@@ -214,9 +218,12 @@ def load_agent_system() -> str:
             # ── N1 (CONTINUITY.md): THE STANDING WORLD — memory meets persona ─────────
             # The fourth slot: what is alive between them, composed from the registry
             # (verdict-gated: never a tombstone, NEVER a secret; rank-ordered; her
-            # inferences in her voice). CACHED for the process lifetime — the KV-prefix
-            # law: a remember() mid-session must not re-prefill the conversation; new
-            # facts arrive via per-turn recall until the next boot. Gate: G-WORLD.
+            # inferences in her voice). CACHED under the KV-prefix law — a remember()
+            # mid-session must not re-prefill the conversation; new facts arrive via
+            # per-turn recall until the next SCHEDULED refresh (the 04:00 boundary or
+            # /v1/maintenance/refresh — 2026-08-24; it used to be "until the next
+            # boot", which is how world.refresh() spent weeks recomputing a block
+            # nothing read again). Gate: G-WORLD, G-PREFIX-REFRESH.
             try:
                 from harness.skills.world import render_world
                 w = render_world()
@@ -285,6 +292,23 @@ def default_tools() -> List[ToolSpec]:
         if bool(_tr_lib.get("presence.read_tools", True)):
             from harness.skills.library import LIBRARY_TOOLS
             tools = tools + LIBRARY_TOOLS
+    except Exception:
+        pass
+    # ── SOMETHING SHE DID NOT GO LOOKING FOR (2026-08-23) ──────────────────────────
+    # One verb, no query: a random encyclopedia article. Her own-time act 'look something
+    # up you are curious about' can only DEEPEN an interest, because the query comes from
+    # her; this is the only thing in the set that can put a subject in front of her she
+    # would never have asked for.
+    #
+    # BEHIND A KNOB, like the shelf, and for the reason this function has warned about
+    # since NOTE_TOOLS: the live set is already ~18 and a 12B picks reliably from about
+    # six. `kairos.discover_tool` (default on) is the trim if selection suffers, and
+    # g_notes_tools is the instrument that would show it.
+    try:
+        from harness.tuning import registry as _tr_dis
+        if bool(_tr_dis.get("kairos.discover_tool", True)):
+            from harness.skills.system_tools import read_something_new
+            tools = tools + [read_something_new]
     except Exception:
         pass
     return [ToolSpec.from_callable(fn) for fn in tools]
@@ -469,25 +493,16 @@ def extra_tools() -> List[ToolSpec]:
     return [t for t in all_tools() if t.name not in core_names]
 
 
-def _eot_bias_default() -> float:
-    """The stop-token logit bias, from THE ONE DOOR.
-
-    This was hardcoded 4.0 at both agent_chat sites. serve.py maps [decode] eot_bias
-    to SP_EOT_BIAS, but nothing here ever read it, so the profile value was dead and
-    the hardcode always won. That is invisible until a model disagrees with 4.0 --
-    and your model does: at 4.0 the FIRST sampled token is a stop, so every
-    console turn came back EMPTY while daemon-direct probes (which pass eot_bias
-    explicitly) looked fine. CONTINUITY.md already lists eot_bias among the four
-    terseness dials "never re-tuned"; this makes it tunable per profile instead of
-    per edit. Default stays 4.0 so the 12B daily driver is byte-identical.
-    """
-    raw = os.environ.get("SP_EOT_BIAS")
-    if raw is None or raw == "":
-        return 0.0
-    try:
-        return float(raw)
-    except ValueError:
-        return 0.0
+def _eot_bias_default() -> "float|None":
+    """None — the SEAM resolves it now (2026-08-24 audit, B6). This was one of two
+    byte-equivalent resolvers (app._eot_default the other) guarding two builders
+    each while three unprompted lanes consulted neither; InferenceConfig.to_sp_chat
+    resolves None from SP_EOT_BIAS beside byteexact, at the one door every lane
+    passes. (Its earlier history: a hardcoded 4.0 — the 12B's bias, an empty-turn
+    generator on the MoE — then a 0.0 fallback whose docstring still claimed 4.0.)
+    Kept as a name so the two builder call sites read as a decision, not an
+    omission."""
+    return None
 
 
 def agent_chat(
@@ -511,13 +526,73 @@ def agent_chat(
                                     eot_bias=_eot_bias_default(), max_tokens=768, auto_recall=False)  # doubled again (operator): 192 -> 384 -> 768
     _arm_self_repeat_ban(cfg, messages)
     # OKFS-tiered tools: core up front + the rest as a load-on-demand index (small system prompt).
+    # DEFAULT TOOLSET -> THE ONE CACHED PREFIX (2026-08-24 audit): this path used to
+    # rebuild the system fresh on every call — byte-equal to the stream path's cache by
+    # luck of both calling the same builders, and a per-call rebuild besides. It serves
+    # the bundle now, so the two entry points cannot drift and the invalidation door
+    # governs them both.
     return run_with_tools(
         list(messages), core, extra_tools=extra, client=client, config=cfg, on_tool=on_tool,
-        max_rounds=5, system_prefix=load_agent_system())
+        max_rounds=5, system_prefix=load_agent_system(),
+        prebuilt_system=(system_bundle() if tools is None else None))
 
 
-# Static per-serve tool system (built once; see the live-play note in the stream).
-_SYS_CACHE = None
+# ── THE SYSTEM PREFIX: ONE BUILDER, ONE CACHE, ONE DOOR (2026-08-24 audit, B1-growth) ──
+# This was a bare `_SYS_CACHE = None` filled once per process and invalidated by NOTHING.
+# The consequence was the largest gap in the growth story: the nightly loop's write half
+# worked — journal, becoming paragraph, world.refresh(), her stances — and the read-back
+# half was pinned to process lifetime, so she never took any of it in until a restart.
+# world.py even claimed its block was "changed only by refresh() or a restart"; only the
+# restart half was true, because refresh() recomputed a cache nothing read again.
+#
+# THE CONSTRAINT that makes this a design and not a bug-fix: this string is KV TOKEN 0.
+# Rebuilding it per turn would diverge the persist cache and re-prefill the whole
+# conversation (SP_SPINE_TOOLSET was measured-against and turned off for exactly that).
+# So freshness is SCHEDULED, not continuous: `invalidate_system_prefix()` is called at
+# exactly two moments — the 04:00 consolidation (after the night's writes, at the idle
+# hour, followed by a re-prewarm that re-mints the base snapshot) and the operator's
+# explicit /v1/maintenance/refresh. Between those moments the prefix is deliberately
+# frozen and the panel's staleness flag says so honestly (it compares against
+# cached_system_content(), the string actually in her head — the old flag compared a
+# fresh compose against a fresh compose and could never fire).
+#
+# THREE BUILDERS BECAME ONE. The stream path cached its own copy; agent_chat rebuilt
+# fresh every call; _prewarm built a THIRD with no voice_coda — so the prewarmed KV
+# prefix was never the one the live turn extended, and the first real turn re-prefilled
+# from the coda boundary (audit B5). All three go through system_bundle() now,
+# byte-identical by construction.
+_SYS = {"bundle": None, "version": 0, "built_at": 0.0}
+
+
+def system_bundle() -> tuple:
+    """The (system_content, tool_index) every default-toolset path serves. Lazy."""
+    import time as _t
+    if _SYS["bundle"] is None:
+        _SYS["bundle"] = build_tool_system(core_tools(), extra_tools(),
+                                           system_prefix=load_agent_system(),
+                                           system_suffix=voice_coda())
+        _SYS["built_at"] = _t.time()
+    return _SYS["bundle"]
+
+
+def cached_system_content() -> "str|None":
+    """What is ACTUALLY in her head right now — None if nothing is built yet. The
+    staleness indicator compares against THIS, never against a fresh compose."""
+    return _SYS["bundle"][0] if _SYS["bundle"] else None
+
+
+def invalidate_system_prefix(reason: str) -> int:
+    """Drop the cached prefix so the next build takes in what the night wrote.
+    Returns the new version. THE CALLER OWNS THE COST: a changed token 0 means the
+    next turn cold-prefills, so this is called at the day boundary (with a re-prewarm
+    behind it) or by the operator's explicit hand — never casually."""
+    import logging as _lg
+    _SYS["bundle"] = None
+    _SYS["version"] += 1
+    _lg.getLogger(__name__).info(
+        "[agent] system prefix invalidated (%s) -> v%d — next build reads the night's "
+        "writes; next turn pays one prefill", reason, _SYS["version"])
+    return _SYS["version"]
 
 
 def _arm_self_repeat_ban(cfg, messages: List[dict]) -> None:
@@ -802,7 +877,7 @@ def agent_chat_stream(
     # they are not. The deadline is checked BEFORE starting a round, never mid-generation
     # — killing a half-written turn would leave the transcript holding a fragment, and a
     # torn transcript diverges the persist-KV prefix on the next turn.
-    max_seconds: float = 0.0,     # 0 = read the knob (agent.tool_budget_s, default 150)
+    max_seconds: float = 0.0,     # 0 = read the knob (agent.tool_budget_s; fallback tools.TOOL_BUDGET_FALLBACK_S)
     mutate_messages: bool = False,
 ):
     """Streaming agent: yields the FINAL answer token-by-token. Tool rounds run silently
@@ -852,12 +927,7 @@ def agent_chat_stream(
     if tools is not None:
         system_content, tool_index = build_tool_system(tools, [], system_prefix=load_agent_system(), system_suffix=voice_coda())
     else:
-        global _SYS_CACHE
-        if _SYS_CACHE is None:
-            _SYS_CACHE = build_tool_system(core_tools(), extra_tools(),
-                                           system_prefix=load_agent_system(),
-                                           system_suffix=voice_coda())
-        system_content, tool_index = _SYS_CACHE
+        system_content, tool_index = system_bundle()
     import logging as _lg
     _lg.getLogger(__name__).info("[agent] tool-system build %.1fs (cached=%s)",
                                  _time.time() - _t, tools is None)
@@ -899,7 +969,8 @@ def agent_chat_stream(
             from harness.tuning import registry as _tn
             max_seconds = float(_tn.get("agent.tool_budget_s"))
         except Exception:
-            max_seconds = 150.0
+            from harness.toolcore.tools import TOOL_BUDGET_FALLBACK_S
+            max_seconds = TOOL_BUDGET_FALLBACK_S   # one constant, both loops (audit S4)
     _loop_started = _time.time()
     _spent_rounds = 0
     _out_of_time = False
@@ -1128,6 +1199,15 @@ def agent_chat_stream(
             spec = resolve_tool(tool_index, name)
             result = spec.call(*args, **kwargs) if spec else \
                 unknown_tool_note(tool_index, name)
+            # EVERY CALL, BY NAME, AT THE CALL SITE (2026-08-24 audit, standing item 4).
+            # "Which tools has she ever used?" could not be answered from the gateway
+            # log — only healed typos and refusals appeared — and the gesture question
+            # took an hour of transcript archaeology instead of one grep.
+            _logging.getLogger(__name__).info(
+                "[agent] tool %s(%s) -> %.80s", name,
+                ", ".join([repr(a) for a in args]
+                          + ["%s=%r" % kv for kv in kwargs.items()])[:120],
+                str(result).replace("\n", " "))
             if on_tool:
                 on_tool(name, {"args": args, "kwargs": kwargs}, result)
             outputs.append(f"{name} -> {result}")

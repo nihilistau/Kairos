@@ -67,8 +67,11 @@ def _reg_path() -> str:
     return os.environ.get("SP_RECALL_REGISTRY", "")
 
 
-def _load() -> List[dict]:
-    p = _reg_path()
+def _load(path: str = "") -> List[dict]:
+    # `path` (2026-08-24 audit, C): callers with an explicit registry (gates, PersonModel
+    # pointed at a fixture) come through the same parser as everyone else instead of
+    # keeping a private JSONL loop. Default is the live registry, as ever.
+    p = path or _reg_path()
     if not p or not os.path.exists(p):
         return []
     eps = []
@@ -155,6 +158,26 @@ def capture_status() -> dict:
     return dict(_CAPTURE_REFUSED)
 
 
+def eps_root() -> str:
+    """Where episodes live. Beside the registry unless told otherwise.
+
+    AN EPISODE IS BIG AND COLD: ep.k + ep.v at full depth per position, mean 11.1 MB
+    over her real ones, written once and read only on a deep recall. That is exactly
+    the shape you want OFF the working drive, and this box has a 32 GB Optane sitting
+    idle (F:). MEASURED at that shape (tools/disk_bench.py, unbuffered): F: writes at
+    0.30 GB/s and random-reads 2.84 MB blocks at 1.36 GB/s -- slower than D:, and far
+    too slow to stream EXPERTS from, which is why that idea was measured and dropped.
+    For an 11 MB write-once blob it is ample: ~37 ms to mint, ~8 ms to read back.
+
+    The row carries its own absolute `dir`, so moving the root does not orphan
+    anything already written -- old episodes stay where they are and are still found.
+    """
+    d = (os.environ.get("SP_EPS_DIR") or "").strip()
+    if d:
+        return d.replace("\\", "/").rstrip("/")
+    return os.path.join(os.path.dirname(_reg_path()), "eps").replace("\\", "/")
+
+
 def _mint_now(daemon: str, fact: str, out_dir: str):
     """The blocking capture. Still used when async is off (gates that want determinism) and by the
     background worker, which is the only place it belongs.
@@ -171,6 +194,59 @@ def _mint_now(daemon: str, fact: str, out_dir: str):
     if _CAPTURE_REFUSED["why"]:
         _CAPTURE_REFUSED["n"] += 1        # counted, not retried: the engine already said no
         return 0, False
+    # ── THE DISK FLOOR (2026-08-23, the day the mint came back). ──────────────────
+    # An episode is not small: MEASURED over her 51 real ones, mean 11.1 MB and max
+    # 79.1 MB (ep.k + ep.v are the full-depth K/V rows for every position). While
+    # /v1/capture was refusing on the MoE this cost nothing, and the drive filled up
+    # for other reasons — 930 of 932 GB, 2.57 GB free, about 231 episodes of headroom.
+    # Turning the mint back on without a floor would quietly spend that in a week.
+    #
+    # A FULL DISK IS NOT A MEMORY PROBLEM, it is an everything problem: the gateway
+    # log, the KV snapshot capture and the registry write all fail on it, and the
+    # registry write is the one that would actually lose something of hers. So the
+    # mint yields first. The row still lands with npos=0 — recall is text + semantic,
+    # no episode — which is exactly the documented degradation for "no engine, no
+    # mint", reached by a different road.
+    #
+    # Said ONCE through the same breaker as a structural refusal, because "the disk is
+    # full" is also a standing no rather than a transient one; it clears on restart,
+    # by which time somebody has either freed space or not.
+    #
+    # THE PROBE IS INSIDE THE try; THE REFUSAL IS NOT. First draft put the whole thing
+    # in one try/except and called a `logger` this module does not have — the NameError
+    # was swallowed by the except, execution fell through, and the mint ran anyway. A
+    # guard whose failure mode is "no guard" is worse than no guard, because it reads
+    # like protection. So: measure defensively, decide in the open.
+    # ...AND THE PROBE MUST ASK A DIRECTORY THAT EXISTS. `out_dir` is the episode dir
+    # and it has NOT been created yet at this point, so disk_usage() on it (or on its
+    # parent, the first time) raises and the guard silently skips — measured: the floor
+    # set to an impossible 9000 GB and the mint ran anyway, npos=12. Walk up to the
+    # nearest ancestor that exists; the free space of any of them is the same volume.
+    _free_gb = None
+    try:
+        import shutil
+        _p = os.path.abspath(out_dir)
+        for _ in range(6):
+            if os.path.isdir(_p):
+                break
+            _up = os.path.dirname(_p)
+            if _up == _p:
+                break
+            _p = _up
+        _free_gb = shutil.disk_usage(_p if os.path.isdir(_p) else ".").free / 1e9
+    except Exception:
+        _free_gb = None                   # a broken probe must never block a memory
+    if _free_gb is not None:
+        try:
+            _floor = float(os.environ.get("SP_CAPTURE_MIN_FREE_GB", "2") or 2)
+        except ValueError:
+            _floor = 2.0
+        if _free_gb < _floor:
+            why = ("disk floor: %.2f GB free, below the %.2f GB floor — the mint yields "
+                   "so the registry write does not fail. Rows land with npos=0; recall is "
+                   "text + semantic until there is room." % (_free_gb, _floor))
+            _CAPTURE_REFUSED.update(why=why, at=time.time(), n=1)
+            return 0, False
     try:
         body = json.dumps({"text": fact, "out_dir": out_dir}).encode()
         req = urllib.request.Request(
@@ -262,6 +338,47 @@ def mint_drain_blocking(timeout: float = 30.0) -> bool:
     return _MINT_Q.qsize() == 0
 
 
+# ── A STRANDED .tmp IS EVIDENCE, NOT LITTER (2026-08-24 audit, H4) ─────────────────────
+# tmp+os.replace means a crash between the write and the replace leaves `<store>.tmp` on
+# disk — a complete candidate registry that never became the registry. One is sitting in
+# the live var/memory right now. The next _save_all would open that same path "w" and
+# SILENTLY OVERWRITE it: the only record of what the dying process was about to commit,
+# gone, from the store whose one doctrine is that nothing is destroyed. So the first
+# write per path per process moves it aside to a timestamped quarantine name and says so
+# in the log. Never deleted, never auto-restored — restoring would resurrect a rewrite
+# whose context is unknowable; the operator can diff it against the store at leisure.
+# Checked once per path per process: a crash kills the process, so the next stranding
+# can only be met by a fresh process. Shared with notes._write_all — ONE implementation,
+# both tmp+replace writers, or the doctrine holds in one of two lanes and thus neither.
+_TMP_RESCUED: set = set()
+
+
+def rescue_stray_tmp(path: str) -> str:
+    """Quarantine a stranded `path + '.tmp'` (crash leftover). Returns the quarantine
+    filename, or '' when there was nothing to rescue. Logged, never silent."""
+    if not path or path in _TMP_RESCUED:
+        return ""
+    _TMP_RESCUED.add(path)
+    tmp = path + ".tmp"
+    try:
+        if not os.path.exists(tmp):
+            return ""
+        dest = "%s.stranded-%s" % (tmp, time.strftime("%Y%m%d-%H%M%S", time.gmtime()))
+        os.replace(tmp, dest)
+        try:
+            import logging
+            logging.getLogger("harness.memory").warning(
+                "[memory] stranded %s found beside its store (a crash between the tmp "
+                "write and os.replace) — quarantined to %s. Nothing deleted, nothing "
+                "auto-restored; diff it against %s if you want to know what was lost.",
+                tmp, dest, path)
+        except Exception:
+            pass
+        return dest
+    except Exception:
+        return ""                         # a broken rescue must never block a write
+
+
 def _save_all(rows: List[dict]) -> None:
     """Rewrite the registry. Atomic via os.replace — a half-written memory file is worse
     than a stale one, and this is now called on the hot path (every reinforcement)."""
@@ -269,6 +386,7 @@ def _save_all(rows: List[dict]) -> None:
     if not p:
         return
     with _REG_LOCK:
+        rescue_stray_tmp(p)               # BEFORE open(tmp,"w") clobbers the evidence (H4)
         tmp = p + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             for r in rows:
@@ -339,18 +457,40 @@ def live_rows(testimony: bool = False) -> List[dict]:
     return rows
 
 
+def all_rows(path: str = "") -> List[dict]:
+    """Every row, TOMBSTONES INCLUDED, in store order — THE AUDIT LANE DOOR (2026-08-24
+    audit, C). live_rows() is for readers that serve; this is for readers that ACCOUNT:
+    maintenance, PersonModel's evidence walk, anything answering "what did she believe,
+    when". It exists so an audit reader stops opening SP_RECALL_REGISTRY itself with a
+    private JSONL loop (person.py did; malformed-line policy and parse behaviour then
+    drift per reader). Callers apply lifecycle.is_retired() themselves — asking for the
+    dead is the point of this door. `path` serves callers pointed at a fixture."""
+    return _load(path)
+
+
+def orphan_tombstones(path: str = "") -> List[dict]:
+    """AUDIT: tombstones with no `superseded_by` breadcrumb (2026-08-24 audit, H5).
+    The live store carries 25 of them (repair-era retirements; forget() before it grew
+    its breadcrumb). They are DEAD to every reader — `lifecycle` is the one death field
+    — but they cannot answer WHY they died, which is the audit lane's whole question.
+    This helper only RETURNS them, for the curate panel to show him one day; rewriting
+    history onto 25 old rows is his call row by row, never a maintenance pass's."""
+    return [r for r in _load(path) if r.get("lifecycle") and not r.get("superseded_by")]
+
+
 def list_memories() -> str:
     """List every fact currently stored in long-term memory."""
-    from harness.skills import lifecycle as lc
     # LIVE (not retired), FRAMED, and SPEAKABLE. It used to dump every row raw — including
     # superseded ones — so she read back tombstones as current, and read HIS first-person
     # facts ("My name is Sam") as if they were her own. And until 2026-08-19 it skipped
     # testimony_wins(), so 8 seam-silenced inferences took the floor through this door
     # verbatim. The owner is stamped on the row; render it. The floor is his; hold it.
+    # _present_row (2026-08-24, A3): a private-secret row is listed as withheld, never
+    # dumped — a listing asks no attribute, so it may serve none. G-SECRET §5.
     eps = live_rows(testimony=True)
     if not eps:
         return "(memory is empty)"
-    return "\n".join(f"{i + 1}. {lc.render(e)}" for i, e in enumerate(eps))
+    return "\n".join(f"{i + 1}. {_present_row(e)}" for i, e in enumerate(eps))
 
 
 def remember(fact: str, source: str = "", *, kind: str = "", mem_class: str = "",
@@ -370,6 +510,18 @@ def remember(fact: str, source: str = "", *, kind: str = "", mem_class: str = ""
     p = _reg_path()
     if not p:
         return "[no registry configured]"
+    # ── ANONYMOUS MODE (2026-08-23, his ask) ─────────────────────────────────────────
+    # THE ONE DOOR IS WHY THIS IS ONE LINE. Everything that ever enters this store comes
+    # through remember() — the tool, _capture_after_turn, the consolidator, the reflector,
+    # remember_about_self and therefore every self-narrative row, the episode mint and the
+    # semantic index that hang off the write below. Guarding HERE guards all of them,
+    # including callers written after this line. Guarding callers instead is how you get a
+    # mode that says "nothing was recorded" over an evening sitting in the registry.
+    # It returns a SENTENCE, not a silent no-op: she reads this string, and a store verb
+    # that quietly fails is how she ends up promising to remember what she cannot.
+    from harness.control import anon as _anon
+    if _anon.holds("memory.row"):
+        return _anon.WHY
     # ADMISSION AT THE STORE (2026-07-12). The daemon's B4 gate now refuses impersonal
     # sentences — and she immediately stored one THROUGH THIS TOOL instead (G-ADMISSION
     # caught an ep_tool_ row holding "The kind nurse painted the tall building..."). An
@@ -418,8 +570,6 @@ def remember(fact: str, source: str = "", *, kind: str = "", mem_class: str = ""
         ok, why = lc.admit_to_user_store(fact, _self_names())
         if not ok:
             return f"not stored — {why}"
-    existing = _load()
-
     # ── A REPEAT IS NOT A DUPLICATE. IT IS A SECOND DATA POINT. (2026-07-13) ────────
     #
     # These two guards used to read:
@@ -444,23 +594,40 @@ def remember(fact: str, source: str = "", *, kind: str = "", mem_class: str = ""
         return (f"reinforced ({n}x): {_text(e)}"
                 + (f"  [{why}]" if why else ""))
 
-    for e in existing:
-        if e.get("lifecycle"):
-            continue                       # a tombstone is not reinforced back to life
-        if _text(e).strip() == fact.strip():
-            return _reinforce(e, "")
+    # ── THE REINFORCE BRANCH IS A READ-MODIFY-WRITE, SO IT HOLDS THE LOCK (2026-08-24
+    # audit, A2). The invariant at _REG_LOCK's definition says a load/change/rewrite is
+    # not interleaved with another — and this branch loaded OUTSIDE the lock, mutated a
+    # row, and _save_all'd the stale list: a remember() landing between the read and the
+    # write was silently rewritten away, the exact lost-write shape the comment up there
+    # narrates, on the hottest write path in the file. The store branch below re-reads
+    # inside its own locked block and was always right; this one now matches it.
+    # The lock is RELEASED before the mint/supersede work that follows — _mint_now can
+    # block on HTTP for up to 120 s when SP_CAPTURE_ASYNC=0, and a registry lock held
+    # across a GPU call would serialize every concurrent turn behind it. A stale
+    # `existing` beyond this block is safe by construction: the store branch applies
+    # its tombstones by NAME against a fresh locked read. RLock, so _save_all's own
+    # acquire nests without deadlock; nothing in this block does I/O beyond the store.
+    # Gate: G-REGISTRY-RMW (mutant: lift this `with` and it goes red by name).
+    with _REG_LOCK:
+        existing = _load()
 
-    ft = _toks(fact)
-    if ft:
         for e in existing:
             if e.get("lifecycle"):
-                continue
-            et = _toks(_text(e))
-            if not et:
-                continue
-            inter = len(ft & et)
-            if inter / len(ft) >= 0.9 and inter / len(et) >= 0.9:
-                return _reinforce(e, "said again, in different words")
+                continue                   # a tombstone is not reinforced back to life
+            if _text(e).strip() == fact.strip():
+                return _reinforce(e, "")
+
+        ft = _toks(fact)
+        if ft:
+            for e in existing:
+                if e.get("lifecycle"):
+                    continue
+                et = _toks(_text(e))
+                if not et:
+                    continue
+                inter = len(ft & et)
+                if inter / len(ft) >= 0.9 and inter / len(et) >= 0.9:
+                    return _reinforce(e, "said again, in different words")
     # ── SHE WAS MADE TO WAIT ON A GPU BEFORE SHE WAS ALLOWED TO ANSWER HIM (2026-07-14) ────
     #
     # This block used to POST /v1/capture SYNCHRONOUSLY, with timeout=120, right here — on the
@@ -497,7 +664,7 @@ def remember(fact: str, source: str = "", *, kind: str = "", mem_class: str = ""
     # the process dies before the queue drains, the fact is still on disk — exactly as it already
     # was whenever the daemon happened to be unreachable.
     daemon = os.environ.get("SP_DAEMON_URL", "http://127.0.0.1:3000")
-    out_dir = os.path.join(os.path.dirname(p), "eps", f"ep_tool_{int(time.time() * 1000)}")
+    out_dir = os.path.join(eps_root(), f"ep_tool_{int(time.time() * 1000)}")
     out_dir = out_dir.replace("\\", "/")
     npos = 0
     minted = False
@@ -684,6 +851,14 @@ def reset_author(token) -> None:
     _AUTHOR.reset(token)
 
 
+def reset_question(token) -> None:
+    """The question's half of the same contract (2026-08-24 audit, A5): her unprompted
+    turns now arm the lane with author=self and the impulse nudge, and must restore
+    BOTH on the way out — resetting the author while leaving the previous turn's
+    question standing is the lag _arm_turn's own receipt documents."""
+    _QUESTION.reset(token)
+
+
 _GENDER_WORDS = {
     "female": {"female", "woman", "girl", "she", "her"},
     "male": {"male", "man", "boy", "he", "him"},
@@ -762,7 +937,13 @@ def provenance(fact: str) -> str:
         return f"no stored fact matches '{fact}'"
     src = hit.get("src", "unknown source")
     ts = hit.get("ts", "unknown time")
-    return f"'{_text(hit)}' — learned from {src} at {ts}"
+    # Through _present_row, not a raw quote (2026-08-24, D2 + A3). This door quoted the
+    # bare first-person row — "'My name is Sam' — learned from..." — while
+    # docs/MEMORY-AND-RECALL.md has listed provenance among the render() doors since
+    # 2026-08-19: the code catches up to the doc. It also quoted a private-secret's text
+    # verbatim; now the secret rule runs first, and a direct ask (attribute present)
+    # still answers, because provenance carries the query. G-MEMORY-LIFECYCLE / G-SECRET §5.
+    return f"{_present_row(hit, fact)} — learned from {src} at {ts}"
 
 
 def forget(fact: str) -> str:
@@ -798,22 +979,28 @@ def forget(fact: str) -> str:
     model-callable tool, and it deleted the wrong twin. Nothing hard-deletes any more;
     compaction tombstones and quarantines. Gate: G-COMPACT.)
     """
-    rows = _load()
-    if not rows:
-        return "(memory is empty)"
-    best, hit = -1.0, None
-    for e in rows:
-        if e.get("lifecycle"):
-            continue                       # already retired: forgetting it again is a no-op
-        ov = _overlap(fact, _text(e))
-        if ov > best:
-            best, hit = ov, e
-    if best < 0.3 or hit is None:
-        return f"no stored fact matches '{fact}'"
-    hit["lifecycle"] = 1
-    hit["superseded_by"] = "forget"
-    hit["forgotten_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    _save_all(rows)
+    # The whole match-and-tombstone is ONE read-modify-write under the lock (2026-08-24
+    # audit, A2): it read outside and rewrote inside, so a concurrent remember() between
+    # the load and the _save_all was silently rewritten away — by the tool whose entire
+    # docstring is about how it used to destroy things. Pure string matching inside; no
+    # I/O beyond the store, no nesting hazard (RLock).
+    with _REG_LOCK:
+        rows = _load()
+        if not rows:
+            return "(memory is empty)"
+        best, hit = -1.0, None
+        for e in rows:
+            if e.get("lifecycle"):
+                continue                   # already retired: forgetting it again is a no-op
+            ov = _overlap(fact, _text(e))
+            if ov > best:
+                best, hit = ov, e
+        if best < 0.3 or hit is None:
+            return f"no stored fact matches '{fact}'"
+        hit["lifecycle"] = 1
+        hit["superseded_by"] = "forget"
+        hit["forgotten_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        _save_all(rows)
     return f"forgotten (retired, not erased): {_text(hit)}"
 
 
@@ -852,6 +1039,51 @@ def attr_absent(query: str, fact: str) -> bool:
     fs = {w for w in re.findall(r"[a-z0-9]+", fact.lower()) if len(w) > 2}
     salient_absent = [w for w in qs if w not in fs]
     return len(salient_absent) >= 2 and len(salient_absent) * 2 >= len(qs)
+
+
+# ── THE SECRET WAS GUARDED AT ONE OF FIVE DOORS (2026-08-24 audit, A3) ─────────────────
+# spine.recall_decider — the automatic per-turn injection — has honoured private-secret
+# since G-SECRET landed: absent attribute -> zero-inference decline, present attribute ->
+# she may answer him. And EVERY OTHER READ DOOR in this file served the row verbatim:
+# list_memories dumped it (model-callable, no question asked), recall() presented it,
+# search_memories returned its raw text, provenance() quoted it. The live store holds a
+# real credential as a private-secret row, so this was not hypothetical: the guard held
+# on the path that runs automatically and on none of the paths she chooses. AGENTS.md §0,
+# in the exact subsystem whose closed trap ("the privacy decline cannot fire") is the §0
+# table's last row.
+#
+# THE RULE, once, here, consumed by every door in this file:
+#   no question (a listing)      -> withheld. A dump has no attribute to test, and a
+#                                   secret in a listing is a leak with pagination.
+#   asked, attribute ABSENT      -> withheld (the decider's own attr_absent test).
+#   asked, attribute PRESENT     -> served. He told her the secret; asked for the thing
+#                                   itself she answers HIM — the decider's existing
+#                                   semantics (G-SECRET §3: she is not made useless).
+# The decider keeps its own dispatch (it needs the row to decline loudly rather than
+# quietly); the ranked seam is deliberately NOT filtered, because dropping the row there
+# would make the decider's decline unreachable — the guard must fire, not evaporate.
+SECRET_WITHHELD_NOTE = "a private thing, held — ask me directly about it"
+
+
+def secret_withheld(row: dict, query: str = "") -> bool:
+    """Must this row's text stay out of a reply to this question? (See the note above.)"""
+    if (row.get("mem_class") or "") != "private-secret":
+        return False
+    if not (query or "").strip():
+        return True
+    return attr_absent(query, _text(row))
+
+
+def _present_row(row: dict, query: str = "") -> str:
+    """THE class-aware render for the speaks-ABOUT-the-store doors in this file
+    (list_memories, search_memories, provenance): lifecycle.render()'s framing, with the
+    secret rule applied first. recall() speaks TO HER through world.present_for_her and
+    applies secret_withheld itself — presentation differs by addressee (two rendering
+    doors, on purpose), the withholding rule does not."""
+    if secret_withheld(row, query):
+        return SECRET_WITHHELD_NOTE
+    from harness.skills import lifecycle as lc
+    return lc.render(row)
 
 
 def search_memories_ranked_rows(query: str, k: int = 5, min_overlap: float = 0.25,
@@ -1047,10 +1279,17 @@ def search_memories_ranked(query: str, k: int = 5, min_overlap: float = 0.25,
 def search_memories(query: str) -> str:
     """Search long-term memory for facts relevant to a query (ranked; better than
     list_memories when memory is large)."""
-    hits = search_memories_ranked(query, k=5)
+    # ROWS, so the result can be FRAMED (2026-08-24, D1 + A3). This tool returned the
+    # raw first-person text — a row HE spoke ("My workshop bench is oak") arrived in a
+    # voice with no owner on it, the exact blur lifecycle.render() exists to prevent,
+    # through the one speaking door that skipped it. And a private-secret's text rode
+    # out with a match score attached. _present_row applies the framing and the secret
+    # rule; a direct ask (attribute present) still serves, same as the decider.
+    hits = search_memories_ranked_rows(query, k=5)
     if not hits:
         return f"(no stored facts match '{query}')"
-    return "\n".join(f"{i+1}. {t}  [match {s:.2f}]" for i, (s, t) in enumerate(hits))
+    return "\n".join(f"{i+1}. {_present_row(e, query)}  [match {s:.2f}]"
+                     for i, (s, e) in enumerate(hits))
 
 
 def recall(query: str) -> str:
@@ -1089,17 +1328,22 @@ def recall(query: str) -> str:
     # recalls his name constantly, and that is not a fact about how much his name matters.
     # Letting a lookup feed the significance score would be a system marking its own
     # homework, and the loop is vicious: recalled -> more salient -> recalled more.
+    # Under the lock as ONE read-modify-write (2026-08-24 audit, A2): the load, the
+    # counter bumps and the rewrite used to straddle the lock (only _save_all held it),
+    # so a remember() landing mid-count was rewritten out of the store by a READ path —
+    # a lookup that could cost a fact. Same fix as the reinforce branch; RLock nests.
     try:
-        rows = _load()
-        by_name = {r.get("name"): r for r in rows}
-        touched = False
-        for _s, e in top:
-            r = by_name.get(e.get("name"))
-            if r is not None:
-                lc.note_recalled(r)
-                touched = True
-        if touched:
-            _save_all(rows)
+        with _REG_LOCK:
+            rows = _load()
+            by_name = {r.get("name"): r for r in rows}
+            touched = False
+            for _s, e in top:
+                r = by_name.get(e.get("name"))
+                if r is not None:
+                    lc.note_recalled(r)
+                    touched = True
+            if touched:
+                _save_all(rows)
     except Exception:
         pass
 
@@ -1121,7 +1365,14 @@ def recall(query: str) -> str:
     # read as his, her inferences read as hers) instead of in a "Sam told me:" prefix she
     # can quote. render() is untouched — the provenance lane and G-SEM-PROJ still use it.
     from harness.skills.world import present_for_her
-    return "\n".join("- " + present_for_her(e) for _s, e in top)
+    # THE FOURTH DOOR (2026-08-24 audit, A3). _present_row's docstring promised this
+    # line before it existed — the claim outran the code by one door, which is the
+    # exact §0 shape the other three doors were fixed for. recall() speaks TO HER, so
+    # a withheld secret keeps present_for_her's grammar out of it entirely.
+    return "\n".join(
+        "- " + (SECRET_WITHHELD_NOTE if secret_withheld(e, query)
+                else present_for_her(e))
+        for _s, e in top)
 
 
 # ── WHO IS THE QUESTION ABOUT? (2026-07-12) ───────────────────────────────────

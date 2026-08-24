@@ -18,6 +18,15 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.pop("SP_RECALL_REGISTRY", None)  # keep the server leg registry-free
+# ...AND UNSETTING IT WAS THE BUG (2026-08-24). Popping SP_RECALL_REGISTRY does not
+# make the leg registry-free: every reader FALLS BACK to the repo path, so this wrote
+# a .bak- file into her real store. Registry-free is not reachable; a temp one is.
+# SANDBOX FIRST (2026-08-24). One of nine gates the sandbox audit caught writing into
+# her REAL stores; `_gate.sandbox` points every root at a temp dir and must run BEFORE
+# any harness import, because a module resolves its root once, at import.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _gate import sandbox as _sandbox  # noqa: E402
+_sandbox(os.path.basename(__file__))
 # THE FIXTURE, NOT THE PRODUCTION CONFIG (2026-07-31). mcp_servers.json used to hold
 # this repo's own server, which is what leg B connected to. That entry was a loop —
 # every tool it exposes is already native and got shadowed — so production now holds

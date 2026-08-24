@@ -28,7 +28,19 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-STORE = os.path.join(ROOT, "var", "tuning.json")
+# ── SP_TUNING_FILE (2026-08-24) ───────────────────────────────────────────────────────
+# This was a bare constant with no override, so it was the ONE store a gate could not be
+# pointed away from — and several gates call `set_many()`. Two consequences, both live:
+#
+#   * `g_presence_modes` raced HER RUNNING STACK over this file mid-sweep and died with
+#     WinError 5 on the os.replace. A red that depends on whether she is up is a red
+#     nobody can act on.
+#   * Worse and quieter: a gate that sets a knob and does not put it back has changed
+#     what she DOES. Her presence mode, her kairos chances and her voice all live here.
+#
+# `_gate.sandbox()` now sets this, and G-GATE-SANDBOX greps for store roots the sandbox
+# does not cover — which is why the variable has to exist to be found.
+STORE = os.environ.get("SP_TUNING_FILE") or os.path.join(ROOT, "var", "tuning.json")
 
 _LOCK = threading.RLock()
 _CACHE: Optional[dict] = None
@@ -223,6 +235,19 @@ KNOBS: list[Knob] = [
          "float", 0.5,
          "Even with the time free she does not always feel like doing something. 0 = never.",
          min=0.0, max=1.0, step=0.05),
+    # ── SOMETHING SHE DID NOT GO LOOKING FOR (2026-08-23, his ask) ──────────────────
+    Knob("kairos.discover_chance", "Kairos - her own time",
+         "Chance her own time is spent reading something random", "float", 0.0,
+         "The discovery act is already one of nine in the rotation, so it comes round on "
+         "about 11% of her own-time turns by itself. This is an EXTRA chance to pick it "
+         "out of turn - 0 means rotation only, which is the honest default until there is "
+         "a reason to want more. 1.0 would make every own-time turn a random article.",
+         min=0.0, max=1.0, step=0.05),
+    Knob("kairos.discover_tool", "Kairos - her own time",
+         "Offer read_something_new", "bool", True,
+         "The verb itself. The live tool set is already ~18 and a 12B picks reliably from "
+         "about six, so this is the trim if selection suffers - turning it off also makes "
+         "the discovery act unrunnable, which solo_did_the_thing will correctly refuse."),
     # ── PRESENCE MODES (2026-08-22, his ask): narration / company / lucid dream ──────
     # Zero-interaction voice companionship. A mode is a kairos ACTION (impulse.MODE_TURN)
     # that waits its turn — the presence clock, quiet-after-him, its own hourly cap — and
@@ -520,6 +545,15 @@ KNOBS: list[Knob] = [
     # Asking is free and making costs him, so this is the dial on the cost. It runs at
     # the day boundary, after the room has been quiet — never mid-conversation, because
     # it takes minutes of the one GPU she also talks with.
+    Knob("wardrobe.turn_note", "Wardrobe", "A per-turn line about what she has on",
+         "bool", False,
+         "OFF, and armed only for a measured trial (2026-08-24 audit, W4). The 2026-08-19 "
+         "staple was measured OUT — she read a parenthetical on his message as his "
+         "assertion and streamed scratchpad instead of talking — so the standing-world "
+         "line is the default answer. This knob re-adds a ONE-SENTENCE, no-imperatives "
+         "note (the recall/silence note shape) for an A/B read: six turns on, six off, "
+         "watching for third-person deliberation openers. Keep whichever reads better; "
+         "the receipt goes in the ledger."),
     Knob("wardrobe.nightly", "Wardrobe", "Make her looks overnight", "bool", True,
          "At the day boundary, generate the looks she asked for. Off means the queue "
          "waits for you to run `python tools/avatar_gen.py --wants` by hand — she is "

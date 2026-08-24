@@ -212,6 +212,23 @@ def synthesize(text: str, voice: str | None = None, steps: int | None = None,
     if not lv["enabled"]:
         raise TTSError("voice is off (voice.enabled) — text only")
     _method = lv["method"]
+    # ── ANONYMOUS MODE AND HER VOICE (2026-08-24, his question) ──────────────────
+    # "does anon mode leak anywhere? eg via voice either local or sent to providers
+    # such as the xai api?" It did. `voice.method` is `xai` on his profile, so every
+    # sentence she spoke off the record was POSTED TO api.x.ai in full — the one leak
+    # he could neither audit nor delete, and much worse than a row on his own disk.
+    #
+    # A LOCAL VOICE IS NOT A LEAK and is not held: the audio is synthesised on this
+    # machine and played. Silencing her would be the mode disabling the room, which
+    # is the failure the whole design is written against. A REMOTE voice is held, and
+    # it RAISES rather than returning silence — the room shows the reason, so "she has
+    # gone quiet" can never be mistaken for "she had nothing to say".
+    from harness.control import anon as _anon
+    if _method != "local" and _anon.holds("net.voice"):
+        raise TTSError(
+            "off the record — her voice is %s, which would send this sentence to a "
+            "third party. Switch voice.method to local to hear her while the switch "
+            "is on." % _method)
     # THE TTS EDGE (2026-08-21, the expressive-voice framework): her [laugh] / <soft>
     # tags pass to the xAI voice verbatim and are stripped for the local chain, which
     # would read the brackets aloud. Unknown tag-shapes never reach any voice. Done
@@ -267,7 +284,12 @@ def synthesize(text: str, voice: str | None = None, steps: int | None = None,
             wav = _via_server(text, lvoice, steps) if TTS_URL else _via_cli(text, lvoice, steps)
     dt = time.perf_counter() - t0
 
-    if use_cache:
+    # A CACHED WAV IS A RECORDING. Keyed by a hash of the text, but the FILE is her
+    # voice saying the private thing, and it outlives the mode by design (the cache
+    # is trimmed by size, not by age). Held; she still speaks, the bytes go to the
+    # room and nowhere else. A cache READ is left alone: a hit means she has said
+    # this before, on the record, so there is nothing new to protect.
+    if use_cache and not _anon.holds("voice.cache"):
         os.makedirs(CACHE_DIR, exist_ok=True)
         tmp = path + ".part"
         with open(tmp, "wb") as f:

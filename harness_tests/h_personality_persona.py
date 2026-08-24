@@ -72,7 +72,11 @@ def main() -> int:
 
     s = load()
     prose_ok = "particular someone made of math" in s
-    state_ok = ("Current personality state" in s and "voice: dry, warm" in s
+    # AMENDED 2026-08-24: the line is labelled "when this session began" now — it lives
+    # in the KV-cached prefix and only moves at the scheduled refresh, so "Current" was
+    # asserting a stale present (audit, Phase E). The CLAIM here is unchanged: the state
+    # is parsed and injected with its values.
+    state_ok = ("Personality state when this session began" in s and "voice: dry, warm" in s
                 and "mood: neutral" in s and "traits: curious, candid" in s)
     header_stripped = "## Personality state" not in s   # the raw block header must not leak in
     # the block's header changed 2026-08-22 (it read as a briefing and she narrated it);

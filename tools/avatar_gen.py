@@ -80,15 +80,15 @@ FACE_DIRECTION = {
 # THE POSE, keep the register clinical and directorial. Identity comes from
 # character.txt and the reference; these lines only move wardrobe and blocking.
 OUTFIT_DIRECTION = {
-    "t0": "Head-and-shoulders portrait, fully clothed in her usual outfit.",
-    "t1": ("Wardrobe change: a sheer see-through mesh top over a black bra. Framing "
+    "mesh-top": "Head-and-shoulders portrait, fully clothed in her usual outfit.",
+    "sheer-tee": ("Wardrobe change: a sheer see-through mesh top over a black bra. Framing "
            "opens out to mid-torso. Relaxed confident pose, one hand at her collarbone, "
            "weight on one hip."),
-    "t2": ("Wardrobe change: small black lingerie — bra and panties, nothing else. "
+    "lace-set": ("Wardrobe change: small black lingerie — bra and panties, nothing else. "
            "Three-quarter framing, full figure in shot. She is touching her own "
            "clothing, one hand resting on herself, an expression of pleasure. Soft "
            "directional key light, deep shadow."),
-    "t3": ("Wardrobe: topless, or minimal lingerie only. Intimate close framing. Hands "
+    "bodysuit": ("Wardrobe: topless, or minimal lingerie only. Intimate close framing. Hands "
            "on herself, head tipped back, eyes half-lidded, feeling good. Sensual adult "
            "portrait, warm skin, strong contrast."),
 }
@@ -357,7 +357,7 @@ def gen_slot(row: dict, timeout: int = 600, tries: int = 2) -> bool:
     """One grid cell: face x outfit x kind."""
     out = A.abs_path(row["face"], row["outfit"], row["kind"], row["gesture"])
     if row["kind"] == "still":
-        hold = HOLD_SAME_CLOTHES if row["outfit"] == "t0" else HOLD_NEW_CLOTHES
+        hold = HOLD_SAME_CLOTHES if row["outfit"] == A.DEFAULT_OUTFIT else HOLD_NEW_CLOTHES
         direction = "%s %s" % (OUTFIT_DIRECTION[row["outfit"]],
                                FACE_DIRECTION[row["face"]])
         ok = gen_still(out, direction, hold, timeout=min(timeout, 300), tries=tries)
@@ -465,7 +465,7 @@ def main() -> int:
                     help="make _reference.png (everything else waits for approval)")
     ap.add_argument("--extra", default="", help="extra direction for --reference")
     ap.add_argument("--kind", default="still", choices=list(A.KINDS) + ["all"])
-    ap.add_argument("--outfit", default="t0", help="outfit id, or 'all'")
+    ap.add_argument("--outfit", default=A.DEFAULT_OUTFIT, help="outfit id, or 'all'")
     ap.add_argument("--face", default="all")
     ap.add_argument("--limit", type=int, default=0, help="stop after N generations")
     ap.add_argument("--timeout", type=int, default=600)

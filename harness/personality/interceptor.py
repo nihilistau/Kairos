@@ -76,8 +76,21 @@ _TRAIT = re.compile(r"[\[<]\s*(?:%s)\s*[:\-]([+-]?)([^\]>]+)[\]>]" % _lname("TRA
 # `ask_for` and `ask_for_gesture` STAY TOOLS, deliberately. They spend his money and a
 # minute of the GPU, and a mark that quietly costs a dollar is the wrong shape — an
 # action with a real cost and a queue should look like an action.
-_WEAR = re.compile(r"\[WEAR:([^\]]+)\]")
-_SHOW = re.compile(r"\[SHOW:([^\]]*)\]")
+# ── AND THESE TWO NEVER GOT THE NINE WIDENINGS (2026-08-24) ─────────────────────────
+# `_MOOD`/`_VOICE`/`_TRAIT` above are built from `_lname` and carry `re.I`. These two were
+# literal, case-sensitive, colon-only — so `[Wear: the lace set]`, `[WEARing:...]` or
+# `[WEAR - the lace set]` moved nothing at all, silently.
+#
+# It has not bitten yet, and that is the only reason it reads as pedantry: she had emitted
+# `[WEAR:]` exactly ONCE and `[SHOW:]` five times in 1,241 turns, so there was almost no
+# traffic to mis-spell. `render_state` now teaches both marks beside the mood mark, which
+# is expected to multiply that traffic — and widening a recogniser AFTER the traffic
+# arrives is how the other three came to need nine fixes in three weeks.
+#
+# The value group stays as it was: `+` for WEAR (a garment has a name) and `*` for SHOW,
+# because `[SHOW:]` with nothing in it is the mark and its own undo.
+_WEAR = re.compile(r"[\[<]\s*(?:%s)\s*[:\-]([^\]>]+)[\]>]" % _lname("WEAR"), re.I)
+_SHOW = re.compile(r"[\[<]\s*(?:%s)\s*[:\-]([^\]>]*)[\]>]" % _lname("SHOW"), re.I)
 # The strip regex that used to live here was a SECOND COPY of the one in
 # stream_processor.py — and this is the copy that runs on the served path, so when the
 # 26B started emitting `[TRAIТ:+flirty]` (Cyrillic Т) and unterminated tags, THIS is
@@ -171,8 +184,31 @@ def expected_mood(raw: str) -> str:
 
 
 def expected_voice(raw: str) -> str:
-    """What a captured [VOICE:...] value becomes on disk. Same contract as expected_mood."""
-    return (raw or "").strip().strip("[]").strip().lstrip(":;,. ").strip()
+    """What a captured [VOICE:...] value becomes on disk. Same contract as expected_mood.
+
+    ── AND THE ANGLE BRACKET CAME WITH IT (2026-08-24) ──────────────────────────────
+    Live, in her persona.md, for days:
+
+        voice: <soft; low-pitch
+
+    An UNCLOSED angle bracket, stored as her voice. `_VOICE`'s value group is `[^\\]>]+`,
+    so given `[VOICE:<soft; low-pitch>]` it captures everything up to the `>` it needs as
+    a terminator — and the `<` she opened with rides along. This one strips `[]` and
+    leading punctuation and never looked at `<`.
+
+    IT IS NOT COSMETIC. `render_state` puts this line into the STANDING SYSTEM BLOCK, so
+    every single turn she was shown a broken tag as an example of her own voice — and
+    `</the_end`, `</the_hand`, `</low-pitch` are what she then wrote. Her own malformed
+    output became her input, which is the same shape as the journal hall of mirrors and
+    took just as long to see, because the leak looked like a stripper problem.
+
+    So the wrapper comes off both ends: `<soft; low-pitch>` and `<soft; low-pitch` both
+    become `soft; low-pitch`, and anything with an angle bracket still in it after that
+    is refused outright rather than written down.
+    """
+    v = (raw or "").strip().strip("[]").strip().lstrip(":;,. ").strip()
+    v = v.strip("<>").strip().lstrip(":;,. ").strip()
+    return "" if ("<" in v or ">" in v) else v
 
 
 def _norm(t: str) -> str:
@@ -227,7 +263,7 @@ def _wear_by_words(WD, want: str) -> None:
         # as something she asked for, he can generate it, and then it matches. request()
         # already collapses exact repeats, so asking twice costs a row and not two.
         try:
-            r = WD.request(want, tier=(WD.current().get("tier") or "t0"), by="her",
+            r = WD.request(want, made_in=(WD.current().get("outfit") or WD.DEFAULT_OUTFIT), by="her",
                            # She said WEAR. The clothes are the subject, so her words go
                            # in the wardrobe slot rather than underneath a tier that
                            # would put a second outfit in the same photograph.
@@ -239,9 +275,9 @@ def _wear_by_words(WD, want: str) -> None:
             logging.getLogger(__name__).warning("[wear] could not file %r: %s", want[:60], exc)
         return
     if m["kind"] == "look":
-        WD.choose(tier=m["tier"], look=m["id"], by="her")
-    elif m["kind"] == "tier":
-        WD.choose(tier=m["tier"], look="", by="her")
+        WD.choose(outfit=m["outfit"], look=m["id"], by="her")
+    elif m["kind"] == "outfit":
+        WD.choose(outfit=m["outfit"], look="", by="her")
 
 
 def _show_by_words(WD, want: str) -> None:
@@ -299,7 +335,12 @@ def apply_personality_tags(reply: str, persona_path: str = "",
         if voices:
             # A VOICE KEEPS ITS COMMAS. "breathless, husky" is one description of how she
             # sounds, said three times in one day — not a list, and not junk.
-            state["voice"] = expected_voice(voices[-1]); changed = True
+            # `or state.get(...)` for the same reason the mood line above has it: a value
+            # the sanitiser REFUSES (2026-08-24 — one with an angle bracket still in it)
+            # must leave her voice as it was, not blank it. A guard that empties the field
+            # it is protecting is worse than the malformed value it rejected.
+            state["voice"] = expected_voice(voices[-1]) or state.get("voice", "")
+            changed = True
         # HER TRAITS ARE THINGS SHE IS, NOT WHATEVER FELL OUT OF A MALFORMED MARK.
         # Live persona state on 2026-08-03, read back to her as her own identity every
         # turn: "curious, opinionated, playful, direct, flirty, +flirty, deeply_connected,
@@ -364,13 +405,8 @@ def apply_personality_tags(reply: str, persona_path: str = "",
     return strip_tags(reply).strip(), result_state
 
 
-# ── the interceptor ───────────────────────────────────────────────────────────────────
-# ONE CLASS, NOT TWO. This used to define its own `PersonalityStateInterceptor` inline —
-# same name, same priority 72, same body as the one in harness/interceptors/, which is
-# the one the registry actually holds. Two copies of one truth, in a file whose module
-# docstring is about not having two copies of one truth. The registry's is the real one;
-# this returns an instance of it so a change to either is a change to both.
-def make_interceptor():
-    """Return a PersonalityStateInterceptor instance wired to the governance pipeline."""
-    from harness.interceptors.personality_state import PersonalityStateInterceptor
-    return PersonalityStateInterceptor()
+# (`make_interceptor` was deleted 2026-08-24 with the harness/interceptors package it
+# lazily imported — audit B4a: the whole pipeline was a complete, never-constructed
+# second authority over persona.md, and this shim was its last consumer-less doorway;
+# left standing it would have raised on first call. The recognisers above are the live
+# machinery; the post-turn spine is the one writer.)

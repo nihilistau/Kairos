@@ -141,6 +141,27 @@ class InferenceConfig:
                 eff_bx = False
                 _warn_unconfigured_byteexact()
 
+        # ── eot_bias RESOLVES AT THE SAME SEAM (2026-08-24 audit, B6) ────────────────
+        # The byteexact block above is the precedent, written after five builders missed
+        # it — and eot_bias had the identical history (app.py's own header: "two
+        # builders defaulted it to 4.0, which on this model makes the FIRST sampled
+        # token a stop") and was NOT moved here: two byte-equivalent resolvers
+        # (app._eot_default, agent._eot_bias_default) guarded two builders each, and
+        # the three unprompted lanes built configs that sent nothing, leaving the
+        # daemon's own default to rule her own time. Same remedy, including the last
+        # line of it: resolve None from SP_EOT_BIAS here, where every lane must pass;
+        # an explicit value still wins; and unset-and-no-profile is a VALUE (0.0, the
+        # tuning registry's declared default), never a shrug — the byteexact block
+        # above earned that rule when "send nothing" turned out to mean the daemon's
+        # hostile default and twenty empty turns scored as a finding about her voice.
+        eff_eot = self.eot_bias
+        if eff_eot is None:
+            _eraw = _os.environ.get("SP_EOT_BIAS")
+            try:
+                eff_eot = float(_eraw) if _eraw not in (None, "") else 0.0
+            except ValueError:
+                eff_eot = 0.0
+
         body: Dict[str, Any] = {}
         if prompt is not None:
             body["prompt"] = prompt
@@ -157,7 +178,9 @@ class InferenceConfig:
             "self_repeat_ngram", "self_repeat_text",
             "tool_names",
         ):
-            v = eff_bx if k == "byteexact" else getattr(self, k)
+            v = (eff_bx if k == "byteexact"
+                 else eff_eot if k == "eot_bias"
+                 else getattr(self, k))
             if v is not None:
                 body[k] = v
         if self.stop:

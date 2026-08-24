@@ -47,7 +47,7 @@ def check(name, cond, detail=""):
 
 from harness.skills import looking as L  # noqa: E402
 
-L._NOW = None
+L._NOW = {}      # per-thread map since 2026-08-24 (audit B10)
 L._LAST = None
 L._LISTENERS.clear()
 
@@ -77,7 +77,7 @@ check("end emits a done event",
       heard[-1] if heard else None)
 # Bounce restore MUST be asserted against THIS look, before any later end().
 L._LAST = None
-L._NOW = None
+L._NOW = {}      # per-thread map since 2026-08-24 (audit B10)
 restored = L.status()
 check("status rereads last from the ledger after a bounce",
       (restored.get("last") or {}).get("title") == "RMSNorm vs LayerNorm"
@@ -157,7 +157,7 @@ empty = L.my_research()
 # we wrote looks in §1, so this tmp ledger is not empty
 check("my_research reports a look that happened",
       "RMSNorm" in empty or "web_search" in empty, empty[:200])
-L._NOW = None
+L._NOW = {}      # per-thread map since 2026-08-24 (audit B10)
 # a fresh tmp with no rows
 import tempfile as _tf
 _empty = _tf.mkdtemp(prefix="g-looking-empty-")
@@ -203,7 +203,7 @@ try:
           "his search, not yours" in feed and "his query" in feed, feed[:200])
     # THE CHIP IS HERS: status()'s ledger fallback must skip his rows — his
     # search wore her "looked up" face within a minute of the run route landing.
-    L._NOW = None
+    L._NOW = {}      # per-thread map since 2026-08-24 (audit B10)
     L._LAST = None
     st = L.status()
     check("status()'s last-look fallback never wears his rows",
@@ -217,14 +217,14 @@ try:
             return [{"title": "hit", "url": "https://f.test/" + q, "snippet": "s"}]
     from harness.skills import search as S6
     S6.set_backend(_FloorEngine())
-    L._NOW = None
+    L._NOW = {}      # per-thread map since 2026-08-24 (audit B10)
     L._LAST = None
     r = L.his_search("manual box", 3)
     check("his_search runs the real engine seam and returns hits",
           r.get("ok") and r["hits"], r)
     check("...writes the row by=him", r["row"].get("by") == "him", r.get("row"))
     check("...and never touches the in-flight chip (hers)",
-          L._NOW is None and L._LAST is None)
+          not L._NOW and L._LAST is None)   # the empty per-thread map (audit B10)
     S6._BACKEND = None
 finally:
     if _old6 is None:

@@ -354,6 +354,13 @@ def research(question: str, depth: str = "normal") -> str:
     q = (question or "").strip()
     if not q:
         return "[research: no question]"
+    # ANONYMOUS MODE (2026-08-24). This posts the question to api.x.ai. It has its
+    # OWN client (_xai_post) rather than going through skills/xai.py, so guarding
+    # that file would have covered images and video and left this open — which is
+    # exactly the "one of two paths" shape this repo is named for.
+    from harness.control import anon as _anon
+    if _anon.holds("net.research"):
+        return "[" + _anon.WHY + " — nothing was sent to a third party]"
     if not ARMED:
         return "[research is not armed — SP_RESEARCH=0]"
     b = backend()

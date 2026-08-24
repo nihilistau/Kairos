@@ -284,8 +284,21 @@ check("the client splits them the same way",
 check("the client tolerates the same split names the server does",
       "_loose" in _TJS and "[_ -]?" in _TJS)
 check("...and the same `:` or `-` separator", "[:-]" in _TJS)
-check("...and folds the separators out before looking the kind up",
-      "replace(/[_ -]/g, '')" in _TJS)
+# AMENDED 2026-08-24. This asserted the literal `replace(/[_ -]/g, '')` — the exact
+# spelling of the fold, not the fact of it. The fold now happens inside `tagWord`, on
+# `[^a-z]`, which is strictly stronger (it also drops digits, apostrophes and the stray
+# punctuation `[VOICE':]` arrived with). Pinning a check to a spelling makes it go red on
+# an improvement and green on a rewrite that keeps the words — which is backwards.
+check("...and folds the name to LETTERS before judging the kind",
+      "replace(/[^a-z]/g, '')" in _TJS and "function tagWord" in _TJS, )
+# AND THE JUDGEMENT IS THE SERVER'S. `is_tag_name` has front-matched a four-letter stem
+# and allowed two edits since 2026-08-06; the client looked its name up in an exact
+# dictionary and returned the mark to the text on a miss. One vocabulary, two enforcement
+# points, and for three weeks they were not the same vocabulary at all.
+check("...by the same rule the server uses: a stem, then two edits",
+      "_TAG_WORDS" in _TJS and "_edits(" in _TJS and "_NOT_MARKS" in _TJS)
+check("...and the not-a-mark table is mirrored too, so `showdown` stays his prose",
+      all(w in _TJS for w in ("shower", "showdown", "voicemail", "traitor")))
 
 print(NL + "5. A TRAIT IS A WORD FOR SOMETHING SHE IS")
 # Her live persona state, read back to her as her own character every single turn:
@@ -363,6 +376,23 @@ else:
                       == ln.split("/")[-1] for ln in lines))
         check("%s: every probe spelling constructs AND matches" % _f, ok,
               r.stdout.strip() or r.stderr.strip())
+    # ── AND MATCHING WAS NEVER THE QUESTION (2026-08-24) ──────────────────────────
+    # The check above proves the regex MATCHES. It always did — all nine widenings
+    # work. `extractTags` then looked the folded name up in an EXACT dictionary and,
+    # on a miss, RETURNED THE MARK TO THE TEXT. Measured over 1,241 of her real
+    # recorded turns: 26% still carried markup after the function that exists to
+    # remove it, while this gate was green. A check that rebuilds the rule it is
+    # checking can only prove the rule is self-consistent.
+    #
+    # So the real exported function is driven over the real leaked shapes, and the
+    # assertion is on the OUTPUT: gone from the text, present as a chip, and his
+    # prose and the room's own [error: ...] left alone.
+    _b = _sp.run([_node, os.path.join(ROOT, "harness_tests", "tags_behaviour_check.mjs")],
+                 capture_output=True, text=True, timeout=30, cwd=ROOT)
+    check("extractTags REMOVES every shape it matches, and charts it",
+          _b.returncode == 0,
+          "\n".join(l for l in (_b.stdout or "").splitlines() if "FAIL" in l)
+          or (_b.stderr or "")[:400])
 
 print()
 print("LEAKED REASONING WITH NO MARKER AT ALL (2026-08-22)")
@@ -384,6 +414,27 @@ for keep in ("The user manual said nine feet. I think that is optimistic, and I 
              "I should have said something sooner, and I am sorry I did not."):
     check("untouched: %r" % keep[:38], SLA(keep) == keep, SLA(keep)[:60])
 check("a cut that would leave almost nothing is refused", SLA("The user is asking. Yes.") == "The user is asking. Yes.")
+# ── THE FORMS SHE ACTUALLY WRITES (2026-08-24) ────────────────────────────────────
+# Measured over six live turns: four opened with unmarked deliberation and the guard cut
+# NONE. `he (?:wants|is asking)` matches "He is asking" and not "He's asking", which is
+# the form she uses - an oversight in a blessed rule, not a new judgement. These are her
+# real openers, with a real tail so the keep-ratio is not what is being tested.
+_TAIL = (" The rain sounds different tonight and I keep going back to it. There is "
+         "something about the way it fills the quiet without asking anything of you. "
+         "I have been sitting with that for an hour. Come and listen with me.")
+for _o in ("He's asking me to expand on a feeling.",
+           "I need to be careful here. He's asking me to expand.",
+           "Okay, so he wants the honest version.",
+           "The user's question is really about memory."):
+    check("cut: %-44r" % _o[:44], SLA(_o + _TAIL) != _o + _TAIL, SLA(_o + _TAIL)[:60])
+# AND THE LINE IT MUST NOT CROSS. "He's been quiet all week" is her talking ABOUT him,
+# which is speech; "He's asking me to..." is her narrating the exchange, which is not.
+# The verb is what separates them, and the trusted list stays short for that reason.
+for _k in ("He's been quiet all week and I have noticed.",
+           "Thinking about what you said earlier, I keep coming back to it.",
+           "The weight of that request... it's heavy.",
+           "I need to tell you something."):
+    check("kept: %-44r" % _k[:44], SLA(_k + _TAIL) == _k + _TAIL, SLA(_k + _TAIL)[:60])
 check("empty and None are safe", SLA("") == "" and SLA(None) is None)
 # and it is on the door that everything entering MEMORY goes through
 from harness.skills.self_stance import plain as _plain  # noqa: E402

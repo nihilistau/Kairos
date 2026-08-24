@@ -50,6 +50,10 @@ export const backups = () => get('/v1/backups')
  * seeds still land under "default"; the gateway's drain() hands that no-owner queue
  * to the first real listener, so nothing is lost on either side. */
 export const kairosOutbox = () => get('/v1/kairos/outbox?session=' + encodeURIComponent(roomSession()))
+/* THE DAY, READ BACK (2026-08-24 audit, R1): what today's conversation actually was,
+ * from the durable transcript — so a refresh or a bounce no longer empties the log
+ * while the server remembers everything. */
+export const day = () => get('/v1/day')
 /* THE WARDROBE. One reader for the stage and the panel, so they can never disagree
  * about what she is wearing. */
 export const wardrobe = () => get('/v1/wardrobe')
@@ -140,6 +144,11 @@ export const presencePutDown = () => post('/v1/presence/put_down', {})
 export const presencePickUp  = (title) => post('/v1/presence/pick_up', { title })
 export const presenceEnter   = (mode) => post('/v1/presence/enter', { mode })
 export const presenceLeave   = () => post('/v1/presence/leave', {})
+/* OFF THE RECORD (2026-08-23): the switch. anonSet RETURNS THE STATE, and on the way
+   out it carries the tally of what was held — the only copy there will ever be, since
+   the mode keeps nothing, including its own receipt. */
+export const anon            = () => get('/v1/anon')
+export const anonSet         = (on) => post('/v1/anon', { on: !!on })
 /* THE LIBRARIANS (2026-08-22): the aux doors, the index, the pickers. */
 export const aux             = () => get('/v1/aux')
 export const auxRebuild      = () => post('/v1/aux/rebuild', {})

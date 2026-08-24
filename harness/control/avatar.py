@@ -61,8 +61,34 @@ MOOD_FACE: Dict[str, str] = {
 # The outfit axis: OPAQUE PATH KEYS. Words, garments and choosing live in
 # harness/control/wardrobe.py (OUTFITS). "t0" is the default only in the sense
 # that it is what she wears at the desk when nothing else was chosen.
-OUTFIT_IDS: tuple = ("t0", "t1", "t2", "t3")
-DEFAULT_OUTFIT = "t0"
+# ── THE OUTFITS HAVE NAMES NOW (2026-08-23, his ask) ──────────────────────────────
+# They were t0..t3. wardrobe.py kept the words in OUTFITS and called the ids "opaque
+# path keys", which was true and was also the problem: every reader had to hold a
+# lookup table in their head, and a mislabelled row was INVISIBLE. It took a gate going
+# red to notice that w016 — "Black lace underwear" — was filed under t0, and t0 is "the
+# mesh top". Spelled out, that is obviously wrong; spelled t0, nobody saw it for three
+# days.
+#
+# (It turned out to be harmless — see the note on `tier` in wardrobe.wants(): the field
+# records what she was WEARING WHEN THE WANT WAS FILED, not what the garment is, and
+# for a clothes-subject want it is never used. But "harmless once you have read three
+# files" is exactly the cost a name is supposed to remove.)
+OUTFIT_IDS: tuple = ("mesh-top", "sheer-tee", "lace-set", "bodysuit")
+DEFAULT_OUTFIT = "mesh-top"
+
+# ── AND THE OLD IDS STILL RESOLVE, FOREVER ────────────────────────────────────────
+# 112 files, 29 want rows and her current-outfit state all say t0..t3, and so does
+# anything he or she typed before today. `canon()` is called wherever an outfit id
+# arrives from outside, so a stale id is a rename and not a 404. This is the safety net
+# that makes the rename reversible: delete the map and old data breaks; keep it and
+# nothing can.
+_ALIAS = {"t0": "mesh-top", "t1": "sheer-tee", "t2": "lace-set", "t3": "bodysuit"}
+
+
+def canon(outfit: str) -> str:
+    """Any outfit id, old or new, as the one this tree uses now."""
+    o = (outfit or "").strip()
+    return _ALIAS.get(o, o)
 
 # What an asset can be. `still` is the anchor; `loop` and `clip` are grown from it.
 KINDS: tuple = ("still", "loop", "clip")
@@ -78,6 +104,7 @@ def root() -> str:
 
 
 def rel_path(face: str, outfit: str, kind: str = "still", gesture: str = "") -> str:
+    outfit = canon(outfit)          # a stale t0..t3 is a rename, never a missing file
     if kind == "clip":
         return "%s/%s/clip-%s%s" % (face, outfit, gesture, EXT["clip"])
     return "%s/%s/%s%s" % (face, outfit, kind, EXT[kind])

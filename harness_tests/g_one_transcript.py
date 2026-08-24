@@ -74,8 +74,12 @@ for m in re.finditer(r"def _continue\(", src):
 check("BOTH continuation paths exist and are both checked (console + OpenAI)",
       len(blks) == 2, "found %d _continue definitions, expected 2" % len(blks))
 blk = "\n".join(blks)
+# AMENDED 2026-08-24: the real call is `_session_transcript(body, append=False)`; the
+# bare-`(body)` spelling this used to look for existed only in a COMMENT inside the old
+# closure, so the check was matching the description, not the code — the exact failure
+# the "COMMENTS ARE NOT CODE" note below already names, on the affirmative side.
 check("_continue builds its history from _session_transcript",
-      "_session_transcript(body)" in blk,
+      "_session_transcript(body, append=False)" in blk,
       "it must see the same conversation the turn it continues saw")
 # COMMENTS ARE NOT CODE. The first cut flagged its own explanation of the bug. A gate that
 # cannot tell a fix from a description of the bug gets silenced by whoever documents it.

@@ -167,5 +167,26 @@ missing = [f for f in facts
 check("every concurrent fact is on disk (no lost writes)", not missing,
       ("%d missing" % len(missing), missing[:2]))
 
+print("\n7. CLEANUP QUARANTINES WHAT IT CANNOT PARSE — the doctrine in BOTH passes")
+# _cleanup_locked read _rows() — which silently drops what does not parse — and then
+# _write(keep): a malformed line was VAPORISED by the one maintenance pass whose
+# docstring says "REVERSIBLE: everything lands in quarantine.jsonl". _compact_locked
+# (§3 above) had learned to quarantine them on 2026-08-19; this pass had not — same
+# file, one doctrine, held in one of two passes, AGENTS.md §0 verbatim. Fixed
+# 2026-08-24 (_rows_and_malformed); this section is the receipt the fix's own comment
+# promised. Mutant: put `rows, malformed = _rows(), []` back and both checks go red.
+with open(REG, "a", encoding="utf-8") as f:
+    f.write("{ cleanup must quarantine me, not vaporise me\n")
+n_parsed_before = sum(1 for r in rows() if "_malformed" not in r)
+res7 = ops.cleanup()
+check("cleanup reports the malformed line", res7.get("malformed_quarantined") == 1, res7)
+check("the malformed line is OUT of the registry",
+      not [r for r in rows() if "_malformed" in r])
+q7 = open(qp, encoding="utf-8").read() if os.path.exists(qp) else ""
+check("...and IN quarantine, raw, with the cleanup reason",
+      "cleanup must quarantine me" in q7 and "malformed line (cleanup)" in q7, q7[-160:])
+check("no parsed row was lost in the pass",
+      sum(1 for r in rows() if "_malformed" not in r) >= n_parsed_before)
+
 print("\nG-COMPACT: %d pass, %d fail" % (PASS, FAIL))
 sys.exit(1 if FAIL else 0)

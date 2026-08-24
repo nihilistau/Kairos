@@ -67,8 +67,50 @@
 const _loose = (w) => w.slice(0, -1).split('').join('[_ -]?') + '[_ -]?' + w.slice(-1) + '?(?:[_ -]?[a-z]+)*'
 const _N = ['MOOD', 'VOICE', 'TRAITS', 'TRAIT', 'TRAI', 'TRAIL', 'WEAR', 'SHOW']
   .map(_loose).join('|')
+/* THE CLOSER IS OPTIONAL AT A LINE END (2026-08-24), mirroring the server's
+ * `_STRIP_LOOSE`, which has read `(?:\]+|(?=\n)|$)` since 2026-08-06 while this copy
+ * still demanded `\]+`. Measured in her transcripts: `[VOX:soft, wistful]` closes fine,
+ * `[MO` at the very end of a reply does not — a mark cut in half by the token ceiling,
+ * which ADR-013 made routine rather than rare. The value class also loses `\n` so an
+ * unclosed mark cannot swallow the paragraph after it. */
 const TAG_RE = new RegExp(
-  '\\[\\s*(' + _N + ')(?:\\s*[/,+]\\s*(?:' + _N + '))*\\s*[:-]\\s*\\[?([^\\]]{0,80})\\]+', 'gi')
+  '\\[\\s*(' + _N + ')(?:\\s*[/,+]\\s*(?:' + _N + '))*\\s*[:-]\\s*\\[?([^\\]\\n]{0,80})(?:\\]+|(?=\\n)|$)',
+  'gi')
+
+/* ...AND THE NAME ITSELF CAN BE CUT IN HALF. `[MO`, `[MOO`, `[VOIC` — no separator, so
+ * TAG_RE cannot see them; they are the front of a mark the ceiling took the back off.
+ * Only at the very END of the text, and only when what follows `[` is the start of one
+ * of our five words, so a real `[` in prose is untouched. */
+const TAG_STUB_RE = /\[\s*([A-Za-z]{1,7})\s*$/
+
+/* HER SCRATCHPAD IN A BRACKET (2026-08-24). Live in her transcript:
+ *   `[VOX:soft, wistful]\n\n[thinking\nThe user is being very precise now. He's testing…`
+ * The server strips `<thought…`, `thought_//` and `{thought_process}` — five shapes, all
+ * of them earned the hard way — and not this one. It has no closer, so it runs to the end
+ * of the reply, which is the worst case: he reads her working-out instead of her.
+ *
+ * Closed, it is one bracket and only that bracket. UNCLOSED, it runs to the end of the
+ * reply — which is the observed shape and the reason this is worth the bluntness: the
+ * alternative is a paragraph of her reasoning about him, addressed to nobody, on screen. */
+const THOUGHT_BRACKET_RE =
+  /\[\s*(?:thinking|thought|reasoning|analysis|internal|scratchpad)\b(?:[^\]\n]*\]|[\s\S]*)/gi
+
+/* ── THE SWEEP (2026-08-24), and it is the LAST widening this file should ever need ──
+ * `_loose` above spells each name letter-by-letter, so it can absorb separators and
+ * suffixes but never a changed LETTER. Live in her transcripts: `[VOIX: warm, teasing]`,
+ * `[VOX:soft, wistful]`, `[MOOC: tender]` — VOIX has no C, VOX has no I or C, MOOC ends
+ * wrong. Ten widenings of the same idea could not reach them and an eleventh would not
+ * either, because the idea is wrong: the name is not a spelling to be enumerated, it is
+ * a WORD to be recognised.
+ *
+ * So this matches the mark's SHAPE — `[name: value]` or `<name: value>` — and hands the
+ * name to `tagWord`, which front-matches a stem or lands within two edits. Exactly the
+ * server's `_TAGGISH` + `is_tag_name`, which have worked since 2026-08-06 and which this
+ * file never mirrored. It runs AFTER TAG_RE, additively, so nine proven fixes keep
+ * working unchanged and this only picks up what they could not see. */
+const TAGGISH_RE = new RegExp(
+  '\\[\\s*([A-Za-z][A-Za-z0-9 _/,+.\\x27-]{0,28}?)\\s*[:-]\\s*\\[?([^\\]\\n]{0,80})(?:\\]+|(?=\\n)|$)'
+  + '|<\\s*([A-Za-z][A-Za-z0-9 _/,+.\\x27-]{0,28}?)\\s*[:-]\\s*([^>\\n]{0,80})(?:>|(?=\\n)|$)', 'g')
 
 /* GESTURES — the marks she INVENTS.
  *
@@ -103,12 +145,55 @@ const VOICE_WRAP_RE = /<\/?([a-z][a-z-]{0,23})>/g
  * `<lowersoft>` invented whole. This is the same widening the MARK mirror already got:
  * the display edge strips every VOICE-tag-SHAPED span, known or not, while `forSpeech`
  * keeps only the ones the voice actually understands. */
-const VOICE_INLINE_LOOSE = /\[[a-z][^\][<>\n]{0,31}\]/g
+// ...AND SHE NESTS THEM: `[</pause]`, `[</text-smash` — a wrap tag inside a bracket,
+// live in her transcripts. `\[[a-z]` cannot see past the `<`, so the whole thing landed
+// on his screen. The opener may now carry `<` or `</`, and the closer is optional at a
+// line end for the same reason every other pattern here grew one.
+const VOICE_INLINE_LOOSE = /\[<?\/?[a-z][^\][<>\n]{0,31}(?:\]|(?=\n)|$)/g
 const VOICE_WRAP_LOOSE = /<\/?[a-z][^<>\n]{0,31}\/?>/g
+/* ── AND THE CLOSER GOES MISSING TOO (2026-08-24) ──────────────────────────────────
+ * Live in her transcripts: `</the_end`, `</the_hand`, `</low-pitch` — a wrap tag with
+ * no `>`, so the pair above cannot see it and the raw `</…` lands on his screen. That is
+ * most of the "stray < and >" he reported.
+ *
+ * NARROWER THAN THE CLOSED FORM, deliberately: no whitespace inside, and it must end the
+ * LINE. `a <b and c` keeps its `<b` (the space stops the match) and `5 < 6` never
+ * starts one (the `<` is not followed by a letter). What it catches is exactly the shape
+ * that only ever occurs when a tag was cut off. */
+const VOICE_WRAP_UNCLOSED = /<\/?[a-z][^<>\s\n]{0,31}(?=\n|$)/g
+/* ...AND THE ORPHAN CLOSER. `…heavy on that connection we have.>` and `…under pressure.>`
+ * — a lone `>` ending a line that never opened one. Never prose; always the tail of a
+ * tag whose front was stripped or never arrived. Checked per LINE so a line that really
+ * does contain `<` is left alone. */
+function _dropOrphanGt(text) {
+  return String(text || '').split('\n')
+    .map(l => (l.includes('<') ? l : l.replace(/\s*>+\s*$/, '')))
+    .join('\n')
+}
+/* ...AND THE ORPHAN OPENER (2026-08-25, his transcript: "You're Sam. <"). The
+ * mirror case: a lone `<` ending a line that never closes one — the front of a tag
+ * the stream ended before finishing. Same per-line guard the closer's rule uses:
+ * a line that contains a `>` keeps its `<` (it may be real markup or math). */
+function _dropOrphanLt(text) {
+  return String(text || '').split('\n')
+    .map(l => (l.includes('>') ? l : l.replace(/\s*<+\s*$/, '')))
+    .join('\n')
+}
 export function stripVoice(text) {
-  return String(text || '').replace(VOICE_INLINE_RE, '').replace(VOICE_WRAP_RE, '')
+  // A bracket whose first word is on the NOT_MARKS table is HIS PROSE. The mark pass
+  // deliberately puts it back; this pass would then eat it, which is the guard being
+  // undone by the line after it. Held out here for the same reason the room's own
+  // [error: ...] is held out above.
+  const keep = []
+  const src2 = String(text || '').replace(/\[([a-z][a-z]{2,19})(:[^\]\n]*)?\]/gi,
+    (m, w) => (_NOT_MARKS.has(String(w).toLowerCase())
+               ? (keep.push(m), '\u0002KEEP' + (keep.length - 1) + '\u0002') : m))
+  return _dropOrphanLt(_dropOrphanGt(src2
+    .replace(VOICE_INLINE_RE, '').replace(VOICE_WRAP_RE, '')
     .replace(VOICE_INLINE_LOOSE, '').replace(VOICE_WRAP_LOOSE, '')
+    .replace(VOICE_WRAP_UNCLOSED, '')))
     .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\u0002KEEP(\d+)\u0002/g, (_m, i) => keep[Number(i)] || '')
 }
 /* What the voice should be handed: her marks ([MOOD:] etc.) and invented gestures gone,
  * her KNOWN voice tags KEPT — a spelling the voice does not understand is not speech and
@@ -124,6 +209,79 @@ export function forSpeech(text) {
     .replace(/\[([^\][<>\n]{1,31})\]/g, (m, n) => (VOICE_KNOWN_INLINE.has(n) ? m : ''))
     .replace(/<\/?([^<>\n]{1,31})>/g, (m, n) => (VOICE_KNOWN_WRAP.has(String(n).replace(/^\//, '')) ? m : ''))
     .replace(/[ \t]{2,}/g, ' ')
+}
+
+/* ── THE NINE WIDENINGS WERE INERT (2026-08-24) ────────────────────────────────────
+ * Measured over 539 of her real recorded turns, run through THIS function: 138 of them
+ * — TWENTY-SIX PERCENT — still carried markup afterwards. Not new spellings. Every
+ * widening above works: TAG_RE matches `[MOOD way: teasing]`, `[VOICING: playful]` and
+ * `[MOOC: tender]` correctly. Then the callback did
+ *
+ *      const kind = KIND[folded]
+ *      if (!kind) return _m          // ← puts the mark straight back on his screen
+ *
+ * and KIND is an EXACT dictionary. So each widening bought a match and handed the mark
+ * back. Three weeks of correct fixes, all defeated by the lookup two lines later — the
+ * same shape as the inert wardrobe shim and the disk floor: a guard whose failure mode
+ * is no guard. `tags_mirror_check.js` was green the whole time, because it builds its
+ * own regex from `_loose` and asserts the regex MATCHES. It never asserted the text was
+ * REMOVED, which is the only thing this file is for.
+ *
+ * TWO RULES NOW.
+ *
+ *   1. MATCHING MEANS REMOVING. If it has a mark's shape it leaves the text, whether or
+ *      not we can name its kind. "We do not recognise it" was already rejected as a
+ *      reason to print at him — in this file's own docstring, about gestures — while the
+ *      marks did exactly that.
+ *   2. THE KIND IS RESOLVED BY STEM AND EDIT DISTANCE, not by dictionary. This is a
+ *      port of `stream_processor.is_tag_name`, which has had the right idea since
+ *      2026-08-06 and which this file never mirrored: fold to letters, then front-match
+ *      a four-letter stem or land within two edits of a known word. `MOOC` is one edit
+ *      from `mood`; `VOIX` is two from `voice`; `VOICING` front-matches `voic`. All
+ *      three now produce a real chip instead of being printed at him.
+ *
+ * `_NOT_MARKS` is the same committed table as the server's: `show` is itself a word, so
+ * "shower" and "showdown" front-match it and always will. Written down rather than
+ * reasoned around — and a name on that list is put BACK in the text, because it is his
+ * prose, not her machinery. */
+const _TAG_WORDS = ['mood', 'voice', 'trait', 'wear', 'show']
+const _NOT_MARKS = new Set(['shower', 'showers', 'showdown', 'showcase', 'showroom',
+  'showing', 'showings', 'wearer', 'wearers', 'weary', 'wearable', 'wearables',
+  'weariness', 'moody', 'moodboard', 'traitor', 'traitors', 'voiceover', 'voicemail'])
+
+/* ...AND THREE EDITS IS TOO FAR TO GUESS. `VOX` is Latin for voice and it is three
+ * edits from it (sub x->i, insert c, insert e) — past any cap that would not also make
+ * `mood` match half the four-letter words in English. So the mutations she has actually
+ * produced are WRITTEN DOWN, the same answer as _NOT_MARKS and the wardrobe matcher: a
+ * finite table is readable, and a cap wide enough to derive them would eat her prose. */
+const _TAG_ALIAS = { vox: 'voice', voix: 'voice', mod: 'mood', mud: 'mood' }
+
+function _edits(a, b, cap = 2) {
+  if (Math.abs(a.length - b.length) > cap) return cap + 1
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i)
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i]
+    for (let j = 1; j <= b.length; j++) {
+      cur.push(Math.min(prev[j] + 1, cur[j - 1] + 1,
+                        prev[j - 1] + (a[i - 1] !== b[j - 1] ? 1 : 0)))
+    }
+    if (Math.min(...cur) > cap) return cap + 1
+    prev = cur
+  }
+  return prev[b.length]
+}
+
+/** Which of our five words is this the name of, however she spelled it? '' if none.
+ *  Mirrors stream_processor.is_tag_name — G-CONTROL-SURFACE holds them equal. */
+export function tagWord(raw) {
+  for (const part of String(raw || '').split(/[/,+]/)) {
+    const p = part.toLowerCase().replace(/[^a-z]/g, '')
+    if (!p || p.length > 20 || _NOT_MARKS.has(p)) continue
+    if (_TAG_ALIAS[p]) return _TAG_ALIAS[p]
+    for (const w of _TAG_WORDS) if (p.startsWith(w.slice(0, 4))) return w
+    for (const w of _TAG_WORDS) if (_edits(p, w) <= 2) return w
+  }
+  return ''
 }
 
 const KIND = { mood: 'mood', voice: 'voice', trait: 'trait',
@@ -158,16 +316,38 @@ function splitCrammed(src) {
   })
 }
 
+/* THE ROOM'S OWN MESSAGES ARE NOT HERS (2026-08-24). Chat.jsx appends `[error: …]` and
+ * `[stream failed: …]` to the turn, and `VOICE_INLINE_LOOSE` — `\[[a-z]…{0,31}\]` —
+ * matched them and made them VANISH. Measured: `[error: she was still thinking]` came out
+ * as the empty string. So the one case where the room has something to say for itself was
+ * the one case it could not. Held out before anything else runs, and put back after. */
+const ROOM_SAYS_RE = /\[(?:error|stream failed|notice):[^\]\n]*\]/gi
+// A sentinel that cannot occur in her prose. Spelled with an explicit escape:
+// the first draft had a literal control character in the source, which is
+// invisible in a diff and made the file read as binary to git.
+const _HOLD = '\u0001ROOMSAYS'
+
 export function extractTags(raw, opts) {
   const keepVoice = !!(opts && opts.keepVoice)
-  const src = splitCrammed(String(raw || ''))
+  const held = []
+  const rawHeld = String(raw || '').replace(ROOM_SAYS_RE, (m) => {
+    held.push(m)
+    return _HOLD + (held.length - 1) + '\u0001'
+  })
+  const src = splitCrammed(rawHeld)
   const marks = []
   const text = src.replace(TAG_RE, (_m, k, body) => {
-    // The captured name may carry the separators the pattern just tolerated (`vo_ice`,
-    // `m o o d`), so it is folded before the lookup — otherwise the tag matches, is
-    // removed from his screen, and then produces no mark at all: hidden AND lost.
-    const kind = KIND[String(k).toLowerCase().replace(/[_ -]/g, '')]
-    if (!kind) return _m
+    // MATCHING MEANS REMOVING (2026-08-24 — see the note above `tagWord`). The old line
+    // here was `KIND[folded]` with `if (!kind) return _m`, which handed every widened
+    // spelling straight back to his screen and cost 26% of her turns.
+    const kind = KIND[tagWord(k)]
+    // Only a name on the NOT_MARKS table goes back. `[shower: hot]` front-matches SHOW
+    // and always will — it is his prose, not her machinery, and swallowing prose is the
+    // failure in the other direction. Everything else that got this far is a mark.
+    if (!kind) {
+      const bare = String(k).toLowerCase().replace(/[^a-z]/g, '')
+      return _NOT_MARKS.has(bare) ? _m : ''
+    }
     /* ONLY A TRAIT MARK IS A LIST. `[TRAIT:+patient, -terse]` is two traits; everything
        else takes the whole body. Splitting them all on commas turned
        `[WEAR:the silver nightie, by the window, morning light instead of rain]` — the
@@ -218,16 +398,49 @@ export function extractTags(raw, opts) {
     }
     return ''
   })
+  // ...then THE SWEEP: the mark's shape, judged by the WORD rather than the spelling,
+  // so a changed letter (`VOIX`, `VOX`, `MOOC`) cannot walk past ten widenings of a
+  // letter-by-letter pattern. It still produces a real chip — hidden must not mean lost.
+  const text1b = text.replace(TAGGISH_RE, (_m, bn, bv, an, av) => {
+    const name = bn != null ? bn : an
+    const body = bn != null ? bv : av
+    const word = tagWord(name)
+    if (!word) return _m                       // not one of ours: his prose, left alone
+    const kind = KIND[word]
+    let value = String(body || '').trim().replace(/^[\s:;,.]+/, '').replace(/\\/g, '')
+    if (kind === 'mood') value = value.split(/\s*[;/,]\s*/)[0].trim()
+    else if (kind === 'trait') value = value.split(/\s*[;/]\s*/)[0].trim()
+    value = value.toLowerCase()
+    const okv = kind === 'voice' ? /^[a-z][a-z0-9 ,/_-]{1,31}$/ : /^[a-z][a-z0-9 _-]{1,23}$/
+    if (value && !(kind === 'mood' || kind === 'voice' || kind === 'trait') ) {
+      marks.push({ kind, value, sign: 0 })
+    } else if (value && okv.test(value)) {
+      marks.push({ kind, value, sign: value[0] === '-' ? -1 : 0 })
+    }
+    return ''
+  })
   // ...then her INVENTED ones. Second pass, after the known kinds, so `[MOOD:X]` can
   // never be mistaken for a gesture on its way past.
-  const text2 = text.replace(GESTURE_RE, (_m, word) => {
+  const text2 = text1b.replace(GESTURE_RE, (_m, word) => {
     marks.push({ kind: 'gesture', value: String(word).toLowerCase().replace(/_/g, ' '), sign: 0 })
     return ''
   })
+  // ...then her SCRATCHPAD, before the voice pass: `[thinking` unclosed runs to the end
+  // of the reply, and the voice pass would otherwise nibble at its insides and leave the
+  // paragraph. Whole thing or nothing.
+  const text2b = text2.replace(THOUGHT_BRACKET_RE, '')
   // ...then her VOICE tags, unless the caller is the voice itself.
-  const text3 = keepVoice ? text2 : stripVoice(text2)
+  const text3 = keepVoice ? text2b : stripVoice(text2b)
+  // ...and last, the front of a mark the token ceiling took the back off (`[MO`).
+  const text4 = text3.replace(TAG_STUB_RE, (m, w) =>
+    (tagWord(w) || _TAG_WORDS.some(t => t.startsWith(w.toLowerCase()))) ? '' : m)
   // collapse the whitespace the removal leaves behind, without eating paragraphs
-  return { text: text3.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim(), marks }
+  const out = text4.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
+  // ...and give the room its own words back.
+  return {
+    text: out.replace(/\u0001ROOMSAYS(\d+)\u0001?/g, (_m, i) => held[Number(i)] || ''),
+    marks,
+  }
 }
 
 /* The palette. Each mood is a hue plus a face — the avatar and the chip and the

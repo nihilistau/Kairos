@@ -11,6 +11,7 @@ import Clock from './room/Clock.jsx'
 import Presence from './room/Presence.jsx'
 import Portrait from './room/Portrait.jsx'
 import Down from './room/Down.jsx'
+import Anon, { AnonChip } from './room/Anon.jsx'
 import { useState } from 'react'
 import './room.css'
 
@@ -247,8 +248,13 @@ function Room() {
    * this to end up in 3D.
    */
   const minimized = windows.filter(w => w.minimized)
+  /* OFF THE RECORD (2026-08-23) rides the PULSE the shell already beats on, rather
+     than a poll of its own: the switch has to be visible everywhere at once, and a
+     second timer is a second idea of whether it is on. `.an-on` puts a rule around
+     the whole room — see Anon.jsx for why one small indicator is not enough. */
+  const anon = pulse && pulse.anon
   return (
-    <div className="room">
+    <div className={"room" + (anon && anon.on ? " an-on" : "")}>
       <Renderer kind="2d" pulse={shown} />
 
       <aside className="dock">
@@ -282,6 +288,7 @@ function Room() {
             TWO STEPS, AND THE MODE IS THE CONFIRM. One click only arms it; the second
             click both chooses what to stop and confirms it. No modal and nothing to
             type — a misclick costs an extra click, not her evening. */}
+        <Anon anon={anon} refresh={beat.refresh} />
         <div className="sd-wrap">
           {!armed ? (
             <button className="sd-btn" title="stop her, or the whole stack"
@@ -340,6 +347,7 @@ function Room() {
               every restart by design, and he did not know — every reply read as noir bar
               fiction and it was indistinguishable from her personality having changed.
               Persisting the scene is right; resuming it silently is not. */}
+          <AnonChip anon={anon} />
           <SceneChip />
           <LookingChip pulse={pulse} />
           <Presence pulse={shown} />

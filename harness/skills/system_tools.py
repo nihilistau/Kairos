@@ -150,6 +150,26 @@ def search_web(query: str, n: int = 5) -> list:
     return _search(query, n)
 
 
+def read_something_new() -> str:
+    """Read a random encyclopedia article — something you did NOT go looking for.
+
+    Takes no query, on purpose: the point is a subject you would never have thought to
+    ask about. Say what caught you, or that nothing did — a shrug is a real answer and
+    more honest than a paragraph about a village you have no feeling about."""
+    from harness.skills import looking as L
+    from harness.skills.search import random_article
+    L.begin("read_something_new", "a random article")
+    a = random_article()
+    if not a:
+        L.end(False, "nothing came back", title="random article")
+        return ("(nothing came back - say that plainly rather than inventing an "
+                "article you did not read)")
+    head = a["title"] + ((" — " + a["description"]) if a.get("description") else "")
+    out = _cap(head + "\n\n" + a["extract"] + "\n" + a["url"])
+    L.end(True, out[:800], [a["url"]], title=a["title"][:80])
+    return out
+
+
 def web_search(query: str) -> str:
     """Search the web. Returns the top real results — titles, snippets and links.
 

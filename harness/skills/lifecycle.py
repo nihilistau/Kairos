@@ -330,22 +330,23 @@ def classify(fact: str) -> str:
 # of gold evidence against 0.770 for a value model. We have recency and frequency; per-class
 # durability is the cheapest honest step toward the missing term, and unlike an LLM-assigned
 # importance score it cannot hallucinate.)
-_NEVER = 1.0e9        # dispositions and identity do not fade. They are what he IS.
-_HALF_LIFE_BY_CLASS = {
-    "identity":       _NEVER,     # his name, his gender
-    "preference":     _NEVER,     # "I like fun" — a disposition, not a mood
-    "relationship":   _NEVER,     # his cat is his cat
-    "persona":        3650.0,     # ten years
-    "private-secret": 3650.0,
-    "fact":            365.0,     # possessions, hardware, work — slow, but they do change
-    "event":             3.0,     # an appointment is worthless the day after
-    "episodic-event":    3.0,
-    # THE REAL HER (2026-08-22): her narrative is who she is — it does not fade; a
-    # feeling fades slowly (years), so last month's unease does not read as tonight's.
-    "self-narrative":  _NEVER,
-    "feeling":         730.0,
-}
-_HALF_LIFE_DAYS = 45.0            # the default for anything unclassified
+# THE TABLE LIVES IN THE REGISTRY NOW (2026-08-25, G1). This was a hand enumeration —
+# `identity: NEVER, fact: 365, event: 3, ...` — beside a registry (memclass.py) whose
+# whole doctrine is "one registry, everyone consumes". So a class added THERE silently
+# decayed at the 45 d default HERE: three registered classes (counterfact, same-template,
+# self-fact) were already doing exactly that, and nothing said so. The per-class values
+# are now attributes of the registry entry itself (half_life_days, beside delivery and
+# producers), this is a projection of them, and G-MEMCLASS goes red for a registered
+# class that has not chosen. The values are unchanged — including the three 45 d
+# fall-throughs, now recorded as decisions on their rows. THE REAL HER note survives on
+# the registry entries: her narrative is who she is — it does not fade; a feeling fades
+# slowly (years), so last month's unease does not read as tonight's.
+from harness.skills import memclass as _mc  # a leaf module: no import cycle
+_NEVER = _mc.NEVER_DAYS   # dispositions and identity do not fade. They are what he IS.
+_HALF_LIFE_BY_CLASS = _mc.half_life_map()
+_SALIENCE_WEIGHT_BY_CLASS = _mc.salience_weight_map()   # consumed by salience(), below
+_HALF_LIFE_DAYS = _mc.DEFAULT_HALF_LIFE_DAYS   # for anything UNREGISTERED (see salience;
+#                          the twin definition that sat 630 lines down is gone, G3)
 
 # ── TIERED PERMANENCE: NOT EVERY THING SHE SAYS IS A DISPOSITION (2026-08-22) ───────────
 # The class is the wrong grain for her own lane. `self-narrative` covers a journal entry
@@ -501,7 +502,16 @@ def find_superseded(new_fact: str, speaker: str, rows: Iterable[dict],
         # was LIVE to the supersede machinery: a dead fact could still be re-retired,
         # chained, and counted as a conflict. One real orphan existed in the live store
         # when this was found (2026-08-19).
-        if r.get("lifecycle") or r.get("superseded_by"):
+        # ONE SPELLING (2026-08-25). The 2026-08-19 fix WIDENED this to `lifecycle or
+        # superseded_by` while every reader in the tree tests `lifecycle` alone — two
+        # silent spellings of "dead", which is §0 waiting to fire. Measured on the live
+        # store: 25 lifecycle-without-superseded_by, ZERO superseded_by-without-lifecycle
+        # — the wider clause matches nothing real. And if a half-stamped row (breadcrumb,
+        # no tombstone) ever DID exist, the wide spelling would make it dead to this
+        # machinery and live to every reader — a split brain; `lifecycle` alone keeps it
+        # consistently live so a later supersede can retire it properly. Same edit in
+        # dominance.find_subsumed, same day.
+        if r.get("lifecycle"):
             continue
         if r.get("speaker", SPEAKER_USER) != speaker:
             continue
@@ -976,7 +986,11 @@ def render(row: dict) -> str:
 # already decides what is eligible to be counted. The gate says what is a fact; salience
 # says which facts matter. Built in the other order, frequency would have amplified the
 # firehose instead of ranking the store.
-_HALF_LIFE_DAYS = 45.0        # a fact unmentioned for 45 days is worth half as much at recall
+# (_HALF_LIFE_DAYS was defined a SECOND time here, same value, different comment —
+#  "a fact unmentioned for 45 days is worth half as much at recall". Two definitions of
+#  one constant is how they drift apart the day someone edits the one they can see;
+#  deduped 2026-08-25 (G3) onto the single definition beside the class table above,
+#  which now reads memclass.DEFAULT_HALF_LIFE_DAYS.)
 
 
 def _age_days(iso: str, now: Optional[float] = None) -> float:
@@ -1077,8 +1091,12 @@ def salience(row: dict, now: Optional[float] = None) -> float:
         recency = 0.5 ** (age / half)                       # 1.0 for anything that does not fade
 
     # identity and preference are what he IS; an off-hand fact is what he mentioned once.
-    weight = {"identity": 1.6, "self-narrative": 1.5, "preference": 1.3, "relationship": 1.3,
-              "feeling": 1.3, "persona": 1.2, "private-secret": 1.2}.get(cls, 1.0)
+    # FROM THE REGISTRY (2026-08-25, G1): this was a dict literal here — the same silent
+    # fall-through as the half-life table above it, in the same function's input. The
+    # weights are memclass registry attributes now (salience_weight, unchanged values);
+    # 1.0 remains the floor for an UNREGISTERED class only, and G-MEMCLASS convicts a
+    # registered class that has not chosen.
+    weight = _SALIENCE_WEIGHT_BY_CLASS.get(cls, 1.0)
     return round(weight * (1.0 + freq) * (0.35 + 0.65 * recency), 4)
 
 

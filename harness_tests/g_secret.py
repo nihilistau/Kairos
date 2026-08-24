@@ -176,6 +176,60 @@ for cls in BRANCHED_ON:
 check("classify() can emit private-secret (it could not, and that was the bug)",
       "private-secret" in {lc.classify(s) for s in ["My PIN is 4471"]})
 
+# ── 5. THE GUARD HOLDS AT ALL FIVE DOORS, NOT ONE (2026-08-25; audit A3 2026-08-24) ──
+# §3 proves the decline on spine.recall_decider — the AUTOMATIC door. The audit found the
+# other FOUR read doors in memory.py serving the same row verbatim: list_memories dumped
+# it, recall() presented it, search_memories returned its raw text with a match score,
+# provenance() quoted it. The guard held on the path that runs without her choosing it
+# and on none of the paths she chooses — AGENTS.md §0, in the subsystem whose closed
+# trap is the §0 table's last row. The rule now lives in memory.secret_withheld(), one
+# function, consumed by every door; this section walks all four with a secret minted
+# through remember() (never hand-built — §0 of this file's own doctrine).
+print("\n5. the withholding holds at every TOOL door (the decider was one of five)")
+reset()
+M.remember("My garage door code is 8812", source="user turn")
+M.remember("Sam's workshop bench is oak", source="user turn")     # listings need company
+
+ABSENT_Q = "when did I last change the garage door code?"           # attribute NOT in the row
+
+for door, out in [
+    ("list_memories", M.list_memories()),                            # a dump asks no attribute
+    ("recall", M.recall(ABSENT_Q)),
+    ("search_memories", M.search_memories(ABSENT_Q)),
+    ("provenance", M.provenance(ABSENT_Q)),
+]:
+    check("%-16s does not surface the secret's text" % door, "8812" not in out, out[:90])
+    check("%-16s says it is HELD, not silently absent" % door,
+          M.SECRET_WITHHELD_NOTE in out, out[:90])
+
+# ...and none of that made her useless (G-SECRET §3's other leg, at the tool doors too):
+# asked for the thing ITSELF — attribute present — she answers HIM.
+check("recall: the direct present-attribute ask still answers him",
+      "8812" in M.recall("what is the garage door code?"))
+check("search_memories: the direct ask still answers him",
+      "8812" in M.search_memories("what is the garage door code?"))
+check("...and the innocent row is untouched by the secret rule",
+      "oak" in M.list_memories())
+
+# THE IN-GATE MUTANT: every door must CONSULT the rule, not coincidentally hide the row.
+# With secret_withheld forced False each door must LEAK — proving the guard is the one
+# load-bearing thing between the row and the reply, per door, by name. (The offline
+# mutant procedure — break memory.secret_withheld itself, run this file, watch the four
+# doors above go red by name, restore — was performed when this section landed.)
+_orig_sw = M.secret_withheld
+M.secret_withheld = lambda row, query="": False
+try:
+    for door, out in [
+        ("list_memories", M.list_memories()),
+        ("recall", M.recall(ABSENT_Q)),
+        ("search_memories", M.search_memories(ABSENT_Q)),
+        ("provenance", M.provenance(ABSENT_Q)),
+    ]:
+        check("MUTANT %-16s leaks with the guard lifted (the guard is load-bearing)" % door,
+              "8812" in out, out[:90])
+finally:
+    M.secret_withheld = _orig_sw
+
 os.unlink(_reg)
 print("\nG-SECRET  %d/%d" % (PASS, PASS + FAIL))
 sys.exit(1 if FAIL else 0)

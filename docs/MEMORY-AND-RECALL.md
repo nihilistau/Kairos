@@ -132,6 +132,14 @@ Other fields:
 
 ## Write paths — there are three, and only one is authoritative
 
+> **All three can be closed.** `harness/control/anon.py` — anonymous mode, 2026-08-23 —
+> holds every write that records the conversation, guarded AT THE WRITE so that guarding
+> `remember()` once guards all thirty of its callers. Volatile: process memory, never a
+> file, OFF in a cold stack, ended by a restart. Twelve doors, the two deliberate
+> exceptions, and what it does NOT touch (all reads, the KV cache, his own hands) are in
+> [`docs/ANON-MODE.md`](ANON-MODE.md); G-ANON is the proof.
+
+
 ### 1. `harness/skills/memory.py:remember()` — the authoritative door
 
 In order (`memory.py:97-263`):
@@ -238,11 +246,34 @@ a deterministic extractor that lifts first-person stances (I think / I feel / I 
 decided …) out of her replies, never whole replies, never questions, at most four per reply.
 Narrative rows never supersede; a repeat reinforces. Presence-mode turns (C, 2026-08-22) write by their kind — narration→`narration`, company→`thought`, lucid→`dream`; a passage read aloud is not memory, the act is (`I read him the next pages of …`). Full rule: `docs/INVARIANT-MEMORY.md` §2.2.
 
+> **QUALIFIED 2026-08-25 — the kind mapping above is still right, and the fourth producer no
+> longer fires on those turns.** A presence-mode turn now settles with `record=False,
+> stances=False` (`harness/server/app.py`, the scheduler passes the impulse KIND to
+> `on_spoke`): it writes **no** day-transcript row and **no** `self_stance` rows. Her dials
+> still move — a dream can leave her wistful — but nothing is filed. His call, in his words:
+> the lucid/reading lines are *too specific and too repetitive to be stored as her memories*,
+> and the `kind=dream` pile in the registry was the receipt. So read the mapping as: the
+> presence lane writes ITS OWN narrative row by kind, and the ordinary epilogue that follows
+> a spoken turn (day transcript + stance extraction) is skipped for it. **These turns are
+> ambient company, not memory.** Gated by `harness_tests/g_turn_epilogue.py` §4b (22/22),
+> whose differential leg proves the KIND is the gate and not the text.
+
 **Durability is per KIND, not per class (2026-08-22).** `lifecycle._HALF_LIFE_BY_KIND` is
 consulted before the class table and only her lane has a `kind`: what she CONCLUDED
 (`journal` `self_description` `thought` `dream` `chapter`) never fades; what she DID
 (`narration` `spoke_up`) fades at 120 d; `company` at 60 d; a `feeling` keeps the class's 730 d.
 Decay is not deletion — the rows stay live, findable and in `provenance()`.
+
+> **WHERE THE PER-CLASS HALF-LIFE LIVES, since 2026-08-25.** The per-KIND table above is
+> still `lifecycle._HALF_LIFE_BY_KIND` and is still consulted first. The per-CLASS fallback
+> is NOT a table in `lifecycle` any more: `half_life_days` and `salience_weight` are now
+> **registry attributes in `harness/skills/memclass.py::REGISTRY`**, one entry per class, and
+> `lifecycle` reads them through a projection (`memclass.half_life_map()`). That is the file
+> you edit to add a class or move a decay — and a class registered without them **fails
+> G-MEMCLASS**, which is the whole point of the move: they lived as a hand enumeration inside
+> `lifecycle`, so a class added to the registry silently decayed at the 45 d default
+> (`memclass.DEFAULT_HALF_LIFE_DAYS`) instead of at anything anyone had chosen. The registry's
+> own doctrine, violated by the registry's first consumers.
 
 **The chapter.** `narrative.weekly_chapter()` writes one `kind="chapter"` row every seven
 nights (step 5 of `ops.reflect`, latched on the store) from the EPISODIC kinds and her own-time
@@ -260,6 +291,37 @@ through **`memory.live_rows(testimony=)`** — added 2026-08-19 after nine reade
 found re-implementing the tombstone filter with three different predicates, two of them
 model-facing and skipping `testimony_wins` entirely. Two functions, one predicate; a new
 reader uses one of them or it is a bug.
+
+**And ONE audit door beside them: `memory.all_rows(path="")`** (2026-08-24, audit C).
+Readers that ACCOUNT rather than serve — maintenance, `PersonModel`'s evidence walk,
+anything answering *what did she believe, when* — want the tombstones too, and were
+getting them by opening `SP_RECALL_REGISTRY` with private JSONL loops, so malformed-line
+policy and parse behaviour drifted per reader. `all_rows()` is `_load()` made public:
+every row, store order, one parser. Callers apply `lifecycle.is_retired()` themselves —
+asking for the dead is the point of this door; `path` serves callers pointed at a
+fixture (`person.py` migrated 2026-08-25, gate G-PERSON-SLOTS §5). Its companion
+**`memory.orphan_tombstones(path="")`** returns the tombstones with no `superseded_by`
+breadcrumb — the live store carries 25 (repair-era retirements; `forget()` before it
+grew its breadcrumb). They are properly DEAD to every reader (`lifecycle` is the one
+death field, ONE spelling since 2026-08-25 — `find_superseded`/`find_subsumed` dropped
+their wider `or superseded_by` clause, G-MEMORY-LIFECYCLE / G-SEM-DOMINATE), but they
+cannot answer WHY they died. The helper only RETURNS them, for the curate panel to show
+him one day; rewriting history onto 25 old rows is his call row by row, never a
+maintenance pass's.
+
+**The secret is withheld at ALL the tool doors, by one rule** (2026-08-24, audit A3;
+gate G-SECRET §5). `spine.recall_decider` — the automatic injection — has honoured
+`private-secret` since G-SECRET landed, and every OTHER read door in memory.py served
+the row verbatim: `list_memories` dumped it, `recall()` presented it, `search_memories`
+returned its raw text with a match score, `provenance()` quoted it. The rule lives in
+**`memory.secret_withheld(row, query)`** now, consumed by all four (the listing and
+`search`/`provenance` through `_present_row()`, `recall()` directly): no question (a
+listing) → withheld; asked with the attribute ABSENT (`attr_absent`) → withheld, the
+fixed `SECRET_WITHHELD_NOTE` ("a private thing, held — ask me directly about it") in
+its place; asked for the thing ITSELF → served, because he told her the secret and she
+is not made useless (the decider's own semantics, G-SECRET §3). The ranked seam is
+deliberately NOT filtered — dropping the row there would make the decider's loud
+decline unreachable; the guard must fire, not evaporate.
 
 - **`recall()`** (`memory.py:546-594`) — the tool. Renders through `lifecycle.render()`,
   ranks through `_target_and_rank()` (pronoun-scoped: "my" means him, "your" means her,
@@ -350,10 +412,15 @@ the Memory group. The block is part of the cached prefix: a gateway bounce refre
 - **`lifecycle.salience()`** (`lifecycle.py:808-839`) = `weight(mem_class) × log-scaled
   mentions × recency(half_life by class)`. A ranking *prior*, not an answer — it only breaks
   ties among facts the query already matched (`memory.py:679-695`,
-  `0.22 * lc.salience(e)`). Half-life is per `mem_class`
-  (`lifecycle.py:223-234`): `identity`/`preference`/`relationship` never decay (they're what
+  `0.22 * lc.salience(e)`). Half-life is per `mem_class`:
+  `identity`/`preference`/`relationship` never decay (they're what
   he *is*), `fact` decays over a year, `event` decays in 3 days (a flight is worthless the day
-  after), everything else defaults to 45 days.
+  after), everything else defaults to 45 days. **Both numbers moved house on 2026-08-25** —
+  the per-class `half_life_days` AND the class prior `salience_weight` are entries in
+  `harness/skills/memclass.py::REGISTRY` now, not literals in `lifecycle` (which reads them
+  through `memclass.half_life_map()`). Values unchanged by the move; a class that does not
+  declare them fails G-MEMCLASS. The per-KIND override for her own lane still wins first
+  (`lifecycle._HALF_LIFE_BY_KIND`, see "Durability is per KIND" above).
 - **`harness/model/person.py:PersonModel`** — slots (`identity`, `dispositions`,
   `relationships`, `possessions`, `happenings`, `person.py:86-93`), built only from
   `speaker=user` rows (`from_registry`, `person.py:122-142` — "her facts do not model him").
@@ -399,7 +466,8 @@ It is fixed now: `lifecycle.classify()` (`lifecycle.py:245-265`) checks for a cr
 FIRST, before `_CLASS_RULES` (`lifecycle.py:235-242`, relationship/identity/event) ever runs,
 via `_SECRET` / `_SECRET_POSS` (`lifecycle.py:220-233`) — so "my wife's password is hunter2"
 classifies as `private-secret`, not `relationship`, because a secret that names a person is
-still a secret. Gated end to end by `harness_tests/g_secret.py` (G-SECRET, 22/22, OFFLINE): it
+still a secret. Gated end to end by `harness_tests/g_secret.py` (G-SECRET, **37/37** — 22/22 when this
+paragraph was written; §5 added the four tool doors, count re-run 2026-08-25, OFFLINE): it
 sets no `mem_class` itself, drives real sentences through `remember()` and the real
 `spine.recall_decider()`, and asserts the decline fires with the secret text never appearing
 in the payload, while a direct ask for the secret itself still gets answered. It also confirms

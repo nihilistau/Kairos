@@ -1,6 +1,6 @@
 {
  "set": "kairos-default-1",
- "outfit": "t0",
+ "outfit": "mesh-top",
  "faces": [
   "bright",
   "smirk",
@@ -20,5 +20,5 @@
  ],
  "bytes": 23905183,
  "built_by": "tools/kairos_default_set.py",
- "note": "stills and loops only - the prompts that made them are not published. character.txt is a written template, not the source repo's own."
+ "note": "stills and loops only - the prompts that made them are not published. character.txt is a written template, not the source repo's own. Outfit ids were t0..t3 when this set was built (2026-08-23) and became names hours later; the directories and this field were renamed 2026-08-25 to the canonical id, and avatar_seed canonicalises on the way in besides, so a bundle built before the rename still lands correctly."
 }

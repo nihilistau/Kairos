@@ -25,6 +25,12 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+# SANDBOX FIRST (2026-08-24). One of nine gates the sandbox audit caught writing into
+# her REAL stores; `_gate.sandbox` points every root at a temp dir and must run BEFORE
+# any harness import, because a module resolves its root once, at import.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _gate import sandbox as _sandbox  # noqa: E402
+_sandbox(os.path.basename(__file__))
 
 _TMP = tempfile.mkdtemp()
 os.environ["SP_RECALL_REGISTRY"] = os.path.join(_TMP, "registry.jsonl")

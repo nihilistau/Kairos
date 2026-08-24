@@ -65,6 +65,50 @@ _state = {
 }
 
 
+# ── THE COOLDOWN SURVIVES THE RESTART IT CAUSES (2026-08-24 audit, B7) ──────────────
+# `last_restart_at` lived in process memory, and the one restart this module performs
+# STOPS THIS PROCESS: the new gateway booted with 0.0, so the floor documented above
+# ("a watchdog with no cooldown is a restart loop with a justification") never applied
+# across the restarts it actually causes — a guard whose failure mode is no guard.
+# Persisted beside the registry (the path every gate sandbox already redirects), read
+# once at first need, written on every restart.
+def _persist_path() -> str:
+    reg = os.environ.get("SP_RECALL_REGISTRY", "")
+    base = (os.path.dirname(reg) if reg else
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+                os.path.abspath(__file__)))), "var", "memory"))
+    return os.path.join(base, "watchdog.json")
+
+
+def _recall_persisted() -> None:
+    """Fold the previous process's restart clock into this one. Best-effort; called
+    under _LOCK by _restart before the floor is judged."""
+    if _state["last_restart_at"]:
+        return
+    try:
+        import json
+        with open(_persist_path(), encoding="utf-8") as f:
+            d = json.load(f)
+        _state["last_restart_at"] = float(d.get("last_restart_at") or 0.0)
+        _state["restarts"] = int(d.get("restarts") or 0)
+        _state["last_reason"] = str(d.get("last_reason") or "")
+    except Exception:
+        pass
+
+
+def _persist() -> None:
+    try:
+        import json
+        p = _persist_path()
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump({"last_restart_at": _state["last_restart_at"],
+                       "restarts": _state["restarts"],
+                       "last_reason": _state["last_reason"]}, f)
+    except Exception as exc:
+        logger.warning("[watchdog] could not persist the restart clock: %s", exc)
+
+
 def enabled() -> bool:
     return os.environ.get("SP_WATCHDOG", "1") != "0"
 
@@ -175,6 +219,7 @@ def _should_restart() -> str:
 def _restart(reason: str, restart_fn: Callable[[bool], None]) -> None:
     now = time.time()
     with _LOCK:
+        _recall_persisted()       # the previous process's clock counts against the floor
         since = now - (_state["last_restart_at"] or 0.0)
         if _state["last_restart_at"] and since < cooldown_s():
             logger.warning("[watchdog] would restart (%s) but the last one was %.0fs ago "
@@ -186,11 +231,39 @@ def _restart(reason: str, restart_fn: Callable[[bool], None]) -> None:
         _state["last_reason"] = reason
         _state["empty_streak"] = 0
         _state["down_since"] = 0.0
+        _persist()                # so the gateway this restart spawns still knows
     logger.error("[watchdog] RESTARTING THE STACK: %s", reason)
+    # ── THROUGH THE LADDER'S FIRST RUNGS, NOT AROUND THEM (2026-08-24 audit, B8) ──
+    # The operator's shutdown runs quiesce -> finish_or_abandon -> flush before
+    # anything stops; this automatic path ran NONE of it — no refusal of new turns,
+    # no wait for the one in flight, and the undelivered outbox died with the
+    # process. The invariant was enforced on one of two teardown paths and the
+    # unguarded one was the automatic one. Bounded (finish_or_abandon has its own
+    # timeout; a wedged CUDA context abandons rather than hangs), and if the spawn
+    # itself fails the quiesce is RESUMED — a watchdog that leaves the gateway
+    # refusing every turn after a failed restart would be the worse fault.
+    _spawned = False
     try:
+        from harness.control import shutdown as _sd
+        try:
+            _sd.quiesce()
+            _sd.finish_or_abandon(60.0)
+            _sd.flush()
+        except Exception as exc:
+            logger.warning("[watchdog] pre-restart rungs incomplete (%s) — "
+                           "restarting anyway; the daemon is the thing that is broken",
+                           exc)
         restart_fn(True)          # full: the daemon is the thing that is broken
+        _spawned = True
     except Exception as exc:
         logger.error("[watchdog] restart failed: %s", exc)
+    finally:
+        if not _spawned:
+            try:
+                from harness.control import shutdown as _sd2
+                _sd2.resume()
+            except Exception:
+                pass
 
 
 def _held_by_shutdown() -> bool:

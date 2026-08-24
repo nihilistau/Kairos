@@ -476,6 +476,12 @@ def build_env(c: dict) -> dict:
         # generation tag (lcp lands 2-3 tokens short of any prompt's end, which is
         # why the first cut was never once restored from). `min` is the suffix below
         # which the memcpy costs more than the prefill it saves.
+        # The retokenization seam (2026-08-24 audit): when the divergent committed
+        # tail and the incoming prompt spell the SAME bytes, the prompt takes the
+        # committed spelling and drop goes to 0 — the strict append fires instead of
+        # a 133-second suffix re-prefill. Off by default; armed per profile on the
+        # live receipt (routes.rs::reseam_join carries the whole story).
+        "SP_KV_RESEAM": b(kv.get("reseam", False)),
         "SP_ROLL_SNAPSHOT": b(kv.get("roll_snapshot", False)),
         "SP_ROLL_SNAPSHOT_MIN": str(kv.get("roll_snapshot_min", 384)),
         "SP_ROLL_SNAPSHOT_MARGIN": str(kv.get("roll_snapshot_margin", 16)),
@@ -557,6 +563,16 @@ def build_env(c: dict) -> dict:
         # builds are never read — authority='spine' disables the engine recall that consumes them.
         # false = the old synchronous behaviour (determinism, for gates). Gate: G-CAPTURE-ASYNC.
         "SP_CAPTURE_ASYNC": b(mem.get("mint_async", True)),
+        # THE DISK FLOOR. An episode is mean 11.1 MB / max 79.1 MB measured over her
+        # real ones, so a live mint spends real disk. Below this many GB free the mint
+        # yields and rows land with npos=0 (recall is text + semantic) rather than
+        # racing the registry write for the last block. harness/skills/memory.py.
+        "SP_CAPTURE_MIN_FREE_GB": str(mem.get("mint_min_free_gb", 2)),
+        # WHERE EPISODES LIVE. An episode is ep.k + ep.v at full depth per position:
+        # mean 11.1 MB, written once, read only on a deep recall. That belongs OFF the
+        # working drive. Empty = beside the registry, as it always was. The row carries
+        # its own absolute dir, so moving the root never orphans what is already written.
+        "SP_EPS_DIR": str(mem.get("eps_dir", "") or ""),
 
         # ── SEM (docs/SEMANTICS.md): S0 sidecar index + S1 semantic rank ───────────────────
         # S0 (mint/index): DERIVED data in its own file (harness/skills/semindex.py) —
@@ -659,6 +675,39 @@ def build_env(c: dict) -> dict:
         # MoE ROUTE TRACE — the measurement that decides whether speculation can pay on
         # an expert-streaming model at all (see profiles/companion.toml [decode]).
         "SP_MOE_TRACE": b(dec.get("moe_trace", False)),
+        # SP_G4_NAN_PROBE — a BISECTION TOOL, not a guard (2026-08-23). A CUDA fault
+        # announces itself; a NaN rides the residual forward in silence and the first
+        # thing that notices is something far downstream with no idea where it came
+        # from. This reports the first layer+stage where the residual goes non-finite.
+        # Costs a D2H + sync per layer when armed, so it is off and stays off: arm it,
+        # run the failing thing once, read the layer, disarm.
+        "SP_G4_NAN_PROBE": b(dec.get("nan_probe", False)),
+        # SP_MOE_TIMING — how much of the routed FFN is the CPU waiting on the GPU.
+        # moe_topk_host picks experts on the HOST, so every layer does a router D2H +
+        # cudaStreamSynchronize: 30 pipeline stalls per decoded token. Prints cumulative
+        # sync / expert-loop / whole-branch ms every 300 syncs. Off = no clock calls.
+        "SP_MOE_TIMING": b(dec.get("moe_timing", False)),
+        # SP_MOE_PIN_STAGE — expert staging through a pinned ring instead of a pageable
+        # cudaMemcpyAsync (which is not async at all: the driver blocks staging it through
+        # its own pinned buffer). MEASURED at 2.0-2.56 GB/s pageable. "0" is the null floor.
+        "SP_MOE_PIN_STAGE": ("0" if dec.get("moe_pin_stage", True) is False else "1"),
+        # SP_MOE_PIN_ARENA — cudaHostRegister the expert weights WHERE THEY LIE, so the
+        # DMA engine reads them directly and the ring's CPU memcpy disappears. It does
+        # not allocate: those pages are already resident and read every token. May be
+        # refused if the arena is file-backed; falls back to the ring, then to pageable.
+        "SP_MOE_PIN_ARENA": b(dec.get("moe_pin_arena", True)),
+        # SP_G4_ATTN_TILE — tile width for the decode attention. 0 = the flat kernel
+        # byte for byte. Above 0, shared memory becomes tile+HD floats instead of
+        # Pmax floats, which is what makes pmax a VRAM question instead of a 48 KB
+        # shared-memory question. Numerics differ (reduction order), so it is gated.
+        "SP_G4_ATTN_TILE": str(int(dec.get("attn_tile", 0) or 0)),
+        # SP_KV_PREFILL_CHUNK — feed a cold prompt to the BATCHED prefill N tokens at a
+        # time. The batched path materialises O(n) f32 activation scratch (~156 KB/token
+        # measured), so a long prompt declines on VRAM and falls to the per-token floor:
+        # 11,733 tokens took 512 s that way. Chunking makes the scratch O(chunk) instead,
+        # which is also what stops pmax and the prefill bidding for the same GB. 0 = one
+        # batch, exactly as before.
+        "SP_KV_PREFILL_CHUNK": str(int(kv.get("prefill_chunk", 0) or 0)),
         "SP_SPECTEST": b(veto.get("spectest", False)),
         "SP_SPECTEST_HEAD": paths["spectest_head"].replace("/", "\\"),
         # gateway
@@ -917,6 +966,14 @@ def build_env(c: dict) -> dict:
         "SP_AVATAR_DEFAULTS": (c.get("paths", {}).get("avatar_defaults") or ""),
         "SP_LEDGER_FILE": c.get("paths", {}).get("ledger_file")
                           or os.path.join(VAR, "room", "ledger.json"),
+        # HER LIVE KNOBS (2026-08-24). `harness/tuning/registry.py:STORE` was a bare
+        # constant with no override — the one store a gate could not be pointed away
+        # from, and several gates call set_many(). One of them raced her RUNNING stack
+        # over this file mid-sweep and died on the os.replace; on a quieter day it would
+        # simply have changed her presence mode or her voice and said nothing. The
+        # default is the path the constant already used, so nothing moves.
+        "SP_TUNING_FILE": c.get("paths", {}).get("tuning_file")
+                          or os.path.join(VAR, "tuning.json"),
         # (defaults below copied from the READERS — match.py/engine.py/scenarios.py all
         # fall back to var/room/<name>; the first draft of this mapping said var/<name>,
         # which would have silently moved three stores: the exact bug this table's own

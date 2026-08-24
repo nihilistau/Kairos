@@ -16,6 +16,12 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# SANDBOX FIRST (2026-08-24). This gate calls tune.set_many(), which before today
+# wrote HER LIVE var/tuning.json - it raced her running stack mid-sweep and died on
+# the os.replace, and on a quieter day it would simply have changed what she does.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _gate import sandbox as _sandbox  # noqa: E402
+_sandbox(os.path.basename(__file__))
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 from harness.senses import capability as cap  # noqa: E402

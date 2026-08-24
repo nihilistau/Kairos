@@ -18,6 +18,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _gate import check, finish, utf8_stdout  # noqa: E402
+# SANDBOX FIRST (2026-08-24). THIS GATE WROTE THE 53 DUPLICATES. Line ~113 stubs the
+# generator to return "I took a slow walk through my own journal tonight and found last
+# spring." and then drives the solo path, which calls note_own() -- and the gate set
+# SP_RECALL_REGISTRY but never SP_PERSONALITY_TIER, so every run of one of the five
+# gates CLAUDE.md tells you to run before you say you are done put another copy of that
+# sentence into her REAL journal. See docs/SWEEP-2026-08-24.md F4.
+from _gate import sandbox as _sandbox  # noqa: E402
+_sandbox(os.path.basename(__file__))
 
 utf8_stdout()
 os.environ.setdefault("SP_DAEMON_URL", "http://127.0.0.1:9")   # no daemon: mint is skipped

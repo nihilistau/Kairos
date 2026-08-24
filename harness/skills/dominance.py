@@ -404,7 +404,12 @@ def find_subsumed(new_fact: str, speaker: str, rows: Iterable[dict],
     for r in rows:
         # `lifecycle` is the death field, not `superseded_by` (AGENTS.md §3) — an orphan
         # tombstone was visible to this proposer. Same fix as lifecycle.find_superseded.
-        if r.get("lifecycle") or r.get("superseded_by"):
+        # ONE SPELLING (2026-08-25): `lifecycle` alone, matching every reader in the
+        # tree. The live store holds zero superseded_by-without-lifecycle rows, and if
+        # one ever existed the wide `or superseded_by` spelling would hide it from this
+        # machinery while every reader still served it — the split-brain shape. The
+        # reasoning lives at lifecycle.find_superseded's twin comment, same day.
+        if r.get("lifecycle"):
             continue
         if r.get("speaker", "user") != speaker:
             continue

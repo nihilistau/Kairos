@@ -36,6 +36,12 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
+# SANDBOX FIRST (2026-08-24). This gate was one of nine the sandbox audit caught
+# writing into her REAL stores; `_gate.sandbox` points every root at a temp dir and
+# must run BEFORE any harness import, because a module resolves its root once.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _gate import sandbox as _sandbox  # noqa: E402
+_sandbox(os.path.basename(__file__))
 
 PASS = FAIL = 0
 
@@ -167,6 +173,51 @@ try:
               os.path.join(ROOT, "harness", "control", "watchdog.py"),
               encoding="utf-8").read().split("def _loop", 1)[1])
 finally:
+    SD._reset_for_test()
+
+print("\nTHE COOLDOWN SURVIVES THE RESTART IT CAUSES (2026-08-24 audit, B7)")
+# `last_restart_at` was process memory, and the one restart this module performs stops
+# THIS process — the floor never applied across the restarts it actually causes. The
+# clock is persisted beside the registry now (the sandbox already redirected it), and
+# a fresh process folds it back in before judging the floor.
+W._state.update(last_restart_at=time.time() - 5.0, restarts=1, last_reason="test")
+W._persist()
+W._state.update(last_restart_at=0.0, restarts=0, last_reason="",
+                empty_streak=0, down_since=0.0)      # a NEW process, memory blank
+_calls = []
+W._restart("g_watchdog: floor test", lambda full: _calls.append(full))
+check("a fresh process still honours the previous process's floor", _calls == [],
+      _calls)
+# MUTANT, run live: forget the persisted clock and the floor is gone — the old bug.
+_real_recall = W._recall_persisted
+W._recall_persisted = lambda: None
+W._state.update(last_restart_at=0.0)
+try:
+    W._restart("g_watchdog: mutant", lambda full: _calls.append(full))
+    check("mutant(no recall): the restart fires straight through — the persisted clock "
+          "is load-bearing", _calls == [True], _calls)
+finally:
+    W._recall_persisted = _real_recall
+    SD._reset_for_test()                     # the mutant's restart quiesced the module
+
+print("\nTHE AUTOMATIC RESTART CLIMBS THE LADDER'S FIRST RUNGS (2026-08-24 audit, B8)")
+# quiesce -> finish_or_abandon -> flush ran on the operator's shutdown and NOT here —
+# one invariant, two teardown paths, the automatic one unguarded: an in-flight turn was
+# never waited for and the undelivered outbox died with the process.
+_order = []
+_real_q, _real_f, _real_fl = SD.quiesce, SD.finish_or_abandon, SD.flush
+SD.quiesce = lambda: (_order.append("quiesce"), True)[1]
+SD.finish_or_abandon = lambda t=120.0: (_order.append("finish"), True)[1]
+SD.flush = lambda: (_order.append("flush"), 0)[1]
+try:
+    W._state.update(last_restart_at=0.0, restarts=0)
+    # a clean persisted clock too, or the B7 floor above refuses this restart
+    W._persist()
+    W._restart("g_watchdog: ladder test", lambda full: _order.append("spawn"))
+    check("the rungs run, in the ladder's order, before the spawn",
+          _order == ["quiesce", "finish", "flush", "spawn"], _order)
+finally:
+    SD.quiesce, SD.finish_or_abandon, SD.flush = _real_q, _real_f, _real_fl
     SD._reset_for_test()
 
 print("\nG-WATCHDOG: %d pass, %d fail" % (PASS, FAIL))

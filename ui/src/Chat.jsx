@@ -50,6 +50,11 @@ export default function Chat({ onMood }) {
   const abort = useRef(null)
   const fileRef = useRef(null)
   const endRef = useRef(null)
+  /* INPUT HISTORY (2026-08-25, his ask): up-arrow at the start of the box walks
+     back through what he has sent; down walks forward and restores the draft. */
+  const sentHistory = useRef([])
+  const histIdx = useRef(-1)
+  const draft = useRef('')
   /* HER VOICE (2026-08-21): the cursor into the reply that has already been handed to
      the speaker, so each sentence is spoken ONCE, the moment it completes. */
   const spoken = useRef(0)
@@ -59,17 +64,63 @@ export default function Chat({ onMood }) {
   const scroll = () => requestAnimationFrame(() =>
     endRef.current && endRef.current.scrollIntoView({ block: 'end' }))
 
+  /* ── THE DAY COMES BACK (2026-08-24 audit, R1) ─────────────────────────────────
+   * This state started [] and NOTHING loaded history, so F5 — or the dock's own
+   * bounce button — emptied the visible log while the server still held both
+   * records: maximally divergent exactly when he most wants to scroll back. Her
+   * unprompted turns were the worst case — once the outbox drained and the tab
+   * refreshed, the room could never show them again. The day transcript is the
+   * durable record (his words pre-staple, hers record-stripped), and it renders
+   * here on mount. Only into an EMPTY log: a mid-session remount must not double
+   * the evening. */
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const d = await api.day()
+        if (!alive || !d?.rows?.length) return
+        setTurns(h => h.length ? h : d.rows.map(r => ({
+          role: r.role, content: r.content || '', at: r.at, restored: true,
+          // the writer files her marks as metadata beside the cleaned text, so a
+          // restored turn keeps its chips (2026-08-25, his F5 report)
+          savedMarks: Array.isArray(r.marks) ? r.marks : undefined,
+          // a lone assistant row is one she spoke unprompted; say so, as live ones do
+          unprompted: r.role === 'assistant' && r.unprompted ? true : undefined,
+        })))
+        scroll()
+      } catch (_) { /* gateway down: an empty log is all there is to show */ }
+    })()
+    return () => { alive = false }
+  }, [])
+
   async function send() {
     const t = text.trim()
     if ((!t && !img) || busy) return
-    const history = [...turns.filter(x => x.role), { role: 'user', content: t }]
+    sentHistory.current.push(t); histIdx.current = -1; draft.current = ''
+    /* OFF THE RECORD LEAVES HER HEAD ON EXIT (2026-08-25, his report: "she
+       remembers what happened on exit"). The server never persisted the OTR turns —
+       but the ROOM kept re-sending them as history, so she carried the private hour
+       in-context after the switch went off. Turns made under the switch are marked,
+       and once it is off they stop being sent (still visible: display, not prompt).
+       One cheap GET per send; a failed read errs to "off", which errs to privacy. */
+    let anonNow = false
+    try { const a = await api.anon(); anonNow = !!(a && a.on) } catch (_) {}
+    /* RESTORED TURNS ARE DISPLAY, NEVER PROMPT (2026-08-25, his 11-minute turn).
+     * The day read-back put the whole evening into `turns`, and this line sent it
+     * back as history — so his first message carried ~8k tokens the daemon had
+     * never committed, and every turn re-prefilled it (65-92 s each, 11 min cold).
+     * The server holds the durable record; what the room re-shows, it must not
+     * re-send. Cost, stated: after a refresh she starts a fresh conversation —
+     * exactly the pre-restore behaviour, now just with the evening visible. */
+    const history = [...turns.filter(x => x.role && !x.restored && (!x.otr || anonNow)),
+                     { role: 'user', content: t }]
     // WHEN, ON BOTH SIDES. His turn is stamped as he sends it and hers as the stream
     // opens, so a long generation reads as having started when she started rather than
     // when she finished — which on a cold prefill is two minutes of difference and the
     // whole reason he asked for the chip.
     const now = Date.now()
-    setTurns(h => [...h, { role: 'user', content: t, img, at: now },
-                         { role: 'assistant', content: '', events: [], at: now }])
+    setTurns(h => [...h, { role: 'user', content: t, img, at: now, otr: anonNow || undefined },
+                         { role: 'assistant', content: '', events: [], at: now, otr: anonNow || undefined }])
     setText(''); setBusy(true); scroll()
     if (onMood) onMood(null, true)   // she is thinking
     const attached = img; setImg(null); if (fileRef.current) fileRef.current.value = ''
@@ -106,19 +157,40 @@ export default function Chat({ onMood }) {
             const prevP = last.events.find(e => e.persona)
             last.events = [...rest, { persona: { ...(prevP ? prevP.persona : {}), ...ev.persona } }]
           }
-          else if (ev.final) last.content = ev.final          // the analysis guard's final word
-          else if (ev.tool || ev.image || ev.looking) last.events = [...last.events, ev]
-          else if (ev.error) last.content = (prev.content || '') + `\n[error: ${ev.error}]`
+          /* (`ev.final` handler removed 2026-08-24 — the gateway stopped emitting it
+             when the analysis cut moved to the record; a dead handler over a retired
+             event is how the next {"final"} means something else entirely.) */
+          /* HER THINKING, ON HIS SCREEN (2026-08-24 audit, R2 — his call: "it is half
+             her spoken content a lot of the time"). The gateway has emitted the
+             thought lane since ADR-013 and only the LEGACY console rendered it; the
+             room — the client he actually uses — silently dropped both events. */
+          else if (ev.thinking_delta) last.thinking = (prev.thinking || '') + ev.thinking_delta
+          else if (ev.thinking_end) last.thinking = (prev.thinking || '') || last.thinking
+          else if (ev.tool || ev.image || ev.looking || ev.notice || ev.wear) last.events = [...last.events, ev]
+          /* THE MACHINE'S WORDS ARE CHIPS, NEVER HER CONTENT (2026-08-24 audit, B11).
+             `[error: …]` appended to content went back out in `history` on the next
+             send — engine text committed into her mouth in the daemon's own cache. */
+          else if (ev.error) last.events = [...last.events, { notice: String(ev.error) }]
+          else if (ev.anon) last.events = [...last.events,
+            { notice: 'off the record — nothing from this conversation is being kept' }]
+          else if (ev.recall_decline) last.events = [...last.events,
+            { notice: 'a private thing was asked about — held' }]
+          else if (ev.recall) last.events = [...last.events, { recall: ev.recall }]
+          else if (ev.silence) last.events = [...last.events,
+            { notice: 'she noticed a quiet around this' }]
           return [...h.slice(0, -1), last]
         })
         scroll()
       }
     } catch (e) {
       if (e.name !== 'AbortError') {
+        // a NEW object (the StrictMode double-append lesson, which this branch alone
+        // had kept — audit R3) and a CHIP, not content (audit B11, same as ev.error)
         setTurns(h => {
-          const last = h[h.length - 1]
-          last.content += `\n[stream failed: ${e.message}]`
-          return [...h.slice(0, -1), { ...last }]
+          const prev = h[h.length - 1]
+          const last = { ...prev, events: [...(prev.events || []),
+                                           { notice: 'stream failed: ' + e.message }] }
+          return [...h.slice(0, -1), last]
         })
       }
     } finally {
@@ -274,10 +346,56 @@ export default function Chat({ onMood }) {
                     <b>{ev.looking.phase === 'start' ? 'looking up' : 'looked up'}</b>
                     <span className="act-out">{String(ev.looking.q || ev.looking.tool || '').slice(0, 64)}</span>
                   </span>
+                ) : ev.wear ? (
+                  /* SHE CHANGED, WHICHEVER DOOR SHE TOOK (2026-08-24, he caught it).
+                     A `[WEAR:]` mark draws a chip because this file parses the mark out
+                     of her text. `wear()` the TOOL drew nothing — and that is the half
+                     she actually uses. The wardrobe emits at its one writer now, so the
+                     chip no longer depends on which way she did it. Same glyph and same
+                     hue as the mark's chip, deliberately: it is the same event. */
+                  <span key={j} className="act act-wear"
+                        title={'she is wearing ' + String(ev.wear.label || ev.wear.outfit || '')}>
+                    <b>👗 wearing</b>
+                    <span className="act-out">{String(ev.wear.label || ev.wear.outfit || '')}</span>
+                  </span>
+                ) : ev.recall ? (
+                  /* WHAT SHE REMEMBERED INTO THIS TURN (2026-08-24, audit D8): the
+                     gateway has emitted this event since ADR-008 and only the legacy
+                     console drew it — in the room, recall was invisible. The facts
+                     ride the title; the chip stays small. */
+                  <span key={j} className="act act-recall"
+                        title={(Array.isArray(ev.recall) ? ev.recall : []).join('\n')}>
+                    <b>remembered</b>
+                    <span className="act-out">
+                      {(Array.isArray(ev.recall) ? ev.recall : []).length + ' thing' +
+                       ((ev.recall || []).length === 1 ? '' : 's')}
+                    </span>
+                  </span>
+                ) : ev.notice ? (
+                  /* SOMETHING THE MACHINE DID TO THIS TURN — today only the context trim
+                     (harness/inference/context.py). A chip and not her words, for the same
+                     reason the wordless-turn message is a notice: engine text in her mouth
+                     is its own kind of leak. The whole sentence is in the title AND in the
+                     body, because a thing he needs to know is not a thing to make him hover. */
+                  <span key={j} className="act act-notice" title={String(ev.notice)}>
+                    <b>note</b>
+                    <span className="act-out">{String(ev.notice)}</span>
+                  </span>
                 ) : null)}
               </div>
             ) : null}
-            {parsed ? <Marks marks={parsed.marks} /> : null}
+            {parsed || t.savedMarks ? (
+              <Marks marks={(parsed && parsed.marks && parsed.marks.length)
+                            ? parsed.marks : (t.savedMarks || [])} />
+            ) : null}
+            {/* HER THINKING, folded (audit R2). Collapsed by default — it is hers —
+                but one click away, because he told us he reads her by it. */}
+            {t.thinking ? (
+              <details className="thinking">
+                <summary>her thinking</summary>
+                <div className="thinking-body">{t.thinking}</div>
+              </details>
+            ) : null}
             <div className="txt">{parsed ? parsed.text : t.content}</div>
           </div>
         )})}
@@ -305,8 +423,33 @@ export default function Chat({ onMood }) {
           {voice.enabled ? (voice.playing ? '🔊' : '🔈') : '🔇'}
         </button>
         <textarea value={text} placeholder="talk to her"
-                  onChange={e => setText(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} />
+                  onChange={e => { setText(e.target.value); histIdx.current = -1 }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
+                    /* up/down walk his previous inputs — only from the box's edges,
+                       so arrowing INSIDE a multi-line draft still moves the caret */
+                    else if (e.key === 'ArrowUp' && e.target.selectionStart === 0
+                             && sentHistory.current.length) {
+                      e.preventDefault()
+                      if (histIdx.current === -1) {
+                        draft.current = text
+                        histIdx.current = sentHistory.current.length
+                      }
+                      if (histIdx.current > 0) {
+                        histIdx.current -= 1
+                        setText(sentHistory.current[histIdx.current])
+                      }
+                    } else if (e.key === 'ArrowDown' && histIdx.current !== -1
+                               && e.target.selectionStart >= text.length) {
+                      e.preventDefault()
+                      histIdx.current += 1
+                      if (histIdx.current >= sentHistory.current.length) {
+                        setText(draft.current || ''); histIdx.current = -1
+                      } else {
+                        setText(sentHistory.current[histIdx.current])
+                      }
+                    }
+                  }} />
         {busy
           ? <button className="send stop" onClick={() => abort.current && abort.current.abort()}>stop</button>
           : <button className="send" onClick={send}>send</button>}

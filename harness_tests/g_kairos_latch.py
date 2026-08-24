@@ -43,6 +43,12 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+# SANDBOX FIRST (2026-08-24). This gate calls tune.set_many(), which before today
+# wrote HER LIVE var/tuning.json - it raced her running stack mid-sweep and died on
+# the os.replace, and on a quieter day it would simply have changed what she does.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _gate import sandbox as _sandbox  # noqa: E402
+_sandbox(os.path.basename(__file__))
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 PASS = FAIL = 0

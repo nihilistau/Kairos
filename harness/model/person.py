@@ -57,7 +57,6 @@ person instead of a list.
 """
 from __future__ import annotations
 
-import json
 import math
 import os
 import re
@@ -177,17 +176,15 @@ class PersonModel:
     def from_registry(cls, path: str = "", speaker: str = lc.SPEAKER_USER) -> "PersonModel":
         p = path or os.environ.get("SP_RECALL_REGISTRY", "")
         m = cls()
-        if not p or not os.path.exists(p):
-            return m
-        with open(p, encoding="utf-8", errors="replace") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    r = json.loads(line)
-                except Exception:
-                    continue
+        # Through memory.all_rows(), not a private JSONL loop (2026-08-25; audit C
+        # 2026-08-24). This reader opened SP_RECALL_REGISTRY itself, so its malformed-line
+        # policy and parse behaviour could drift from every other reader's — the exact
+        # reason all_rows() exists. all_rows and not live_rows because this walk is an
+        # ACCOUNTING read that keeps its own death filter visible one line down (it reads
+        # fixtures via `path`, which live_rows does not take); the predicate is the same
+        # one field everything keys on.
+        from harness.skills import memory as _mem
+        for r in _mem.all_rows(p):
                 if r.get("lifecycle"):
                     continue                            # a retired fact is not evidence
                 if (r.get("speaker") or lc.SPEAKER_USER) != speaker:

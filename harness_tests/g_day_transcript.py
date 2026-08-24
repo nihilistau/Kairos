@@ -113,26 +113,40 @@ A._CHAT_SESSIONS["stale"] = [{"role": "user", "content": "one lonely turn"}]
 got = A._longest_transcript()
 check("a longer durable day beats a shorter live one", len(got) == 4, got)
 A._CHAT_SESSIONS["big"] = [{"role": "user", "content": "x"}] * 40
-check("...but a genuinely longer live session is not thrown away",
-      len(A._longest_transcript()) == 40)
+# AMENDED 2026-08-24 (audit T7): the day transcript wins WHENEVER it exists, not merely
+# when it is longer. The canonical session is what the DAEMON saw — the recall/silence/
+# anon notes stapled onto his turns and every tool round as a user row — so "longest
+# wins" meant one tool-heavy session-id day handed the narrative her own injected
+# context to reflect on. The live copy is the fallback for a day with no disk rows,
+# nothing more.
+check("...and a longer live session does NOT displace it (canon carries stapled notes)",
+      len(A._longest_transcript()) == 4)
 A._CHAT_SESSIONS.clear()
 
 print("\n5. HIS WORDS, not the message list he never sent")
 # `user_text` is bound at the top of the turn, before the recall note, the silence
 # note and the roleplay director note mutate msgs. Proven positionally: every
 # injection site must come AFTER the binding, or the argument is already poisoned.
-bind = src.index("user_text = next((m.get(\"content\", \"\")")
-call = src.find("_append_day_turn(user_text, final)")
+# AMENDED AGAIN 2026-08-24 (audit B1): the day write moved into the turn epilogue —
+# _pay_turn_debts hands _settle_turn `_human`, the words _arm_turn bound at the TOP of
+# the turn, and _settle_turn is the one caller of _append_day_turn on this path. The
+# claim is unchanged: the turn is written from HIS words, bound before the recall,
+# silence and anon notes are stapled onto the message list.
+bind = src.index("_human = _arm_turn(msgs)")
+call = src.find("_settle_turn(_human, final_text")
 # find(), not index(): a call site that stopped passing his words must read as a FAIL
 # with a name on it, not as a traceback halfway down the gate.
-check("the turn is written from his words", call > 0, "call site no longer passes user_text")
+check("the turn is written from his words", call > 0,
+      "the epilogue no longer settles with _human")
 check("...bound before anything is stapled onto the message list", 0 < bind < call)
+check("...and the epilogue's day write passes them through verbatim",
+      "_append_day_turn(human_text, reply_text, synthetic=synthetic)" in src)
 for marker, what in (("Things you happen to know", "the recall note"),
                      ("note_for_question(user_text)", "the silence note")):
     at = src.index(marker)
     check("%s is stapled onto msgs AFTER his words were taken" % what, at > bind)
 check("the helper takes a string, so a mutated msgs cannot reach it",
-      "def _append_day_turn(user_text: str, final: str)" in src)
+      "def _append_day_turn(user_text: str, final: str," in src)
 
 print("\n6. a day that FAILED is not stamped done")
 check("the marker is conditional now",
