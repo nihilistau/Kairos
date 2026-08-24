@@ -95,6 +95,15 @@ def last_error() -> str:
 
 
 def _post(path: str, body: dict, timeout: float = 120.0) -> Optional[dict]:
+    # ANONYMOUS MODE (2026-08-24). THE ONE DOOR OUT of this module: tts, image,
+    # image_edit, video_submit and upload all reach api.x.ai through here, so one
+    # guard covers every one of them including the ones added next year. A prompt
+    # for a picture of her, written during a private hour, is that hour described
+    # in words and handed to somebody else.
+    from harness.control import anon as _anon
+    if _anon.holds("net.provider"):
+        _LAST_ERROR[0] = _anon.WHY
+        return None
     k = api_key()
     if not k:
         _LAST_ERROR[0] = "no api key"
@@ -328,6 +337,12 @@ def video(prompt: str, image_url: str = "", duration: int = 6,
 
 
 def upload_image(path: str, timeout: float = 120.0) -> str:
+    # ...AND THE MULTIPART UPLOAD DOES NOT GO THROUGH _post. A reference image is a
+    # picture from the private hour; it needs its own guard (2026-08-24).
+    from harness.control import anon as _anon
+    if _anon.holds("net.provider"):
+        _LAST_ERROR[0] = _anon.WHY
+        return ""
     """Upload a local image, return its file_id ('' on failure). Multipart by hand —
     the one place urllib needs help; no new dependency for one endpoint."""
     try:

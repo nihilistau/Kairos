@@ -33,11 +33,13 @@ from harness.kairos.impulse import (
     CHECK_IN, CONTINUE, REMIND, MUSE, CHECK_IN_NUDGE, continue_nudge, remind_nudge,
     muse_nudge,
     Impulse, KairosConfig, TurnState, SOLO, SOLO_NUDGE, solo_nudge, solo_worth_saying,
+    DISCOVER_ACT_N,
     solo_did_the_thing, solo_needs,
     EXPAND, expand_nudge, MODE_TURN,
     decide, note_spoke, note_user, worth_saying,
 )
 from harness.kairos import speechlog as _speech
+from harness.control import anon as _anon      # the three log lines below carry HER WORDS
 from harness.tuning import registry as tune
 
 logger = logging.getLogger(__name__)
@@ -365,6 +367,9 @@ def on_reply(
 _LAST_REFLECT_AT: float = 0.0
 _LAST_EVIDENCE: int = -1
 _PENDING_INSIGHT: dict = {}
+# The last reason we said out loud in the log, so a standing offer is announced once
+# rather than on every 7 s beat. See the note at the propose() call site.
+_LAST_REASON: dict = {}
 
 
 def _evidence_count() -> int:
@@ -657,6 +662,32 @@ def _due_notes() -> list:
         return []
 
 
+def _spend_attempt(st: "TurnState", action: str, now: "Optional[float]" = None) -> None:
+    """An attempt spends the pacing clocks — the ARITHMETIC, in one copy (2026-08-24).
+
+    The 2026-08-20 fix metered SOLO and CHECK_IN at the site of the generate() call;
+    F4 (2026-08-24) added MODE_TURN's three clocks to the same inline block — and the
+    same audit found FIVE drop doors that return BEFORE that block (the scratchpad
+    drop, mode-off mid-wait, the pregate veto, and both generate() failure paths), so
+    with a presence mode armed one drop on any of them latched `mode_kick` forever:
+    decide() checks the kick above REMIND, so an unmetered drop muted reminders and
+    re-armed an eleven-minutes-of-26B loop four seconds at a time. §0's shape, so
+    §0's remedy: the spend lives in `_fire_inner`'s finally, where a drop path added
+    tomorrow is metered by construction, and this function is only the arithmetic so
+    the finally and any future caller cannot drift on WHICH clocks an action owns.
+    Speech facts (chain / unanswered / spoken_times / solo_n) still move in
+    note_spoke, on speech alone — this meters attempts, not conversation."""
+    _now = time.monotonic() if now is None else now
+    st.last_spoke_at = _now
+    if action == SOLO:
+        st.last_solo_at = _now
+    if action == MODE_TURN:
+        st.last_mode_at = _now
+        st.mode_times.append(_now)
+        st.mode_times[:] = [t for t in st.mode_times if _now - t < 3600.0]
+        st.mode_kick = False      # the kick is CONSUMED by the attempt
+
+
 def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -> None:
     """Wait the delay, generate, and let worth_saying() have the last word."""
     def _fire():
@@ -678,8 +709,32 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
             _sd.note_turn_end()
 
     def _fire_inner():
+        # ── THE PER-DOOR TABLE (2026-08-24 audit, K1) ────────────────────────────────
+        # Every exit of _attempt spends the attempt via the finally below, EXCEPT the
+        # doors that flip the meter off — enumerated here so the decision is readable:
+        #
+        #   scratchpad drop (CONTINUE)   SPENDS  unbounded otherwise (re-proposed each tick)
+        #   mode switched off mid-wait   SPENDS  consumes a stale kick with it
+        #   his turn in flight           KEEPS   naturally bounded — his turn ends; an
+        #                                        asked-for mode turn is still OWED, so
+        #                                        the kick survives and no clock moves
+        #   sidecar pregate veto         SPENDS  unbounded otherwise
+        #   generate() raised            SPENDS  the GPU/time was still burned
+        #   solo evidence refusal        SPENDS  two generations were burned
+        #   worth_saying / solo vetoes   SPENDS  the F4/2026-08-20 cases, now by rule
+        #   spoken                       SPENDS  note_spoke still owns the speech facts
+        _meter = [True]
+        try:
+            _attempt(_meter)
+        finally:
+            if _meter[0]:
+                with _LOCK:
+                    _spend_attempt(_STATE[session], imp.action)
+
+    def _attempt(_meter):
         _mode_meta = None                      # set only on a MODE_TURN (presence modes)
         _mode_sampling, _mode_max = None, None
+        _n_act = None                          # SOLO only: the EFFECTIVE act index (K2)
         # the CONTINUE nudge is built from the reply so she can see WHERE she was cut —
         # without the tail she just restates the whole thing and worth_saying() drops it.
         if imp.action == CONTINUE:
@@ -707,7 +762,20 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
             # 'I read my journal', because that option needed no tool and could not
             # fail. The counter is the state's own solo count, so the rotation is
             # deterministic and testable rather than a random draw.
-            nudge = solo_nudge(_STATE[session].solo_n)
+            _n_act = _STATE[session].solo_n
+            # ── AN EXTRA CHANCE AT SOMETHING UNASKED-FOR (2026-08-23) ──────────────
+            # The rotation already reaches the discovery act about once in nine. This
+            # is his dial for wanting it more often, and it lives HERE rather than in
+            # solo_nudge because that function is deterministic on purpose - the gate
+            # asserts the rotation over it and must not have to fight a random seed.
+            # Default 0.0: rotation only, so this changes nothing until he moves it.
+            try:
+                _p_dis = float(tune.get("kairos.discover_chance", 0.0) or 0.0)
+                if _p_dis > 0.0 and random.random() < _p_dis:
+                    _n_act = DISCOVER_ACT_N
+            except Exception:
+                pass
+            nudge = solo_nudge(_n_act)
         elif imp.action == MODE_TURN:
             # ── A PRESENCE MODE'S TURN (2026-08-22): narration / company / lucid ───────
             if str(tune.get("presence.mode") or "off") == "off":
@@ -783,7 +851,8 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
         # of him. Dropped, not deferred: see the note at _USER_TURN_DEPTH.
         if user_turn_active():
             logger.info("[kairos] impulse dropped — his turn is in flight")
-            return
+            _meter[0] = False       # bounded by his turn ending; an asked-for mode
+            return                  # turn is still OWED — the kick and clocks survive
         # ── HIS QUIET IS THE CLOCK (2026-08-20, operator's rule) ─────────────────────
         # checkin_idle_s measures the SESSION's quiet, which includes her own speech —
         # so she could ping, wait out her cooldown, and ping again with him gone the
@@ -844,11 +913,28 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
         # generate(), so the pacing clocks advance at generate() — attempts are what
         # the budget must meter. ONLY the clocks: chain / unanswered / spoken_times /
         # solo_n are speech facts and still move in note_spoke, on speech alone.
-        with _LOCK:
-            _st_now = _STATE[session]
-            _st_now.last_spoke_at = time.monotonic()
-            if imp.action == SOLO:
-                _st_now.last_solo_at = time.monotonic()
+        # ── ...AND MODE_TURN WAS NEVER ADDED TO IT (2026-08-24) ─────────────────────
+        # The note above is dated 2026-08-20 and names SOLO and the check-in. A presence
+        # mode's turn has three clocks of its own — `last_mode_at`, `mode_times` and the
+        # `mode_kick` LATCH — and all three move only in note_spoke. Measured live in
+        # `var/gateway.log`, 17:02 to 18:00 on 2026-08-23, once for every mode turn:
+        #
+        #     17:02:18  idle tick -> mode_turn (lucid — asked for; her first turn comes now)
+        #     17:13:41  mode turn DROPPED: 100% a restatement of what she just said
+        #     17:13:45  idle tick -> mode_turn (lucid — asked for; her first turn comes now)
+        #     17:25:09  mode turn DROPPED: ...
+        #
+        # Eleven minutes of 26B, vetoed, re-armed FOUR SECONDS later, forever. The kick
+        # was never consumed so `decide()` returned MODE_TURN unconditionally; the spacing
+        # gate never applied because `last_mode_at` never moved; and `max_per_hour` never
+        # counted it because `mode_times` stayed empty. A dropped mode turn cost NOTHING
+        # against any budget, which is exactly the shape the 2026-08-20 fix was written
+        # for. He heard the fans and saw an empty room.
+        #
+        # Same rule, third path — and then a FOURTH and FIFTH the same week: the spend
+        # ran here, AFTER generate(), so the five drop doors that return above it
+        # ran unmetered for four days. It is _fire_inner's finally now; the history and
+        # the arithmetic live in _spend_attempt, one copy. (2026-08-24 audit, K1.)
 
         # ONE RE-ASK, THEN REFUSED. The correction is specific — it names the tool and
         # says the writing-up is the second half — because "try again" taught her nothing
@@ -857,9 +943,9 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
         # which is the whole point. A journal that records things she did not do is worse
         # than no journal, and this one has been doing it since the day it was written.
         if imp.action == SOLO and called is not None:
-            ok_did, why_did = solo_did_the_thing(_STATE[session].solo_n, called)
+            ok_did, why_did = solo_did_the_thing(_n_act, called)   # the EFFECTIVE act (K2)
             if not ok_did:
-                need = solo_needs(_STATE[session].solo_n)
+                need = solo_needs(_n_act)
                 logger.info("[kairos] solo: %s — asking once more", why_did)
                 retry = (nudge + "\n\n(You wrote that up without doing it. CALL %s FIRST — "
                          "one fenced tool_code block, nothing else — and then say what came "
@@ -872,7 +958,7 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
                 except Exception as exc:
                     logger.warning("[kairos] solo retry failed: %s", exc)
                     return
-                ok_did, why_did = solo_did_the_thing(_STATE[session].solo_n, called2)
+                ok_did, why_did = solo_did_the_thing(_n_act, called2)
                 if not ok_did:
                     logger.info("[kairos] solo REFUSED — %s (asked twice)", why_did)
                     try:
@@ -893,6 +979,14 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
         if imp.action == SOLO:
             ok_solo, why_solo = solo_worth_saying(text)
             if not ok_solo:
+                # RECORDED (2026-08-24 audit, K3): this was the ONE veto absent from the
+                # speech ledger — and its own docstring says it ate 13 of her first 21
+                # own-time turns, so it is the dial that most needs the denominator.
+                try:
+                    _speech.record(imp.action, _speech.DROPPED,
+                                   "solo_worth_saying: %s" % why_solo, text)
+                except Exception:
+                    pass
                 logger.info('[kairos] solo dropped — %s', why_solo)
                 return
         if imp.action == MODE_TURN:
@@ -904,7 +998,7 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
             ok, why = worth_saying(text, _LAST_MODE_TEXT.get(session, "") or reply_text)
             if not ok:
                 _speech.record(imp.action, _speech.DROPPED, why, text)
-                logger.info("[kairos] mode turn DROPPED: %s :: %r", why, text[:60])
+                logger.info("[kairos] mode turn DROPPED: %s :: %r", why, _anon.say(text, 60))
                 return
         elif imp.action != REMIND and not (imp.action == MODE_TURN and _mode_meta and _mode_meta["reading"]):
             ok, why = worth_saying(text, reply_text)
@@ -916,7 +1010,7 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
                 # the text, because "did that rule eat a real thought?" is not a question
                 # a tally can answer.
                 _speech.record(imp.action, _speech.DROPPED, why, text)
-                logger.info("[kairos] DROPPED: %s :: %r", why, text[:60])
+                logger.info("[kairos] DROPPED: %s :: %r", why, _anon.say(text, 60))
                 return
         elif not text:
             # she produced nothing at all — say it plainly rather than drop the promise
@@ -967,7 +1061,16 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
             # writer here. One hook, called at the one point every impulse converges on.
             if _ON_SPOKE is not None:
                 try:
-                    _ON_SPOKE(text)
+                    # THE KIND RIDES ALONG (2026-08-25, his call): a presence-mode turn
+                    # is ambient company — narration, a dream, a chapter read aloud
+                    # while he sleeps — and the epilogue treats it differently from a
+                    # thing she SAID (too specific, too repetitive to become her
+                    # memories). One-arg fallback for a registered writer that predates
+                    # the kind.
+                    try:
+                        _ON_SPOKE(text, imp.action)
+                    except TypeError:
+                        _ON_SPOKE(text)
                 except Exception as exc:
                     logger.warning("[kairos] could not record what she said: %s", exc)
             if imp.action == MODE_TURN and _mode_meta:
@@ -1038,7 +1141,7 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
             except Exception as exc:
                 logger.warning("[kairos] could not mark reminder raised: %s", exc)
 
-        logger.info("[kairos] SPOKE (%s): %r", imp.action, text[:70])
+        logger.info("[kairos] SPOKE (%s): %r", imp.action, _anon.say(text, 70))
 
     with _LOCK:
         # CANCEL WHAT WE OVERWRITE. tick_once guards this slot; on_reply's path did not,
@@ -1135,8 +1238,21 @@ def tick_once(now: Optional[float] = None) -> None:
             from harness.kairos import reasons as _R
             insight = _R.propose()
             if insight:
-                logger.info("[kairos] a reason to speak: %s — %r",
-                            insight.get("kind"), str(insight.get("text", ""))[:70])
+                # ── ONCE PER REASON, NOT ONCE PER TICK (2026-08-24) ──────────────────
+                # `propose()` is PURE and runs on every 7 s beat; the reason stays on
+                # offer until she actually raises it, which can be hours. So this line
+                # logged the same sentence forever: measured in var/gateway.log, 7,803
+                # copies of one wardrobe arrival and 2,852 of another, out of 102,807
+                # lines. Two thirds of everything the gateway had to say about itself
+                # was one unchanged fact, which is how a log stops being readable — and
+                # an unreadable log is the instrument every other diagnosis here starts
+                # from. Log the reason when it CHANGES; the tick is not news.
+                _rk = "%s|%s" % (insight.get("kind"), insight.get("raise_key")
+                                 or str(insight.get("text", ""))[:70])
+                if _rk != _LAST_REASON.get("k"):
+                    _LAST_REASON["k"] = _rk
+                    logger.info("[kairos] a reason to speak: %s — %r",
+                                insight.get("kind"), str(insight.get("text", ""))[:70])
         except Exception as exc:
             logger.warning("[kairos] reasons: %s", exc)
 
@@ -1476,8 +1592,14 @@ def _presence_state(cfg, st, now: float) -> dict:
             from harness.kairos import presence as _pm
             every = (cfg.presence_every_s if cfg.presence_every_s > 0
                      else _pm.EVERY_DEFAULT.get(cfg.presence_mode, 300.0))
-            last = max(st.last_user_at, st.last_spoke_at, st.last_solo_at, st.last_mode_at)
-            out["next_in_s"] = round(max(0.0, every - (now - last)), 1)
+            # THE SAME ARITHMETIC THE POLICY RUNS (2026-08-24 audit, K4). This held its
+            # own max() over four clocks — one of them a clock the policy's idle floor
+            # deliberately EXCLUDES, and none of them the cooldown the policy checks
+            # first — so the chip could read "next ~0m" while decide() would not fire.
+            # impulse.mode_wait_s is the one copy of the deterministic gates; the chip
+            # and the policy both call it and cannot drift (G-KAIROS-CHIP).
+            from harness.kairos.impulse import mode_wait_s as _mws
+            out["next_in_s"] = round(max(0.0, _mws(cfg, st, now, every)), 1)
         from harness.skills import library as _lib
         b = _lib.in_hand()
         if b:

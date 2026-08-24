@@ -46,6 +46,13 @@ def _path() -> str:
 
 
 def record(kind: str, outcome: str, reason: str, text: str = "") -> None:
+    # ANONYMOUS MODE (2026-08-23). "IT KEEPS THE TEXT" above is exactly why this door has
+    # to close: 240 characters of what she almost said is a record of the evening whatever
+    # else it is for. The denominator loses a few turns, which is the correct trade — the
+    # ratio is a measurement of her policy over weeks, not of one private hour.
+    from harness.control import anon as _anon
+    if _anon.holds("speech.log"):
+        return
     p = _path()
     if not p:
         return

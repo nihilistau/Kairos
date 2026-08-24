@@ -178,6 +178,36 @@ check("...and still carries her own time", "on my own time" in j, j[:200])
 check("...coarsest first: the week comes before the moments",
       j.index("the weeks") < (j.index("on my own time") if "on my own time" in j else len(j)))
 
+print("\n6b. A LONG WEEK STILL FITS ITS ROW (2026-08-25, the first logged 04:00)")
+# The receipt instrument's very first night answered the zero-chapters mystery:
+# she WROTE the week and the admission cap refused it — "too long for one row
+# (688 > 600)". Every chapter ever written had died exactly there, silently.
+# The writer now cuts back to the last full sentence under the cap; the prompt
+# asks for 90 words instead of 120 so the cut is the belt, not the plan.
+_long = ("The rain kept finding new ways in and I kept letting it. " * 16).strip()
+assert len(_long) > 600
+# a FRESH registry for this leg: the legs above already stored this week's chapter
+# and the store-latch (correctly) refuses a second — the subject here is the bound,
+# not the latch. own_time still feeds it from the sandboxed journal tier.
+_prev_reg = os.environ["SP_RECALL_REGISTRY"]
+os.environ["SP_RECALL_REGISTRY"] = _prev_reg + ".bound-leg"
+open(os.environ["SP_RECALL_REGISTRY"], "a").close()
+_res_long = N.weekly_chapter(ask=lambda p: _long)
+check("an over-long chapter draft STORES after the sentence bound",
+      _res_long.get("written") is True, _res_long.get("result", ""))
+_stored = (_res_long.get("text") or "")
+check("...bounded under the row cap", len(_stored) <= 600, len(_stored))
+check("...and it ends at a sentence, never mid-word",
+      _stored.endswith("."), _stored[-40:])
+# MUTANT, run live: without the bound, the same draft is refused by admission —
+# the exact shape the 04:00 receipt logged.
+import harness.skills.narrative as _N_m  # noqa: E402
+from harness.skills import memory as _M_m  # noqa: E402
+_res_mut = _M_m.remember_about_self(_long, kind="chapter", source="g_chapters mutant")
+check("mutant(no bound): the raw draft is refused by the row cap — the bound is "
+      "load-bearing", "too long for one row" in _res_mut, _res_mut[:90])
+os.environ["SP_RECALL_REGISTRY"] = _prev_reg
+
 print("\n7. ONE TIER RESOLUTION, NOT FOUR")
 src = open(os.path.join(ROOT, "harness", "skills", "narrative.py"),
            encoding="utf-8", errors="replace").read()

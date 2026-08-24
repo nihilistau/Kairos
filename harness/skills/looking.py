@@ -18,9 +18,20 @@ import time
 from typing import Any, Optional
 
 _LOCK = threading.Lock()
-_NOW: Optional[dict] = None
+# ── SCOPED TO THE TURN'S THREAD, NOT THE PROCESS (2026-08-24 audit, B10) ────────────
+# `_NOW` was THE in-flight look and `_LISTENERS` was every subscriber, process-wide,
+# under a ThreadingHTTPServer — trap 3(b), state with no owner, in the chip lane. Two
+# overlapping looks (a chat turn and a kairos speak-up) meant the second `end()` built
+# its ledger row from `base = {}` — losing the query, the kind and the seconds — and a
+# chip from one session's turn was emitted onto EVERY concurrent session's SSE stream.
+# A look begins and ends on the thread that runs the tool, and each turn subscribes
+# from the thread that drains it, so the thread id IS the turn scope: `_NOW` is a map
+# keyed by it, and a listener registered from a thread hears that thread's looks only.
+# `_LAST` stays global (a status readout of "her most recent look" is genuinely
+# process-wide); his_search never touched any of this and still does not.
+_NOW: dict = {}                    # thread id -> the in-flight look
 _LAST: Optional[dict] = None
-_LISTENERS: list = []
+_LISTENERS: dict = {}              # thread id -> [listeners]
 
 
 def _root() -> str:
@@ -34,19 +45,24 @@ def _looks_path() -> str:
 
 
 def subscribe(fn):
-    """SSE and the room register here. The seam emits; callers do not."""
+    """SSE registers here, FROM THE THREAD THAT RUNS THE TURN — the subscription is
+    scoped to that thread's looks (see the note on _NOW/_LISTENERS above)."""
+    tid = threading.get_ident()
     with _LOCK:
-        _LISTENERS.append(fn)
+        _LISTENERS.setdefault(tid, []).append(fn)
     def unsub() -> None:
         with _LOCK:
-            if fn in _LISTENERS:
-                _LISTENERS.remove(fn)
+            lst = _LISTENERS.get(tid, [])
+            if fn in lst:
+                lst.remove(fn)
+            if not lst:
+                _LISTENERS.pop(tid, None)
     return unsub
 
 
 def _emit(ev: dict) -> None:
     with _LOCK:
-        fns = list(_LISTENERS)
+        fns = list(_LISTENERS.get(threading.get_ident(), ()))
     for fn in fns:
         try:
             fn(dict(ev))
@@ -61,7 +77,6 @@ def begin(kind: str, query: str, by: str = "her") -> dict:
     manual search/research boxes pass "him". The distinction is his ask
     (2026-08-21): one shared ledger both can read, but hers stay hers — her
     thoughts, her activities — and a chip says whose each row is."""
-    global _NOW
     row = {
         "kind": (kind or "look").strip() or "look",
         "query": (query or "").strip()[:240],
@@ -70,7 +85,7 @@ def begin(kind: str, query: str, by: str = "her") -> dict:
         "phase": "start",
     }
     with _LOCK:
-        _NOW = dict(row)
+        _NOW[threading.get_ident()] = dict(row)
     _emit({"phase": "start", "kind": row["kind"], "q": row["query"],
            "tool": row["kind"]})
     return row
@@ -79,10 +94,9 @@ def begin(kind: str, query: str, by: str = "her") -> dict:
 def end(ok: bool, summary: str = "", sources: Optional[list] = None,
         title: str = "") -> dict:
     """A look has FINISHED. Written to the ledger, then cleared from in-flight."""
-    global _NOW, _LAST
+    global _LAST
     with _LOCK:
-        base = dict(_NOW or {})
-        _NOW = None
+        base = dict(_NOW.pop(threading.get_ident(), None) or {})
     row = {
         **base,
         "ok": bool(ok),
@@ -180,7 +194,9 @@ def status() -> dict:
     from harness.skills import research as R
     from harness.skills import search as S
     with _LOCK:
-        inflight = dict(_NOW) if _NOW else None
+        # ANY thread's in-flight look: the taskbar asks "is she looking something up",
+        # not "is this thread" — the map is per-turn, the readout is process-wide.
+        inflight = next((dict(v) for v in _NOW.values()), None)
         last = dict(_LAST) if _LAST else None
     # Process-local last dies on bounce. The ledger does not. HERS ONLY here:
     # the taskbar chip this feeds says what SHE looked up, and his manual rows
@@ -303,6 +319,15 @@ def _mtime(p: str) -> float:
 
 
 def _write(row: dict) -> None:
+    # ANONYMOUS MODE (2026-08-23). The receipt ledger carries the QUERY and 800 characters
+    # of what came back, which over a private evening is the most legible record in the
+    # system of what was being talked about. Held at the write and not at the two callers,
+    # because both of them — her look and his — are recording. The chip still moves: the
+    # in-flight state is process-local (`_NOW`/`_LAST`), so the room still shows her
+    # looking something up; only the durable receipt is held.
+    from harness.control import anon as _anon
+    if _anon.holds("lookup.receipt"):
+        return
     p = _looks_path()
     try:
         os.makedirs(os.path.dirname(p), exist_ok=True)

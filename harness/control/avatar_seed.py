@@ -150,7 +150,20 @@ def seed() -> Dict[str, Any]:
             for fn in files:
                 if rel == "." and fn in never_copy:
                     continue
-                d = os.path.join(dst_root, "" if rel == "." else rel, fn)
+                # ── THE BUNDLE PREDATES THE RENAME (2026-08-25) ──────────────────
+                # The shipped set was built while outfits were still t0..t3 and lays
+                # down `bright/t0/…`; outfits became names on 2026-08-23 and the
+                # wardrobe now looks for `bright/mesh-top/…`. So a fresh clone seeded
+                # 24 MB of art and then drew the fallback SVG — `faces_with_art: 0`,
+                # the framework's first impression, broken since the rename and
+                # invisible because the export's own suite had no runner until today.
+                # CANONICALISED AS IT IS COPIED, not rebuilt: `AV.canon` is the one
+                # rename table, so every future bundle and every old one land right,
+                # and the asset stays byte-identical to what was published.
+                _rel = os.path.join(*[AV.canon(part) if AV.canon(part) in AV.OUTFIT_IDS
+                                      else part
+                                      for part in rel.split(os.sep)]) if rel != "." else "."
+                d = os.path.join(dst_root, "" if _rel == "." else _rel, fn)
                 if os.path.exists(d):
                     skipped += 1
                     continue

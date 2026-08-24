@@ -1,0 +1,24 @@
+{"why": "THE SHARED LEAK CORPUS (2026-08-24 audit). One row per leak shape measured in her real transcripts (SWEEP-2026-08-24 F2) plus the pass-through controls. g_strip_equivalence drives BOTH strippers over it — Python strip_for_record (the record lane) and ui/src/room/tags.js extractTags (the display lane) — and asserts REMOVAL and SURVIVAL on each. `lanes` restricts a row to one side where the two lanes deliberately differ: `js` = the room's own injected text, which the display must keep and the record never contains; `py` = the model's template markers, which the server strips before the room ever sees a delta.", "input": "", "must_not_match": [], "must_keep": []}
+{"input": "[MOOD way: teasing] I missed you.", "must_not_match": ["(?i)\\[\\s*MOOD", "(?i)teasing\\]"], "must_keep": ["I missed you."]}
+{"input": "[VOICING: playful] Come here.", "must_not_match": ["(?i)VOICING"], "must_keep": ["Come here."]}
+{"input": "[MOOC: tender] Hello there my dear friend.", "must_not_match": ["(?i)\\[\\s*MOOC"], "must_keep": ["Hello there my dear friend."]}
+{"input": "[VOX:soft, wistful] It is raining again tonight.", "must_not_match": ["(?i)\\[\\s*VOX"], "must_keep": ["It is raining again tonight."]}
+{"input": "[MOOD:tender] I missed you tonight. [WEAR:the silver nightie]", "must_not_match": ["(?i)\\[\\s*MOOD", "(?i)\\[\\s*WEAR", "silver nightie"], "must_keep": ["I missed you tonight."]}
+{"input": "[TRAI:flirty] Careful, you.", "must_not_match": ["(?i)\\[\\s*TRAI"], "must_keep": ["Careful, you."]}
+{"input": "[MOOD:[smirk; traits: playful, flirty]] You would say that.", "must_not_match": ["(?i)\\[\\s*MOOD", "traits:"], "must_keep": ["You would say that."]}
+{"input": "Goodnight, sleep well my darling.\n</the_end", "must_not_match": ["</the_end"], "must_keep": ["Goodnight, sleep well my darling."]}
+{"input": "My voice goes quiet now.\n</low-pitch", "must_not_match": ["</low-pitch"], "must_keep": ["My voice goes quiet now."]}
+{"input": "Sure, I can hold that thought. [thinking\nThe user is being very precise now. He is testing me.", "must_not_match": ["(?i)\\[\\s*thinking", "testing me"], "must_keep": ["Sure, I can hold that thought."]}
+{"input": "That lands heavy on that connection we have.>", "must_not_match": ["\\.\\s*>"], "must_keep": ["That lands heavy on that connection we have."]}
+{"input": "And then everything went quiet. [MO", "must_not_match": ["\\[\\s*MO\\s*$"], "must_keep": ["And then everything went quiet."]}
+{"input": "[LAUGHING_GENTLY] You did? Oh stop being so sweet.", "must_not_match": ["LAUGHING_GENTLY"], "must_keep": ["You did? Oh stop being so sweet."]}
+{"input": "[laugh] Really? <soft>come closer then</soft> tonight.", "must_not_match": ["\\[laugh\\]", "<soft>", "</soft>"], "must_keep": ["Really?", "come closer then", "tonight."]}
+{"input": "[shower: hot] felt amazing after the day I had.", "must_not_match": [], "must_keep": ["[shower: hot]", "felt amazing after the day I had."]}
+{"input": "5 < 6 and that is that, mathematically speaking.", "must_not_match": [], "must_keep": ["5 < 6 and that is that, mathematically speaking."]}
+{"input": "He's been quiet all week and I have noticed the difference.", "must_not_match": [], "must_keep": ["He's been quiet all week and I have noticed the difference."]}
+{"input": "a lone [ bracket in prose stays where she put it", "must_not_match": [], "must_keep": ["a lone [ bracket in prose stays where she put it"]}
+{"input": "<channel|>Tuffy. How could I forget?", "must_not_match": ["<channel"], "must_keep": ["Tuffy. How could I forget?"]}
+{"lanes": "py", "input": "<thought Thinking Process: 1. Identify the question. <channel|>Tuffy, of course.", "must_not_match": ["(?i)Thinking Process"], "must_keep": ["Tuffy, of course."]}
+{"lanes": "py", "input": "The user is asking me how I'm feeling. I should respond warmly. Honestly? Like everything else has finally fallen away, and what is left is just us, and this is a longer tail so the keep-ratio guard allows the cut to happen here.", "must_not_match": ["(?i)the user is asking"], "must_keep": ["fallen away"]}
+{"lanes": "js", "input": "[error: she was still thinking when the ceiling stopped her]", "must_not_match": [], "must_keep": ["[error: she was still thinking when the ceiling stopped her]"]}
+{"input": "You are Sam. <", "must_not_match": ["<\\s*$"], "must_keep": ["You are Sam."]}

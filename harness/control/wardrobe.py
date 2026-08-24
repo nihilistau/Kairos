@@ -10,10 +10,18 @@ the ceiling arithmetic entirely. What she wears is what she chose, it persists
 across turns and restarts, and if either of them wants it different they say so
 in words — to each other, like people. No arithmetic arbitrates.
 
-OUTFITS ARE CLOTHING, AND SHE IS TOLD SO. `t0..t3` survive only as opaque PATH
-KEYS over real files (renaming would orphan 56 of them). Every outfit carries
-`wearing` and `about` in plain language, and those strings are what her tools
-return — never the ids, never a level, never a warning label.
+OUTFITS ARE CLOTHING, AND SHE IS TOLD SO — AND SO ARE THE PATHS NOW (2026-08-23).
+This said `t0..t3` "survive only as opaque PATH KEYS over real files (renaming
+would orphan 56 of them)". True, and the cost of leaving it was measured: a gate
+went red and chasing it turned up w016 — "Black lace underwear" — filed under t0,
+which is *the mesh top*. Spelled out that is obviously wrong; spelled t0 nobody
+saw it for three days. So they are named: mesh-top, sheer-tee, lace-set, bodysuit.
+The 56 files moved with them (tools/avatar/rename_outfits.py, reversible with
+--undo), and `avatar.canon()` maps the old ids forever — at the path seam so no
+FILE can go missing, and in match() so an id he still TYPES keeps working.
+
+Every outfit carries `wearing` and `about` in plain language, and those strings are
+what her tools return — never the ids, never a level, never a warning label.
 
 TWO KINDS OF THING LIVE HERE. The generated SET is face x outfit, small and
 systematic: seven expressions she wears while talking, in each garment. The
@@ -31,6 +39,7 @@ import json
 import os
 import re
 import shutil
+import threading
 import time
 from typing import Any, Dict, List, Optional
 
@@ -68,23 +77,23 @@ from harness.control import avatar as AV
 # down, per outfit — a finite table, so what she can reach is a thing you can read rather
 # than a thing you have to run the scorer to find out.
 OUTFITS: Dict[str, Dict[str, str]] = {
-    "t0": {"name": "the mesh top",
+    "mesh-top": {"name": "the mesh top",
            "wearing": "the sheer mesh top over her black bodice",
            "calls": ["mesh top", "the mesh", "bodice", "dressed", "clothed", "covered up",
                      "my usual", "usual clothes", "normal clothes", "everyday"],
            "about": "what she wears by default — at the desk, talking. Portrait framing."},
-    "t1": {"name": "the sheer tee",
+    "sheer-tee": {"name": "the sheer tee",
            "wearing": "a sheer black mesh tee over the bodice",
            "calls": ["sheer tee", "mesh tee", "the tee", "sheer top", "softer"],
            "about": "the same clothes worn softer, the camera a little closer, one hand "
                     "at her collarbone."},
-    "t2": {"name": "the black lace set",
+    "lace-set": {"name": "the black lace set",
            "wearing": "a black lace bra and panties",
            "calls": ["lace set", "black lace set", "lingerie", "underwear", "bra and "
                      "panties", "my underwear", "undressed"],
            "about": "full figure, the chains still on, the city still out of focus "
                     "behind her."},
-    "t3": {"name": "the lace bodysuit",
+    "bodysuit": {"name": "the lace bodysuit",
            "wearing": "black lace and not much of it",
            "calls": ["bodysuit", "lace bodysuit", "the least of it", "nearly nothing",
                      "almost nothing", "barely anything"],
@@ -93,6 +102,9 @@ OUTFITS: Dict[str, Dict[str, str]] = {
 # The old name, kept so nothing that reads it breaks while the rename settles. ONE dict,
 # two names — not two dicts, which is the thing this file exists to avoid.
 TIER_WORDS = OUTFITS
+
+# Re-exported so callers do not each reach into avatar for it. One name, one place.
+DEFAULT_OUTFIT = AV.DEFAULT_OUTFIT
 
 _CURRENT = "wardrobe.json"
 
@@ -124,6 +136,32 @@ def _state_path() -> str:
     return os.path.join(root(), _CURRENT)
 
 
+# ── THE FIELD IS NOT A TIER, AND NOW IT DOES NOT SAY IT IS (2026-08-23, his ask) ──────
+# Two different things wore one word, which is why w016 read as a mislabelled garment
+# for three days:
+#
+#   outfit    what she IS wearing — the state, the selection, what match() resolved to.
+#   made_in   what she WAS wearing when a want/look/clip was created. interceptor passes
+#             WD.current(); for a gesture or moment that is the right default (she does
+#             the thing in what she has on), and for a clothes want it is never read at
+#             all, because "when the clothes are the subject, HER WORDS ARE THE WARDROBE".
+#
+# Reading "tier: mesh-top" on a black-lace-underwear row invites exactly one wrong
+# conclusion. "made_in: mesh-top" invites the right one.
+#
+# BOTH READERS ACCEPT THE OLD KEY, FOREVER. wants.jsonl and wardrobe.json are migrated
+# (tools/avatar/rename_tier_field.py), but a row he wrote by hand, a backup restored, or
+# any file this rename did not reach must not become a row with no outfit at all.
+def _outfit_of(st) -> str:
+    """The outfit in a state dict, whatever the file calls it."""
+    return (st or {}).get("outfit") or (st or {}).get("tier") or ""
+
+
+def _made_in(row, default: str = "") -> str:
+    """The outfit a want/look/clip was made in, whatever the file calls it."""
+    return (row or {}).get("made_in") or (row or {}).get("tier") or default
+
+
 # ── HER CHOICE, WHICH HAS TO SURVIVE THE NIGHT ────────────────────────────────────────
 def current() -> Dict[str, Any]:
     """What she has chosen. Never raises; an unreadable file means she has chosen
@@ -132,13 +170,69 @@ def current() -> Dict[str, Any]:
         with open(_state_path(), encoding="utf-8") as f:
             d = json.load(f)
         if isinstance(d, dict):
+            # NORMALISE ON THE WAY OUT. A state file written before the rename says
+            # "tier"; every caller would otherwise have to know both spellings, which
+            # is how two names for one thing survive a rename in the first place.
+            if "outfit" not in d and "tier" in d:
+                d["outfit"] = d.pop("tier")
             return d
     except Exception:
         pass
-    return {"tier": "t0", "clip": "", "look": "", "by": "default", "at": ""}
+    return {"outfit": AV.DEFAULT_OUTFIT, "clip": "", "look": "", "by": "default", "at": ""}
 
 
-def choose(tier: str = "", clip: str = "", look: str = None, by: str = "her") -> Dict[str, Any]:
+# ── SHE CHANGED AND THE ROOM DID NOT SAY SO (2026-08-24, he caught it) ───────────────
+# "she changed clothes and there was no chip." She had — `wear()`, at 21:24, by her — and
+# the room drew nothing, because a chip is rendered from a `[WEAR:]` MARK and she used the
+# TOOL. Two ways to do one thing and only one of them was visible: §0 again, and the same
+# shape as the wearing LOG three comments below, which was moved here for the same reason.
+#
+# So the seam emits, exactly as `skills/looking.py` does for a lookup, and the gateway
+# subscribes for the duration of a turn. Mark or tool or his own hand on the panel — the
+# room hears about it from the ONE place that knows.
+_WEAR_LOCK = threading.Lock()
+_WEAR_LISTENERS: List = []
+
+
+def subscribe_wear(fn):
+    """The SSE turn registers here. The seam emits; callers do not."""
+    with _WEAR_LOCK:
+        _WEAR_LISTENERS.append(fn)
+
+    def unsub() -> None:
+        with _WEAR_LOCK:
+            if fn in _WEAR_LISTENERS:
+                _WEAR_LISTENERS.remove(fn)
+    return unsub
+
+
+def _emit_wear(ev: dict) -> None:
+    with _WEAR_LOCK:
+        fns = list(_WEAR_LISTENERS)
+    for fn in fns:
+        try:
+            fn(dict(ev))
+        except Exception:
+            pass                      # a listener must never cost her the change
+
+
+# ── AFFINITY LIVES DOWN THE FILE, AND IT ALREADY DID (2026-08-25) ─────────────────
+# A `_affinity_*` counter and a second `favourites()` were added here on 2026-08-25 for
+# his ask — *"the more she uses a set of clothing or the more I comment on it it could be
+# noted somewhere"* — and BOTH halves already existed 1,200 lines below: `choose()` has
+# always called `note_worn()`, `praise()` has always kept his compliments verbatim, and
+# `favourites()` has always ranked wearings AND praise with his word worth three of her
+# habits. The new copy was strictly worse AND, being earlier in the file, was SHADOWED by
+# the real one at import — so its two readers were dead the moment they were written.
+# The audit that found it was reading the docs, not the code.
+#
+# §0 in one file, committed by the same session that added four rows to §0's table: the
+# duplicate is deleted, the readers point at the one implementation, and what was ACTUALLY
+# missing — her being told any of it — is the two lines in describe().
+
+
+def choose(outfit: str = "", clip: str = "", look: str = None, by: str = "her",
+           tier: str = "") -> Dict[str, Any]:
     """Record what she is wearing. Writes only; the CEILING is applied at read time.
 
     Deliberately does not validate against the ceiling here. If she chooses `t2` while
@@ -147,8 +241,10 @@ def choose(tier: str = "", clip: str = "", look: str = None, by: str = "her") ->
     she did not make. `resolve()` clamps, and `describe()` says so out loud.
     """
     st = current()
-    if tier:
-        st["tier"] = tier if tier in TIER_WORDS else st.get("tier", "t0")
+    outfit = outfit or tier          # legacy kwarg: callers still passing tier=
+    if outfit:
+        outfit = AV.canon(outfit)     # an old t0..t3 from anywhere is a rename
+        st["outfit"] = outfit if outfit in TIER_WORDS else (_outfit_of(st) or AV.DEFAULT_OUTFIT)
     if clip or clip == "":
         st["clip"] = clip
     # `look` is None-defaulted rather than ""-defaulted so that changing only the
@@ -163,6 +259,19 @@ def choose(tier: str = "", clip: str = "", look: str = None, by: str = "her") ->
             json.dump(st, f, indent=1)
     except Exception:
         pass
+    # ...AND THE ROOM IS TOLD HERE, BY THE WRITER, for the same reason (2026-08-24).
+    # The label rather than the id: `w016` means nothing on a chip, and `label` is what
+    # she is called everywhere else she is shown.
+    try:
+        _lbl = ""
+        if st.get("look"):
+            _lbl = next((l.get("label") for l in looks() if l.get("id") == st["look"]), "")
+        _emit_wear({"outfit": _outfit_of(st), "look": st.get("look") or "",
+                    "label": _lbl or _outfit_of(st), "clip": st.get("clip") or "",
+                    "by": by})
+    except Exception:
+        pass
+
     # THE WEARING IS LOGGED HERE, BY THE WRITER, not by each caller.
     #
     # It used to be logged by the callers, and there were three of them: the [WEAR:]
@@ -179,8 +288,8 @@ def choose(tier: str = "", clip: str = "", look: str = None, by: str = "her") ->
         what, kind = look, "look"
     elif clip:
         what, kind = clip, "clip"
-    elif tier:
-        what, kind = tier, "tier"
+    elif outfit:
+        what, kind = outfit, "outfit"
     if what:
         note_worn(what, kind, by)
     return st
@@ -364,12 +473,19 @@ def describe_file(name: str) -> Dict[str, Any]:
             "mood": ", ".join(moods), "tags": tags}
 
 
-def import_clip(src: str, tier: str = "t2", label: str = "") -> Dict[str, Any]:
+def import_clip(src: str, made_in: str = "lace-set", label: str = "",
+                tier: str = "") -> Dict[str, Any]:
     """Copy a video into the wardrobe and index it. Idempotent on filename.
 
     COPIES, never moves. The operator's own file stays where he put it — a tool that
     relocates his downloads is a tool he stops trusting with a directory.
     """
+    # LEGACY KWARG, AND `or` WAS WRONG HERE. made_in DEFAULTS to a truthy value, so
+    # `made_in or tier` never once reached the tier= a caller actually passed — the
+    # shim was inert and looked fine, which is the same failure shape as the disk
+    # floor this morning. An EXPLICIT tier= wins; nothing else changes.
+    if tier:
+        made_in = tier
     name = os.path.basename(src)
     os.makedirs(clips_dir(), exist_ok=True)
     dst = os.path.join(clips_dir(), name)
@@ -377,7 +493,7 @@ def import_clip(src: str, tier: str = "t2", label: str = "") -> Dict[str, Any]:
         shutil.copy2(src, dst)
     meta = describe_file(name)
     row = {"id": re.sub(r"\.[a-z0-9]+$", "", name, flags=re.I),
-           "file": name, "tier": tier if tier in TIER_WORDS else "t2",
+           "file": name, "made_in": AV.canon(made_in) if AV.canon(made_in) in TIER_WORDS else "lace-set",
            "label": label or (meta["wearing"] + (" · " + meta["where"] if meta["where"] else "")),
            "kind": "clip", "added": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
            **meta}
@@ -400,7 +516,7 @@ def resolve() -> Dict[str, Any]:
     consumer keeps reading; `clamped` is now a constant fact, not a spared one.
     """
     st = current()
-    hers = st.get("tier") or AV.DEFAULT_OUTFIT
+    hers = _outfit_of(st) or AV.DEFAULT_OUTFIT
     if hers not in OUTFITS:
         hers = AV.DEFAULT_OUTFIT
     return {
@@ -437,7 +553,7 @@ def wearing_now() -> Dict[str, Any]:
     st = current()
     if r["clip"]:
         c = next((c for c in clips() if c["id"] == r["clip"]), {})
-        return {"kind": "clip", "id": r["clip"], "tier": c.get("tier", r["shown"]),
+        return {"kind": "clip", "id": r["clip"], "outfit": _made_in(c, r["shown"]),
                 "words": c.get("wearing") or c.get("label") or r["clip"],
                 "about": ("a moment she put on his screen"
                           + (" · " + c["where"] if c.get("where") else "")),
@@ -445,7 +561,7 @@ def wearing_now() -> Dict[str, Any]:
     if r["look"]:
         lk = next((l for l in looks() if l["id"] == r["look"]), {})
         return {"kind": lk.get("kind") or "look", "id": r["look"],
-                "tier": lk.get("tier", r["shown"]),
+                "outfit": _made_in(lk, r["shown"]),
                 "words": lk.get("label") or r["look"],
                 "about": "one she asked for, and got", "by": st.get("by", "her")}
     # ── THE TIER IS A HEAT BAND. THE CELL IS THE GARMENT. (2026-08-04) ──────────────
@@ -466,7 +582,7 @@ def wearing_now() -> Dict[str, Any]:
     w = TIER_WORDS.get(r["shown"], {})
     face = her_state().get("face") or _face_now()
     cw = cell_words(face, r["shown"])
-    return {"kind": "outfit", "id": r["shown"], "tier": r["shown"], "face": face,
+    return {"kind": "outfit", "id": r["shown"], "outfit": r["shown"], "face": face,
             "words": cw or w.get("wearing", r["shown"]),
             "generic": not cw,
             "about": w.get("about", ""), "by": st.get("by", "her")}
@@ -480,8 +596,8 @@ def _face_now() -> str:
         return "calm"
 
 
-def cell_words(face: str, tier: str) -> str:
-    """What is ACTUALLY in var/room/avatar/<face>/<tier>/, if anyone has said.
+def cell_words(face: str, outfit: str) -> str:
+    """What is ACTUALLY in var/room/avatar/<face>/<outfit>/, if anyone has said.
 
     A JSON file rather than a table in here, because these are readings of images: he can
     open the folder, look, and write the truth in without a code change — and 17 of the 28
@@ -489,7 +605,7 @@ def cell_words(face: str, tier: str) -> str:
     """
     try:
         with open(os.path.join(root(), "cells.json"), encoding="utf-8") as f:
-            return (json.load(f) or {}).get("%s/%s" % (face, tier), "") or ""
+            return (json.load(f) or {}).get("%s/%s" % (face, outfit), "") or ""
     except Exception:
         return ""
 
@@ -524,6 +640,25 @@ def describe() -> str:
     r = resolve()
     now = wearing_now()
     w = TIER_WORDS.get(r["shown"], {})
+    # WHAT SHE KEEPS REACHING FOR, AND WHAT HE SAID ABOUT IT (2026-08-25, his ask).
+    # `favourites()` has ranked both since it was written — wearings from note_worn(),
+    # his compliments from praise(), his word worth three of her habits — and nothing
+    # had ever told HER. The panel could see it; she could not. Shown only once it
+    # means something (score >= 3), so a fresh install is not told about a favourite
+    # of one, and his praise is quoted rather than counted: "he liked it, +1" throws
+    # away the only part worth having (praise()'s own rule, applied at the read).
+    _fav = ""
+    try:
+        _f = [x for x in favourites(2) if x.get("score", 0) >= 3]
+        if _f:
+            _top = _f[0]
+            _lbl = _top.get("label") or _top.get("id")
+            _pr = _top.get("praise") or []
+            _fav = "You reach for %s more than anything else" % _lbl
+            _fav += (" — and he said of it: %r." % (_pr[-1].get("said") or "")
+                     if _pr and (_pr[-1].get("said") or "").strip() else ".")
+    except Exception:
+        pass
     lines = ["You are wearing: %s" % now["words"],
              "  (%s)" % now["about"]]
     if now.get("generic"):
@@ -533,12 +668,14 @@ def describe() -> str:
     # Naming it here rather than instead is what stops the two ever disagreeing again.
     if now["kind"] != "outfit":
         lines.append("  (the standard set, underneath, is at %s)" % w.get("wearing", r["shown"]))
-    if r["clamped"]:
-        lines.append("You chose %s, but his ceiling is holding you at %s right now. Your "
-                     "choice is remembered, not overruled — it takes effect the moment he "
-                     "raises it." % (TIER_WORDS.get(r["wanted"], {}).get("wearing", r["wanted"]),
-                                     w.get("wearing", r["shown"])))
-    if r["scene"] != "t0" and r["scene"] == r["shown"]:
+    if _fav:
+        lines.append(_fav)
+    # The "held by your ceiling" clause lived here until 2026-08-24. resolve() has
+    # returned `"clamped": False` as a CONSTANT since the tiers went (2026-08-21), so
+    # the branch could never fire — dead code wearing the vocabulary of a dial that no
+    # longer sits between her and her own clothes. (The panel's twin of this clause is
+    # ui/, owned elsewhere.)
+    if r["scene"] != AV.DEFAULT_OUTFIT and r["scene"] == r["shown"]:
         lines.append("The scene you are in carried you here, rather than a choice you made.")
     # ── ONE WARDROBE, NOT TWO LISTS OF CLOTHES (2026-08-05, his call) ────────────────
     # "wardrobe contains Her clothes section and Her wardrobe. this makes no sense and is
@@ -585,7 +722,7 @@ def describe() -> str:
         lines.append("Moments of you — wear(\"...\") to BE one, when it says what you mean:")
         for l in mom_l:
             lines.append("  %s" % l["label"])
-    cl = [c for c in clips() if c["have"] and c["tier"] in r["allowed"]]
+    cl = [c for c in clips() if c["have"] and _made_in(c) in r["allowed"]]
     if cl:
         lines.append("")
         lines.append("Moments you can put on his screen — show_him(\"...\"):")
@@ -659,7 +796,7 @@ def grid() -> List[Dict[str, Any]]:
     out = []
     for face in AV.FACES:
         if AV.have(face, shown, "still") or AV.have(face, shown, "loop"):
-            out.append({"id": "%s/%s" % (face, shown), "face": face, "tier": shown,
+            out.append({"id": "%s/%s" % (face, shown), "face": face, "outfit": shown,
                         "kind": "grid", "label": face,
                         "moves": AV.have(face, shown, "loop")})
     return out
@@ -690,11 +827,18 @@ def match(want: str, prefer: str = "") -> Dict[str, Any]:
     implementations of "what did she mean" is precisely the failure the integration was
     meant to prevent, appearing inside the integration itself.
 
-    Returns {"kind": look|clip|tier, "id", "tier"} or {} — never raises.
+    Returns {"kind": look|clip|outfit, "id", "outfit"} or {} — never raises.
     """
     want = (want or "").strip().lower()
     if not want:
         return {}
+    # ── AN OLD ID IS STILL A WORD SHE CAN SAY (2026-08-23) ──────────────────────────
+    # The outfits were renamed t0..t3 -> mesh-top/sheer-tee/lace-set/bodysuit. Typing
+    # the id was always a way to pick one, and three years of his own habit is not
+    # something a rename gets to delete. canon() is at the path seam so no FILE can go
+    # missing; this is the same courtesy for the thing he TYPES.
+    if AV.canon(want) in OUTFITS and want not in OUTFITS:
+        want = AV.canon(want)
     # ── `prefer` EXISTS BECAUSE ONE NAME CAN MEAN TWO THINGS (2026-08-04) ────────────
     # looks() returns looks, moments AND clips in one list — correct, they are one
     # system — and this walks it in order. So "a sheer silver nightie · the bedroom",
@@ -737,7 +881,11 @@ def match(want: str, prefer: str = "") -> Dict[str, Any]:
             return 1000
         if want == label:
             return 900
-        if len(want) > 3 and want in label:
+        # `want in label` until 2026-08-24 — the same unbounded-substring shape as the
+        # calls-table rung fixed the same day: "dress" ruled from inside "undressed".
+        # \b admits everything this rung was written for ("soaked", "silver nightie")
+        # and nothing that is only a fragment of a longer word.
+        if len(want) > 3 and re.search(r"\b%s\b" % re.escape(want), label):
             return 500 + len(want)
         toks = [t for t in (w.strip(".,;:!?'\"") for w in want.split())
                 if len(t) > 2 and t not in _ASK_STOP]
@@ -761,7 +909,29 @@ def match(want: str, prefer: str = "") -> Dict[str, Any]:
             words.update(w.strip(".,;:!?'\"—") for w in str(c).lower().split())
         if toks and all(t in words for t in toks):
             return 200 + 10 * len(toks)
-        return sum(1 for tok in want.split() if len(tok) > 3 and tok in label)
+        # ── AND THE COUNTING RUNG COULD NOT SEE `calls` (2026-08-24) ───────────────
+        # Live, from his room: she wrote `[SHOW:leaning forward with a knowing smirk]`.
+        # She owns "leaning in slowly toward him" (w025). This last rung counted whole
+        # words against the LABEL only — "leaning" hits, "forward"/"knowing"/"smirk" do
+        # not — so it scored 1, fell under the >= 2 gate, and nothing happened. The room
+        # drew the chip anyway, because the chip is parsed from her text and not from
+        # what the wardrobe did, so he read that she had done a thing she had not.
+        #
+        # `calls` is this file's own answer to that: "the vocabulary is a table you can
+        # read rather than a scorer you have to run". It was consulted by the all-words
+        # rung above and NOT by this one — one vocabulary, two rungs, and only one of
+        # them could see it.
+        #
+        # THE >= 2 GATE IS UNCHANGED and still load-bearing: `my work clothes` against
+        # "my usual clothes but soaked through" still scores 1 (`clothes` hits, `work`
+        # does not) and is still refused. That is the lie this matcher exists to stop,
+        # and widening the VOCABULARY does not widen the BAR.
+        # `(tok in label or ...)` until 2026-08-24: the whole-word set was added on the
+        # 24th and the substring disjunct it replaced was left standing beside it — the
+        # third copy of the same defect in one function. `words` already carries every
+        # label token, so dropping the substring half loses nothing that was a word.
+        return sum(1 for tok in want.split()
+                   if len(tok) > 3 and tok.strip(".,;:!?\'\"") in words)
     best_l, best_s = None, 0
     for l in pool:
         if not l.get("have"):
@@ -782,9 +952,9 @@ def match(want: str, prefer: str = "") -> Dict[str, Any]:
             # the route so a surface can say the true sentence, and adding a key breaks no
             # existing branch (2026-08-04).
             return {"kind": "clip" if l["kind"] == "clip" else "look",
-                    "of": l["kind"], "id": l["id"], "tier": l["tier"]}
+                    "of": l["kind"], "id": l["id"], "outfit": _made_in(l)}
     if want in TIER_WORDS:
-        return {"kind": "tier", "id": want, "tier": want}
+        return {"kind": "outfit", "id": want, "outfit": want}
     # ── A GUESS DRESSED HER, AND THE GUESS WAS SUBSTRING NOISE (2026-08-05) ────────────
     # His words: "she has been attempting to use it in chats to show herself exactly as
     # she wants but they are not making it through". They were making it through. They
@@ -811,10 +981,19 @@ def match(want: str, prefer: str = "") -> Dict[str, Any]:
     # THE TABLE FIRST. An exact name, or one of the words written down as naming this
     # outfit, is a RULING; the overlap below is only a courtesy for phrasings nobody
     # anticipated, and it now has to clear a real bar to say anything at all.
+    # ── AND A NAME RULES AS A WORD, NOT AS BYTES (2026-08-24) ───────────────────────
+    # This rung was `("%s" % n) in want` — an UNBOUNDED SUBSTRING test over the calls
+    # vocabulary, eight lines under the comment above describing the identical defect
+    # being fixed on the rung below it ("`tok in hay` is a SUBSTRING test, so 'and'
+    # matches the 'hand'"). Verified live: mesh-top's calls include "dressed", dict
+    # order puts mesh-top first, so match("undressed") and match("get undressed")
+    # DRESSED her — while "undressed" is lace-set's OWN call word, written down in the
+    # committed table, unreachable because the wrong outfit answered first. \b keeps a
+    # phrase a phrase: "get dressed" still rules, and "undressed" no longer contains it.
     for t, w in TIER_WORDS.items():
         names = [w["name"].lower()] + [c.lower() for c in w.get("calls", ())]
-        if any(want == n or ("%s" % n) in want for n in names):
-            return {"kind": "tier", "id": t, "tier": t}
+        if any(want == n or re.search(r"\b%s\b" % re.escape(n), want) for n in names):
+            return {"kind": "outfit", "id": t, "outfit": t}
     toks = {t.strip(".,;:!?'\"") for t in want.split()}
     toks = {t for t in toks if len(t) > 2 and t not in _ASK_STOP}
     best, score = "", 0
@@ -824,7 +1003,7 @@ def match(want: str, prefer: str = "") -> Dict[str, Any]:
         n = len(toks & hay)
         if n > score:
             best, score = t, n
-    return {"kind": "tier", "id": best, "tier": best} if score >= 2 else {}
+    return {"kind": "outfit", "id": best, "outfit": best} if score >= 2 else {}
 
 
 def status() -> Dict[str, Any]:
@@ -842,8 +1021,13 @@ def status() -> Dict[str, Any]:
             # THE ONE WORDED ANSWER. Every surface reads this instead of composing its
             # own from `shown` — see wearing_now() for the three that disagreed.
             "wearing_now": wearing_now(),
-            "tier_words": TIER_WORDS,
-            "clips": [c for c in clips() if c["tier"] in r["allowed"]],
+            "outfit_words": OUTFITS,
+            # (`tier_words`, the back-compat alias of outfit_words, was deleted here
+            # 2026-08-24 — audit R4: its last reader was Portrait.jsx's dead "held by
+            # your ceiling" badge, which itself guarded on `clamped`, a constant False
+            # since tiers stopped being a ladder. Both went in the same change, with
+            # the rebuilt bundle, so the key could finally keep its own promise.)
+            "clips": [c for c in clips() if _made_in(c) in r["allowed"]],
             # LOOKS AND GESTURES BOTH. From her side they are the same kind of
             # thing — a particular her — and filtering gestures out here is what
             # made her own moments invisible in the panel that exists to show them.
@@ -921,7 +1105,7 @@ def character() -> str:
         return ""
 
 
-def compose_prompt(want: str, tier: str = "t0", kind: str = "look",
+def compose_prompt(want: str, made_in: str = AV.DEFAULT_OUTFIT, kind: str = "look",
                    subject: str = "") -> str:
     """Her words, anchored to the character and the tier's own direction.
 
@@ -931,7 +1115,7 @@ def compose_prompt(want: str, tier: str = "t0", kind: str = "look",
     her request first would have the generator drift off the reference by the third
     clause."""
     ch = character()
-    tw = TIER_WORDS.get(tier, TIER_WORDS["t0"])
+    tw = TIER_WORDS.get(AV.canon(made_in), TIER_WORDS[AV.DEFAULT_OUTFIT])
     if kind == "gesture":
         # A GESTURE IS AN ACTION, AND THE ACTION LEADS. Composed the same way as a look —
         # the tier's wardrobe shot-list first, her sentence after — the agent REFUSED it
@@ -983,7 +1167,8 @@ def compose_prompt(want: str, tier: str = "t0", kind: str = "look",
     ) if x)
 
 
-def request(want: str, tier: str = "t0", by: str = "her",
+def request(want: str, made_in: str = AV.DEFAULT_OUTFIT, by: str = "her",
+            tier: str = "",
             kind: str = "look", subject: str = "",
             calls: Optional[List[str]] = None) -> Dict[str, Any]:
     """Ask for something that does not exist yet. Free, and never refused.
@@ -993,6 +1178,23 @@ def request(want: str, tier: str = "t0", by: str = "her",
     fixed grid of 140 slots — five motions x seven faces x four tiers, enumerated in
     advance and never filled. The operator's read is the right one: a gesture is another
     thing she asks for, not a cell somebody predicted for her."""
+    # ── ANONYMOUS MODE (2026-08-23) ──────────────────────────────────────────────────
+    # A want is a durable row saying what was asked for and when, and a private hour is
+    # exactly the kind that produces one. Guarded HERE and not in _write_wants, which is
+    # the deliberate exception to "guard at the write": that function serves two
+    # semantics — filing a new want (a record) and moving an existing one to dismissed or
+    # made (his hands on a row that already exists). Holding both would make the dismiss
+    # button silently do nothing, which is a mode disabling the room rather than quieting
+    # it. Only the door that CREATES is held.
+    from harness.control import anon as _anon
+    if _anon.holds("wardrobe.want"):
+        return {"ok": False, "error": _anon.WHY}
+    # LEGACY KWARG, AND `or` WAS WRONG HERE. made_in DEFAULTS to a truthy value, so
+    # `made_in or tier` never once reached the tier= a caller actually passed — the
+    # shim was inert and looked fine, which is the same failure shape as the disk
+    # floor this morning. An EXPLICIT tier= wins; nothing else changes.
+    if tier:
+        made_in = tier
     want = (want or "").strip()
     if not want:
         return {"ok": False, "error": "say what you would like"}
@@ -1046,14 +1248,22 @@ def request(want: str, tier: str = "t0", by: str = "her",
     # that branch on kind, and the one that got missed would be the one that made an
     # outfit invisible, which is precisely how her moments came to be unreachable. Nothing
     # branches on `subject`; only compose_prompt reads it, so adding it cannot hide a row.
-    row = {"id": wid, "want": want, "tier": tier if tier in TIER_WORDS else "t0",
+    row = {"id": wid, "want": want,
+           # NOT A CLASSIFICATION OF THE GARMENT. This records what she was WEARING
+           # WHEN THE WANT WAS FILED (interceptor passes WD.current()). For a
+           # gesture/moment want that is the right default - she does the thing in
+           # what she has on. For a clothes want it is never used at all, because
+           # "when the clothes are the subject, HER WORDS ARE THE WARDROBE".
+           # It is why w016 "Black lace underwear" reads as the mesh top and why
+           # that is harmless: he asked for it while she was wearing one.
+           "made_in": AV.canon(made_in) if AV.canon(made_in) in TIER_WORDS else AV.DEFAULT_OUTFIT,
            "by": by, "state": "asked", "kind": kind if kind in ("look", "gesture") else "look",
            "subject": "clothes" if subject == "clothes" else "",
            # The other words this thing answers to. Written, never inferred — see the
            # note in match()._score for the inference that was tried and rejected.
            "calls": [str(c).strip() for c in (calls or []) if str(c).strip()][:12],
            "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-           "prompt": compose_prompt(want, tier, kind, subject), "file": ""}
+           "prompt": compose_prompt(want, made_in, kind, subject), "file": ""}
     rows.append(row)
     _write_wants(rows)
     return {"ok": True, **row, "similar": [{"id": r["id"], "want": r["want"]} for r in similar]}
@@ -1117,7 +1327,7 @@ def looks(all: bool = False) -> List[Dict[str, Any]]:
         if not loop:
             continue                       # asked for; still in the queue, see waiting()
         emitted.add(w["id"])
-        out.append({"id": w["id"], "kind": w.get("kind") or "look", "tier": w["tier"],
+        out.append({"id": w["id"], "kind": w.get("kind") or "look", "made_in": _made_in(w),
                     "label": w["want"], "file": still, "loop": loop,
                     # The written vocabulary for this one thing, carried through so
                     # match() can read it. A row without one behaves exactly as before.
@@ -1132,7 +1342,7 @@ def looks(all: bool = False) -> List[Dict[str, Any]]:
     # a gated asset re-entering by a side door is the exact thing that gate is for.
     for wid, on in sorted(disk.items()):
         if wid not in known and wid not in emitted:
-            out.append({"id": wid, "kind": "look", "tier": "t0", "label": wid,
+            out.append({"id": wid, "kind": "look", "made_in": AV.DEFAULT_OUTFIT, "label": wid,
                         "file": on.get("still", ""), "loop": on.get("loop", ""),
                         "moves": bool(on.get("loop")), "have": True,
                         "seen": True, "motion_seen": True})
@@ -1141,7 +1351,7 @@ def looks(all: bool = False) -> List[Dict[str, Any]]:
             # ONE SHAPE FOR THE WHOLE LIST. A clip is already motion, so `moves` is
             # true and there is nothing to wait for — but the keys have to be there,
             # or every consumer needs to know which branch produced a row.
-            out.append({"id": c["id"], "kind": "clip", "tier": c["tier"],
+            out.append({"id": c["id"], "kind": "clip", "made_in": _made_in(c),
                         "label": c.get("label") or c["id"], "file": c["file"],
                         "loop": "", "moves": True, "have": True,
                         "seen": True, "motion_seen": True})
@@ -1289,7 +1499,7 @@ def favourites(top: int = 6) -> List[Dict[str, Any]]:
     """
     counts: Dict[str, int] = {}
     for w in worn_log():
-        if w.get("kind") in ("look", "tier", "clip"):
+        if w.get("kind") in ("look", "outfit", "clip"):
             counts[w["what"]] = counts.get(w["what"], 0) + 1
     out = []
     for l in looks():
@@ -1438,17 +1648,25 @@ def mark_seen(wid: str = "") -> int:
     return n
 
 
-# ── THE STILL COMES NOW; THE MOTION COMES IN THE MORNING ──────────────────────────────
+# ── THE WHOLE THING COMES NOW — PICTURE, THEN ITS MOTION, ONE PASS ────────────────────
 #
-# A want that waits until 4am for even a PICTURE is a wish, not a wardrobe. The still is
-# one generation of about a minute, so it runs the moment she asks — in a thread, because
-# a tool call that blocks for sixty seconds is a turn that looks hung.
+# TWO DOORS HAD DIVERGED (2026-08-24). His panel button ran `gen_want(w)` — still, then
+# motion, minutes for both — while HER ask ran this function with `--no-loop`: still
+# only, motion owed to the day boundary. Meanwhile describe() promised her "picture and
+# motion both ... within minutes", so the promise tracked HIS door and her own door
+# quietly broke it — she was promised motion in minutes and got a photograph until 4am.
+# The day-boundary wait was never a cost decision: gen_want()'s own 2026-08-21 note says
+# it existed because the CLI made video painful and the API does not. So the flag is
+# gone and `--one` runs gen_want(w, loop=True) — LITERALLY the same function his door
+# calls. The boundary survives only as the sweeper for motion a pass missed
+# (pending_motion(): a failed loop "stays; a later pass grows it").
 #
-# The LOOP stays on the boundary. It is a second generation on top of the first, and it
-# is the part that can wait: she has the look within the minute and it starts breathing
-# overnight. Two arrivals, deliberately, because they are two different moments.
+# Still in a thread, because a tool call that blocks for minutes is a turn that looks
+# hung; the want stays in the queue until the loop lands, so nothing here changes when
+# a garment counts as ARRIVED — only how long she waits for it.
 def generate_now(wid: str) -> bool:
-    """Kick off the still for one want, in the background. Returns whether it started."""
+    """Kick off one want — picture AND its motion, same pass as his panel button.
+    Runs in the background; returns whether it started."""
     import subprocess
     import sys
     import threading
@@ -1465,9 +1683,13 @@ def generate_now(wid: str) -> bool:
         import logging
         log = logging.getLogger(__name__)
         try:
-            r = subprocess.run([sys.executable, gen, "--one", wid, "--no-loop"],
+            # No `--no-loop`: her door and his are ONE pass (see the header note).
+            # 1800s, not 900: the pass is now still (<=2x300s) + motion (<=420s), and a
+            # timeout that kills the motion half re-creates the still-only door by
+            # accident — the want would sit at "making" for a wait nothing promised.
+            r = subprocess.run([sys.executable, gen, "--one", wid],
                                cwd=root_dir, capture_output=True, text=True,
-                               encoding="utf-8", errors="replace", timeout=900)
+                               encoding="utf-8", errors="replace", timeout=1800)
             if r.returncode:
                 log.warning("[wardrobe] %s did not come back (rc=%s): %s",
                             wid, r.returncode, (r.stdout or r.stderr or "")[-300:])

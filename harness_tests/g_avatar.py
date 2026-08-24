@@ -88,25 +88,25 @@ print("\n2. OUTFITS ARE PATH KEYS, NOT A LADDER — the censor is gone")
 # generate what she wishes. She or I decide any ceilings." The outfit axis
 # survives as opaque path keys over real files; nothing ranks them, nothing maps
 # scene heat onto them, and no arithmetic clamps what may be shown.
-check("the outfit axis is declared", A.OUTFIT_IDS == ("t0", "t1", "t2", "t3"))
-check("the default outfit is the everyday one", A.DEFAULT_OUTFIT == "t0")
+check("the outfit axis is declared", A.OUTFIT_IDS == ("mesh-top", "sheer-tee", "lace-set", "bodysuit"))
+check("the default outfit is the everyday one", A.DEFAULT_OUTFIT == "mesh-top")
 for gone in ("tier_of_rung", "allowed_tiers", "TIERS", "TIER_IDS"):
     check("the ladder API %r is gone" % gone, not hasattr(A, gone))
 check("no second explicit-content switch is READ anywhere",
       "avatar.explicit" not in code and "SP_AVATAR_EXPLICIT" not in code)
 
 print("\n4. NOTHING IS GATED — every outfit she owns is servable")
-os.makedirs(os.path.join(SB, "smirk", "t3"), exist_ok=True)
-io.open(os.path.join(SB, "smirk", "t3", "still.png"), "w").write("x")
-r = A.resolve("smirk", "t3")
-check("the t3 asset is served exactly as asked",
-      r and r["path"].endswith("smirk/t3/still.png"), r)
+os.makedirs(os.path.join(SB, "smirk", "bodysuit"), exist_ok=True)
+io.open(os.path.join(SB, "smirk", "bodysuit", "still.png"), "w").write("x")
+r = A.resolve("smirk", "bodysuit")
+check("the least-covered outfit is served exactly as asked",
+      r and r["path"].endswith("smirk/bodysuit/still.png"), r)
 check("the resolver never clamps (no clamp key at all)", bool(r) and "clamped" not in r, r)
 
 print("\n5. MISSING DEGRADES, NEVER BLANKS")
 check("no asset at all -> None, so the SVG stays", A.resolve("calm") is None)
-os.makedirs(os.path.join(SB, "calm", "t0"), exist_ok=True)
-io.open(os.path.join(SB, "calm", "t0", "still.png"), "w").write("x")
+os.makedirs(os.path.join(SB, "calm", "mesh-top"), exist_ok=True)
+io.open(os.path.join(SB, "calm", "mesh-top", "still.png"), "w").write("x")
 r = A.resolve("calm", kind="loop")
 check("a missing LOOP degrades to the still before it degrades to the SVG",
       r and r["kind"] == "still", r)
@@ -114,9 +114,9 @@ r = A.resolve("calm", kind="clip", gesture="laughing")
 check("...and so does a missing gesture clip", r and r["kind"] == "still", r)
 check("an unknown face resolves to something rather than throwing",
       A.resolve("nonsense-face") is not None)
-r = A.resolve("smirk", "t2")
+r = A.resolve("smirk", "lace-set")
 check("a missing outfit cell falls back to the default outfit's cell",
-      r is None or r["outfit"] in ("t2", "t0"), r)
+      r is None or r["outfit"] in ("lace-set", "mesh-top"), r)
 
 print("\n6. THE MANIFEST NAMES ONLY WHAT THE TABLES ALLOW")
 m = A.manifest()
@@ -140,8 +140,8 @@ check("the plan exists", len(plan) > 500)
 check("...and states that the still is the anchor for motion",
       "image-to-video" in plan.lower() or "from the still" in plan.lower())
 check("a loop and a still share the same (face, outfit) directory",
-      os.path.dirname(A.rel_path("calm", "t0", "loop"))
-      == os.path.dirname(A.rel_path("calm", "t0", "still")))
+      os.path.dirname(A.rel_path("calm", "mesh-top", "loop"))
+      == os.path.dirname(A.rel_path("calm", "mesh-top", "still")))
 
 print("\n8. THE REPO IS PUBLIC — no asset may be tracked")
 try:

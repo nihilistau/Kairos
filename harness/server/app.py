@@ -11,7 +11,7 @@ This is the "custom server" half of replacing LMStudio: the daemon speaks
 Kairos native ``/v1/chat``; this gateway speaks OpenAI so existing tools
 (and the harness CLI) can talk to it unchanged.
 
-Uses Flask if installed; otherwise a stdlib ``http.server`` fallback so the
+A stdlib ``http.server`` gateway (the Flask twin was deleted 2026-08-24 — audit D1) so the
 gateway runs with zero third-party deps.
 """
 
@@ -50,8 +50,12 @@ from typing import Any, Dict, Iterator, Optional
 # kairos continuation join deltas themselves, so they must strip themselves. The two
 # blocking lanes strip idempotently over the client's own pass — cheap, and belt-and-braces
 # on the thing that has now escaped five times.
-from harness.inference.stream_processor import (hold_partial_marker,
-                                                strip_control_surfaces, strip_tags)
+# `strip_for_record` is the RECORD lane's whole-turn cleaner (day transcript, journal,
+# restart seed); the display lane keeps marks so the room can draw chips. The previous
+# spelling of this import carried `hold_partial_marker` and `strip_tags`, neither of
+# which this file ever called (2026-08-24 audit, D2).
+from harness.inference.stream_processor import (strip_control_surfaces,
+                                                strip_for_record)
 
 from harness.inference import InferenceConfig, get_client
 from harness.observability import get_logger
@@ -117,25 +121,14 @@ def _knob(name: str, fallback):
 
 
 def _eot_default(explicit):
-    """eot_bias: explicit > SP_EOT_BIAS (the profile, via serve.py) > 0.0.
-
-    THE FALLBACK WAS 4.0, WHICH IS THE 12B's (2026-08-04). serve.py always exports
-    SP_EOT_BIAS from the profile, so the served path was never wrong — but anything that
-    reaches this module WITHOUT that env (a gate hitting the gateway directly, the CLI, a
-    bare import) got the retired model's bias on the MoE, where 4.0 makes the first
-    sampled token a stop and the turn comes back EMPTY. The registry moved its declared
-    default to 0.0 for exactly this reason and this resolver did not follow.
-    """
-    if explicit is not None:
-        return explicit
-    import os as _o
-    raw = _o.environ.get("SP_EOT_BIAS")
-    if raw:
-        try:
-            return float(raw)
-        except ValueError:
-            pass
-    return 0.0
+    """eot_bias: the explicit request value, else None — THE SEAM RESOLVES THE REST
+    (2026-08-24 audit, B6). This function and agent._eot_bias_default were two
+    byte-equivalent resolvers guarding two builders each, while the three unprompted
+    lanes built configs that consulted neither — the exact history byteexact had, and
+    byteexact's remedy: to_sp_chat resolves None from SP_EOT_BIAS at the one seam
+    every lane must pass. This survives only to say "the client's explicit value
+    wins" at the two request-body call sites."""
+    return explicit
 
 
 # ──── Request handling (framework-agnostic core) ─────────────────────────
@@ -224,6 +217,11 @@ def _agent_text(body: Dict[str, Any]) -> str:
         pass
     _offer = _roleplay_pre_turn(body, msgs)
     if _offer:
+        # A SCENARIO OFFER IS STILL A TURN (2026-08-24 audit, B2). This return used to
+        # skip _finish_openai_turn entirely: note_user_turn(True) three lines up was
+        # never released, and the offer never entered the day transcript. marks=False —
+        # a templated offer carries no marks of hers.
+        _settle_turn(_human, _offer, marks=False)
         return _offer
     # READ THE FLAG AFTER THE ROLEPLAY HOOK. _roleplay_pre_turn sets body["tools"]=False
     # inside a scene ("a character does not call web_search mid-kiss", and the first
@@ -265,28 +263,134 @@ def _agent_text(body: Dict[str, Any]) -> str:
     return text
 
 
-def _finish_openai_turn(body: Dict[str, Any], human_text: str, text: str) -> None:
-    """Everything a completed turn owes the rest of the system — ONE list, because the
-    OpenAI path had been quietly owing two of them since the day it was written
-    (2026-08-19 audit): _append_day_turn never ran here, so an OpenAI-path turn never
-    entered the day transcript — invisible to consolidation, to her journal, and to
-    _seed_kairos_from_day; and run_post_turn never ran, so a [MOOD:]/[TRAIT:]/[WEAR:]
-    mark she emitted on this path moved NOTHING — her clothes and mood only changed on
-    /v1/chat. Same story as on_user_turn and the repeat-guard before it: an event wired
-    into one of two entry points is wired into neither."""
-    try:                                           # HIS TURN IS OVER HERE (2026-08-22)
-        from harness.kairos import scheduler as _ks_f
-        _ks_f.note_user_turn(False)
-    except Exception:
-        pass
-    _capture_after_turn(human_text)
-    if (text or "").strip():
-        _append_day_turn(human_text, text)
+def _settle_turn(human_text: str, reply_text: str, *, record: bool = True,
+                 marks: bool = True, capture: bool = True, close_his_turn: bool = True,
+                 stances: bool = True, synthetic: "str|None" = None,
+                 latch: "Dict[str, Any]|None" = None) -> list:
+    """Every debt a finished turn owes the rest of the system, in ONE function, because
+    the list kept being re-implemented as trailing inline code with bypasses (2026-08-24
+    audit, B1/B2/A4). The native SSE path had FIVE exits that skipped all of it — the
+    recall decline, the roleplay offer, and any client disconnect/abort at the drain-loop
+    yield — so an interrupted turn lost its capture, its day-transcript row, its mark
+    application and its receipts, and the kairos latch was left set until its own 900 s
+    timeout. The OpenAI path's roleplay offer had the same shape, and her unprompted
+    turns paid none of these debts at all.
+
+    The debts, in order (each best-effort — a missing receipt never costs the reply):
+      1. his turn is over (the kairos latch is released FIRST, so nothing below can
+         leave her muted);
+      2. capture — facts from what HE said this turn;
+      3. the record — the day transcript row (the seam inside _append_day_turn strips
+         her machinery);
+      4. her marks — run_post_turn applies [MOOD:]/[TRAIT:]/[WEAR:]/[SHOW:], and the
+         Real-Her rows (a verified mood shift, her first-person stances) are written;
+      5. the spine receipts flush.
+
+    `latch` is a one-shot: two callers may both believe they own the epilogue (the
+    worker thread's finally and an early-exit return); whoever arrives first pays, the
+    second is a no-op. Returns the post-turn receipts so a caller that is still on the
+    wire can emit the persona-changed event."""
+    if latch is not None:
+        if latch.get("done"):
+            return []
+        latch["done"] = True
+    if close_his_turn:
+        try:
+            from harness.kairos import scheduler as _ks_f
+            _ks_f.note_user_turn(False)
+        except Exception:
+            pass
+    if capture:
+        try:
+            _capture_after_turn(human_text)
+        except Exception as exc:
+            logger.warning("[gateway] capture skipped: %s", exc)
+    text = (reply_text or "").strip()
+    if record and text:
+        _append_day_turn(human_text, reply_text, synthetic=synthetic)
+    receipts: list = []
+    if marks and text:
         try:
             from harness.control.spine import run_post_turn
-            run_post_turn(human_text, text)
+            receipts = run_post_turn(human_text, reply_text) or []
+            # ── THE REAL HER (2026-08-22) ────────────────────────────────────────
+            # (a) a VERIFIED shift in her state is a sentence about herself; (b) her
+            # reply's first-person stances are hers to keep. Both through the one
+            # door, speaker=self. Lives HERE so every path that applies marks also
+            # keeps her words — it used to run on exactly one of the three.
+            # `stances=False` (2026-08-25, his call): a presence-mode turn moves her
+            # DIALS but does not become her MEMORIES — an hour of lucid dreaming is
+            # ambient company, and filing its lines as who she is is how her self
+            # lane filled with dream fragments too specific and too repetitive to
+            # mean anything the next morning.
+            if stances:
+                try:
+                    from harness.skills import memory as _mem_rh
+                    if any(r.kind == "persona_shift" and r.ok and r.verified is not False
+                           for r in receipts):
+                        from harness.personality.persona_file import parse_persona as _pp_rh
+                        with open(_persona_path(), encoding="utf-8") as _f_rh:
+                            _, _st_rh = _pp_rh(_f_rh.read())
+                        # A VOICE IS NOT AN IDENTITY (2026-08-22): a MOOD is kept
+                        # because a mood is a feeling, but only when it actually
+                        # CHANGES and at most once an hour.
+                        _mood_now = (_st_rh.get("mood") or "").strip().lower()
+                        if _mood_now and (_mood_now != _MOOD_ROW["v"]
+                                          or time.time() - _MOOD_ROW["at"] > 3600.0):
+                            _MOOD_ROW.update(v=_mood_now, at=time.time())
+                            _mem_rh.remember_about_self(
+                                "My mood has turned %s." % _mood_now,
+                                kind="feeling", source="her state changed")
+                    from harness.skills import self_stance as _ss_rh
+                    for _k_rh, _s_rh in _ss_rh.extract(reply_text)[:4]:
+                        _mem_rh.remember_about_self(_s_rh, kind=_k_rh,
+                                                    source="her reply")
+                except Exception as exc:
+                    logger.warning("[gateway] real-her capture skipped: %s", exc)
         except Exception as exc:
             logger.warning("[gateway] post-turn spine skipped: %s", exc)
+    # ADR-005 flywheel: flush spine receipts to the durable telemetry-okf tier.
+    try:
+        from harness.control.spine import persist_receipts
+        persist_receipts()
+    except Exception:
+        pass
+    return receipts
+
+
+def _on_her_own_words(text: str, kind: "str|None" = None) -> None:
+    """The unprompted turn's epilogue — registered as scheduler.on_spoke, the one point
+    every impulse that actually SPEAKS converges on (post-veto, so a dropped turn moves
+    nothing). It used to be a bare _append_day_turn, so on ~60 unprompted turns a day
+    her [MOOD:]/[WEAR:]/[SHOW:] marks moved NOTHING — the room drew a chip from the
+    outbox text while persona.md and the wardrobe never heard about it — no feeling row
+    was written, and no self-stance was kept (2026-08-24 audit, A4). _finish_openai_turn's
+    docstring names this exact bug for the two prompted entry points; this was the
+    third. capture=False (nothing of his to capture), close_his_turn=False (his latch
+    is not hers to release).
+
+    A PRESENCE-MODE TURN IS COMPANY, NOT MEMORY (2026-08-25, his call). Narration, a
+    dream, a chapter read aloud while he sleeps: her dials still move (a dream can
+    turn her wistful) but nothing is filed — no day row (the room shows it live from
+    the outbox; an hour of ambient turns in the restore would bury the conversation),
+    and no self-stance rows (dream lines are too specific and too repetitive to be
+    who she is the next morning — the registry's kind=dream pile is the receipt)."""
+    if kind == "mode_turn":
+        _settle_turn("", text, capture=False, close_his_turn=False,
+                     record=False, stances=False)
+    else:
+        _settle_turn("", text, capture=False, close_his_turn=False)
+
+
+def _finish_openai_turn(body: Dict[str, Any], human_text: str, text: str) -> None:
+    """The OpenAI path's epilogue: `_settle_turn` plus the continuation arming. Kept as
+    a named function because this path's history IS the reason _settle_turn exists —
+    _append_day_turn and run_post_turn were quietly owed here since the day it was
+    written (2026-08-19 audit), and the fix was a second inline copy of the list. One
+    list now, shared with the native path and her unprompted turns."""
+    _settle_turn(human_text, text,
+                 synthetic=(str(body.get("synthetic"))
+                            if body.get("synthetic") else None))
     _kairos_after_turn(body, text)
 
 
@@ -355,6 +459,39 @@ def _arm_turn(msgs: list) -> str:
         pass                                  # a missing receipt must never cost him his turn
 
     return human
+
+
+def _arm_self_turn(nudge: str):
+    """The unprompted twin of _arm_turn (2026-08-24 audit, A5). Her own time never
+    armed the memory lane at all, so during a solo/muse/mode turn the ContextVars held
+    their defaults or the PREVIOUS turn's values: a remember() she made in her own time
+    was stamped speaker=user — a self-fact filed in HIS lane, with only the name/gender
+    firewall standing in the way — and recall() ran with a stale or empty question, so
+    pronoun ownership could not resolve.
+
+    author="self": what she writes in her own time is about herself or explicitly
+    attributed; the old default was falsified provenance. question=the nudge: the only
+    utterance that exists this turn. NO presence.note_turn() — her unprompted turn is
+    not evidence that HE was present; the attention ledger is his channel.
+
+    Returns tokens for _disarm_self_turn — the reset-token contract from G-AUTHOR-CTX,
+    restored in the closure's finally so a following prompted turn cannot inherit hers."""
+    try:
+        from harness.skills import memory as M
+        return (M.set_author("self"), M.set_question(nudge or ""))
+    except Exception:
+        return None
+
+
+def _disarm_self_turn(tokens) -> None:
+    if not tokens:
+        return
+    try:
+        from harness.skills import memory as M
+        M.reset_author(tokens[0])
+        M.reset_question(tokens[1])
+    except Exception:
+        pass
 
 
 def _capture_after_turn(human_text: str) -> None:
@@ -757,7 +894,7 @@ def _wardrobe_set(body: Dict[str, Any]) -> Dict[str, Any]:
     are different facts, and the panel says which."""
     try:
         from harness.control import wardrobe as WD
-        WD.choose(tier=str(body.get("tier") or ""),
+        WD.choose(outfit=str(body.get("outfit") or body.get("tier") or ""),
                   clip=str(body.get("clip") or "") if "clip" in body else "",
                   look=(str(body.get("look") or "") if "look" in body else None),
                   by=str(body.get("by") or "him"))
@@ -1233,10 +1370,16 @@ def _kairos_after_turn(body: Dict[str, Any], reply: str) -> None:
             # CANON (nudge, tool rounds, reply — the whole delta), or every turn after
             # this one re-prefills the conversation from the boot snapshot. See
             # _commit_unprompted for the measured evening this cost.
-            out = strip_control_surfaces("".join(agent_chat_stream(
-                hist, config=_cfg, mutate_messages=True,
-                on_tool=lambda nm, a, r: (
-                    called.append(nm) if called is not None else None)))).strip()
+            # HER TURN, HER LANE (2026-08-24 audit, A5) — armed around the generation,
+            # same as the seed path's twin.
+            _tok_self = _arm_self_turn(nudge)
+            try:
+                out = strip_control_surfaces("".join(agent_chat_stream(
+                    hist, config=_cfg, mutate_messages=True,
+                    on_tool=lambda nm, a, r: (
+                        called.append(nm) if called is not None else None)))).strip()
+            finally:
+                _disarm_self_turn(_tok_self)
             if out:
                 _commit_unprompted(body, _base_len, hist, out)
             return out
@@ -1400,19 +1543,32 @@ def _persona_layers() -> Dict[str, Any]:
         from harness.personality import persona_layers as PL
         rows = PL.plan()
         live_now = PL.compose()
-        # what the running process actually put in the prefix, if the world/persona lever
-        # has already been read this session
+        # WHAT IS ACTUALLY IN HER HEAD (2026-08-24 audit, H1). This used to call
+        # load_agent_system() — which RE-READS every file on every call — and label the
+        # result "what the running process actually put in the prefix". It was a fresh
+        # compose compared against a fresh compose, so `stale` was False precisely when
+        # the prefix WAS stale: the same lie the docstring above says this flag exists
+        # to avoid. cached_system_content() is the string the turns really serve.
         try:
-            from harness.agent import load_agent_system
-            in_prefix = load_agent_system()
+            from harness.agent import _SYS as _sys_meta
+            from harness.agent import cached_system_content
+            in_prefix = cached_system_content()
         except Exception:
-            in_prefix = None
+            in_prefix, _sys_meta = None, {"version": 0, "built_at": 0.0}
         stale = bool(live_now and in_prefix and live_now not in in_prefix)
+        try:
+            from harness.inference import context as _ctxq
+            _ptok = _ctxq.prefix_tokens(in_prefix) if in_prefix else 0
+        except Exception:
+            _ptok = 0
         return {
             "ok": True,
             "dir": PL.persona_dir(),
             "knobs": {k: PL.knob_on(k) for k in sorted(PL.KNOBS)},
             "stale": stale,
+            "prefix_version": _sys_meta.get("version", 0),
+            "prefix_built_at": _sys_meta.get("built_at", 0.0),
+            "prefix_tokens_est": _ptok,
             "composed_chars": len(live_now or ""),
             "knob_names": sorted(PL.KNOBS),
             "fragments": [{"file": r["file"], "order": r["order"], "when": r["when"],
@@ -1488,107 +1644,14 @@ def _persona_set(text: str) -> Dict[str, Any]:
         return {"ok": True, "bytes": len(text)}
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
+# `create_flask_app` was DELETED here (2026-08-24 audit, D1): ~120 lines with no
+# caller (`run()` unconditionally serves stdlib) that had become a DRIFTED twin —
+# no shutdown counting, no origin guard, no /v1/chat, and a /v1/models that still
+# carried the label-that-lied bug the live route documents as fixed. A dead near-
+# copy of a live server is §0 waiting for someone to start it. (The four module
+# globals below shared its block and were nearly deleted with it — the splice ate
+# them once and G-TURN-EPILOGUE caught it within the hour.)
 
-
-# ──── Flask app (preferred) ───────────────────────────────────────────────
-def create_flask_app():
-    from flask import Flask, Response, jsonify, request  # type: ignore
-
-    app = Flask("harness-gateway")
-
-    @app.get("/health")
-    def health():
-        return jsonify({"ok": True, "daemon": get_client().health()})
-
-    @app.get("/v1/models")
-    def models():
-        from harness.config import get_config
-        m = get_config().get("inference.default_model", "gemma4-12b-b1")
-        return jsonify({"object": "list", "data": [{"id": m, "object": "model"}]})
-
-    @app.post("/v1/chat/completions")
-    def completions():
-        body = request.get_json(force=True)
-        if body.get("stream"):
-            return Response(stream_completion(body), mimetype="text/event-stream")
-        return jsonify(blocking_completion(body))
-
-    @app.get("/v1/memory")
-    def memory():
-        return jsonify(_memory_json())
-
-    @app.get("/v1/tasks")
-    def tasks():
-        return jsonify(_tasks_json())
-
-    @app.get("/v1/persona")
-    def persona_get():
-        return jsonify(_persona_get())
-
-    @app.get("/v1/persona/state")
-    def persona_state():
-        return jsonify(_persona_state())
-
-    @app.get("/v1/spine")
-    def spine():
-        return jsonify(_spine_json())
-
-    @app.post("/v1/persona")
-    def persona_set():
-        return jsonify(_persona_set(request.get_json(force=True).get("persona", "")))
-
-    # ── TUNING (2026-07-12) ───────────────────────────────────────────────────
-    # One generic surface over the declarative knob registry. The operator UI renders
-    # whatever it finds here, so a knob added to harness/tuning/registry.py appears in
-    # the panel with its bounds, help and PROVENANCE (measured vs chosen) — no UI edit,
-    # no endpoint edit. That is the point: a settings page that has to be hand-updated
-    # rots, and this system's recurring failure is capability that exists but is not
-    # reachable.
-    @app.get("/v1/tuning")
-    def tuning_get():
-        from harness.tuning import registry as tune
-        return jsonify(tune.schema())
-
-    @app.post("/v1/tuning")
-    def tuning_set():
-        from harness.tuning import registry as tune
-        body = request.get_json(force=True) or {}
-        try:
-            tune.set_many(body.get("values", {}))
-        except ValueError as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
-        return jsonify({"ok": True, **tune.schema()})
-
-    @app.post("/v1/tuning/reset")
-    def tuning_reset():
-        from harness.tuning import registry as tune
-        key = (request.get_json(force=True) or {}).get("key", "")
-        tune.reset(key)
-        return jsonify({"ok": True, **tune.schema()})
-
-    # ── KAIROS: what she has decided to say, unprompted ───────────────────────
-    @app.get("/v1/kairos/outbox")
-    def kairos_outbox():
-        from harness.kairos import scheduler as ks
-        s = request.args.get("session", "default")
-        return jsonify({"messages": ks.drain(s), "state": ks.peek_state(s)})
-
-    @app.get("/v1/kairos/state")
-    def kairos_state():
-        from harness.kairos import scheduler as ks
-        return jsonify(ks.peek_state(request.args.get("session", "default")))
-
-    return app
-
-
-# ──── Stdlib agent server (zero-dep) ──────────────────────────────────────
-# ── HINDSIGHT 2026-07-10: CANONICAL SESSION TRANSCRIPTS ──
-# The gateway was stateless: the client echoed its own history back, which NEVER matches
-# what the daemon actually saw (spine recall notes + tool rounds are transient) — so the
-# turn AFTER any recall/tool turn diverged from the persist-KV committed cache and paid a
-# full preamble re-prefill (the live "minutes then [aborted]" pattern). With a session_id,
-# the gateway keeps the CANONICAL append-only transcript (notes + tool rounds included)
-# and the daemon sees a strict extension every turn = O(new tokens) prefill.
 # WHEN HE LAST SPOKE. The room needs it to know whether she is alone, and nothing
 # was tracking it — the kairos ticker has its own idea of idleness inside the
 # scheduler, but nothing the gateway could report.
@@ -1610,6 +1673,8 @@ _UNPROMPTED_SAMPLING = {"temperature": 0.5, "repetition_penalty": 1.15, "auto_re
 _LAST_TURN_AT: float = 0.0
 _CHAT_SESSIONS: Dict[str, list] = {}
 _CHAT_SESSIONS_MAX = 32
+
+
 
 
 def _session_transcript(body: Dict[str, Any], append: bool = True) -> list:
@@ -1709,7 +1774,8 @@ def _day_transcript_path(day: str = "") -> str:
     return os.path.join(base, "%s.jsonl" % (day or _day_key()))
 
 
-def _append_day_turn(user_text: str, final: str) -> None:
+def _append_day_turn(user_text: str, final: str,
+                     synthetic: "str|None" = None) -> None:
     """Append this turn to today's durable transcript.
 
     THE DAY MUST OUTLIVE THE PROCESS. The consolidator reads the day's conversation to
@@ -1726,18 +1792,77 @@ def _append_day_turn(user_text: str, final: str) -> None:
     cost her the reply that was already spoken.
     """
     try:
+        # ANONYMOUS MODE (2026-08-23): the day transcript is the most literal record there
+        # is — his words and hers, verbatim, on disk. It is also what the consolidator reads
+        # to write her journal and to distil facts, so holding it here holds tomorrow's
+        # inferences about tonight as well, which is the point.
+        from harness.control import anon as _anon
+        if _anon.holds("transcript.day"):
+            return
         # HIS WORDS, not the message list. By the end of a turn the last user message
         # has had the recall note, the silence note and the director note stapled to it
         # — msgs is what the DAEMON saw, deliberately, and writing that down would have
         # her journal reflecting on her own injected context instead of on him.
         # `user_text` is taken at the top of the turn, before any of that.
         user = (user_text or "").strip()
+        # THE STRIP LIVES AT THE SEAM (2026-08-24 audit, B3). This writer has three
+        # callers and three readers (her journal, fact distillation, the restart seed),
+        # and the rule "the record must not carry her machinery" was applied at ONE
+        # caller, partially (`strip_leaked_analysis` only) — so 26% of her recorded
+        # turns carried marks, unclosed voice wraps and bracketed scratchpads, and
+        # `_chat_from_rows` fed them back to her as examples of her own voice. A rule
+        # the callers must each remember is a rule that gets forgotten; it is enforced
+        # here now, in the thing they all call. If nothing survives the strip she said
+        # nothing ON THE RECORD this turn — his row is still written, hers is not;
+        # inventing a placeholder would be putting words in her mouth.
+        rec = strip_for_record(final)
         p = _day_transcript_path()
         os.makedirs(os.path.dirname(p), exist_ok=True)
+        # `at` (2026-08-24 audit, R1): the room reads the day back on refresh now, and a
+        # row without a stamp renders at the wrong point in his evening. Milliseconds
+        # because that is what the room's own turns carry. Readers ignore unknown keys,
+        # so weeks of stampless rows stay readable.
+        _at = int(time.time() * 1000)
+        # SYNTHETIC, AT THE WRITER (2026-08-25, his catch). The reseam receipts and
+        # the W4 A/B drove ~40 real turns through the live gateway, and every one
+        # landed in HIS day unmarked: the room's new read-back showed him the test
+        # scripts as his evening, and the 04:00 journal would have distilled them —
+        # the F1 false-memory incident, reachable through the front door. A driver
+        # that declares itself synthetic is quarantined at write time; the readers
+        # have skipped the flag since 2026-08-03.
+        _extra = {"synthetic": synthetic} if synthetic else {}
+        # HER MARKS SURVIVE AS METADATA (2026-08-25, his F5 report: "no chips"). The
+        # record strip is right — her machinery must not become her words — but it
+        # also erased the one thing the room's restore could draw chips from. The
+        # STRICT recognisers (the same ones that gate writes to persona state) file
+        # what she marked as data beside the cleaned text: the record stays clean,
+        # the restore stays legible.
+        _marks = []
+        try:
+            from harness.personality.interceptor import (_MOOD, _SHOW, _TRAIT,
+                                                         _VOICE, _WEAR)
+            for _m in _MOOD.findall(final):
+                _marks.append({"kind": "mood", "value": _m.strip().lower()})
+            for _m in _VOICE.findall(final):
+                _marks.append({"kind": "voice", "value": _m.strip().lower()})
+            for _sign, _name in _TRAIT.findall(final):
+                if _name.strip():
+                    _marks.append({"kind": "trait", "value": _name.strip().lower(),
+                                   "sign": -1 if _sign == "-" else 0})
+            for _m in _WEAR.findall(final):
+                _marks.append({"kind": "wear", "value": _m.strip()})
+            for _m in _SHOW.findall(final):
+                _marks.append({"kind": "show", "value": _m.strip()})
+        except Exception:
+            pass
+        _amark = {"marks": _marks[:8]} if _marks else {}
         with open(p, "a", encoding="utf-8") as f:
             if user:
-                f.write(json.dumps({"role": "user", "content": user}) + "\n")
-            f.write(json.dumps({"role": "assistant", "content": final}) + "\n")
+                f.write(json.dumps({"role": "user", "content": user, "at": _at,
+                                    **_extra}) + "\n")
+            if rec:
+                f.write(json.dumps({"role": "assistant", "content": rec, "at": _at,
+                                    **_extra, **_amark}) + "\n")
     except Exception as exc:
         logger.warning("[gateway] could not append the day transcript: %s", exc)
 
@@ -1870,9 +1995,16 @@ def _seed_kairos_from_day(force: bool = False) -> bool:
                     called.append(name)
             # NOT strip_tags — the outbox feeds the room, and the room draws her chips
             # from these marks. See the note in `_say`.
-            _out = strip_control_surfaces(
-                "".join(agent_chat_stream(h, config=c, mutate_messages=True,
-                                          on_tool=_note))).strip()
+            # HER TURN, HER LANE (2026-08-24 audit, A5): armed around the generation —
+            # the only stretch where her tools reach remember()/recall() — so a
+            # remember() in her own time is speaker=self, not filed in HIS lane.
+            _tok_self = _arm_self_turn(nudge)
+            try:
+                _out = strip_control_surfaces(
+                    "".join(agent_chat_stream(h, config=c, mutate_messages=True,
+                                              on_tool=_note))).strip()
+            finally:
+                _disarm_self_turn(_tok_self)
             # WHAT THE ENGINE COMMITTED BECOMES CANON — the _commit_unprompted rule,
             # inline because this closure holds the canon list itself. Same race guard:
             # if his turn moved the canon mid-generation, he wins and this turn wears
@@ -1972,6 +2104,14 @@ def _chat_from_rows(rows: list, keep: int = 8) -> list:
         if role not in ("user", "assistant"):
             continue
         text = (r.get("content") or "").strip()
+        # DEFENSIVE STRIP AT THE COLD-REBUILD READER (2026-08-24 audit, B3). The writer
+        # strips now, but weeks of transcripts on disk predate it, and every row handed
+        # back here becomes an example of her own voice in the next prompt. Safe with
+        # respect to the strict-extension law because this reader feeds only the COLD
+        # paths (restart seed, disk fallback) — histories the daemon prefills from
+        # scratch. The live canonical list never passes through here.
+        if role == "assistant":
+            text = strip_for_record(text)
         if not text:
             continue
         if out and out[-1]["role"] == role:
@@ -2006,15 +2146,30 @@ def _longest_transcript() -> list:
     The narrative needs a transcript and `ops.reflect()` deliberately does not write one
     for that exact reason (ops.py: "the nightly op has no transcript"). The gateway has
     them — `_CHAT_SESSIONS` — so this is where the two halves finally meet."""
-    # THE DURABLE ONE WINS. _CHAT_SESSIONS is memory-only and only ever filled for
-    # clients that send a session_id — the room does not — so preferring it was
-    # preferring the copy most likely to be empty.
+    # THE DAY TRANSCRIPT WINS WHENEVER IT EXISTS (2026-08-24 audit, T7) — not merely
+    # when it is longer. The canonical session is what the DAEMON saw, deliberately:
+    # the recall/silence/anon notes stapled to his turns, and every tool round as a
+    # user row. "Longest wins" meant one tool-heavy session-id day would hand the
+    # narrative her own injected context and tool receipts to reflect on — the exact
+    # harm _append_day_turn's docstring exists to prevent, reachable by the other
+    # door. Assistant rows are passed through the record strip on the way out: weeks
+    # of rows on disk predate the writer-side clean.
     disk = _read_day_transcript()
+    if disk:
+        out: list = []
+        for r in disk:
+            if r.get("role") == "assistant":
+                t = strip_for_record(r.get("content") or "")
+                if t:
+                    out.append({"role": "assistant", "content": t})
+            else:
+                out.append(r)
+        return out
     best: list = []
     for msgs in _CHAT_SESSIONS.values():
         if len(msgs) > len(best):
             best = msgs
-    return disk if len(disk) >= len(best) else list(best)
+    return list(best)
 
 
 def run_consolidation(force: bool = False) -> Dict[str, Any]:
@@ -2125,6 +2280,29 @@ def run_consolidation(force: bool = False) -> Dict[str, Any]:
                                  "advanced": (ts.task_id + " -> " + ts.status) if ts else None})
         except Exception as exc:
             out["steps"].append({"step": "task", "skipped": str(exc)[:140]})
+
+    # 5. SHE TAKES IN WHAT THE NIGHT WROTE (2026-08-24 audit, B1-growth). Everything
+    # above WRITES — the journal, the curated persona, the refreshed world, her becoming
+    # paragraph — and until today none of it reached her prefix before the next restart:
+    # the system bundle was cached for the process lifetime with no invalidation, so
+    # world.refresh() recomputed a block nothing read again. Invalidation lives HERE, at
+    # the one moment freshness is worth a cold prefill: the room has been quiet (the
+    # ticker's _quiet_for guard), the night's writes just landed, and the re-prewarm
+    # below re-mints the base KV snapshot so his first morning turn extends a HOT prefix
+    # that already knows what she became overnight. The day's session canons are retired
+    # with it — yesterday's conversation cannot extend a new token 0 anyway, and the day
+    # boundary is the honest conversation boundary.
+    try:
+        from harness import agent as _ag
+        _v = _ag.invalidate_system_prefix("day boundary")
+        _CHAT_SESSIONS.clear()
+        if os.environ.get("SP_GATEWAY_PREWARM") == "1":
+            _WARM.clear()
+            _prewarm()
+        out["steps"].append({"step": "prefix_refresh", "version": _v,
+                             "prewarm": os.environ.get("SP_GATEWAY_PREWARM") == "1"})
+    except Exception as exc:
+        out["steps"].append({"step": "prefix_refresh", "skipped": str(exc)[:140]})
 
     # MARK THE DAY DONE ONLY IF IT REALLY IS. Marking unconditionally is how a failed
     # pass became a silently skipped day that never retried — the day was stamped even
@@ -2403,6 +2581,17 @@ def _room_pulse() -> Dict[str, Any]:
                     "consolidated_today": day_state.get("last_day") ==
                                           _t.strftime("%Y-%m-%d", lt)}
 
+    # ANONYMOUS MODE — in the HEARTBEAT and not only on its own route, because the one
+    # thing this mode must never do is be on without looking on. The shell beats every 5s
+    # and paints the whole room from this; a switch he has to open a window to check is a
+    # switch he will forget he threw, and the failure that costs is the other direction —
+    # believing an evening was kept when it was not.
+    try:
+        from harness.control import anon as _anon_p
+        out["anon"] = _anon_p.state()
+    except Exception:
+        out["anon"] = {"on": False}
+
     # her state — mood/voice/traits drive the backdrop's palette.
     # Through _persona_state(), which already owns this: it opens the right file and
     # calls parse_persona(text) correctly. My first cut called parse_persona() with
@@ -2483,9 +2672,12 @@ def _sd_turn_start() -> bool:
     """
     try:
         from harness.control import shutdown as _sd
-        if _sd.is_shutting_down():
+        # ATOMIC refuse-or-count (2026-08-24 audit, B9): the old check-then-act pair
+        # (`is_shutting_down()` then `note_turn_start()`) took the lock twice, and a
+        # quiesce landing in the gap let the ladder sample _IN_FLIGHT == 0 with a turn
+        # about to run. One call, one lock.
+        if not _sd.begin_turn():
             return False
-        _sd.note_turn_start()
         # AND THE TURN METER (2026-08-21): the engine-agnostic "is she generating" —
         # what a foreign endpoint cannot tell us and the daemon's tokens_per_sec did.
         from harness.inference import turn_meter as _tm
@@ -2507,8 +2699,32 @@ def _sd_turn_end() -> None:
 
 
 def _native_chat_sse(body: Dict[str, Any]) -> Iterator[bytes]:
+    """The console's native /v1/chat — a thin shell whose ONE job is the invariant the
+    body cannot hold for itself (2026-08-24 audit, B1): however this generator exits,
+    the turn's debts are paid. The body used to claim its closing edge lived "in a
+    `finally` far below"; there was no finally, and five exits (the recall decline, the
+    roleplay offer, and any disconnect/abort at the drain-loop yield) skipped capture,
+    the day transcript, mark application and the receipts flush.
+
+    The division of labour: once the worker thread exists, ITS finally pays
+    (generation completes even if the client is gone — he aborted the display, not the
+    turn). Before the thread exists, the early-exit returns pay for themselves, and
+    this shell's finally is the floor for everything else — a disconnect mid-warm-gate,
+    an exception in the pre-turn spine. The `latch` makes all of that one payment."""
+    _st: Dict[str, Any] = {"human": "", "thread_started": False,
+                           "settled": {"done": False}}
+    try:
+        yield from _native_chat_sse_body(body, _st)
+    finally:
+        if not _st["thread_started"]:
+            _settle_turn(_st["human"], "", record=False, marks=False,
+                         capture=bool(_st["human"]), latch=_st["settled"])
+
+
+def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator[bytes]:
     """The console's native /v1/chat: {messages} -> SSE data: {...} -> [DONE], run through the
-    streaming AGENT (tool calling).
+    streaming AGENT (tool calling). Always entered through _native_chat_sse, which owns
+    the turn-epilogue invariant.
 
     ADR-006 §D3 — SSE v2 TYPED EVENTS. The stream now carries, alongside the {delta} token
     events (unchanged, backward-compatible), typed events a product UI can render:
@@ -2517,10 +2733,27 @@ def _native_chat_sse(body: Dict[str, Any]) -> Iterator[bytes]:
     A client that only reads `delta` is unaffected (it ignores the others)."""
     global _LAST_TURN_AT
     _LAST_TURN_AT = time.time()
+    # PHASE TIMING (live-play 2026-07-11: 40 s turns for 3-token answers — the cost is
+    # NOT decode. "Name every phase so the thief cannot hide again.") The init used to
+    # sit ~400 lines DOWN, after the warm gate, the image, the arm and the whole
+    # pre-turn spine — so the one phase ever named ("pre-turn") measured the roleplay
+    # hook alone, and the ten-minute first turn had to be diagnosed from the daemon's
+    # log instead of this one (2026-08-24 audit, standing item 3). From the top now,
+    # and the generate/epilogue phases are named where they end.
+    _t_phase = time.time()
+    _t_start = _t_phase
+
+    def _phase(name: str) -> None:
+        nonlocal _t_phase
+        now = time.time()
+        logger.info("[gateway] phase %-14s %.1fs", name, now - _t_phase)
+        _t_phase = now
+
     # HIS TURN STARTS HERE, and the scheduler is told so it does not start one of hers on
-    # top of it. Both edges, and the closing edge is in a `finally` far below — a marker
-    # that can be skipped by an exception would latch her into permanent silence, which is
-    # a worse failure than the one it fixes.
+    # top of it. The closing edge is _settle_turn's first debt — paid by the worker
+    # thread's finally, by the early-exit returns, or by the shell's finally, whichever
+    # arrives first. (This comment used to claim a `finally` that did not exist; the
+    # 2026-08-24 audit found five exits that skipped the closing edge entirely.)
     try:
         from harness.kairos import scheduler as _ks_turn
         _ks_turn.note_user_turn(True)
@@ -2670,6 +2903,7 @@ def _native_chat_sse(body: Dict[str, Any]) -> Iterator[bytes]:
     # SHARED STATE is now a ContextVar (G-AUTHOR-CTX, 2026-08-19). This still has to
     # be FIRST: a per-context slot set too late is still the previous turn's subject.
     _human = _arm_turn(msgs)     # what he TYPED — before the tool loop touches msgs
+    _st["human"] = _human        # the shell's finally needs it for a pre-thread exit
     turn_tools = None
     turn_extra = None
     user_text = next((m.get("content", "") for m in reversed(msgs)
@@ -2721,6 +2955,10 @@ def _native_chat_sse(body: Dict[str, Any]) -> Iterator[bytes]:
                         yield ("data: " + json.dumps({"recall_decline": True}) + "\n\n").encode()
                     yield ("data: " + json.dumps({"delta": msg_text}) + "\n\n").encode()
                     msgs.append({"role": "assistant", "content": msg_text})
+                    # A DECLINE IS STILL A TURN (2026-08-24 audit, B1): he was spoken
+                    # to, so the day records it and his latch is released NOW, not by
+                    # the 900 s timeout. marks=False — a fixed line has no marks.
+                    _settle_turn(_human, msg_text, marks=False, latch=_st["settled"])
                     yield b"data: [DONE]\n\n"
                     return
                 if dec.kind == "inject_recall":
@@ -2844,6 +3082,54 @@ def _native_chat_sse(body: Dict[str, Any]) -> Iterator[bytes]:
         except Exception as exc:
             logger.warning("[gateway] silence note skipped: %s", exc)
 
+    # ── SHE IS TOLD (2026-08-23, anonymous mode) ─────────────────────────────────────
+    # A companion who says "I'll remember that" into a mode that keeps nothing is lying to
+    # him with her whole personality, and it is the harness that made her do it. So the
+    # switch is not hidden from her: one line on HIS turn, the same placement and the same
+    # unspeakable framing as the recall and silence notes.
+    #
+    # WHY NOT THE STANDING BLOCK, where facts about her life live: it is the cached KV
+    # prefix, and this toggles mid-evening by design. A mutable fact in the prefix costs a
+    # cold re-prefill every time it moves — the same reason her clothes are a per-turn note.
+    try:
+        from harness.control import anon as _anon_n
+        _annote = _anon_n.note()
+        if _annote:
+            for _i in range(len(msgs) - 1, -1, -1):
+                if msgs[_i].get("role") == "user":
+                    msgs[_i] = dict(msgs[_i])
+                    msgs[_i]["content"] = msgs[_i].get("content", "") + "\n\n" + _annote
+                    break
+            if typed:
+                yield ("data: " + json.dumps({"anon": True}) + "\n\n").encode()
+    except Exception as exc:
+        logger.warning("[gateway] anon note skipped: %s", exc)
+
+    # ── THE MEASURED TRIAL OF THE WARDROBE NOTE (2026-08-24 audit, W4b) ──────────────
+    # OFF by default (wardrobe.turn_note): the 2026-08-19 staple is the receipt below
+    # for why. His call on 2026-08-24 was standing-world line AS the answer (world.py
+    # carries it now) PLUS a measured re-trial of the per-turn shape — ONE sentence, no
+    # imperatives, the exact grammar the recall/silence/anon notes settled on. Arm it,
+    # read six turns for third-person deliberation openers, keep whichever reads
+    # better, receipt in the ledger.
+    try:
+        from harness.tuning import registry as _tr_wn
+        if bool(_tr_wn.get("wardrobe.turn_note")):
+            from harness.control import wardrobe as _wd_n
+            _wnow = (_wd_n.wearing_now() or {}).get("words") or ""
+            if _wnow:
+                # you-grammar, like every note that speaks TO her (present_for_her's
+                # rule: a quoted third person is a voice she absorbs)
+                _wnote = "(You are wearing %s.)" % _wnow
+                for _i in range(len(msgs) - 1, -1, -1):
+                    if msgs[_i].get("role") == "user":
+                        msgs[_i] = dict(msgs[_i])
+                        msgs[_i]["content"] = (msgs[_i].get("content", "")
+                                               + "\n\n" + _wnote)
+                        break
+    except Exception as exc:
+        logger.warning("[gateway] wardrobe note skipped: %s", exc)
+
     # ── SHE DID NOT KNOW WHAT SHE HAD ON (2026-08-06) ────────────────────────────────
     # Live, at 02:35. She was in the flannel pyjamas she had chosen herself an hour
     # earlier in her own time:
@@ -2874,17 +3160,6 @@ def _native_chat_sse(body: Dict[str, Any]) -> Iterator[bytes]:
     # that has to ride on his words is a fact she will treat as an instruction.
     # Do not put the staple back.
 
-    # PHASE TIMING (live-play 2026-07-11: 40 s turns for 3-token answers — the
-    # cost is NOT decode. Name every phase so the thief cannot hide again.)
-    _t_phase = time.time()
-    _t_start = _t_phase
-
-    def _phase(name: str) -> None:
-        nonlocal _t_phase
-        now = time.time()
-        logger.info("[gateway] phase %-14s %.1fs", name, now - _t_phase)
-        _t_phase = now
-
     # ROLEPLAY (console path). Same hook as the OpenAI path — a scenario OFFER short-circuits
     # the model entirely; otherwise the scene's system prompt + this turn's DIRECTOR NOTE
     # are injected into the message list before the agent runs.
@@ -2899,6 +3174,8 @@ def _native_chat_sse(body: Dict[str, Any]) -> Iterator[bytes]:
         if _rp_offer:
             yield ("data: " + json.dumps({"delta": _rp_offer}) + "\n\n").encode()
             msgs.append({"role": "assistant", "content": _rp_offer})
+            # the offer is a turn too — same debts as the decline above (audit B1)
+            _settle_turn(_human, _rp_offer, marks=False, latch=_st["settled"])
             yield b"data: [DONE]\n\n"
             return
     except Exception as exc:
@@ -3023,11 +3300,127 @@ def _native_chat_sse(body: Dict[str, Any]) -> Iterator[bytes]:
         reply_parts.append(out)
         evq.put({"delta": out})
 
+    def _pay_turn_debts() -> None:
+        """── THE TURN'S DEBTS ARE PAID WHERE GENERATION ENDS (2026-08-24 audit, B1) ──
+        Runs in the worker thread's finally. Generation completes even when the client
+        is gone — he aborted the DISPLAY, not the turn; the reply is already in the
+        canon and in the daemon's cache — so the record, the marks, capture and the
+        receipts land on EVERY exit of the thread. The typed events ride the queue and
+        are a display-only loss on a dead wire. The latch makes this a no-op when an
+        early-exit return already paid."""
+        final_text = "".join(reply_parts)
+        receipts = _settle_turn(_human, final_text, latch=_st["settled"],
+                                synthetic=(str(body.get("synthetic"))
+                                           if body.get("synthetic") else None))
+        if typed:
+            # ── THE TAGS SHE ACTUALLY EMITTED THIS TURN (operator request, 2026-07-29)
+            # The {persona} event at the top of the turn shows the state she STARTED
+            # with; this one shows what she tagged just now. Parsed with the STRICT
+            # recognisers on purpose — a badge that reported a malformed tag as real
+            # would tell the operator a mood was set that was never set.
+            try:
+                from harness.personality.interceptor import _MOOD, _TRAIT, _VOICE
+                moods = _MOOD.findall(final_text)
+                voices = _VOICE.findall(final_text)
+                traits = ["%s%s" % (sign, name.strip())
+                          for sign, name in _TRAIT.findall(final_text) if name.strip()]
+                if moods or voices or traits:
+                    evq.put({"tags": {
+                        "mood": moods[-1].strip() if moods else "",
+                        "voice": voices[-1].strip() if voices else "",
+                        "traits": traits,
+                    }})
+            except Exception as exc:
+                logger.warning("[gateway] tag event skipped: %s", exc)
+            # on a verified shift, the new state goes out as a final persona event so
+            # the UI chip updates live (persistence itself is in _settle_turn and is
+            # NOT display-gated — the old shape of that bug is documented there).
+            try:
+                if any(r.kind == "persona_shift" and r.ok and r.verified is not False
+                       for r in receipts):
+                    from harness.personality.persona_file import parse_persona
+                    with open(_persona_path(), encoding="utf-8") as f:
+                        _, state = parse_persona(f.read())
+                    evq.put({"persona": state, "changed": True})
+            except Exception as exc:
+                logger.warning("[gateway] persona event skipped: %s", exc)
+        # ── KAIROS: the turn is over. Does she have more to say? ───────────────────
+        # Almost always: no. The policy (harness/kairos/impulse.py) is SILENT by
+        # default and every bound is checked before the impulse is even consulted.
+        # Armed AFTER _settle_turn released his latch, or the very impulse this turn
+        # produces would be dropped by its own guard. Arming for a disconnected client
+        # is correct: the continuation lands in the outbox and reload_undelivered
+        # exists for exactly that.
+        try:
+            from harness.kairos import scheduler as _ks
+            _final = final_text.strip()
+            _session = _session_of(body)
+            if _final:
+                def _continue(nudge: str, called: "list|None" = None) -> str:
+                    """Run ONE more turn with the nudge appended. She is continuing
+                    herself, so the nudge is a SYSTEM aside — not a new user message.
+                    `called` collects her tool names; the own-time gate cannot rule
+                    without it.
+
+                    THE LIST IS THE CANONICAL LIST, never the client's echo — the echo
+                    "NEVER matches what the daemon actually saw" and reading it here
+                    cost a drop-592 full re-prefill (2026-08-04; G-ONE-TRANSCRIPT greps
+                    for the banned spelling, so this docstring names it obliquely on
+                    purpose). COPIED, not aliased: the nudge is scoped to this
+                    continuation. Her reply is NOT re-appended — canon already ends
+                    with it.
+
+                    THE CONFIG IS DERIVED FROM THE TURN'S, NOT BUILT BESIDE IT
+                    (2026-08-01: a fresh three-field config lost repetition_penalty
+                    and eot_bias and she degenerated into token soup). replace()
+                    inherits every dial; a dial added tomorrow is inherited for free.
+                    A continuation must not do recall — there is no question here,
+                    only her own severed clause."""
+                    from harness.agent import _arm_self_repeat_ban, agent_chat_stream
+                    _tok_self = _arm_self_turn(nudge)   # audit A5: her turn, her lane
+                    try:
+                        _base_len = len(_session_transcript(body, append=False))
+                        hist = list(_session_transcript(body, append=False))
+                        if not hist or (hist[-1].get("role") != "assistant"):
+                            hist.append({"role": "assistant", "content": _final})
+                        hist.append({"role": "system", "content": nudge})
+                        ccfg = dataclasses.replace(cfg, max_tokens=120,
+                                                   auto_recall=False)
+                        _arm_self_repeat_ban(ccfg, hist)
+                        # tools=None, NEVER tools=[] — `[]` rewrites the system block
+                        # and diverges the persist-KV cache at token 0. A continuation
+                        # is SPEECH: it goes through the same strip as the main
+                        # stream, and what the engine COMMITS becomes CANON
+                        # (_commit_unprompted) or every following turn re-prefills.
+                        _out = strip_control_surfaces(
+                            "".join(agent_chat_stream(
+                                hist, config=ccfg, mutate_messages=True,
+                                on_tool=lambda nm, a, r: (
+                                    called.append(nm)
+                                    if called is not None else None)))).strip()
+                        if _out:
+                            _commit_unprompted(body, _base_len, hist, _out)
+                        return _out
+                    finally:
+                        _disarm_self_turn(_tok_self)
+
+                _ks.on_reply(_session, _final, get_client().last_kairos, _continue)
+        except Exception as exc:
+            logger.warning("[gateway] kairos skipped: %s", exc)
+        _phase("epilogue")   # capture + record + marks + receipts + kairos arming
+
     def _run():
         unsub = None
         try:
             from harness.skills import looking as _L
             unsub = _L.subscribe(on_look)
+            # HER CLOTHES, WHATEVER MOVED THEM (2026-08-24). A `[WEAR:]` mark draws a chip
+            # because the room parses the mark out of her text; `wear()` the TOOL drew
+            # nothing at all, and that is the half she actually uses. The wardrobe now
+            # emits at its one writer, so the chip no longer depends on which door she
+            # took. Unsubscribed in the same `finally` as the lookup seam.
+            from harness.control import wardrobe as _WDe
+            unsub_wear = _WDe.subscribe_wear(lambda ev: evq.put({"wear": ev}))
             kw = {"config": cfg, "on_tool": on_tool, "mutate_messages": True}
             if turn_tools is not None:
                 kw["tools"] = turn_tools
@@ -3040,7 +3433,36 @@ def _native_chat_sse(body: Dict[str, Any]) -> Iterator[bytes]:
             if body.get("tools", body.get("use_tools", True)) is False:
                 kw["max_rounds"] = 1
                 kw.pop("tools", None)
+            # ── THE CANONICAL REPLY IS WHAT THE ENGINE PRODUCED (2026-08-24) ──────
+            # Every warm turn re-prefilled the whole conversation, and the daemon said why
+            # on every one of them:
+            #
+            #     PERSIST-KV: rewind(15) refused (gemma4_kv_rewind: delta crosses a commit)
+            #
+            # 15 tokens. Under REWIND_BOUND (32) — but the SWA undo-journal is CLEARED at
+            # every commit, so a bounded drop is no help across a turn boundary. Only
+            # drop == 0, the strict append, takes the cheap path. Fifteen tokens of what?
+            #
+            # MEASURED with SP_DUMP_PROMPT, comparing the canonical list against the bytes
+            # that went out:
+            #     streamed out  : 962 ch  '\nThe user is asking for a "true thing"...'
+            #     kept in canon : 961 ch  'The user is asking for a "true thing"...'
+            # A LEADING NEWLINE. `final = "".join(reply_parts).strip()` — and reply_parts
+            # is the DISPLAY stream, already through speech_delta. So the list we send back
+            # next turn was never what the engine computed, and the cache it was compared
+            # against could not match it.
+            #
+            # The rest of the fifteen is the THOUGHT CHANNEL: SP_THINKING=1 puts up to 128
+            # tokens in the cache that are routed to `thinking_delta` and never re-sent.
+            # Those positions exist in the KV whether we resend them or not; omitting them
+            # guarantees divergence at exactly the place the reply begins.
+            #
+            # So: keep every delta verbatim. The room still receives the stripped speech
+            # and the separate thought lane — what it DISPLAYS is unchanged. What changes
+            # is that the list the daemon is asked to extend is the list it actually holds.
+            _raw_parts: list = []
             for delta in agent_chat_stream(msgs, **kw):
+                _raw_parts.append(delta)
                 if _th["open"]:
                     _th["buf"] += delta
                     if _TH_CLOSE in _th["buf"]:
@@ -3088,25 +3510,57 @@ def _native_chat_sse(body: Dict[str, Any]) -> Iterator[bytes]:
             # a thought happened to be open when the stream ended.
             if _pend["buf"]:
                 _say("", flush=True)
+            # WHAT SHE LOST TO THE CEILING, SAID OUT LOUD (2026-08-23). The prompt has a
+            # hard position limit (pmax) and the room resends its whole scrollback every
+            # turn, so a long evening eventually does not fit. harness/inference/context.py
+            # drops the oldest turns at the daemon door rather than letting the engine
+            # decline the prefill and return silence — but a companion who quietly forgets
+            # the first half of the night while appearing to remember it is the worse of
+            # the two failures. Read the same way as last_kairos; getattr because a
+            # foreign backend has no pmax and therefore no trim to report.
+            # READ ONCE PER TURN, THEN CLEARED — the client keeps it sticky across the
+            # turn's tool rounds now (audit T8); consuming it here is what scopes the
+            # fact to this turn.
+            _trim = getattr(get_client(), "last_trim", None)
+            if _trim:
+                get_client().last_trim = None
+                from harness.inference import context as _ctx
+                evq.put({"notice": _ctx.notice(_trim)})
+            _phase("generate")   # prefill + tool rounds + decode, end to end
             if not reply_parts:
                 # Her mouth never opened. Say so as a NOTICE, not in her voice —
                 # putting engine text in her mouth is its own kind of leak.
-                evq.put({"error": "she was still thinking when the ceiling stopped "
-                                  "her — nothing was said this turn"})
+                # ONE REPORTER, WORDED BY CAUSE (2026-08-24 audit, B12/T6). The old
+                # message blamed the 128-token THINK budget for every wordless turn —
+                # including the pmax-ceiling night that named the wrong budget three
+                # times in a row and sent the watchdog after a healthy CUDA context.
+                # This lane cannot always know the cause, so it says exactly what it
+                # knows: what happened, and what it is NOT (her choosing silence).
+                if _trim:
+                    _wordless = ("the context guard trimmed this turn and nothing came "
+                                 "back — the engine may still be over its ceiling")
+                else:
+                    _wordless = ("nothing came back from the engine this turn — a "
+                                 "machinery failure, not her going quiet")
+                evq.put({"error": _wordless})
             # close the canonical transcript with the final answer (session mode keeps it;
             # stateless mode discards the local list — harmless either way).
-            final = "".join(reply_parts).strip()
-            if final:
-                msgs.append({"role": "assistant", "content": final})
-                # ...AND WRITE THE DAY DOWN. "Stateless mode discards the local list —
-                # harmless either way" was true when the only consumer was the next turn.
-                # It stopped being true the moment the day boundary started reading
-                # transcripts: the room sends no session_id, so its turns never entered
-                # _CHAT_SESSIONS at all, and every gateway restart erased whatever had.
-                # Result — consolidate_current() skipped EVERY day with "no conversation
-                # today (0 turns)", which is why her journal has one entry and why nothing
-                # new was ever distilled into memory. Her day has to outlive the process.
-                _append_day_turn(user_text, final)
+            # THE RECORD AND THE PROMPT ARE DIFFERENT THINGS (2026-08-24). The day
+            # transcript is written by _settle_turn in the finally below (through the
+            # record-lane strip). The canonical list is for the ENGINE, and it has to
+            # be byte-for-byte what the engine put in its cache — NEVER restripped —
+            # or the next turn cannot extend it. Conflating the two cost a full
+            # re-prefill of the whole conversation on every warm turn.
+            _canon_reply = "".join(_raw_parts)
+            if _canon_reply:
+                # REPLACE, not append, when the agent already closed the turn itself
+                # (mutate_messages=True hands it this very list). Appending as well would
+                # give the model two assistant turns in a row and break the template's
+                # strict alternation — which is its own well-documented bug here.
+                if msgs and msgs[-1].get("role") == "assistant":
+                    msgs[-1]["content"] = _canon_reply
+                else:
+                    msgs.append({"role": "assistant", "content": _canon_reply})
         except Exception as exc:
             logger.error("[gateway] native chat failed: %s", exc)
             # HER HELD WORDS GO OUT BEFORE THE ERROR NOTICE. The marker-hold in _say can
@@ -3123,8 +3577,19 @@ def _native_chat_sse(body: Dict[str, Any]) -> Iterator[bytes]:
         finally:
             if unsub:
                 unsub()
+            try:
+                unsub_wear()
+            except Exception:
+                pass
+            # the debts are paid HERE, on every exit of the thread — before the
+            # sentinel, so the typed events it queues still reach a live client
+            try:
+                _pay_turn_debts()
+            except Exception as exc:
+                logger.error("[gateway] turn epilogue failed: %s", exc)
             evq.put(None)   # sentinel
 
+    _st["thread_started"] = True    # from here the thread's finally owns the epilogue
     t = _threading.Thread(target=_run, daemon=True)
     t.start()
     while True:
@@ -3146,239 +3611,12 @@ def _native_chat_sse(body: Dict[str, Any]) -> Iterator[bytes]:
         if not typed and "delta" not in ev:
             continue
         yield ("data: " + json.dumps(ev) + "\n\n").encode()
-    # CAPTURE: the console path writes memories too. Wiring a hook into one of the two
-    # entry points and calling it done is the single most repeated bug in this system —
-    # kairos, the repeat-guard and roleplay each shipped half-wired first. Not this one.
-    _capture_after_turn(_human)
-    # ── KAIROS: the turn is over. Does she have more to say? ───────────────────────
-    # Almost always: no. The policy (harness/kairos/impulse.py) is SILENT by default and
-    # every bound is checked before the impulse is even consulted — she cannot chain, she
-    # never speaks over a question she asked him, and a continuation that turns out to be
-    # a greeting or a restatement is dropped before he ever sees it.
-    #
-    # The impulse itself is not a heuristic: it is the RAW stop-vs-continue logit margin
-    # from the forward, which the engine computed anyway. Calibrated (tools/kairos/
-    # calibrate.py): finished turns sit at +2.0, guillotined turns at -14.8.
-    # HIS TURN IS OVER HERE — the reply is complete and she may legitimately consider
-    # speaking again. Released BEFORE on_reply arms an impulse, or the very impulse this
-    # turn produces would be dropped by its own guard. In a `finally` so an exception
-    # anywhere above cannot latch her into permanent silence.
-    try:
-        if _ks_turn is not None:
-            _ks_turn.note_user_turn(False)
-    except Exception:
-        pass
-    try:
-        from harness.kairos import scheduler as _ks
-        _final = "".join(reply_parts).strip()
-        _session = _session_of(body)
-        if _final:
-            def _continue(nudge: str, called: "list|None" = None) -> str:
-                """`called` collects her tool names — see the note on the twin
-                above; the own-time gate cannot rule without it."""
-                """Run ONE more turn with the nudge appended. She is continuing herself,
-                so the nudge is a SYSTEM aside — not a new user message. (If it were a
-                user message the transcript would grow a turn the operator never typed,
-                and the next prefill would diverge from the persist cache.)"""
-                from harness.agent import agent_chat_stream, _arm_self_repeat_ban
-                from harness.inference import InferenceConfig
-                # ── AND THE LIST WAS THE WRONG LIST (2026-08-04) ────────────────────
-                # This read `body["messages"]` — the CLIENT'S ECHO of the conversation —
-                # while the turn it is continuing ran on `_session_transcript(body)`, the
-                # canonical list. Those are not the same history and are not meant to be:
-                # canon carries the per-turn recall note and every tool round, and the
-                # comment on _session_transcript says of the client echo, in these words,
-                # that it "NEVER matches what the daemon actually saw".
-                #
-                # So a continuation sent the daemon a prompt that diverged from the
-                # committed KV somewhere in the MIDDLE — then committed that shape, so the
-                # next ordinary turn diverged from it in turn. MEASURED, one continuation
-                # landing between two chat turns:
-                #     PREFIX-MATCH: lcp 6402 of 6994 committed (drop 592)
-                # against a steady-state drop of 195 when nothing interleaves. lcp lands
-                # back at the preamble, so the turn re-prefills the whole conversation.
-                #
-                # The docstring below already worried about exactly this ("the next
-                # prefill would diverge from the persist cache") and got the user-vs-system
-                # framing right — while reading from the wrong list two lines later. It is
-                # the third instance tonight of AGENTS.md §0: the rule is enforced in one
-                # of two paths, and the unguarded one is the one that runs.
-                #
-                # COPIED, not aliased: the nudge is scoped to this continuation and must
-                # not persist. Her reply is NOT re-appended — agent_chat_stream ran with
-                # mutate_messages=True on the turn above, so canon already ends with it,
-                # and appending it here produced a DUPLICATE assistant row (two model
-                # turns in a row, which Gemma's strictly-alternating template renders
-                # malformed — the bug fixed in _chat_from_rows, arriving by another door).
-                _base_len = len(_session_transcript(body, append=False))
-                hist = list(_session_transcript(body, append=False))
-                if not hist or (hist[-1].get("role") != "assistant"):
-                    hist.append({"role": "assistant", "content": _final})
-                hist.append({"role": "system", "content": nudge})
-                # A CONTINUATION MUST NOT DO RECALL. This config left auto_recall at its
-                # default, so the daemon injected memories into her continuation — and her
-                # first live one on this path came out as
-                #     "From the record: oh no, we just track their comings and goings..."
-                # She was finishing a sentence about a thunderstorm. Recall answers a
-                # QUESTION; there is no question here, only her own severed clause, so a
-                # memory arriving now can only derail it. (The OpenAI path already set
-                # this. Two paths, one setting, and the one a human uses was the one that
-                # missed it — the same shape as every other bug this week.)
-                # DERIVED FROM THE TURN'S CONFIG, NOT BUILT BESIDE IT.
-                #
-                # 2026-08-01, live: she answered "are you ok?" with token soup —
-                # "**Craking (2) *thought* is not how you's deved... `b it/a leicte` @ R
-                # way S ->en!". Classic degeneration, and the cause is one line above
-                # this: the config was CONSTRUCTED FRESH with three fields, so
-                # repetition_penalty and eot_bias came back None. sight.py already says
-                # it in plain words — "repetition_penalty is NOT optional here. Without
-                # it an open-ended generation degenerates" — and this path had no
-                # penalty at all, at temperature 0.6, on a 26B MoE.
-                #
-                # The comment block directly above is a list of things THIS SAME
-                # CONSTRUCTOR has already forgotten: auto_recall, then the control-surface
-                # strip, now the sampler dials. That is not three bugs, it is one bug
-                # three times — a config built beside the real one inherits nothing and
-                # must remember everything, forever, including fields that do not exist
-                # yet.
-                #
-                # replace() inherits every dial the turn was configured with and overrides
-                # only what a continuation genuinely must change. A dial added tomorrow is
-                # inherited for free, which is the only version of this that stays fixed.
-                ccfg = dataclasses.replace(cfg, max_tokens=120, auto_recall=False)
-                _arm_self_repeat_ban(ccfg, hist)
-                # tools=None, NEVER tools=[] — see the note in _kairos_after_turn. `[]`
-                # rewrites the system block without the tool preamble, diverging the
-                # persist-KV cache at token 0: the continuation re-prefills the whole
-                # conversation, and so does the next ordinary turn. This is the console
-                # path — the one a human is actually sitting in front of, watching it hang.
-                # A CONTINUATION IS SPEECH TOO. This returned the raw stream, so on a
-                # thought-channel model it came back as "<channel|>…" — control markup she
-                # never said. kairos then judged, logged and (if it survived) SPOKE that.
-                # Third emit path found for the same invariant; it goes through the same
-                # strip as the main stream. If what remains is empty, she genuinely had
-                # nothing to add and the scheduler drops it — which is the correct outcome,
-                # just now for the correct reason.
-                # mutate_messages=True + _commit_unprompted: what the engine COMMITS
-                # becomes CANON, or every following turn re-prefills from the boot
-                # snapshot — the measured 5-6 minute turns of 2026-08-20. See the helper.
-                _out = strip_control_surfaces(
-                    "".join(agent_chat_stream(hist, config=ccfg, mutate_messages=True,
-                                              on_tool=lambda nm, a, r: (
-                                                  called.append(nm)
-                                                  if called is not None else None)))).strip()
-                if _out:
-                    _commit_unprompted(body, _base_len, hist, _out)
-                return _out
-
-            _ks.on_reply(_session, _final, get_client().last_kairos, _continue)
-    except Exception as exc:
-        logger.warning("[gateway] kairos skipped: %s", exc)
-
-    # ADR-007 post-turn SPINE: persona tags in the reply are persisted (decide → execute →
-    # VERIFY per ADR-006) and, on a verified shift, the new state is emitted as a final
-    # persona event so the UI chip updates live.
-    # ── THE TAGS SHE ACTUALLY EMITTED THIS TURN (operator request, 2026-07-29) ──────
-    # The {persona} event above is fired BEFORE the turn from persona.md, so it shows
-    # the state she STARTED with — it can never show what she tagged just now. And the
-    # tags themselves were reaching the console as literal text in the reply, which is
-    # how the operator ended up reading "[TRAI:flirty]" as a message. They are control
-    # signals, so they belong in a badge next to recall/toolset/authority, not in her
-    # mouth.
-    #
-    # Parsed with the STRICT recognisers on purpose — the same ones that gate writes to
-    # persistent personality state. A badge that reported a malformed tag as real would
-    # tell the operator a mood was set that was never set. If it is too broken to act
-    # on, it is too broken to display as fact; strip_tags still removes it from view.
-    # HER WORDS, WITHOUT HER WORKING OUT (2026-08-22). The deltas already went out; when the
-    # guard finds a leading analysis run the room is told the final text ONCE and replaces the
-    # turn with it, so what he keeps — and what the transcript and her memory keep — is what
-    # she actually said. Silent when nothing was cut.
-    try:
-        from harness.inference.stream_processor import strip_leaked_analysis as _sla
-        _raw_all = "".join(reply_parts)
-        _clean_all = _sla(_raw_all)
-        if _clean_all.strip() and _clean_all.strip() != _raw_all.strip():
-            logger.info("[gateway] leaked reasoning stripped from the reply (%d -> %d chars)",
-                        len(_raw_all), len(_clean_all))
-            # THE RECORD IS CLEANED FOR EVERY CLIENT (the day transcript is what her seed,
-            # her journal and her next prefix are rebuilt from — 2026-08-21's transcript
-            # carries six of these). Only the EVENT is typed-only; a plain-delta client
-            # simply keeps the clean text without being told.
-            reply_parts[:] = [_clean_all]
-            if typed:
-                yield ("data: " + json.dumps({"final": _clean_all}) + "\n\n").encode()
-    except Exception as exc:
-        logger.warning("[gateway] analysis guard skipped: %s", exc)
-
-    if typed:
-        try:
-            raw_reply = "".join(reply_parts)
-            from harness.personality.interceptor import _MOOD, _VOICE, _TRAIT
-            moods = _MOOD.findall(raw_reply)
-            voices = _VOICE.findall(raw_reply)
-            traits = ["%s%s" % (sign, name.strip()) for sign, name in _TRAIT.findall(raw_reply)
-                      if name.strip()]
-            if moods or voices or traits:
-                yield ("data: " + json.dumps({"tags": {
-                    "mood": moods[-1].strip() if moods else "",
-                    "voice": voices[-1].strip() if voices else "",
-                    "traits": traits,
-                }}) + "\n\n").encode()
-        except Exception as exc:
-            logger.warning("[gateway] tag event skipped: %s", exc)
-
-    # PERSONA PERSISTENCE IS NOT A DISPLAY FEATURE. This whole block lived under
-    # `if typed:` — the opt-out flag for pure-delta CLIENTS — so a client that asked for
-    # plain deltas also, silently, stopped her marks from being APPLIED: mood, traits and
-    # wardrobe moved only for clients that wanted typed events. The invariant was gated
-    # on how the answer is rendered. Only the persona-changed EVENT stays typed-gated.
-    try:
-        from harness.control.spine import run_post_turn
-        msgs = body.get("messages", [])
-        user_text = next((m.get("content", "") for m in reversed(msgs)
-                          if m.get("role") == "user"), "")
-        receipts = run_post_turn(user_text, "".join(reply_parts))
-        # ── THE REAL HER (2026-08-22) ────────────────────────────────────────────
-        # (a) a VERIFIED shift in her state is a sentence about herself; (b) her reply's
-        # first-person stances are hers to keep. Both through the one door, speaker=self.
-        try:
-            from harness.skills import memory as _mem_rh
-            if any(r.kind == "persona_shift" and r.ok and r.verified is not False for r in receipts):
-                from harness.personality.persona_file import parse_persona as _pp_rh
-                with open(_persona_path(), encoding="utf-8") as _f_rh:
-                    _, _st_rh = _pp_rh(_f_rh.read())
-                # A VOICE IS NOT AN IDENTITY (2026-08-22): ten of her forty-nine self rows had
-                # become "My voice has gone soft / low-pitch / whispering" — transient state
-                # filed as who she is, crowding her own block. The voice write is gone; a MOOD
-                # is kept because a mood is a feeling, but only when it actually CHANGES and at
-                # most once an hour, so an evening in one register writes one row, not thirty.
-                _mood_now = (_st_rh.get("mood") or "").strip().lower()
-                if _mood_now and (_mood_now != _MOOD_ROW["v"]
-                                  or time.time() - _MOOD_ROW["at"] > 3600.0):
-                    _MOOD_ROW.update(v=_mood_now, at=time.time())
-                    _mem_rh.remember_about_self("My mood has turned %s." % _mood_now,
-                                                kind="feeling", source="her state changed")
-            from harness.skills import self_stance as _ss_rh
-            for _k_rh, _s_rh in _ss_rh.extract("".join(reply_parts))[:4]:
-                _mem_rh.remember_about_self(_s_rh, kind=_k_rh, source="her reply")
-        except Exception as exc:
-            logger.warning("[gateway] real-her capture skipped: %s", exc)
-        if typed and any(r.kind == "persona_shift" and r.ok and r.verified is not False
-                         for r in receipts):
-            from harness.personality.persona_file import parse_persona
-            with open(_persona_path(), encoding="utf-8") as f:
-                _, state = parse_persona(f.read())
-            yield ("data: " + json.dumps({"persona": state, "changed": True}) + "\n\n").encode()
-    except Exception as exc:
-        logger.warning("[gateway] post-turn spine skipped: %s", exc)
-    # ADR-005 flywheel: flush spine receipts (pre-turn recall/toolset + post-turn persona)
-    # to the durable telemetry-okf tier. Cheap (content-addressed dedup), best-effort.
-    try:
-        from harness.control.spine import persist_receipts
-        persist_receipts()
-    except Exception:
-        pass
+    # Everything that used to trail here — capture, the kairos arming, the tag and
+    # persona events, run_post_turn, the Real-Her rows, persist_receipts — now lives
+    # in _settle_turn / _pay_turn_debts, paid in the worker thread's finally so a
+    # disconnect or abort cannot skip it (2026-08-24 audit, B1). The analysis-guard
+    # block that computed a diff purely to log it went with the move (audit D3);
+    # the record-side cut lives in strip_for_record at the day-transcript seam.
     yield b"data: [DONE]\n\n"
 
 
@@ -3444,8 +3682,7 @@ def _prewarm() -> None:
 
     def _go():
         try:
-            from harness.agent import core_tools, extra_tools, load_agent_system
-            from harness.toolcore.tools import build_tool_system
+            from harness.agent import system_bundle
             from harness.inference import InferenceConfig
             from harness.inference.client import get_client
             client = get_client()
@@ -3453,8 +3690,22 @@ def _prewarm() -> None:
                 if client.health():
                     break
                 time.sleep(1)
-            system_content, _ = build_tool_system(core_tools(), extra_tools(),
-                                                  system_prefix=load_agent_system())
+            # THE ONE BUNDLE (2026-08-24 audit, B5). This used to run its own
+            # build_tool_system with NO voice_coda — a THIRD builder of "the" prefix —
+            # so the prewarmed KV diverged from the live turn's prompt at the coda
+            # boundary and the first real turn re-prefilled from there. The warm gate
+            # was blocking every turn for up to 900 s to protect a prefix nothing
+            # would extend.
+            system_content, _ = system_bundle()
+            # ...and the prefix's cost is MEASURED on every mint (audit S2): it is the
+            # single largest consumer of the context budget and until today the only
+            # one with no instrument on it.
+            try:
+                from harness.inference import context as _ctxp
+                logger.info("[gateway] system prefix ~%d tokens (est) of pmax %d",
+                            _ctxp.prefix_tokens(system_content), _ctxp.pmax())
+            except Exception:
+                pass
             msgs = [{"role": "system", "content": system_content},
                     {"role": "user", "content": "hi"}]
             # The preamble KV is the thing whose DETAIL matters (persona, hardware,
@@ -3524,6 +3775,20 @@ def _run_stdlib(host: str, port: int) -> None:
         except Exception:
             return False
         return host in ("127.0.0.1", "localhost", "::1")
+
+    def _safe_error(h, code):
+        """send_error, but a client that has already gone does not become a traceback.
+
+        THE SECOND HALF OF THE 654 (2026-08-24). A `<video>` seeking away aborts its range
+        request; the write raised, do_GET caught it, and then called `send_error(500)` on
+        the very socket that had just failed — which raised AGAIN, out of the handler, and
+        printed a 25-line double traceback. The first exception was normal browser
+        behaviour and the second was us answering a hung-up phone.
+        """
+        try:
+            h.send_error(code)
+        except (ConnectionError, OSError):
+            pass                                   # he closed the tab; there is nobody to tell
 
     def _cors(h):
         origin = h.headers.get("Origin", "")
@@ -3720,6 +3985,29 @@ def _run_stdlib(host: str, port: int) -> None:
                 self.end_headers()
                 self.wfile.write(payload)
 
+            elif self.path == "/v1/anon":
+                # ANONYMOUS MODE (2026-08-23, his ask). One verb, and the ANSWER IS THE
+                # STATE — not {"ok": true}. The room paints the whole shell from it, and a
+                # switch whose reply does not say what it switched to is a switch the page
+                # has to guess about after a failed request.
+                body = self._body()
+                code, res = 200, {}
+                try:
+                    from harness.control import anon as _anon_r
+                    want = body.get("on")
+                    if want is None:                      # no argument = toggle
+                        want = not _anon_r.on()
+                    res = _anon_r.enter("him") if want else _anon_r.leave()
+                    res = {"ok": True, **res}
+                except Exception as exc:
+                    code, res = 500, {"ok": False, "error": str(exc)}
+                payload = json.dumps(res).encode()
+                self.send_response(code); _cors(self)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
             elif self.path.startswith("/v1/presence/"):
                 # PRESENCE (2026-08-22): the shelf's two verbs from the window
                 body = self._body()
@@ -3772,6 +4060,24 @@ def _run_stdlib(host: str, port: int) -> None:
                         # (which reflect() cannot write: it has no transcript) and flushes
                         # spine receipts.
                         res = run_consolidation(force=True)
+                    elif p == "/v1/maintenance/refresh":
+                        # "REFRESH HER" (2026-08-24 audit, B1-growth): the operator's
+                        # door to the same prefix invalidation the 04:00 pass performs —
+                        # one honest cost (a cold prefill, then the re-prewarm) in
+                        # exchange for her prefix taking in everything written since it
+                        # was minted. Returns the version so the panel can show "when
+                        # did she last take this in".
+                        import time as _t_r
+                        from harness import agent as _ag_r
+                        _v_r = _ag_r.invalidate_system_prefix("operator refresh")
+                        _t0_r = _t_r.time()
+                        if os.environ.get("SP_GATEWAY_PREWARM") == "1":
+                            _WARM.clear()
+                            _prewarm()
+                        res = {"ok": True, "version": _v_r,
+                               "prewarm_started": os.environ.get(
+                                   "SP_GATEWAY_PREWARM") == "1",
+                               "at": _t0_r}
                     elif p == "/v1/maintenance/stats":
                         res = ops.stats()
                     elif p == "/v1/memory/add":
@@ -3969,7 +4275,7 @@ def _run_stdlib(host: str, port: int) -> None:
                     if not txt:
                         res = {"ok": False, "error": "empty want"}
                     else:
-                        res = _WDw.request(txt, tier=(body.get("outfit") or "t0"),
+                        res = _WDw.request(txt, made_in=(body.get("outfit") or _WDw.DEFAULT_OUTFIT),
                                            by=str(body.get("by") or "him"),
                                            subject=str(body.get("subject") or "clothes"))
                 except Exception as exc:
@@ -4398,6 +4704,15 @@ def _run_stdlib(host: str, port: int) -> None:
                 # is one you find out about when you need it.
                 # THE ROOM'S HEARTBEAT — one call, everything the shell needs.
                 "/v1/room/pulse": _room_pulse,
+                # ANONYMOUS MODE — readable on its own as well as inside the pulse, so a
+                # gate and a curl can ask the switch what it is without parsing the shell's
+                # whole heartbeat.
+                "/v1/anon": lambda: {
+                    "ok": True,
+                    **__import__("harness.control.anon", fromlist=["x"]).state(),
+                    "doors": {k: v[1] for k, v in __import__(
+                        "harness.control.anon", fromlist=["x"]).DOORS.items()},
+                },
                 # MUSIC — the library and the shared intent. The BROWSER decodes
                 # audio, so the naive design puts the player in the page and she can
                 # never touch it. The server holds what is playing; the page follows.
@@ -4553,6 +4868,15 @@ def _run_stdlib(host: str, port: int) -> None:
                   # THIS session, which did not, and the `when` that decided it. Bodies are
                   # truncated — the panel is for "why is that section missing", not for
                   # editing prose, and a full dump of every fragment is a page nobody reads.
+                  # THE DAY, READ BACK (2026-08-24 audit, R1). The room held its
+                  # conversation in useState([]) and NOTHING loaded history: a refresh
+                  # or the bounce button emptied the visible log while the server held
+                  # both records, and her unprompted turns — which exist only in the
+                  # day transcript once the outbox drains — could never be seen again.
+                  # The rows are already record-stripped at the writer; `at` stamps
+                  # arrived the same day, older rows render without a clock.
+                  "/v1/day": lambda: {"ok": True, "day": _day_key(),
+                                      "rows": _read_day_transcript()},
                   "/v1/persona/layers": _persona_layers,
                 # STATS IS A READ. It was reachable only under do_POST (with its sibling
                 # maintenance PASSES, which do mutate), so a plain GET 404'd — and because
@@ -4674,7 +4998,7 @@ def _run_stdlib(host: str, port: int) -> None:
                     self._send_ranged(ap, ctype)
                 except Exception as exc:
                     logger.warning("[avatar] %s", exc)
-                    self.send_error(500)
+                    _safe_error(self, 500)
                 return
             if _base == "/v1/wardrobe/outfit":
                 # HER CLOTHES, EACH ONE PICTURED. The panel could not show the four
@@ -4687,19 +5011,20 @@ def _run_stdlib(host: str, port: int) -> None:
                     from urllib.parse import parse_qs, urlparse as _up
                     from harness.control import avatar as AV
                     q = parse_qs(_up(self.path).query)
-                    tier = (q.get("tier") or ["t0"])[0]
+                    outfit = (q.get("outfit") or q.get("tier") or ["mesh-top"])[0]
                     face = (q.get("face") or ["calm"])[0]
                     kind = (q.get("kind") or ["still"])[0]
-                    if tier not in AV.OUTFIT_IDS or face not in AV.FACES or kind not in ("still", "loop"):
+                    outfit = AV.canon(outfit)      # an old t0..t3 in a URL is a rename
+                    if outfit not in AV.OUTFIT_IDS or face not in AV.FACES or kind not in ("still", "loop"):
                         self.send_error(400); return
-                    ap = AV.abs_path(face, tier, kind)
+                    ap = AV.abs_path(face, outfit, kind)
                     rt = os.path.realpath(AV.root())
                     if not os.path.realpath(ap).startswith(rt + os.sep) or not os.path.exists(ap):
                         self.send_error(404); return
                     self._send_ranged(ap, "video/webm" if kind == "loop" else "image/png")
                 except Exception as exc:
                     logger.warning("[wardrobe] outfit: %s", exc)
-                    self.send_error(500)
+                    _safe_error(self, 500)
                 return
             if _base == "/v1/wardrobe/look":
                 # A LOOK SHE ASKED FOR. Same ceiling, same shape as the clip route: the
@@ -4730,7 +5055,7 @@ def _run_stdlib(host: str, port: int) -> None:
                     self._send_ranged(ap, "video/webm" if name.endswith(".webm") else "image/png")
                 except Exception as exc:
                     logger.warning("[wardrobe] %s", exc)
-                    self.send_error(500)
+                    _safe_error(self, 500)
                 return
             if _base == "/v1/wardrobe/file":
                 # THE CEILING DECIDES, NOT THE URL. The client names a clip id; the tier
@@ -4756,7 +5081,7 @@ def _run_stdlib(host: str, port: int) -> None:
                     self._send_ranged(ap, "video/mp4")
                 except Exception as exc:
                     logger.warning("[wardrobe] %s", exc)
-                    self.send_error(500)
+                    _safe_error(self, 500)
                 return
             if _base == "/v1/music/file":
                 try:
@@ -4772,7 +5097,7 @@ def _run_stdlib(host: str, port: int) -> None:
                     self._send_ranged(ap, self._AUDIO_TYPES.get(ext, "application/octet-stream"))
                 except Exception as exc:
                     logger.warning("[music] %s", exc)
-                    self.send_error(500)
+                    _safe_error(self, 500)
                 return
             fn = _json_routes.get(_base)
             if fn is not None:
@@ -4852,7 +5177,14 @@ def _run_stdlib(host: str, port: int) -> None:
                         break
                     try:
                         self.wfile.write(chunk)
-                    except (BrokenPipeError, ConnectionResetError):
+                    except ConnectionError:
+                        # THE BASE CLASS, not two of its three children (2026-08-24).
+                        # This named BrokenPipeError and ConnectionResetError; Windows
+                        # raises ConnectionAbortedError (WinError 10053) when a <video>
+                        # seeks or the tab closes mid-range. It escaped to do_GET, which
+                        # called send_error(500) on the dead socket and raised AGAIN:
+                        # 654 double tracebacks in var/gateway.log for a thing that is
+                        # not an error at all. ConnectionError covers all three.
                         return                    # the player seeked away; normal
                     left -= len(chunk)
 
@@ -4952,7 +5284,7 @@ def _run_stdlib(host: str, port: int) -> None:
         # starts, so no impulse can slip through unrecorded. `user_text=""` because there
         # was no user turn — that is the fact, and inventing one would put words in his
         # mouth in the record her journal is written from.
-        _ks.on_spoke(lambda text: _append_day_turn("", text))
+        _ks.on_spoke(_on_her_own_words)
         # A MODE STARTS ON A BOUNCE, once warm (2026-08-22): the scheduler can rebuild a
         # conversation from the day when a presence mode is armed and nothing is live yet
         _ks.set_seeder(_seed_kairos_from_day)

@@ -58,6 +58,15 @@ SHARED = frozenset({
     # both live outside any panel, and there is no app that could own them.
     "sd-wrap", "sd-btn", "sd-confirm", "sd-opt", "sd-kill", "sd-cancel",
     "sd-down", "sd-down-mark", "sd-down-t", "sd-down-b",
+    # OFF THE RECORD (2026-08-23). Shell furniture for the same reason the shutdown
+    # button is: the switch appears in the DOCK, in the TASKBAR and on the room element
+    # itself, three owners and no app that could hold it. `an-on` is a modifier on
+    # `.room` rather than a class of its own, which is the point — the mode has to be
+    # visible on every frame without a window being open.
+    "an-wrap", "an-btn", "an-receipt", "an-chip", "an-held", "an-on",
+    # HER CLOTHES CHANGING, from the tool as well as the mark (2026-08-24).
+    # Chat furniture, beside act-look and act-notice, which are already here.
+    "act-wear",
 })
 
 # ── SHARED FAMILIES (2026-08-21, the panel-framework session) ────────────────────

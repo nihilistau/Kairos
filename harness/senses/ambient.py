@@ -228,6 +228,13 @@ def _append(row: dict) -> None:
 def observe_once() -> dict:
     """One capture -> one logged sentence. Safe to call by hand."""
     global _LAST
+    # ANONYMOUS MODE (2026-08-23). Held before the SHUTTER, not before the append: the
+    # objection to an hourly photograph of the room during a private evening is the
+    # photograph, and describing it only to discard the sentence would be the camera
+    # opening anyway. The eye simply does not look while the switch is on.
+    from harness.control import anon as _anon
+    if _anon.holds("senses.ambient"):
+        return {"skipped": _anon.WHY}
     row = {"at": time.time(),
            "iso": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())}
     try:

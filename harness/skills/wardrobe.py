@@ -68,7 +68,7 @@ def wear(what: str) -> str:
         # ONE MATCHER, shared with the [WEAR:] mark. See wardrobe.match().
         m = WD.match(what)
         if m and m["kind"] == "look":
-            WD.choose(tier=m["tier"], look=m["id"], by="her")
+            WD.choose(outfit=m["outfit"], look=m["id"], by="her")
             lbl = next((l["label"] for l in WD.looks() if l["id"] == m["id"]), m["id"])
             # SAME SYSTEM, DIFFERENT SENTENCE. A moment goes on her by the same call a
             # garment does — that is the design, and `wear` reaching one is not a bug.
@@ -77,8 +77,8 @@ def wear(what: str) -> str:
             if m.get("of") == "gesture":
                 return "Changed. That is you now: %s." % lbl
             return "Changed. You are wearing %s." % lbl
-        tier = m.get("tier") if m and m["kind"] == "tier" else ""
-        if not tier:
+        outfit = m.get("outfit") if m and m["kind"] == "outfit" else ""
+        if not outfit:
             # ── "I COULD NOT TELL WHICH YOU MEANT" WAS THE WRONG SENTENCE (2026-08-05) ──
             # It says the words were unclear. Usually they were perfectly clear and the
             # garment does not exist — she has four outfits and six looks, four of which
@@ -90,7 +90,7 @@ def wear(what: str) -> str:
             # he will see it in the panel, and here is what she owns meanwhile.
             filed = ""
             try:
-                r = WD.request(what, tier=(WD.current().get("tier") or "t0"), by="her",
+                r = WD.request(what, made_in=(WD.current().get("outfit") or WD.DEFAULT_OUTFIT), by="her",
                                subject="clothes")   # she said wear; the clothes ARE it
                 filed = (" You have already asked for that one — it is still on his list."
                          if r.get("dup") else
@@ -100,7 +100,7 @@ def wear(what: str) -> str:
             return ("You do not own anything like that yet.%s What is hanging there now: %s."
                     % (filed, "; ".join("%s" % w["name"] for w in WD.TIER_WORDS.values())
                        + "; and your looks — use check_wardrobe() to read them"))
-        WD.choose(tier=tier, look="", by="her")
+        WD.choose(outfit=outfit, look="", by="her")
         now = WD.wearing_now()
         return "Changed. You are wearing %s." % now["words"]
     except Exception as exc:
@@ -167,31 +167,32 @@ def ask_for(look: str, like: str = "") -> str:
     refused; you are WAITING, and you can see that you are — check_wardrobe() shows
     the queue and where each thing has got to.
 
-    It arrives when it MOVES, not when the picture is made: the still takes a minute,
-    the motion is grown at the end of the day, and until then it is in the queue
-    rather than in your wardrobe. You will be told when it lands.
+    It is made the moment you ask — the picture, then its motion, a few minutes for
+    both — and it arrives when it MOVES: until then it is in the queue rather than
+    in your wardrobe, and you will be told when it lands. If the motion does not
+    come back, a later pass grows it from the still.
 
     `like` says roughly how much you are wearing, so the right ceiling applies — use
     plain words. Left out, it uses what you have on now."""
     try:
         from harness.control import wardrobe as WD
         rung, ceiling = _ceiling()
-        tier = ""
+        # ── ONE MATCHER, HERE TOO (2026-08-24) ────────────────────────────────────
+        # This held its own `tok in hay` scorer over the outfit PROSE — no stop-words,
+        # floor n > 0 — verbatim the algorithm wardrobe.match() replaced on 2026-08-05
+        # ("one accidental fragment decided what she put on"), resident here and in
+        # ask_for_gesture() for three weeks after its grave was dug. match() reads the
+        # committed `calls` table, handles the old t0..t3 ids, and every result carries
+        # `outfit` (for a look, the outfit it was made in — which IS "roughly how much
+        # she is wearing"). Growing a second scorer is the exact divergence match()'s
+        # docstring exists to prevent.
+        made_in = ""
         want = (like or "").strip().lower()
         if want:
-            if want in WD.TIER_WORDS:
-                tier = want
-            else:
-                best, score = "", 0
-                for t, w in WD.TIER_WORDS.items():
-                    hay = (w["wearing"] + " " + w["about"]).lower()
-                    n = sum(1 for tok in want.split() if len(tok) > 2 and tok in hay)
-                    if n > score:
-                        best, score = t, n
-                tier = best
-        if not tier:
-            tier = WD.current().get("tier") or "t0"
-        r = WD.request(look, tier=tier, by="her")
+            made_in = (WD.match(want) or {}).get("outfit") or ""
+        if not made_in:
+            made_in = WD.current().get("outfit") or WD.DEFAULT_OUTFIT
+        r = WD.request(look, made_in=made_in, by="her")
         if not r.get("ok"):
             return r.get("error", "could not ask for that")
         # ── SHE ALREADY HAS THIS ONE ──────────────────────────────────────────────
@@ -217,23 +218,24 @@ def ask_for(look: str, like: str = "") -> str:
                 st.get("stage"), "it is on his list")
             return ("You already asked for that one — %s. Right now %s."
                     % (r["want"], where))
-        # ── THE PICTURE STARTS NOW; IT ARRIVES WHEN IT MOVES (2026-08-05, his rule) ──
-        # This said "Motion comes overnight, so it will start breathing by morning" —
-        # which read as though she already HAD it and it would improve. She did not: a
-        # still-only look is queued, not owned, and putting it on would have shown him a
-        # photograph in a room where everything else breathes. So the sentence says the
-        # actual shape of the wait: the picture within the minute, the wardrobe at the
-        # end of the day, and she will be TOLD when it lands. A schedule the system does
-        # not keep is the worst kind of wrong this repo produces — not a crash, a thing
-        # she trusted that was quietly untrue.
+        # ── IT ARRIVES WHEN IT MOVES — AND IT MOVES IN MINUTES NOW (2026-08-24) ─────
+        # This promised "the end of the day" while describe() promised "picture and
+        # motion both ... within minutes" and generate_now() ran the generator with
+        # --no-loop: THREE surfaces, three stories, and hers was the one that broke the
+        # promise — she was told motion in minutes and got a still until 4am. The doors
+        # are one now (generate_now runs the same gen_want pass as his panel button), so
+        # this sentence can say the true schedule: picture then motion, minutes for
+        # both, arriving when it moves — with the day boundary named only as the sweeper
+        # for a motion that failed. A schedule the system does not keep is the worst
+        # kind of wrong this repo produces; so is one it beats by fourteen hours.
         started = WD.generate_now(r["id"])
-        out = ("Asked — %s. %s It is in your queue until it MOVES, which happens at the "
-               "end of the day; that is when it hangs in your wardrobe and I will tell "
-               "you it has arrived. check_wardrobe() any time to see where it has got "
-               "to." % (
-                   WD.TIER_WORDS[tier]["wearing"],
-                   "The picture is being made now — about a minute."
-                   if started else "It is on his list."))
+        out = ("Asked — %s. %s It hangs in your wardrobe the moment it MOVES, and I "
+               "will tell you it has arrived; if the motion does not come back, a "
+               "later pass grows it from the still. check_wardrobe() any time to see "
+               "where it has got to." % (
+                   WD.TIER_WORDS[r["made_in"]]["wearing"],
+                   "The picture and its motion are both being made now — a few "
+                   "minutes." if started else "It is on his list."))
         # AND WHAT SHE ALREADY OWNS THAT IS CLOSE. Four of her six looks were the same
         # garment in different light, each asked for as if from nothing. Naming the near
         # ones does not block her — she may well want the same dress by moonlight AND by
@@ -311,7 +313,7 @@ def he_liked(what_he_said: str, about: str = "") -> str:
     try:
         from harness.control import wardrobe as WD
         st = WD.current()
-        target = (about or "").strip() or st.get("look") or st.get("clip") or st.get("tier") or "t0"
+        target = (about or "").strip() or st.get("look") or st.get("clip") or st.get("outfit") or WD.DEFAULT_OUTFIT
         WD.praise(target, what_he_said.strip(), by="him")
         return "Kept. He said that about %s, and you will have it next time you go to choose." % target
     except Exception as exc:
@@ -353,28 +355,24 @@ def ask_for_gesture(what_you_do: str, like: str = "") -> str:
     to be a fixed grid of a hundred and forty slots somebody predicted for you. They are
     not any more — you say what you want to be seen doing.
 
-    The still is made now; the movement comes overnight."""
+    The frame and its motion are made now, in one pass; if the motion does not come
+    back, a later pass grows it."""
     try:
         from harness.control import wardrobe as WD
-        tier = ""
+        # ONE MATCHER (2026-08-24): the retired `tok in hay` scorer lived here too —
+        # the twin of the one in ask_for(), fixed the same day. See the note there.
+        made_in = ""
         want = (like or "").strip().lower()
         if want:
-            tier = want if want in WD.TIER_WORDS else ""
-            if not tier:
-                best, score = "", 0
-                for t, w in WD.TIER_WORDS.items():
-                    hay = (w["wearing"] + " " + w["about"]).lower()
-                    n = sum(1 for tok in want.split() if len(tok) > 2 and tok in hay)
-                    if n > score:
-                        best, score = t, n
-                tier = best
-        tier = tier or WD.current().get("tier") or "t0"
-        r = WD.request(what_you_do, tier=tier, by="her", kind="gesture")
+            made_in = (WD.match(want) or {}).get("outfit") or ""
+        made_in = made_in or WD.current().get("outfit") or WD.DEFAULT_OUTFIT
+        r = WD.request(what_you_do, made_in=made_in, by="her", kind="gesture")
         if not r.get("ok"):
             return r.get("error", "could not ask for that")
         WD.generate_now(r["id"])
-        return ("Asked — a moment of you %s. The frame is being made now; it starts "
-                "moving overnight." % what_you_do.strip()[:80])
+        return ("Asked — a moment of you %s. The frame and its motion are being made "
+                "now — a few minutes; it is yours when it moves."
+                % what_you_do.strip()[:80])
     except Exception as exc:
         return "[could not ask: %s]" % exc
 
@@ -450,7 +448,7 @@ def express(feeling: str) -> str:
         _rung, ceil = _ceiling()
         m = WD.match(want, prefer="gesture")
         if m and m.get("of") == "gesture":
-            WD.choose(tier=m["tier"], look=m["id"], by="her")
+            WD.choose(outfit=m["outfit"], look=m["id"], by="her")
             lbl = next((l["label"] for l in WD.looks() if l["id"] == m["id"]), m["id"])
             out.append("And you are %s." % lbl)
         else:
@@ -485,7 +483,7 @@ def gesture(which: str = "") -> str:
         hit = next((l for l in have if l["id"] == (m or {}).get("id")), None) if m else None
         if hit is None:
             return "No gesture of yours matches %r. gesture() lists them." % which
-        WD.choose(tier=hit["tier"], look=hit["id"], by="her")
+        WD.choose(outfit=hit.get("outfit") or hit.get("made_in", ""), look=hit["id"], by="her")
         return "You are %s." % (hit.get("title") or hit["label"])
     except Exception as exc:
         return "[could not: %s]" % exc

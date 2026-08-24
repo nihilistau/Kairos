@@ -123,6 +123,28 @@ def main() -> int:
           bool(nrow) and "ep_orphan_test" not in (nrow[0].get("supersedes") or []),
           nrow[0].get("supersedes") if nrow else "-")
 
+    # ── ...AND THE LIVE ARE LIVE BY `lifecycle`, WHATEVER ELSE THE ROW CARRIES ─
+    # The other direction of the same rule (2026-08-25). The 2026-08-19 fix above left
+    # the supersede machinery testing `lifecycle OR superseded_by` while every reader
+    # tests `lifecycle` alone — two spellings of "dead". A half-stamped row (breadcrumb
+    # set, tombstone not) would have been DEAD to this machinery and LIVE to every
+    # reader: served every turn, retireable by nothing. One spelling now: such a row is
+    # consistently live, so a conflicting fact can retire it properly. No writer can
+    # produce this shape (both fields are stamped together, under the lock) — planting
+    # it is the only door in, and the plant IS the alien shape under test.
+    half = {"name": "ep_half_test", "text": "My desk lamp is a red Anglepoise.",
+            "speaker": "user", "status": "observed", "mem_class": "fact",
+            "superseded_by": "ep_vanished", "ts": "2026-07-01T00:00:00Z",
+            "src": "hypothetical half-stamped row"}
+    with open(reg, "a", encoding="utf-8") as f:
+        f.write(json.dumps(half) + "\n")
+    M.remember("My desk lamp is a blue IKEA.")
+    r = rows(reg)
+    hrow = [x for x in r if x.get("name") == "ep_half_test"][0]
+    check("a breadcrumb WITHOUT a tombstone is still LIVE to the machinery "
+          "(one death spelling: `lifecycle`)", bool(hrow.get("lifecycle")),
+          "the wide `or superseded_by` predicate hid it from supersede")
+
     # ── A PARAPHRASE IS NOT TESTIMONY ─────────────────────────────────────────
     # The consolidator asks the model to "write the facts the user stated" and stores
     # the answer. Those are the MODEL'S PARAPHRASES of a transcript, and they were

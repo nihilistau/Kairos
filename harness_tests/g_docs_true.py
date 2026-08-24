@@ -116,4 +116,46 @@ check("START-HERE names the live profile and the one door", "serve.py companion"
 agents = open(os.path.join(ROOT, "AGENTS.md"), encoding="utf-8").read()
 check("AGENTS.md §2 table names ui/, console/, tools/", all(("| `%s` |" % d) in agents for d in ("ui/", "console/", "tools/")))
 
+# ── 4. THE CHANGELOG IS A LEDGER, SO IT OBEYS A LEDGER'S RULES (2026-08-25) ──────────
+# AGENTS.md §6 now says behaviour a reader would notice gets a dated entry in the same
+# commit. That is a promise until something checks it — and the two cheap structural
+# truths are worth more than a word count: every heading is a REAL DATE (a typo'd
+# 2026-18-25 sorts wrong and is invisible for a year), and the entries run NEWEST FIRST
+# (a changelog out of order is a changelog nobody trusts twice). Deliberately NOT
+# asserted: that the newest entry is recent. That check would go red mid-session, every
+# session, and a gate that cries during normal work is a gate people learn to ignore.
+import datetime as _dt  # noqa: E402
+
+# TWO TREES, TWO SHAPES, ONE CLAIM (2026-08-25). This gate SHIPS in the Kairos export,
+# where `docs/CHANGELOG.md` deliberately does not: the dated log is this tree's history,
+# including engine work the framework has no engine for, and the export carries a semver
+# `CHANGELOG.md` at the root instead. Asserting the upstream shape unconditionally would
+# have shipped a red gate to the public repo — which is the exact failure 0.2.1 was
+# released to fix, so this file is not going to be how it happens again. The CLAIM in both
+# trees is the same: this tree keeps a changelog, and it is ordered.
+chpath = os.path.join(ROOT, "docs", "CHANGELOG.md")
+export_ch = os.path.join(ROOT, "CHANGELOG.md")
+check("this tree keeps a changelog (dated upstream, semver in the export)",
+      os.path.exists(chpath) or os.path.exists(export_ch))
+if not os.path.exists(chpath) and os.path.exists(export_ch):
+    exp = open(export_ch, encoding="utf-8").read()
+    vers = re.findall(r"^## (\d+\.\d+\.\d+)", exp, re.M)
+    check("...the export's is versioned, newest first", len(vers) >= 1 and vers == sorted(
+        vers, key=lambda v: [int(x) for x in v.split(".")], reverse=True), vers)
+elif os.path.exists(chpath):
+    ch = open(chpath, encoding="utf-8").read()
+    heads = re.findall(r"^## (\d{4}-\d{2}-\d{2})", ch, re.M)
+    check("...with dated entries (## YYYY-MM-DD)", len(heads) >= 5, len(heads))
+    bad = []
+    for h in heads:
+        try:
+            _dt.date.fromisoformat(h)
+        except ValueError:
+            bad.append(h)
+    check("...every heading is a real date", not bad, bad)
+    check("...newest first", heads == sorted(heads, reverse=True),
+          [h for i, h in enumerate(heads[:-1]) if h < heads[i + 1]][:4])
+    check("...and the semver changelog is the EXPORT's, named as such",
+          "kairos-export/CHANGELOG.md" in ch)
+
 finish("G-DOCS-TRUE")

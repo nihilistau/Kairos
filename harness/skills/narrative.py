@@ -116,6 +116,12 @@ def compose_and_write(messages, ask=None) -> dict:
     tier. Best-effort everywhere: an unreachable model writes NOTHING (yesterday's
     paragraph stands — a stale true record beats a fresh empty one). Never raises."""
     try:
+        # ANONYMOUS MODE (2026-08-23). Held BEFORE the model call, not after: the composed
+        # paragraph is a distillate of the evening, and generating it to throw it away
+        # would spend two minutes of her engine on a thing that must not exist.
+        from harness.control import anon as _anon
+        if _anon.holds("journal.night"):
+            return {"written": False, "why": _anon.WHY}
         ask = ask or _oneshot
         prev = current()
         turns = [m for m in (messages or []) if m.get("role") in ("user", "assistant")
@@ -199,7 +205,11 @@ def compose_and_write(messages, ask=None) -> dict:
 
 # ── THE CHAPTER (2026-08-22) ────────────────────────────────────────────────────────────
 _CHAPTER_EVERY_DAYS = 7
-_CHAPTER_WORDS = 120
+# 90, not 120 (2026-08-25): 120 of her words routinely render past the 600-char row
+# cap — the first logged 04:00 caught the admission refusing an 688-char chapter, and
+# EVERY chapter ever written had died the same way. 90 targets comfortably under the
+# cap; the sentence-bound below is the belt for the nights she runs long anyway.
+_CHAPTER_WORDS = 90
 # "reflection" is load-bearing, not decoration: memory.remember derives status from it
 # (_INFERRED_SOURCES) and lifecycle.status_of sniffs the same word for legacy rows, so both
 # doors agree. A chapter MUST be INFERRED - stamped observed it would carry the authority
@@ -289,6 +299,29 @@ def weekly_chapter(ask=None) -> dict:
         text = _plain(text)
         if len(text.split()) < 8:
             return {"written": False, "why": "the model returned nothing usable"}
+        # ── BOUNDED TO THE ROW IT MUST FIT (2026-08-25, the first logged night) ──────
+        # The receipt instrument's very first 04:00 answered the zero-chapters mystery
+        # in one line: she WROTE the week and the admission cap refused it — "not
+        # stored — too long for one row (688 > 600 chars)". _CHAPTER_WORDS asks for
+        # ~120 words and 120 of her words routinely exceed 600 CHARS, so every chapter
+        # she ever wrote was one paragraph too long, silently, with the why returned
+        # to a caller that logged only step names. Cut back to the last full sentence
+        # under the cap — her words, just bounded; a truncated mid-sentence row would
+        # be the presence.finish lesson ignored.
+        try:
+            from harness.skills.lifecycle import _NARRATABLE_MAX as _ROW_MAX
+        except Exception:
+            _ROW_MAX = 600
+        if len(text) > _ROW_MAX:
+            import re as _re_ch
+            _cut = text[:_ROW_MAX]
+            _m = list(_re_ch.finditer(r"[.!?](?:\s|$)", _cut))
+            if _m:
+                text = _cut[:_m[-1].end()].strip()
+            else:
+                text = _cut.rsplit(" ", 1)[0].strip()
+        if len(text.split()) < 8:
+            return {"written": False, "why": "nothing usable survived the row bound"}
         res = M.remember_about_self(
             text, kind="chapter", source=_CHAPTER_SRC,
             derived_from=[r.get("name") for r in recent],
@@ -326,6 +359,31 @@ def note_own(text: str, kind: str = "solo") -> dict:
     t = (text or "").strip()
     if not t:
         return {"written": False, "why": "nothing to write"}
+    # ANONYMOUS MODE (2026-08-23). Her journal is the second store — a note here is not in
+    # the registry and would survive a mode that only guarded remember(). She still DID the
+    # thing; the evening simply is not written down.
+    from harness.control import anon as _anon
+    if _anon.holds("journal.own"):
+        return {"written": False, "why": _anon.WHY}
+    # ── THE HALL OF MIRRORS, WHICH THIS DOCSTRING ALREADY NAMED (2026-08-23) ──────────
+    # The note above foresaw it for the COMPOSER and not for her: read_journal() hands
+    # these back to her, and the solo "read your journal" act writes its result here. She
+    # wrote the identical sentence 53 times in 35 hours — by the end, the block she was
+    # reading held 18 copies, so the likeliest next line was a nineteenth.
+    #
+    # own_time() dedupes on the way OUT, which breaks the pull. This is the other half:
+    # the store should not fill with 53 files that say one thing either. A repeat inside
+    # the window is not written — she did do it, but the evening is already recorded and
+    # a second copy adds only weight.
+    #
+    # WINDOW, not forever: saying the same true thing next week is her, not a loop.
+    try:
+        _recent = own_time(2)
+        _k = " ".join(t.split()).lower()[:160]
+        if any(" ".join((r or "").split()).lower()[:160] == _k for r in _recent):
+            return {"written": False, "why": "already written in the last two days"}
+    except Exception:
+        pass                      # a broken dedupe must never cost her the note
     try:
         full = _tier_full()
         os.makedirs(full, exist_ok=True)
@@ -362,7 +420,45 @@ def own_time(days: int = 2) -> list:
     except Exception:
         return []
     out.sort(reverse=True)
-    return [t for _at, t in out]
+
+    # ── SHE MUST NOT READ HER OWN ECHO (2026-08-23) ──────────────────────────────────
+    # 53 of her 192 own-time notes were the identical sentence
+    #
+    #     "I took a slow walk through my own journal tonight and found last spring."
+    #
+    # written between 2026-08-22 02:54 and 2026-08-23 13:57, and by the end the block she
+    # was reading contained EIGHTEEN copies of it.
+    #
+    # ── CORRECTED 2026-08-24: SHE NEVER WROTE THEM ───────────────────────────────────
+    # The diagnosis in this comment was a feedback loop — read_journal() hands these back,
+    # the solo act writes its result here, her own output becomes her input. It was wrong,
+    # and the evidence against it was in the note that said "not a sampler fault, the seed
+    # varies per request": a clock-seeded sampler does not emit one sentence BYTE-IDENTICAL
+    # fifty-three times. That should have been the end of the theory, not a footnote to it.
+    #
+    # The sentence is a FIXTURE. `harness_tests/g_real_her.py` stubs the generator to
+    # return exactly it, then drives the solo path — and the gate set SP_RECALL_REGISTRY
+    # and not SP_PERSONALITY_TIER, so every run wrote another copy into her real journal.
+    # It is one of the five gates CLAUDE.md tells you to run before you say you are done.
+    # 53 notes, 53 runs. Found by tools/gate_sandbox_audit.py; see docs/SWEEP-2026-08-24.md.
+    #
+    # THE DEDUPE STAYS, on both sides, and it is not consolation. read_journal() genuinely
+    # does feed her own notes back, the cycle it describes is genuinely closed, and the
+    # only reason it had not fired on its own is that nothing had yet pushed it. The guard
+    # is right; the story attached to it was mine.
+    #
+    # So a repeated evening is shown ONCE. Not dropped — she did do it, and the count is
+    # part of what happened — but a note that says the same thing as one already in the
+    # list adds nothing to read and everything to the pull. Most recent copy wins, because
+    # the list is newest-first and the newest is the one she is closest to.
+    seen, uniq = set(), []
+    for _at, t in out:
+        k = " ".join((t or "").split()).lower()[:160]     # whitespace/case, not identity
+        if k in seen:
+            continue
+        seen.add(k)
+        uniq.append(t)
+    return uniq
 
 
 def read_journal(days: int = 7) -> str:

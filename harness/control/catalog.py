@@ -86,8 +86,8 @@ def _outfit_rows() -> List[Dict[str, Any]]:
         r = {"id": t, "source": "grid", "kind": "outfit",
              "label": o.get("name") or t, "tags": list(o.get("calls") or [])[:6],
              "have": AV.have("calm", t, "still"), "moves": AV.have("calm", t, "loop"),
-             "still_url": "/v1/wardrobe/outfit?tier=%s" % t,
-             "loop_url": "/v1/wardrobe/outfit?tier=%s&kind=loop" % t}
+             "still_url": "/v1/wardrobe/outfit?outfit=%s" % t,
+             "loop_url": "/v1/wardrobe/outfit?outfit=%s&kind=loop" % t}
         r = WD._apply_overlay(r, "clothing")
         if not r["description"]:
             r["description"] = o.get("wearing", "")
@@ -114,7 +114,7 @@ def rows(include_hidden: bool = False, include_removed: bool = False) -> List[Di
     """Everything, one shape. `hidden` and `removed_at` ride on every row so the
     panel can always offer the way back."""
     st = WD.current()
-    on_look, on_clip, on_tier = st.get("look") or "", st.get("clip") or "", st.get("tier") or ""
+    on_look, on_clip, on_tier = st.get("look") or "", st.get("clip") or "", st.get("outfit") or ""
     out = []
     for r in _outfit_rows() + _look_rows():
         if r.get("removed_at") and not include_removed:
@@ -254,8 +254,8 @@ def import_file(name: str, category: str, title: str = "", description: str = ""
 
     # clothing / gesture -> a MADE want, so every reader already knows how to serve it
     kind = "gesture" if category == "gesture" else "look"
-    tier = WD.current().get("tier") or AV.DEFAULT_OUTFIT
-    r = WD.request(title, tier=tier, by=by, kind=kind, calls=tags)
+    outfit = WD.current().get("outfit") or AV.DEFAULT_OUTFIT
+    r = WD.request(title, made_in=outfit, by=by, kind=kind, calls=tags)
     if not r.get("ok"):
         return {"ok": False, "error": r.get("error", "could not register")}
     wid = r["id"]

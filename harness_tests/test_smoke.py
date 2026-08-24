@@ -2,9 +2,9 @@
 Smoke tests — import surface + offline functional paths.
 
 These run with zero third-party deps and without a live sp-daemon. They cover:
-the skill registry, the interceptor pipeline + governor, the NEXUS embedded
-store, ephemeral tool-call parsing, the SSE gateway formatting, and stream-tag
-extraction.
+the skill registry, the governor (bare — the interceptor pipeline was deleted
+2026-08-25, see the note below), the NEXUS embedded store, ephemeral tool-call
+parsing, the SSE gateway formatting, and stream-tag extraction.
 """
 
 from __future__ import annotations
@@ -53,9 +53,21 @@ def test_nexus_embedded_ingest_and_search(tmp_path):
     assert hits and hits[0].title == "Byte-exact forward"
 
 
-def test_interceptor_pipeline_shapes_reply():
+# test_interceptor_pipeline_shapes_reply WAS HERE — DELETED WITH ITS SUBJECT (2026-08-25).
+# harness/interceptors/ (build_pipeline + the four CosySim-ported stages, including
+# PersonalityStateInterceptor, a complete second authority over persona.md) had NO live
+# consumer: this test was the only caller of build_pipeline in the tree, so it was a
+# green suite over code no live path could reach — AGENTS.md §0's quiet sibling. The
+# live authorities the stages duplicated: persona tags persist through
+# spine.py::persona_shift -> apply_personality_tags (gate: h_personality_tags), reply
+# stripping through inference/stream_processor. git history keeps the pipeline; the
+# OFF-BY-DEFAULT §10 row records the deletion and what would justify a rebuild.
+
+
+def test_governor_reply_passthrough():
+    """The governor itself (toolcore) is still importable and replies with an EMPTY
+    pipeline — what remains after the dead interceptor package was removed."""
     from harness.toolcore import get_governor
-    from harness.interceptors import build_pipeline
 
     class FakeAgent:
         agent_id = "t"
@@ -63,13 +75,10 @@ def test_interceptor_pipeline_shapes_reply():
         system_prompt = "base"
 
         def reply(self, msg, system_prompt="", messages=None):
-            # skill_awareness must have injected skills into the system prompt
-            assert "# Available skills" in system_prompt
-            return "Answer.<|endoftext|>\n# Available skills (leak)"
+            return "Answer."
 
-    gov = get_governor(FakeAgent(), pipeline=build_pipeline())
-    out = gov.reply("hi")
-    assert out == "Answer."
+    gov = get_governor(FakeAgent())
+    assert gov.reply("hi") == "Answer."
 
 
 def test_ephemeral_tool_call_parsing():

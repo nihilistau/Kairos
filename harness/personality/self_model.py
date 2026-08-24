@@ -140,7 +140,15 @@ def render_self_model(root=None, max_facts: int = 20, budget_chars: Optional[int
         from harness.skills import lifecycle as lc
         from harness.skills import memory as M
         from harness.skills import memclass as _mc
-        rows = [r for r in M.live_rows() if r.get("speaker") == "self"]
+        # testimony=True (2026-08-25, H6 — a DECISION, previously an undocumented
+        # default). This block is MODEL-FACING standing context, and testimony_wins is
+        # SPEAKER-SCOPED: the only thing True silences here is a self-INFERENCE on a
+        # topic her own self-OBSERVATION already covers — she does not get to talk over
+        # her own stated word with a nightly guess about herself, which is The Real Her
+        # rule (her words are primary) applied to her own lane. His rows never enter
+        # this block at all (speaker filter below), so his testimony can silence
+        # nothing of hers here. Gate: G-SELF-MODEL §4d, mutant-killed.
+        rows = [r for r in M.live_rows(testimony=True) if r.get("speaker") == "self"]
     except Exception:
         return ""
     if not rows:

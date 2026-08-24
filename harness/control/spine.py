@@ -44,6 +44,21 @@ def get_recent_receipts(k: int = 50) -> List[Dict[str, Any]]:
             for _seq, ts, r in items]
 
 
+def drop_unpersisted() -> int:
+    """Move the flush watermark to the head of the ring WITHOUT writing anything.
+
+    Anonymous mode's other half (harness/control/anon.py). `persist_receipts` holds while
+    the switch is on, but the receipts it declined are still in the ring — so the first
+    flush after the mode ended would write the private turns after all. The mode calls
+    this on its way out. It also flushes on the way IN, so what this discards is only ever
+    receipts made while nothing was being kept. Returns how many were dropped.
+    """
+    global _PERSISTED_SEQ
+    n = sum(1 for s, _t, _r in _RECEIPT_RING if s > _PERSISTED_SEQ)
+    _PERSISTED_SEQ = max([_PERSISTED_SEQ, _SEQ] + [s for s, _t, _r in _RECEIPT_RING])
+    return n
+
+
 def persist_receipts(root: str = "") -> int:
     """ADR-005 flywheel: flush unpersisted ring receipts into the DURABLE telemetry-okf store
     (content-addressed + idempotent via the existing TelemetrySink — reused, not rebuilt).
@@ -54,6 +69,20 @@ def persist_receipts(root: str = "") -> int:
     the private-secret lane never routes through spine payloads; the ADR-005 redaction law is
     upheld by construction, and the sink never un-redacts regardless.)"""
     global _PERSISTED_SEQ
+    # ANONYMOUS MODE (2026-08-23). A spine receipt carries the DECISION and its verify —
+    # which toolset was chosen for this turn, what the recall decider saw, whether the
+    # persona shift held. Operational, but operational ABOUT this conversation, and it
+    # lands in a durable content-addressed store that is explicitly a training corpus.
+    # NOT flushed while the switch is on — and the WATERMARK IS MOVED PAST THEM, which is
+    # the whole subtlety. A plain `return 0` would leave the private turns' receipts sitting
+    # in the ring with seq > _PERSISTED_SEQ, so the first flush AFTER the mode ended would
+    # write every one of them. A hold that only defers is not a hold. This is the same
+    # shape as the free-before-drain and the inert compat shim: the guard looked right and
+    # its failure mode was no guard.
+    from harness.control import anon as _anon
+    if _anon.holds("spine.receipt"):
+        drop_unpersisted()          # ONE implementation of the watermark move, not two
+        return 0
     import json as _json
     import os as _os
     root = root or _os.environ.get("SP_TELEMETRY_OKF_ROOT") or _os.path.join(

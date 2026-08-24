@@ -8,6 +8,12 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# SANDBOX FIRST (2026-08-24). One of nine gates the sandbox audit caught writing into
+# her REAL stores; `_gate.sandbox` points every root at a temp dir and must run BEFORE
+# any harness import, because a module resolves its root once, at import.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _gate import sandbox as _sandbox  # noqa: E402
+_sandbox(os.path.basename(__file__))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from harness.toolcore.tools import ToolSpec, run_with_tools

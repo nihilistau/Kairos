@@ -28,8 +28,10 @@ export default function Wardrobe() {
     setBusy(JSON.stringify(body))
     try { await api.wardrobeSet({ ...body, by: 'him' }); w.refresh() } finally { setBusy('') }
   }
-  const words = d.tier_words || {}
-  const order = ['t0', 't1', 't2', 't3']
+  // (the t0..t3 `order` array and the tier_words fallback left 2026-08-24, audit R4:
+  // the tiers were renamed 2026-08-23 and are not a ladder any more; a stale ordering
+  // constant nothing used was a landmine for whoever wired it up next)
+  const words = d.outfit_words || {}
 
   return (
     <div className="wr">
@@ -53,11 +55,8 @@ export default function Wardrobe() {
         <b>{(d.wearing_now || {}).words || d.shown}</b>
         <span className="wr-by">{d.by === 'her' ? 'she chose this' :
           d.by === 'him' ? 'you chose this for her' : 'the default'}</span>
-        {d.clamped ? (
-          <span className="wr-held" title={'she chose ' + ((words[d.wanted] || {}).wearing || d.wanted)}>
-            held by your ceiling
-          </span>
-        ) : null}
+        {/* the ceiling badge left with Portrait's (audit R4): clamped is a constant
+            false since tiers stopped being a ladder */}
       </div>
 
       {(d.arrivals || []).length ? (
@@ -198,27 +197,27 @@ export default function Wardrobe() {
            time it goes on her — see wardrobe.note_worn. */
         const newIds = new Set((d.arrivals || []).map(a => a.id))
         const outfits = (d.outfits || []).filter(o => o.have).map(o => ({
-          key: 'o:' + o.id, kind: 'outfit', tier: o.id, label: o.name, sub: o.wearing,
+          key: 'o:' + o.id, kind: 'outfit', outfit: o.id, label: o.name, sub: o.wearing,
           moves: o.moves, on: d.shown === o.id && !d.look && !d.clip, isNew: false,
-          src: `/v1/wardrobe/outfit?tier=${o.id}`,
-          loop: `/v1/wardrobe/outfit?tier=${o.id}&kind=loop`,
-          put: () => set({ tier: o.id, look: '', clip: '' }),
+          src: `/v1/wardrobe/outfit?outfit=${o.id}`,
+          loop: `/v1/wardrobe/outfit?outfit=${o.id}&kind=loop`,
+          put: () => set({ outfit: o.id, look: '', clip: '' }),
         }))
         const asked = (d.looks || []).filter(l => l.kind === 'look').map(l => ({
-          key: 'l:' + l.id, kind: 'look', tier: l.tier, label: l.label,
+          key: 'l:' + l.id, kind: 'look', outfit: l.made_in, label: l.label,
           sub: 'one she asked for', moves: l.moves, on: d.look === l.id,
           isNew: newIds.has(l.id),
           src: `/v1/wardrobe/look?id=${encodeURIComponent(l.id)}`,
           loop: `/v1/wardrobe/look?id=${encodeURIComponent(l.id)}&kind=loop`,
-          put: () => set({ tier: l.tier, look: d.look === l.id ? '' : l.id }),
+          put: () => set({ outfit: l.made_in, look: d.look === l.id ? '' : l.id }),
         }))
         const moments = (d.looks || []).filter(l => l.kind === 'gesture').map(l => ({
-          key: 'g:' + l.id, kind: 'gesture', tier: l.tier, label: l.label,
+          key: 'g:' + l.id, kind: 'gesture', outfit: l.made_in, label: l.label,
           sub: 'a moment of her', moves: l.moves, on: d.look === l.id,
           isNew: newIds.has(l.id),
           src: `/v1/wardrobe/look?id=${encodeURIComponent(l.id)}`,
           loop: `/v1/wardrobe/look?id=${encodeURIComponent(l.id)}&kind=loop`,
-          put: () => set({ tier: l.tier, look: d.look === l.id ? '' : l.id }),
+          put: () => set({ outfit: l.made_in, look: d.look === l.id ? '' : l.id }),
         }))
         /* NEW FIRST, then what is on her, then the rest — the order he would look in. */
         const worn = [...outfits, ...asked].sort(
@@ -277,7 +276,7 @@ export default function Wardrobe() {
               four outfits (mesh top / mesh tee / black lace bra and panties / black lace
               and not much of it) and the seven are how she wears the one that is on. So
               the heading led with the axis she does not choose and buried the one she
-              does, and the tier ladder read as a different system from her wardrobe when
+              does, and the outfit list read as a different system from her wardrobe when
               it is the rest of it. Her face follows her MOOD — express() — not a click,
               and saying so is the difference between a grid and a thing she operates. */}
           <div className="wr-sec">{(words[d.shown] || {}).wearing || d.shown}
@@ -287,7 +286,7 @@ export default function Wardrobe() {
           </div>
           <div className="wr-grid">
             {(d.grid || []).map(g => (
-              <div key={g.id} className={'wr-face' + (d.shown === g.tier ? ' on' : '')}
+              <div key={g.id} className={'wr-face' + (d.shown === g.outfit ? ' on' : '')}
                    title={g.face + (g.moves ? ' · moves' : ' · still')}>
                 {/* SHE MOVES HERE TOO. Her portrait has preferred the loop since the set
                     was generated; this panel was the last surface still showing her as a

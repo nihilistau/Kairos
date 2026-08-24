@@ -21,15 +21,25 @@ from harness.inference.inference_config import InferenceConfig
 
 logger = logging.getLogger(__name__)
 
+# ── forget() IS OUT OF THIS VOCABULARY (2026-08-24 audit, B4) ──────────────────────────
+# The whole agency-loop family (agency_round / run_agency_loop / run_agency_scheduler) is
+# UNREACHABLE from any live path — app.py deliberately does not start the scheduler (its
+# own comment: "it also fires agency_round(), an open-ended MODEL turn") — and this prompt
+# told the model, four separate ways, to forget() rows on its own judgement. A model-driven
+# forget loop must not sit fully built and green-gated, waiting for someone to wire it: the
+# day a caller appears, the prompt is the policy. So the retiring verbs are gone from the
+# vocabulary AND forget is stripped from the toolset the round is handed (below): a
+# redundancy or a contradiction is REPORTED, and retiring is the operator's call. The
+# store's own supersede machinery already tombstones a changed fact without being asked.
+# The disconnected-surface row (with the arming condition) is docs/OFF-BY-DEFAULT.md §10.
 AGENCY_PROMPT = (
     "You are reviewing your OWN long-term memory for upkeep. Your current memories:\n"
     "{mems}\n\n"
     "Maintain them with the tools:\n"
-    "- If one memory is redundant because another already says it (a more specific fact "
-    "subsumes a vaguer one), forget the vaguer/redundant one.\n"
-    "- If two memories contradict, forget the outdated one.\n"
-    "- If a single combined fact is clearer, remember it and forget the parts.\n"
-    "- If a memory is stale or wrong, forget it.\n"
+    "- If a single combined fact is clearer than several fragments, remember the combined "
+    "fact — the store supersedes and tombstones on its own; you never delete anything.\n"
+    "- If two memories contradict, or one looks stale or wrong, SAY WHICH and why in your "
+    "reply. Retiring a memory is the operator's decision, not this round's.\n"
     "Make at most a few changes. If everything is consistent and current, do nothing "
     "and reply 'memory is healthy'."
 )
@@ -43,10 +53,13 @@ def agency_round(
 ) -> str:
     """Run one model-driven memory-maintenance round; return the model's closing text."""
     from harness.toolcore.tools import ToolSpec, run_with_tools
-    from harness.skills.memory import MEMORY_TOOLS, list_memories
+    from harness.skills.memory import MEMORY_TOOLS, forget, list_memories
 
     prompt = AGENCY_PROMPT.format(mems=list_memories())
-    tools = [ToolSpec.from_callable(fn) for fn in MEMORY_TOOLS]
+    # No forget in the round's hand — see the AGENCY_PROMPT note (2026-08-24, B4). The
+    # prompt no longer asks for it, and a tool the prompt does not ask for but the hand
+    # still holds is a leak waiting for a paraphrase.
+    tools = [ToolSpec.from_callable(fn) for fn in MEMORY_TOOLS if fn is not forget]
     cfg = config or InferenceConfig(temperature=0.0, max_tokens=220, auto_recall=False)
     return run_with_tools(
         [{"role": "user", "content": prompt}],
@@ -70,6 +83,28 @@ def run_agency_loop(
         if on_round:
             on_round(i, r)
     return out
+
+
+# ── THE RAN-TODAY LEDGER (2026-08-24 audit, H8) ────────────────────────────────────────
+# The nightly job (app.py's day-boundary pass) runs consolidate_current() and THEN
+# ops.reflect(), in one process — and both ran the personality curator and world.refresh,
+# so each fired TWICE per night on the same day's evidence. The dedupe lives here, beside
+# the first runner: consolidate_current marks what it ran, reflect() asks before repeating
+# it. In-process on purpose — the two calls share the night job's process, and a marker
+# that survived restarts would wrongly suppress a legitimately re-run pass tomorrow-shaped
+# edge cases aside (a UTC date is the grain the night job already thinks in). Deliberately
+# ONE-directional: reflect() defers to consolidate_current, never the reverse, so the
+# operator's reflect button always does what it says when pressed first.
+_NIGHTLY_RAN: dict = {"personality": "", "world": ""}
+
+
+def _mark_ran(step: str) -> None:
+    _NIGHTLY_RAN[step] = time.strftime("%Y-%m-%d", time.gmtime())
+
+
+def ran_today(step: str) -> bool:
+    """Did consolidate_current already run this shared nightly step today (UTC)?"""
+    return _NIGHTLY_RAN.get(step, "") == time.strftime("%Y-%m-%d", time.gmtime())
 
 
 def _daemon_busy(client: SPDaemonClient) -> bool:
@@ -123,6 +158,7 @@ def consolidate_current(convo, client: Optional[SPDaemonClient] = None) -> Optio
         try:
             from harness.personality.curator import consolidate_personality
             pr = consolidate_personality(msgs)
+            _mark_ran("personality")       # so ops.reflect does not run it again tonight (H8)
             if isinstance(result, dict):
                 result["personality"] = pr
         except Exception as exc:
@@ -137,6 +173,7 @@ def consolidate_current(convo, client: Optional[SPDaemonClient] = None) -> Optio
             from harness.skills.world import refresh
             nr = compose_and_write(msgs)
             refresh()          # the deliberate prefix re-cost, at the night boundary
+            _mark_ran("world")             # so ops.reflect does not refresh again tonight (H8)
             if isinstance(result, dict):
                 result["narrative"] = nr
             logger.info("[agency] narrative: %s", nr)

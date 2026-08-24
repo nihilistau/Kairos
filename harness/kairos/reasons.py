@@ -139,7 +139,7 @@ def from_arrival(new: List[dict], raised: set) -> Optional[dict]:
         if not wid or key in raised:
             continue
         return {"kind": "arrival", "raise_key": key, "id": wid,
-                "text": w.get("want", ""), "tier": w.get("tier", "t0")}
+                "text": w.get("want", ""), "made_in": w.get("made_in", w.get("tier", "mesh-top"))}
     return None
 
 
@@ -201,13 +201,13 @@ def from_journal(narrative: str, today: str, raised: set) -> Optional[dict]:
 def from_rhythm(days: Dict[str, int], today: str, raised: set) -> Optional[dict]:
     """His week has a shape, and today does not fit it.
 
-    OFF UNTIL THE LEDGER IS DEEP ENOUGH — see MIN_LEDGER_DAYS. ARMING CONDITION, written
-    down because a feature that is off without one never comes back: this needs
-    `presence.present_days_total() >= 14`. It stood at 7 on 2026-08-01, so roughly seven
-    more days he is present. Before arming, run `reasons.why_quiet()` and READ what it
-    would actually have said — a remark about his rhythm is an observation about him he
-    did not volunteer, and the only way to know whether it lands as care or as
-    surveillance is to look at the sentence first.
+    OFF UNTIL THE LEDGER IS DEEP ENOUGH — MIN_LEDGER_DAYS (7) is the one number, and the
+    backtest above it is the reason. This docstring used to say 14 while the constant
+    said 7 — two numbers for one gate, two lines apart, the §0 shape (2026-08-24 audit,
+    K5); the constant's own justification is the authority. Before trusting a firing,
+    run `reasons.why_quiet()` and READ what it would actually have said — a remark about
+    his rhythm is an observation about him he did not volunteer, and the only way to
+    know whether it lands as care or as surveillance is to look at the sentence first.
     """
     present = [d for d, n in sorted(days.items()) if n > 0]
     if len(present) < MIN_LEDGER_DAYS:

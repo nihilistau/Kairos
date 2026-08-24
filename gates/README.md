@@ -17,6 +17,34 @@ needs the stack, and its run command. This directory also keeps the write-ups an
 that asserted nothing is a skip, not a pass). `harness_tests/_gate.py` implements it
 (`check`, `finish`, `skip`, `utf8_stdout`) — new gates use it.
 
+## A gate with a synthetic clock must pin the boot (2026-08-23)
+
+Every `TurnState` clock defaults to `impulse.BOOT_AT` — the real monotonic boot time,
+because a zero clock **fails open** (a1ecf2a: five unrelated checks were skipped when a clock
+was unset). On a box that has been up a day that is ~1e5, which sits in the **future** of the
+small synthetic fixtures gates use (`now=100.0`, `1000.1`, `5000.0`). `now - last_spoke_at`
+goes hugely negative and every decision comes back `cooldown (98000s left)` — a gate red
+for a reason with nothing to do with what it guards.
+
+**Pin the boot, once, at import scope:**
+
+```python
+import harness.kairos.impulse as _imp_pin  # noqa: E402
+_imp_pin.BOOT_AT = 1.0
+```
+
+Non-zero, so the no-zero-clock rule is still exercised, and before every `now` the gate uses.
+**Seven gates** do this: `g_kairos_latch`, `g_kairos_presence`, `g_kairos_reasons`,
+`g_kairos_policy`, `g_kairos_tick`, `g_tuning`, `g_notes`.
+
+The alternative — leaving the global alone and offsetting every fixture time from
+`BOOT_AT` — also works, and `g_notes` shipped that way for four hours before converging
+here. It is not wrong; it is a SECOND ANSWER to one question, which is what AGENTS.md 0 is
+about. One idiom. If you are writing a gate that drives `decide()` with made-up times, pin.
+
+A gate whose subject is BOOT_AT itself (`g_kairos_latch` asserts a fresh state equals it) pins
+too and then compares against the pinned value — the pin is a fixture, not a bypass.
+
 ## An offline gate that writes memory is paying 2 seconds a write (2026-08-23)
 
 Pointing `SP_DAEMON_URL` at a dead port is the house pattern for "no engine here", and it
@@ -46,3 +74,16 @@ does, this is most of it.
 
 Minimum bar after touching memory: `g_claim`, `g_durability`, `g_memory_lifecycle`. After touching
 docs: `g_docs_true`, `g_profile_door`. After the room: `g_room_css`, `g_room_bundle`.
+
+### G-VRAM evicts the resident prefix (2026-08-23)
+
+`g_vram.py` posts to the **daemon** directly, which is correct for what it measures and
+means it overwrites the gateway's ~7.9k persona prefix. Her next turn logs
+`PERSIST-KV: guard miss (pos=0 != committed N) — full prefill` and pays ~97 s to rebuild it.
+
+Worse, the gate's own `a short turn is short` check then queues behind that re-prefill and
+reports ~80,000 ms with *"the daemon is paging over PCIe. Lower [kv].pmax"* — a gate
+accusing the machine of what the gate did. Measured: three runs, three re-prefills, one
+false FAIL, and a real regression hunt that found nothing because there was nothing.
+
+Run it with `--daemon-only`, or accept one cold prefill afterwards.

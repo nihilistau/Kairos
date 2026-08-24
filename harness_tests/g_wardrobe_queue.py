@@ -204,7 +204,49 @@ try:
     check("asking for one already queued says WHERE it is, not 'it will turn up'",
           "held up" in asked or "picture" in asked, asked[:200])
 
-    print("\n8. ONE WARDROBE, NOT TWO LISTS OF CLOTHES")
+    print("\n7b. HER DOOR IS HIS DOOR — the promise and the pass agree (2026-08-24)")
+    # THREE SURFACES DISAGREED: describe() promised "picture and motion both ... within
+    # minutes"; ask_for() said "in your queue until it MOVES ... end of the day"; and
+    # generate_now() — HER door — ran avatar_gen with --no-loop (still only) while HIS
+    # panel button ran gen_want(w) (both). She was promised motion in minutes and got a
+    # photograph until 4am. The doors are one pass now, and this section holds the JOIN:
+    # what the door actually runs is captured through the REAL path (subprocess.run is
+    # the one call generate_now makes — intercepted, because a gate that hits the paid
+    # image API is a gate nobody runs twice) and compared against what the words promise.
+    # Flip either side — restore --no-loop, or re-promise the day boundary — and the
+    # agreement check goes red by name.
+    import subprocess as _sp   # noqa: E402
+    import threading as _th    # noqa: E402
+
+    class _R:
+        returncode, stdout, stderr = 0, "", ""
+
+    _argvs = []
+    _real_run = _sp.run
+    _sp.run = lambda argv, **kw: (_argvs.append([str(a) for a in argv]), _R())[1]
+    try:
+        started = WD.generate_now(wid2)
+        reply = TOOLS["ask_for"].call(look="a hi-vis jacket, for this gate only")
+        for _t in _th.enumerate():
+            if _t.name.startswith("wardrobe-now-"):
+                _t.join(timeout=15)
+    finally:
+        _sp.run = _real_run
+    # By the want id, not by position — the two intercepted threads race each other.
+    argv = next((a for a in _argvs if wid2 in a), [])
+    check("her generate-now door starts, one want by id",
+          started is True and "--one" in argv and wid2 in argv, (argv, _argvs))
+    check("...and runs the SAME pass as his panel — no --no-loop, motion included",
+          bool(argv) and not any("--no-loop" in a for a in _argvs), _argvs)
+    door_motion = bool(argv) and "--no-loop" not in argv
+    check("the door and describe()'s promise AGREE — a still-only door may not say 'motion both'",
+          door_motion == ("picture and motion" in desc),
+          (argv, [l for l in desc.splitlines() if "ask_for" in l][:1]))
+    check("ask_for's own reply promises what the pass does — picture AND motion, minutes",
+          "picture and its motion" in reply and "minutes" in reply, reply[:220])
+    check("...and no longer promises the day boundary as the schedule",
+          "end of the day" not in reply and "until it MOVES, which happens" not in reply,
+          reply[:220])
     # His words: "wardrobe contains Her clothes section and Her wardrobe. this makes no
     # sense and is redundant... and they contain separate items."
     panel = io.open(os.path.join(ROOT, "ui", "src", "apps", "Wardrobe.jsx"),

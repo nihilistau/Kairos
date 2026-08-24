@@ -221,9 +221,9 @@ appears there with no UI edit at all. What matters most, and why:
 
 | knob | where | what it actually changes |
 |---|---|---|
-| `[decode].temperature` | profile | 0.6 is the tuned value. Above ~0.9 she starts losing the mark syntax the room parses. |
-| `[decode].max_tokens` | profile | 768. The ceiling on one reply. |
-| `[decode].repetition_penalty` | profile | 1.3. Below ~1.1 a long evening starts looping. |
+| `decode.temperature` | **tuning registry** (live) | 0.6 is the tuned value. Above ~0.9 she starts losing the mark syntax the room parses. |
+| `decode.max_tokens` | **tuning registry** (live) | 768. A CEILING on one reply, not a target — she stops when she is done. |
+| `decode.repetition_penalty` | **tuning registry** (live) | 1.3. Below ~1.1 a long evening starts looping. |
 | `[decode].eot_bias` | profile | **0.0 here, and the comment says why**: at 4.0 the default model's first sampled token is a stop and she goes completely silent while `/health` says warm. It is an sp-daemon knob; on a generic endpoint it is inert. |
 | `[agent].personality` | profile | her marks and the curator. Off makes her an assistant. |
 | `[agent].spine_recall` | profile | whether the decide→execute→verify spine may reach memory. |
@@ -233,6 +233,22 @@ appears there with no UI edit at all. What matters most, and why:
 | `[memory].growth`, `store_verb`, `persist_growth`, `classify`, `policy` | profile | the daemon's own memory writers. **Refused at boot** on this profile — one writer, and it is the harness. |
 | kairos reasons (continue / check-in / remind / solo / muse) | live | when she speaks unprompted. The idle clock is `harness/kairos/`. |
 | `[backup]` | profile | hourly zip of `var/` and the persona. Her state is gitignored, so this is the safety net. |
+
+> **CORRECTED 2026-08-24 (commit `4519873`): the first three rows are NOT profile keys, and
+> this table said they were.** `temperature`, `max_tokens` and `repetition_penalty` sat in
+> `profiles/companion.toml` under `[decode]` — **and `serve.py` maps none of them**. The
+> values were INERT: the live decode defaults have come from the tuning registry
+> (`harness/tuning/registry.py`, persisted in `var/tuning.json`, edited in the room's
+> settings window) the whole time, resolved **per turn**. All three keys are now deleted from
+> the profile, with pointer comments naming the real owner, and `[agent].tool_budget_s` went
+> the same day for the same reason — the budget that actually runs is the registry's
+> `agent.tool_budget_s` (400 s). The *numbers* above did not change, because the registry
+> declares the same ones; what was wrong was **which file moves them**, which is the worse
+> failure of the two — editing the profile read exactly like configuring the model and moved
+> nothing at all, in the first file a newcomer edits. `harness_tests/g_profile_keys.py`
+> (G-PROFILE-KEYS) now holds every key under `profiles/` to a reader, so the next key that
+> promises something the code never reads convicts itself by dotted name. `[decode].eot_bias`
+> is a real profile key and stays one.
 
 **Read [`OFF-BY-DEFAULT.md`](OFF-BY-DEFAULT.md) before arming anything.** It is a live
 ledger: every knob that ships off has a row saying what evidence would turn it on, and a
@@ -259,7 +275,7 @@ gate holds the ledger to the profile.
 |---|---|
 | `serve.py: name the profile` | the profile is positional. `python serve.py companion`. |
 | the room loads, she never replies | the endpoint is not up, or `base_url` has the wrong port. The setup panel probes it and says which. |
-| replies come back empty | a decode knob from another model — check `[decode]` against §8. |
+| replies come back empty | a decode knob from another model. In the profile that is `[decode].eot_bias` — at 4.0 on a non-sp endpoint her first sampled token is a stop and `/health` still says warm. The sampling dials live in the settings window, not the profile (§8). |
 | `401` from your own server | LM Studio's *require authentication* is on; put its token in `var/secrets/engine.token`. |
 | no voice | `[tts].method` is not `"xai"`, or `var/secrets/Xapi.txt` is missing or empty. |
 | the drawn SVG instead of a face | the bundled set was never seeded — check `var/room/avatar/` and the gateway log line `[gateway] avatar defaults:`. |

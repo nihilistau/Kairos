@@ -169,6 +169,28 @@ export default function Ledger() {
                 </section>
               )
             })}
+            {/* THE OTHER BUCKET (2026-08-24 audit, R5). Rows render only inside their
+                kind's section, so a row whose kind drifted from d.kinds was counted in
+                "N shown" and drawn NOWHERE — a standing list that can silently hide a
+                row is the one failure a standing list exists to prevent. */}
+            {(() => {
+              const known = new Set(kinds)
+              const stray = rows.filter(e => !known.has(e.kind))
+              if (!stray.length) return null
+              return (
+                <section className="lgr-sec" style={{ '--h': 0 }}>
+                  <h4>other <span className="muted">
+                    rows whose kind the panel does not know — they are still yours
+                  </span></h4>
+                  {stray.map(e => (
+                    <Row key={e.id} e={e}
+                         onSave={row => act({ op: 'edit', ...row })}
+                         onDrop={id => act({ op: 'drop', id })}
+                         onRestore={id => act({ op: 'restore', id })} />
+                  ))}
+                </section>
+              )
+            })()}
           </>
         )
       }}</Body>

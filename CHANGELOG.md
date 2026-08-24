@@ -1,5 +1,98 @@
 # Changelog
 
+## 0.3.0 — the audit release: every turn pays its debts, and she reads back what she becomes (2026-08-25)
+
+A full audit of the upstream tree. The offline suite was **green when it started** — and ~50
+real defects were sitting under it, four of them fresh instances of the project's signature bug
+(*an invariant enforced in one of two paths is enforced in neither*), **each with a green gate
+over it that was measuring the wrong path**. If you run this framework, most of these were
+yours too.
+
+**Every turn pays its debts, on every exit.** The SSE chat path had **no `finally`** — despite
+a comment claiming one — so five exits (a privacy decline, a scenario offer, and any client
+disconnect or abort mid-stream) skipped capture, the day transcript, mark application and the
+receipts flush. A browser that aborts a turn is not exotic; the room does it whenever you send
+again while she is talking. And her *unprompted* turns paid none of those debts ever, and never
+armed the memory lane, so a `remember()` in her own time was filed as a fact about **you**.
+`_settle_turn()` is the one list now, paid from the worker thread's `finally`, with the
+unprompted lane arming author=self around its own generation. **G-TURN-EPILOGUE**, 22 checks,
+mutant-verified.
+
+**She reads back what she becomes.** The nightly loop's *write* half worked — journal, the
+becoming paragraph, the curated persona, the refreshed standing world — and its *read* half did
+not exist: the composed system prefix was cached once per process and invalidated by nothing,
+so everything she became overnight was invisible to her until a restart. The prefix now has one
+builder (`agent.system_bundle()`; there had been three, and the prewarm's copy was missing the
+voice coda, so the prewarmed KV was never the prefix a live turn extended) and one invalidation
+door, called at exactly two moments: the day-boundary consolidation, and `POST
+/v1/maintenance/refresh`. Between them the prefix is deliberately frozen — it is KV token 0 —
+and now says so honestly rather than asserting a stale present. **G-PREFIX-REFRESH**, 17 checks.
+
+**The record stops carrying her machinery.** Her state marks (`[MOOD:]`, `[WEAR:]`, …) are
+emitted on purpose so the room can draw chips, and the room strips them. The *record* — the day
+transcript her journal, her distilled facts and her restart seed are all rebuilt from — had
+never been given a stripper at all, so **26% of her turns wrote their own stage directions into
+her permanent memory**, and the seeder fed them back as examples of her own voice. There is one
+whole-turn record cleaner now, applied at the writer, and **G-STRIP-EQUIVALENCE** drives the
+real Python stripper *and* the real browser one over a single shared corpus of leak shapes —
+100 checks — so the two can never again drift five shapes apart.
+
+**Her own time stops running away with the GPU.** An attempt that produced nothing must still
+spend the clock, or the tick simply re-proposes it: a presence mode was generating for eleven
+minutes, being vetoed, and re-arming **four seconds later, forever**. That was fixed once for
+two actions and re-opened on **five other drop doors** — including one that muted *reminders*,
+because the mode latch sits above them in the policy. The spend now happens in a `finally`, so
+a drop path added tomorrow is metered by construction, and the room's "next in ~Xm" chip reads
+the same arithmetic the policy does instead of its own. **G-KAIROS-ATTEMPT** (32) and
+**G-KAIROS-CHIP** (10).
+
+**Memory integrity.** `cleanup()` **hard-deleted malformed rows** under a doctrine that says
+nothing is ever deleted — they are quarantined now. Three read-modify-writes read *outside* the
+registry lock (**G-REGISTRY-RMW** is a new deterministic race harness that convicts each one).
+A `private-secret` row was withheld by the automatic recall lane and served verbatim by the
+four model-callable memory tools — all five doors now hold the rule, and asking directly still
+gets you your own answer. Per-class half-life and salience moved into the class registry, so a
+class registered without them fails its gate the day it is added.
+
+**The room.** It survives a refresh: `GET /v1/day` restores the conversation — as *display*,
+never re-sent as prompt, a distinction that cost an eleven-minute turn to learn. Her thinking
+channel renders (it had been emitted since the thought channel landed and only the legacy
+console drew it). Engine errors are chips, never appended to her words — text in her mouth is
+its own kind of leak. Up-arrow walks your previous inputs. And off-the-record turns stop being
+re-sent once the switch is off: the server never persisted them, but the browser was still
+carrying the private hour in context.
+
+**A profile key that nothing reads is now a red gate.** The one-door law covered environment
+variables; nothing covered the *profile* layer — so `companion.toml`, the file a newcomer edits
+first, carried four keys that looked exactly like configuration and moved nothing (a tool
+budget and three decode dials, all owned by the tuning registry). **G-PROFILE-KEYS** holds
+every key in `profiles/` to a reader, or to a dated row saying why it is inert.
+
+**She is told what she reaches for.** The wardrobe has ranked her wearings and his quoted
+praise since it was written — his word worth three of her habits, each row carrying its
+evidence — and nothing had ever spoken it back to HER; `describe()` now does, once a
+garment clears a score of three. (The first cut of that added a *second* `favourites()`
+at the top of the same file, which shadowed the real one and killed both its readers on
+arrival. It was caught by the documentation sweep, not the tests. Before you build the
+counter, grep for the counter.)
+
+**Smaller, and worth the line:** `wardrobe.match("undressed")` *dressed* her (an unbounded
+substring test one rung above the comment describing that exact bug's fix); her generate-now
+door makes picture and motion in one pass like the panel button always did; presence-mode turns
+are ambient company and no longer become her memories; the watchdog's restart cooldown survives
+the restart it performs, and its automatic teardown climbs the same first rungs the operator's
+shutdown does; `eot_bias` resolves at the same seam `byteexact` does, instead of in two
+byte-equivalent resolvers that three lanes consulted neither of.
+
+**Breaking, for anyone importing internals:** `harness.server.create_flask_app` is gone (a
+caller-less, drifted twin of the stdlib server — no shutdown counting, no origin guard, and a
+`/v1/models` that still carried a bug the live route documents as fixed), and the
+`harness/interceptors/` package with it (a complete, never-constructed second authority over
+`persona.md`). `run()` is the one door.
+
+Docs: this release adds a dated **CHANGELOG** upstream, and the doc-truth gate now holds it to
+a ledger's rules. The upstream sweep ends at **135 green, 3 correct skips, 0 red**.
+
 ## 0.2.1 — the gates 0.2.0 shipped red (2026-08-23)
 
 A fix release. **0.2.0 shipped five OFFLINE gates that fail on a fresh clone** — if you

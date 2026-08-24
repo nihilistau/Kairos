@@ -1,6 +1,8 @@
 """G-PF-TAGS (PF-B3) — self-modify via tags: the model emits [MOOD]/[VOICE]/[TRAIT] in its reply;
-a post-call interceptor persists them into the persona state (write_state) and strips them from the
-reply, so the change survives to the next turn."""
+the post-turn path (spine.persona_shift -> apply_personality_tags) persists them into the persona
+state (write_state) and strips them from the reply, so the change survives to the next turn.
+(2026-08-25: this used to say "a post-call interceptor" — that interceptor was the never-run
+harness/interceptors twin, deleted; the spine executor is the door that runs.)"""
 from __future__ import annotations
 
 import os
@@ -49,16 +51,22 @@ def main() -> int:
     print(f"clean reply: {clean!r}")
     print(f"mood={mood_ok} voice={voice_ok} trait_add={trait_add} trait_rm={trait_rm} keep={trait_keep} stripped={stripped}")
 
-    # interceptor wrapper: mock ctx (any object with a .reply attr) -> post_call strips + persists
-    class Ctx:
-        reply = REPLY
-    PERSONA.write_text(BASE, encoding="utf-8")  # reset for the interceptor path
+    # THE LIVE POST-TURN DOOR, not the interceptor wrapper (2026-08-25). This block used
+    # to drive I.make_interceptor().post_call(ctx) — an instance of harness/interceptors'
+    # PersonalityStateInterceptor, which NO live path ever constructed (build_pipeline's
+    # only caller was a smoke test). That dead second authority over persona.md was
+    # git-rm'd; the path that actually persists her tags every turn is the spine's
+    # persona_shift executor, so that is what is asserted here. (make_interceptor at
+    # harness/personality/interceptor.py:414 still exists, consumer-less, importing the
+    # deleted module — left because it shares a file with the live recognisers; see the
+    # OFF-BY-DEFAULT §10 row-note.)
+    PERSONA.write_text(BASE, encoding="utf-8")  # reset for the live-door path
     os.environ["SP_PERSONA_FILE"] = str(PERSONA)
-    interc = I.make_interceptor()
-    ctx = Ctx()
-    interc.post_call(ctx)
-    interc_ok = "[" not in ctx.reply and state_of().get("mood") == "playful"
-    print(f"interceptor: priority={interc.priority} name={interc.name} reply_stripped+persisted={interc_ok}")
+    from harness.control.spine import Decision as _D, stock_executors
+    _msg = stock_executors()["persona_shift"](_D(kind="persona_shift",
+                                                 payload={"reply": REPLY}))
+    interc_ok = state_of().get("mood") == "playful" and "mood=playful" in _msg
+    print(f"live persona_shift executor: persisted={interc_ok} ({_msg})")
 
     # StreamProcessor now strips [TRAIT] on the chat-delta path too
     sp_ok = SP_STRIP.sub("", "hi [TRAIT:+bold] there") == "hi  there"
@@ -95,7 +103,7 @@ def main() -> int:
     ok = (mood_ok and voice_ok and trait_add and trait_rm and trait_keep and stripped
           and interc_ok and sp_ok and tools_ok and verify_ok)
     print(f"RESULT pf-tags: {'PASS' if ok else 'FAIL'} "
-          f"(tags persisted to state + stripped from reply + interceptor + StreamProcessor strips TRAIT)")
+          f"(tags persisted to state + stripped from reply + live spine door + StreamProcessor strips TRAIT)")
     return 0 if ok else 1
 
 

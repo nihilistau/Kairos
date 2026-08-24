@@ -205,6 +205,42 @@ class WikipediaSearcher(Searcher):
                  "snippet": _clean(h.get("snippet") or "")}
                 for h in rows if isinstance(h, dict)]
 
+    # ── SOMETHING SHE DID NOT GO LOOKING FOR (2026-08-23) ─────────────────────────
+    # Her own-time act "look something up you have been curious about" can only ever
+    # DEEPEN what she is already interested in: the query comes from her, so the result
+    # comes back inside the same fence. A RANDOM article is the only mechanism here that
+    # can introduce a subject she would never have asked for, which is the whole point.
+    # No key, no scraping - the REST random endpoint returns a clean summary directly.
+    MIN_EXTRACT = 240      # a two-line stub about a village is not worth her evening
+
+    def random_page(self, tries: int = 4) -> dict:
+        """A random article with enough substance to think about, or {} .
+
+        RETRIES ON PURPOSE. Random Wikipedia is mostly stubs - a hamlet, a beetle, a
+        footballer with two sentences - and handing her 40 characters produces an
+        invented paragraph, which is the failure this codebase pays for most often.
+        Up to `tries` draws for one with a real extract; if none has it, return {} and
+        let the caller say so plainly. Never raises."""
+        for _ in range(max(1, int(tries))):
+            req = urllib.request.Request(
+                "https://en.wikipedia.org/api/rest_v1/page/random/summary",
+                headers={"User-Agent": UA, "Accept": "application/json"})
+            try:
+                with urllib.request.urlopen(req, timeout=15) as r:
+                    obj = json.loads(r.read().decode("utf-8", "replace"))
+            except Exception:
+                continue
+            extract = (obj.get("extract") or "").strip()
+            title = (obj.get("title") or "").strip()
+            if not title or len(extract) < self.MIN_EXTRACT:
+                continue
+            url = (((obj.get("content_urls") or {}).get("desktop") or {}).get("page")
+                   or "https://en.wikipedia.org/wiki/"
+                   + urllib.parse.quote(title.replace(" ", "_")))
+            return {"title": title, "extract": extract, "url": url,
+                    "description": (obj.get("description") or "").strip()}
+        return {}
+
     def summary(self, title: str) -> str:
         """The REST page summary — a clean paragraph of actual encyclopedia, the thing
         a snippet only gestures at. Empty string on any failure; never raises."""
@@ -337,6 +373,15 @@ def set_backend(s: Searcher) -> None:
     _BACKEND = s
 
 
+def random_article() -> dict:
+    """One random encyclopedia article, or {}. Wikipedia only and deliberately: it is the
+    one backend here that needs no key, and 'random' is not a thing a search engine does."""
+    try:
+        return WikipediaSearcher().random_page()
+    except Exception:
+        return {}
+
+
 def search_web(query: str, n: int = 5) -> list:
     """THE HARNESS DOES THE SEARCHING. Returns [{title, url, snippet}].
 
@@ -344,6 +389,14 @@ def search_web(query: str, n: int = 5) -> list:
     Empty is empty. A dead API is not permission to invent."""
     q = (query or "").strip()
     if not q:
+        return []
+    # ANONYMOUS MODE (2026-08-24). A search query is the most legible summary of a
+    # private conversation there is, and it goes to a third party in plain text.
+    # Held. Returning [] rather than raising: an empty result is a shape every
+    # caller here already handles ("Empty is empty. A dead API is not permission to
+    # invent"), and the reason reaches her through the tool's own wording.
+    from harness.control import anon as _anon
+    if _anon.holds("net.search"):
         return []
     try:
         n = max(1, min(int(n), 10))

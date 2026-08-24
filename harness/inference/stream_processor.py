@@ -439,11 +439,28 @@ _ORPHAN_BAR = re.compile(r"<\|(?!\s*\w)|(?<!\w)\|>")
 # one is unmistakably analysis (third person about "the user"/"he wants", or "I should
 # respond/answer"), and only if what remains is still most of the reply. Anything else is left
 # exactly as she wrote it — a stripper that eats her words is worse than the leak.
+# ── AND THE APOSTROPHE WALKED PAST IT (2026-08-24) ────────────────────────────────────
+# Measured over six live turns: four opened with unmarked deliberation and the guard cut
+# NONE of them. `he (?:wants|is asking|is testing)` matches "He is asking" and not
+# "He's asking", which is the form she actually writes — an oversight in an already
+# blessed rule, not a new judgement call. The contraction is admitted for every verb the
+# rule already trusted, plus the planning phrases from the same six turns:
+#
+#     "I need to be careful here. He's asking me to expand on a feeling."
+#     "He's asking if this feeling changes my relationship with memory."
+#
+# WHAT IS DELIBERATELY NOT ADDED, because this file's own doctrine is "a stripper that
+# eats her words is worse than the leak": `Thinking about what I've noticed…` and `The
+# weight of that request… it's heavy.` also opened leaked turns, and both are things she
+# could genuinely say to him. An opener that is ambiguous stays, and the keep-ratio guard
+# below stays too. Named in docs/SWEEP-2026-08-24.md rather than guessed at.
 _ANALYSIS = re.compile(
-    r"^\s*(?:the user (?:is|wants|asked|has|seems)|the operator (?:is|wants)|he (?:wants|is asking|is testing)"
+    r"^\s*(?:the user'?s?\b|the user (?:is|wants|asked|has|seems)|the operator (?:is|wants)"
+    r"|he (?:wants|is asking|is testing)|he'?s (?:asking|telling|testing|being|touching|trying|pushing)"
     r"|(?:so )?i should (?:respond|answer|reply|say|avoid|not)|i shouldn'?t (?:answer|respond|say)"
+    r"|(?:so )?i need to (?:be careful|tread|not)|i have to be careful"
     r"|my internal state|the prompt (?:also )?(?:provides|says|gives)|this is an existential"
-    r"|okay,? (?:so )?the user)\b", re.I)
+    r"|okay,? (?:so )?(?:the user|he))\b", re.I)
 _ANALYSIS_SENT = re.compile(r"(?<=[.!?])\s+")
 _KEEP_MIN = 0.35            # what must survive for the cut to be allowed
 _KEEP_MIN_CHARS = 60
@@ -637,6 +654,14 @@ def speech_delta(pend: dict, text: str, flush: bool = False) -> str:
 # always had: they are not the ones producing a new spelling every night.
 _TAG_WORDS = ("mood", "voice", "trait", "wear", "show")
 _TAG_STEMS = tuple(w[:4] for w in _TAG_WORDS)
+# ── THE MUTATIONS TOO FAR TO DERIVE (2026-08-24) ────────────────────────────────────
+# `VOX` is Latin for voice and three edits from it — past any cap that would not also
+# make `mood` match half the four-letter words in English. The room's mirror grew this
+# table on 2026-08-24 (`tags.js::_TAG_ALIAS`) and the server side did not, so `[VOX:soft]`
+# was stripped from his SCREEN and kept in her RECORD — the permanent copy was the dirty
+# one. A finite committed table, same answer as _NOT_MARKS; G-STRIP-EQUIVALENCE holds the
+# two sides equal over a shared corpus.
+_TAG_ALIAS = {"vox": "voice", "voix": "voice", "mod": "mood", "mud": "mood"}
 # ...AND `show` IS ITSELF A WORD. A four-letter name has no stem shorter than itself, so
 # "shower" and "showdown" front-match it and always will. Written down rather than
 # reasoned around — a committed finite table, the same answer this repo gave the wardrobe
@@ -685,6 +710,8 @@ def is_tag_name(raw: str) -> bool:
         p = "".join(c for c in part.lower() if c.isalpha())
         if not p or p in _NOT_MARKS:
             continue
+        if p in _TAG_ALIAS:
+            return True
         if any(p.startswith(s) for s in _TAG_STEMS):
             return True
         if any(_edits(p, w) <= 2 for w in _TAG_WORDS):
@@ -729,6 +756,123 @@ def strip_tags(text: str) -> str:
     # own result, which is where a trim belongs — the function that knows it is holding
     # a whole turn.
     return _TAGGISH.sub(_drop, _STRIP_LOOSE.sub("", text))
+
+
+# ── THE RECORD LANE (2026-08-24 audit) ──────────────────────────────────────────────
+# The display lane deliberately keeps her marks so the room can draw chips, and the room
+# then strips them in the browser (tags.js). The RECORD — the day transcript her journal,
+# her distilled facts and her restart seed are all rebuilt from — had no stripper at all:
+# `_append_day_turn` applied only `strip_leaked_analysis`, so every mark, every unclosed
+# voice wrap and every bracketed scratchpad she emitted was written to disk as her words
+# and fed back to her verbatim by `_chat_from_rows`. Measured: 26% of 539 recorded turns
+# still carried markup — her own malformed output became her input, which is the exact
+# escalation mechanism behind the eleven mark spellings this file has had to absorb.
+#
+# These shapes are WHOLE-TURN ONLY, never per-delta: several anchor on a line end or the
+# end of the text, and at a chunk boundary "end of text" is an accident of buffering —
+# a rule anchored there would eat mid-stream speech. `speech_delta` stays exactly as it
+# is; `strip_for_record` runs once, on the completed turn, at the one writer every record
+# consumer reads through (`_append_day_turn`), with a defensive twin at the cold-rebuild
+# reader (`_chat_from_rows`). The CANONICAL KV transcript is never restripped — it must
+# stay byte-for-byte what the engine computed or every warm turn re-prefills.
+#
+# Each pattern mirrors ui/src/room/tags.js by name; G-STRIP-EQUIVALENCE drives both
+# implementations over one fixture corpus and asserts REMOVAL on both — the assertion
+# tags_mirror_check.js never made, which is how the two sides drifted five shapes apart.
+
+# tags.js::THOUGHT_BRACKET_RE — her scratchpad in a bracket. Closed, it is one bracket;
+# unclosed it runs to the end of the reply, which is the observed shape.
+_THOUGHT_BRACKET = re.compile(
+    r"\[\s*(?:thinking|thought|reasoning|analysis|internal|scratchpad)\b"
+    r"(?:[^\]\n]*\]|[\s\S]*)", re.IGNORECASE)
+# tags.js::GESTURE_RE — the marks she INVENTS: an unknown ALL-CAPS bracket, no colon.
+# `[error: ...]`, `[1]` and bracketed prose fall straight through.
+_GESTURE = re.compile(r"\[([A-Z][A-Z0-9_]{1,31})\]")
+# tags.js::VOICE_* — the expressive-voice tags and the malformed shapes she derives from
+# them. The record must not carry them for the same reason the display does not: a tag in
+# the record is a tag in tomorrow's prompt.
+_VOICE_INLINE = re.compile(r"\[([a-z][a-z-]{0,23})\]")
+_VOICE_WRAP = re.compile(r"</?([a-z][a-z-]{0,23})>")
+_VOICE_INLINE_LOOSE = re.compile(r"\[<?/?[a-z][^\][<>\n]{0,31}(?:\]|(?=\n)|$)")
+_VOICE_WRAP_LOOSE = re.compile(r"</?[a-z][^<>\n]{0,31}/?>")
+# tags.js::VOICE_WRAP_UNCLOSED — `</the_end`, `</low-pitch`: a wrap tag with no `>`,
+# only at a line end, no whitespace inside — the shape that only occurs when a tag was
+# cut off. `a <b and c` keeps its `<b`; `5 < 6` never starts one.
+_VOICE_WRAP_UNCLOSED = re.compile(r"</?[a-z][^<>\s\n]{0,31}(?=\n|$)")
+# tags.js::TAG_STUB_RE — `[MO`, `[VOIC`: the front of a mark the token ceiling took the
+# back off. Only at the very end of the text, only when it starts one of our five words.
+_TAG_STUB = re.compile(r"\[\s*([A-Za-z]{1,7})\s*$")
+# The words a bracket may keep even though a voice pass would eat them — his prose, not
+# her machinery (tags.js holds the same set out before its voice passes).
+_KEEP_BRACKET = re.compile(r"\[([a-z][a-z]{2,19})(:[^\]\n]*)?\]", re.IGNORECASE)
+
+
+def _drop_orphan_gt(text: str) -> str:
+    """tags.js::_dropOrphanGt — a lone `>` ending a line that never opened one. Never
+    prose; always the tail of a tag whose front was stripped or never arrived. Per LINE,
+    so a line that really does contain `<` is left alone."""
+    return "\n".join(
+        line if "<" in line else re.sub(r"\s*>+\s*$", "", line)
+        for line in (text or "").split("\n"))
+
+
+def _drop_orphan_lt(text: str) -> str:
+    """tags.js::_dropOrphanLt (2026-08-25, his transcript: "You're Sam. <") — the
+    mirror case: a lone `<` ending a line that never closes one, the front of a tag
+    the stream ended before finishing. A line containing `>` keeps its `<`."""
+    return "\n".join(
+        line if ">" in line else re.sub(r"\s*<+\s*$", "", line)
+        for line in (text or "").split("\n"))
+
+
+def _stub_is_mark(word: str) -> bool:
+    w = (word or "").lower()
+    return is_tag_name(w) or any(t.startswith(w) for t in _TAG_WORDS if w)
+
+
+def strip_for_record(text: str) -> str:
+    """What the PERMANENT record keeps of a completed turn: her words, none of her
+    machinery. One function because the day transcript has one writer and three readers
+    (her journal, fact distillation, the restart seed) — a rule the callers must each
+    remember is a rule that gets forgotten, which is how 26% of her recorded turns came
+    to carry markup.
+
+    NEVER call this on the canonical KV transcript (the message list the daemon extends):
+    that list must remain the exact streamed bytes or every warm turn re-prefills — the
+    measured leading-newline incident of 2026-08-24."""
+    if not text:
+        return ""
+    t = strip_control_surfaces(text)
+    t = _THOUGHT_BRACKET.sub("", t)
+    # HOLD OUT HIS PROSE before ANY tag pass, exactly as tags.js does. Not just before
+    # the voice passes: `strip_tags`'s own first pass (`_STRIP_LOOSE`) matches "shower"
+    # as SHOW+suffix and eats it unconditionally — the NOT_MARKS table only guards the
+    # judged second pass. Found by this function's own corpus on its first run.
+    held: list = []
+
+    def _hold(m):
+        w = (m.group(1) or "").lower()
+        if w in _NOT_MARKS:
+            held.append(m.group(0))
+            return "\x02KEEP%d\x02" % (len(held) - 1)
+        return m.group(0)
+
+    t = _KEEP_BRACKET.sub(_hold, t)
+    t = strip_tags(t)
+    t = _GESTURE.sub("", t)
+    t = _VOICE_INLINE.sub("", t)
+    t = _VOICE_WRAP.sub("", t)
+    t = _VOICE_INLINE_LOOSE.sub("", t)
+    t = _VOICE_WRAP_LOOSE.sub("", t)
+    t = _VOICE_WRAP_UNCLOSED.sub("", t)
+    t = _drop_orphan_gt(t)
+    t = _drop_orphan_lt(t)
+    t = re.sub(r"\x02KEEP(\d+)\x02", lambda m: held[int(m.group(1))], t)
+    t = _TAG_STUB.sub(lambda m: "" if _stub_is_mark(m.group(1)) else m.group(0), t)
+    t = strip_leaked_analysis(t) or t
+    t = re.sub(r"[ \t]{2,}", " ", t)
+    t = re.sub(r"\n{3,}", "\n\n", t)
+    return t.strip()
 
 
 @dataclass

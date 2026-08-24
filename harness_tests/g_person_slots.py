@@ -165,6 +165,30 @@ check("...and the veto side at the drop", "_speech.DROPPED, why, text" in io.ope
 check("a broken log costs her no turn",
       (SL.record("x", SL.SPOKE, "y", "z") is None))
 
+print("\n5. THE EVIDENCE WALK READS THROUGH THE SEAM (2026-08-25; audit C 2026-08-24)")
+# from_registry used to open SP_RECALL_REGISTRY with its own JSONL loop, so its
+# malformed-line policy could drift from every other reader's. It goes through
+# memory.all_rows(path) now — the audit-lane door — and keeps only the death filter
+# (`lifecycle`) for itself. Mutant: put the private `open(p, ...)` loop back in
+# from_registry and the source check goes red by name.
+_person_src = io.open(os.path.join(ROOT, "harness", "model", "person.py"),
+                      encoding="utf-8").read()
+check("from_registry consumes memory.all_rows", "all_rows(" in _person_src)
+check("...and keeps no private registry parser (no open()+json loop in the walk)",
+      "json.loads" not in _person_src, "a second JSONL parser is a second policy")
+# ...and behaviourally: a malformed line among good rows costs the walk nothing,
+# because the ONE parser (memory._load) owns that policy for every reader.
+reg3 = write("reg3.jsonl", [
+    {"text": "Sam is a patient teacher", "mem_class": "fact"},
+])
+with io.open(reg3, "a", encoding="utf-8") as f:
+    f.write("{ not json — the one parser owns this policy\n")
+    f.write(json.dumps({"text": "I drive a Subaru WRX", "mem_class": "fact"}) + "\n")
+m3 = PersonModel.from_registry(reg3)
+check("good rows on either side of a malformed line still arrive",
+      sum(len(d.claims) for d in m3.dims.values()) == 2,
+      {k: len(v.claims) for k, v in m3.dims.items()})
+
 shutil.rmtree(SB, ignore_errors=True)
 print("\nG-PERSON-SLOTS: %d pass, %d fail" % (PASS, FAIL))
 rdir = os.path.join(ROOT, "var", "sem", "receipts")

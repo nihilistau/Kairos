@@ -60,16 +60,20 @@ l5_tau = 0.30
 [agent]
 authority = "spine"
 prewarm = false                       # nothing to warm on a foreign endpoint
-tool_budget_s = 400
+# (`tool_budget_s` left 2026-08-24 — audit S3: serve.py never read it, so the value
+# was INERT and the real budget came from the tuning registry's agent.tool_budget_s
+# (400 s) the whole time. A profile key nothing reads is a promise the file cannot
+# keep — G-PROFILE-KEYS now holds every key in this directory to a reader.)
 spine_toolset = false
 spine_recall = true
 personality = true
 mcp_tools = true
 
 [decode]
-temperature = 0.6
-max_tokens = 768
-repetition_penalty = 1.3
+# (`temperature` / `max_tokens` / `repetition_penalty` left 2026-08-24 — audit S3:
+# serve.py maps none of them, so these read as this profile's dials and moved
+# NOTHING. The live decode defaults come from the tuning registry (var/tuning.json,
+# the settings panel) per turn. G-PROFILE-KEYS holds this section honest now.)
 no_repeat_ngram = 0
 eot_bias = 0.0                        # moot here (sp-only); kept so the schema matches
 

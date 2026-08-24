@@ -175,6 +175,10 @@ FACTS: Dict[str, ToolFacts] = {
 
     "web_search": ToolFacts("web", "world"),
     "web_fetch":  ToolFacts("web", "world"),
+    "read_something_new": ToolFacts("web", "world", arms="kairos.discover_tool",
+                          note="a random encyclopedia article — the only verb she has that "
+                               "takes no query, so it can put a subject in front of her she "
+                               "would never have asked for (G-DISCOVER)"),
     "my_research": ToolFacts("web", "read",
                              note="the ledger of what she actually looked up — not her memory of looking"),
 

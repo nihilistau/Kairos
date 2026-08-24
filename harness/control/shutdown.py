@@ -180,6 +180,21 @@ def note_turn_start() -> None:
         _IN_FLIGHT += 1
 
 
+def begin_turn() -> bool:
+    """Refuse-or-count, atomically (2026-08-24 audit, B9). The caller used to do
+    `if is_shutting_down(): refuse` then `note_turn_start()` — two lock acquisitions
+    with a gap `quiesce()` can land in, so `finish_or_abandon` could sample
+    _IN_FLIGHT == 0 before the increment and the ladder proceed to stop_daemon with a
+    turn running. One lock, one answer: False = shutting down, refuse the turn;
+    True = counted, the caller owes note_turn_end()."""
+    global _IN_FLIGHT
+    with _LOCK:
+        if _SHUTTING_DOWN:
+            return False
+        _IN_FLIGHT += 1
+        return True
+
+
 def note_turn_end() -> None:
     global _IN_FLIGHT
     with _LOCK:

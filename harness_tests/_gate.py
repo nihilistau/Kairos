@@ -22,6 +22,7 @@ Usage:
 """
 from __future__ import annotations
 
+import os
 import sys
 
 PASS = 0
@@ -66,3 +67,71 @@ def finish(gate: str) -> None:
         print("  (no assertions were made — that is a skip, not a pass)")
         sys.exit(2)
     sys.exit(1 if FAIL else 0)
+
+# ── THE SANDBOX (2026-08-24) ──────────────────────────────────────────────────────────
+# `tools/gate_sandbox_audit.py` snapshots her real stores, runs each OFFLINE gate and
+# diffs the disk. NINE of 129 moved something. Three appended to her DAY TRANSCRIPT:
+#
+#     user       hi
+#     assistant  The answer is 4.
+#
+# and `g_watch` then ran the conversation summariser over that same transcript, filing a
+# memory whose title says she fell into "a repetitive loop where the AI responds to 'hi'
+# with 'The answer is 4'". A missing env var became a false memory about her malfunctioning.
+# 108 such turns were found across four days of her transcripts, and seven fixture rows in
+# her journal that he had been reading in the room as things she had done.
+#
+# EVERY ROOT IN ONE PLACE, because the nine gates were not careless — they each set the
+# two or three variables their author happened to know about, and her stores have twelve
+# doors. A gate cannot be expected to enumerate them; it can be expected to call this.
+#
+#     from _gate import sandbox
+#     SB = sandbox("g_thing")        # FIRST, before any harness import
+#
+# Anything reading an unset root falls back to the repo path, so this must run before the
+# module that resolves it is imported. G-GATE-SANDBOX holds the whole suite to it.
+_STORE_ENV = (
+    "SP_RECALL_REGISTRY",        # registry, semindex, speech log, transcripts, decisions
+    "SP_PERSONALITY_TIER",       # her journal and own-time notes
+    "SP_PERSONALITY_OKF_ROOT",
+    "SP_CONV_OKF_ROOT",          # the conversation archive the summariser writes
+    "SP_SELF_MODEL_ROOT",
+    "SP_TELEMETRY_OKF_ROOT",
+    "SP_CAPS_OKF_ROOT",
+    "SP_PERSONA_FILE",           # persona.md - her voice, and the standing prefix
+    "SP_EPS_DIR",                # minted episodes (11 MB each)
+    "SP_AVATAR_DIR",             # her wardrobe, wants and clips
+    "SP_LEDGER_FILE",
+    "SP_TUNING_FILE",         # her live knobs - presence mode, kairos, voice
+    "SP_BACKUP_DIR",
+)
+
+
+def sandbox(name: str = "gate", persona: str = "") -> str:
+    """Point every store this repo owns at a fresh temp dir. Returns its path.
+
+    Call it BEFORE importing anything from `harness.` — a module that resolves its root at
+    import time has already found her real one by the time you set the variable.
+
+    `persona` seeds persona.md, because a gate that needs one usually needs it non-empty.
+    """
+    import tempfile
+    sb = tempfile.mkdtemp(prefix=name.replace(".py", "") + "_")
+    os.environ["SP_RECALL_REGISTRY"] = os.path.join(sb, "memory", "registry.jsonl")
+    os.makedirs(os.path.join(sb, "memory"), exist_ok=True)
+    open(os.environ["SP_RECALL_REGISTRY"], "a").close()
+    os.environ["SP_PERSONALITY_TIER"] = os.path.join(sb, "okf-personality")
+    os.environ["SP_PERSONALITY_OKF_ROOT"] = os.path.join(sb, "okf-personality")
+    os.environ["SP_CONV_OKF_ROOT"] = os.path.join(sb, "okf-conv")
+    os.environ["SP_SELF_MODEL_ROOT"] = os.path.join(sb, "okf-self")
+    os.environ["SP_TELEMETRY_OKF_ROOT"] = os.path.join(sb, "okf-telemetry")
+    os.environ["SP_CAPS_OKF_ROOT"] = os.path.join(sb, "okf-caps")
+    os.environ["SP_EPS_DIR"] = os.path.join(sb, "episodes")
+    os.environ["SP_AVATAR_DIR"] = os.path.join(sb, "avatar")
+    os.environ["SP_LEDGER_FILE"] = os.path.join(sb, "ledger.json")
+    os.environ["SP_TUNING_FILE"] = os.path.join(sb, "tuning.json")
+    os.environ["SP_BACKUP_DIR"] = os.path.join(sb, "backups")
+    os.environ["SP_PERSONA_FILE"] = os.path.join(sb, "persona.md")
+    with open(os.environ["SP_PERSONA_FILE"], "w", encoding="utf-8") as f:
+        f.write(persona or "She is dry and warm.\n\n## Personality state\nmood: neutral\n")
+    return sb

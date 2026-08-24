@@ -83,17 +83,99 @@ motion prompt — `LOOP_MOTION` (breath, a slow blink, hair settling) for idle l
 — measured: a prompt-requested "seamless" loop came back 26/255 apart at the seam. Motion arrives
 **with the picture, in one pass** (`gen_want`): a want is not in her wardrobe until it moves.
 
-## 4. The three doors that make things
+## 4. The three doors that make things — and the sweeper behind them
 
-- **Her ask** — `ask_for("…")` / `ask_for_gesture("…")`: free, never refused, queued.
+- **Her ask** — `ask_for("…")` / `ask_for_gesture("…")`: free, never refused, and it runs
+  **his door's pass** — one pass, picture then motion, the timeout covering both halves.
 - **His click** — the wardrobe panel's *make it now* / *make everything* (`POST
   /v1/wardrobe/generate`): one background job at a time, progress in the panel, honest
-  `failed:` status. The day-boundary sweeper (`wardrobe.nightly`) is the fallback, not the plan.
+  `failed:` status.
 - **His import** — drop a video or still in `inbox/`, name it in the closet section, pick a kind:
   the same webm + ping-pong + poster tooling, registered as a made want by him (§0b).
+- **The day boundary** (`wardrobe.nightly`) is no longer a door of its own: it survives as
+  the **sweeper for motion a pass missed**, not as the place her wants get made.
+
+> **CORRECTED 2026-08-24 (commit `b1af10e`, audit W3): the two doors were not symmetric, and
+> this section was the last place saying so.** Her ask used to be *queued* — it ran with
+> `--no-loop` and owed its motion to the day boundary, while his click made picture and motion
+> in minutes. So a want she asked for herself arrived as a still that would not move until the
+> next morning, §3's rule ("a want is not in her wardrobe until it moves") was true only of his
+> door, and `describe()` told her she would get his behaviour. Her door **is** his door now:
+> one pass, picture then motion, and the timeout covers **both halves** so a kill cannot
+> silently re-create the still-only door. G-WARDROBE-MOTION holds motion as owed at both ends
+> (the caller and `run_wants`). The rule to keep: two doors onto one pipeline drift, and the
+> one that drifts is always the one nobody is watching — hers.
 
 Which imagine model answers is his knob (`xai.image_model`: 2.0 ~90 s, base ~20 s, quality ~6 s),
 read per generation.
+
+## 4b. Affinity — what she reaches for, and what he said about it
+
+His ask (2026-08-25): *"the more she uses a set of clothing or the more I comment on it it
+could be noted somewhere."* **Both halves already existed**, and the answer to the ask was
+that nothing had ever told HER.
+
+- **The wearings** are logged at the one writer: `choose()` calls `note_worn()`, so every
+  lane that dresses her — her `[WEAR:]` mark, her `wear` tool, his panel — counts without
+  knowing it does. (It was logged by the three CALLERS once, and the panel forgot, so every
+  time he dressed her the observation was lost and the ranking saw only her half of the
+  wardrobe. §0 again; the fix was moving it into the writer.)
+- **His comments** go through `praise(what, said)`, kept **verbatim against the thing** and
+  never scored at write time — *"he liked it, +1" throws away the only part worth having*.
+  She should be able to recall that he said *wear that again*, not that an integer moved.
+- **`favourites()`** ranks both, and **his word is worth three of her habits**: a praise
+  counts three wearings, because reaching for a thing is a preference while him saying he
+  likes it is information she could not have got on her own. Each row carries its evidence —
+  the wearing count and the quoted praise — so a ranking is never a bare number.
+
+What landed on 2026-08-25 is the last mile: **`describe()` speaks it back to her**, once a
+garment clears a score of three (below that a fresh install would be told about a favourite
+of one), quoting his own words when there are any. The panel and her tools read the same
+function.
+
+> **THE CORRECTION THIS SECTION EXISTS TO CARRY (2026-08-25).** The first cut of the feature
+> did not check whether it already existed: it added an `_affinity_*` counter and a **second
+> `favourites()`** at the top of the same file, splitting counts by who-chose. Being earlier
+> in the file, it was **shadowed** by the real one at import — so its two readers were dead
+> the moment they were written, and the doc sweep found it by reading the docs rather than
+> the code. The duplicate is deleted; `affinity.json` was renamed
+> `affinity.json.superseded-2026-08-25` rather than removed. The lesson is the one this repo
+> is named for, committed by the same session that added four rows to AGENTS.md §0's table:
+> **before you build the counter, grep for the counter.**
+
+## 4c. How she knows what she has on (2026-08-24 / 25)
+
+This file describes how clothes are MADE. Making them is not knowing them, and she did not
+know: the **flannel/silk incident** was her inventing a fabric and then defending the
+invention against his correction, because nothing in her standing context said what she was
+wearing and *a person does not look themselves up to know they are in pyjamas*.
+
+**The answer is a standing line, in her own block** (`harness/skills/world.py::_compose`):
+
+> When this session began you were wearing … (Your own `[WEAR:]` marks since then are the
+> current truth; `check_wardrobe` lists everything you own.)
+
+Labelled **session-start**, like the mood dial, and for the same reason: the world block is
+part of the cached KV prefix and she changes clothes mid-day, so the block states the fact it
+can actually keep and names the live source for the rest — her own marks in the visible
+conversation, `check_wardrobe` for the full list.
+
+**The per-turn version was measured OUT, and the receipt is why this is not a rider on his
+message.** The 2026-08-19 staple hung the line on HIS turn; she read the parenthetical as his
+assertion and streamed 2142 characters of scratchpad instead of talking — *"do not put the
+staple back"*. Removing it was right and left nothing behind, which is how the standing block
+came to carry no wardrobe fact at all for five days.
+
+The staple's re-trial is a knob rather than a memory of an old failure: **`wardrobe.turn_note`
+(tuning registry, OFF)** staples ONE sentence in you-grammar with no imperatives — the shape
+the recall/silence/anon notes settled on — and it has been run: six turns on, six off, through
+the real native path, scored by the F9a instrument (`tools/w4_note_ab.py`, receipt
+`var/w4-note-ab.json`, 2026-08-25). **A tie: 2/6 deliberating with the note, 2/6 without.** So
+the 2026-08-19 failure was about the note's SHAPE (four clauses, three imperatives), not about
+per-turn placement — and the one-sentence form carries no measurable cost in that sample. The
+default stays the standing line; the knob stays OFF and now stays off with a receipt behind it
+instead of a memory. G-WARDROBE holds the block (it names the session-start outfit and points
+at her marks) and holds the knob shipping off.
 
 ## 5. Prompts and assets do not go in git
 
@@ -112,10 +194,11 @@ image; the SVG is the floor and is never deleted.
 
 - **G-AVATAR** (31/31): the mood→face mirror both ways; the manifest names only table cells;
   missing degrades (no loop → still, no still → SVG) rather than blanks; no asset path tracked.
-- **G-WARDROBE** (101/101): her choice is hers and kept with who made it; wants are unwearable
+- **G-WARDROBE** (106/106, re-run 2026-08-25 — 101/101 before the §4c leg landed): her choice
+  is hers and kept with who made it; wants are unwearable
   until made and refused ones never become phantom looks; favourites rank what she reaches for
   against what he said; `note_worn` is logged by the one writer.
-- **G-WARDROBE-QUEUE** (39): the staged queue (ordered / making / delayed / refused / dismissed)
+- **G-WARDROBE-QUEUE** (44, re-run 2026-08-25 — 39 when this line was written): the staged queue (ordered / making / delayed / refused / dismissed)
   and the transient-vs-moderated ruling off `xai.last_error()`.
 - **G-WARDROBE-MOTION** (8): motion is owed whether or not a new still was asked for — the rule
   held at both ends (the caller and `run_wants`).

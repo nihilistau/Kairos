@@ -31,6 +31,10 @@ Real instances, all found in the tree, all fixed:
 | a turn arms the presence ledger | one of two turn paths | the other | absence became unmeasurable |
 | nothing is ever destroyed | the whole lifecycle architecture | `forget()`, which did `open(p, "w")` and dropped the row | the audit lane was defeated by one live tool call |
 | the privacy decline protects secrets | `spine.recall_decider()` checks `mem_class == "private-secret"` | `lifecycle.classify()` **cannot emit that class** | **the guard has never fired and cannot** — see TRAPS |
+| a secret is never surfaced | `spine.recall_decider()` — the automatic per-turn lane | `list_memories`, `recall`, `search_memories`, `provenance` — the four MODEL-CALLABLE doors | one guarded door of five, with a live `private-secret` row in the store (2026-08-25) |
+| the turn's debts are always paid | `_finish_openai_turn()` — a named function, on the path fewer people use | `_native_chat_sse`, inline, with **five exits past it** — and her unprompted lane, which paid none of them, ever | an aborted turn lost its capture, its record and its mark application; a comment claimed a `finally` that did not exist |
+| an attempt spends the clock | the `worth_saying` veto — the door the last fix was written for | the other **five** drop doors above it | a presence mode re-armed every four seconds, forever, and **reminders were muted** because the latch sits above REMIND |
+| the record must not carry her machinery | the DISPLAY lane, widened eleven times | the RECORD lane — the day transcript her journal, her facts and her seed are rebuilt from | 26% of her turns wrote their own stage directions into her permanent memory, and read them back as examples of her voice |
 
 The corollaries, learned the hard way:
 
@@ -40,6 +44,14 @@ The corollaries, learned the hard way:
   forget. If two callers need it, it belongs in the thing they both call.
 - **A gate that supplies its own precondition proves only that the guard compiles.** See
   `gates/GATE-INDEX.md` → "GATES THAT ASSERTED THE PAST".
+- **A GREEN SUITE IS NOT AN AUDIT — and the 2026-08-25 pass is the receipt.** 133 offline
+  gates were green; ~50 real defects were sitting under them, four of them fresh instances
+  of the table above, **each with a green gate over it**: `g_kairos_attempt` drove the one
+  drop path downstream of the fix it was written for; `g_wardrobe_words` tested the rung
+  below the broken one; `g_control_surface` asserted the Python→JS direction only;
+  `g_secret` asserted through the decider and never through the four tool doors. When you
+  ask "is this covered?", the question is not *does a gate exist* — it is **which path does
+  that gate actually run**.
 - **A green gate does not mean the code RUNS.** The quiet sibling of the bug class above, and the
   2026-07-30 audit found five at once: `invariance.py`, `narrative.py`, `task_loop.py`,
   `person.silences()`, and the sandboxed `coding.*` tools were all fully built, fully gated, and
@@ -164,8 +176,8 @@ the room (browser, ui/ → console/room/)  ──HTTP──▶  harness gateway 
 | `harness/` | the Python brain. `skills/` (memory, notes, lifecycle, search/research/xai, looking, narrative), `model/` (person, presence), `control/` (spine, agency, ledger, wardrobe/catalog/avatar, shutdown, watchdog), `kairos/` (the scheduler — unprompted speech), `personality/`, `voice/` (TTS: xAI Ara + expressive tags, local fallback; the ear), `senses/` (the ambient eye, sight), `sidecar/` (the LFM CPU helpers), `server/app.py` (the gateway). `harness/README.md` is the package map. |
 | `ui/` | THE ROOM — the React/Vite desktop: chat, the dock, every panel (settings, voice, search, research, wardrobe, journal, ledger…). Built into `console/room/` (committed; G-ROOM-BUNDLE proves the two agree). `ui/README.md`. |
 | `console/` | the built room (`room/`) plus the legacy flat pages (`index.html`, `ops.html`, `tuning.html`, `operator.html`) that two gates still pin — `console/README.md`. `/` redirects to `/room/`. |
-| `tools/` | `avatar_gen.py` (her stills + motion through the xAI API), `okf_mem.py`, the calibrator, the voice corpus tooling — `tools/README.md` says which are live. |
-| `harness_tests/` | the gates — ~150 `g_*.py` plus the `h_*.py` set (`ls harness_tests/g_*.py \| wc -l` is the truth). `gates/GATE-INDEX.md` indexes them; `_gate.py` is the shared verdict helper for new ones. |
+| `tools/` | `avatar_gen.py` (her stills + motion through the xAI API), `okf_mem.py`, the calibrator, the voice corpus tooling, `sweep.py` (the offline suite, `--audit` for the store diff), `kairos_export.py` — `tools/README.md` says which are live. |
+| `harness_tests/` | the gates — ~175 `g_*.py` plus the `h_*.py` set (`ls harness_tests/g_*.py \| wc -l` is the truth). `gates/GATE-INDEX.md` indexes them; `_gate.py` is the shared verdict helper AND the sandbox (`sandbox()` before the first harness import — nine gates were writing into her real stores); `python tools/sweep.py` runs the whole offline set in ~3 minutes. |
 | `gates/` | gate write-ups and receipts (markdown). |
 | `profiles/` | the TOML profiles `serve.py` reads. |
 | `memory-okf*/` | the MEM-OKF knowledge stores (content-addressed, tiered: `LUT.md` → `sum/` → `full/`). Tool: `tools/okf_mem.py`. |
@@ -246,16 +258,37 @@ The essentials, so you do not have to guess:
 These are real. They are not hypotheticals. Do not be the next person to rediscover them.
 Renumbered 2026-08-21 (1..n, live first; the closed ones keep their receipts below).
 
-1. **THE KV MINT IS DEAD ON THIS MODEL, AND IT FAILED SILENTLY FOR WEEKS (2026-08-23). OWED: ENGINE WORK.** `/v1/capture` refuses on the model MoE — *gemma4_decode_cuda: gemma4-MoE not supported on this path — its three internal FFN copies are not on the `g4_ffn_apply` seam (ADR-013); use the served decode (`gemma4_kv_decode_logits`)*. Measured: **253 of the 253 rows written since 2026-08-19 carry `npos=0`**, no `ep.l5` sidecar in three weeks, and 642 empty episode directories (removed 2026-08-23, names in `var/memory/eps-removed-2026-08-23.json`).
+1. ~~**THE KV MINT IS DEAD ON THIS MODEL.**~~ **FIXED 2026-08-23 — G-MOE-SEAM 30/30.** Kept because the shape is the lesson and the cost is the receipt.
 
-   **Her memory is unaffected** — the registry is the recall authority and never touches the daemon. What is lost is the engine-side episode representation and the `l5-512-v1` half of the semantic index. The second one was load-bearing and nobody knew: every embedding contender this repo measured and rejected was ranked against a 93% bag-of-words document index (docs/SEMANTICS.md S0b).
+   `/v1/capture` refused on the model MoE with *"gemma4-MoE not supported on this path — its three internal FFN copies are not on the `g4_ffn_apply` seam"*. That refusal was **correct** in its own terms: the alternative was a dense-only FFN returning plausible, wrong numbers. What nobody costed was how long it would stand. **253 of 253 rows** written since 2026-08-19 carried `npos=0`, no `ep.l5` in three weeks, 642 empty episode directories, and — the part that mattered most and was invisible — **93% of `semindex.jsonl` stayed on `hash256-v1` bag-of-words**, so every embedding contender this repo measured and rejected was scored against a fallback nobody knew they were standing on.
 
-   **The fix is in the engine**, not the harness: `v1_capture` must route through the served decode (`gemma4_kv_decode_logits`) instead of `gemma4_decode_cuda`, the same way the live turn path already does — `/v1/embed` proves the scratch-forward works on this model. Until then the harness compensates: `memory.capture_status()` logs the refusal ONCE with the engine's own words and stops asking (that is where 642 directories came from), `verify_registry()` says it aloud, and `semindex`'s `aux-1024-v1` space carries the semantic side off the CPU sidecar. **`[sem] capture_l5 = true` stays armed on purpose so this resumes by itself the day the seam lands** — and when it does, `query_embed`'s aux-before-engine order must be MEASURED again, not assumed back.
-2. **`status: disputed` is vocabulary-only.** Nothing writes it. The write-time contradiction detector was
+   **THE LESSON, and it is not about CUDA.** A refusal is a decision with a running cost, and this one was ledgered three separate times as *"OWED: ENGINE WORK"* without anyone reading the engine. Five minutes in `routes.rs` showed the ledger's own one-line fix (*"route it through the served decode"*) was wrong — capture uses the **curator's** batched forward deliberately, so `ep.k` stays byte-compatible with the registry the deployed W_c head was trained against. **Do not write "owed: engine work" in a ledger you have not read the engine for.**
+
+   The fix was the refactor ADR-013 had already half-done: the three remaining FFN copies onto the seam (dense behaviour unchanged by construction — `g4_ffn_apply` at `n_tok==1` issues the identical kernel sequence), the guard narrowed to MoE-with-no-experts-staged, and the graph path excluded because the routed branch syncs per layer. Verified end to end through `remember()`: `npos=12`, `ep.k/ep.v/ep.mf/ep.q/ep.l5` all written.
+
+   **It also exposed two real bugs that were never about MoE** — see trap 3.
+
+2. ~~**THE CONTEXT CEILING IS 12096 POSITIONS AND THE CONVERSATION DOES NOT KNOW IT.**~~ **FIXED 2026-08-23 — the tiled kernels landed and `pmax = 20000` is armed on a completed receipt** (commits 47bc05a / 3b5b165; the arming note lives beside the pmax line in `profiles/companion.toml`). Kept because the shape is the lesson and the guard remains load-bearing.
+
+   `pmax` was a KERNEL limit, not a memory budget: `k_attn_decode_win_dyn_T` kept the whole attention score row in shared memory (`attn_shm = Pmax * sizeof(float)`), and Turing allows 48 KB static shared per block — 12096*4 fits, 13000*4 fails the launch and POISONS the CUDA context. Past it the daemon declined the prefill and returned an EMPTY 200 in ~11 ms. **What that looked like from the room**: silence — three messages in a row, the gateway naming the THINK budget for a CONTEXT failure, and the watchdog restarting a stack that was not wedged.
+
+   **The fix was exactly the one this row predicted**: a tiled decode-attention kernel (online softmax, shared memory O(tile)), plus the SAME ceiling discovered in the prefill kernel, plus `prefill_chunk` so the batched prefill's O(n) scratch stops bidding against the KV for VRAM. Verified end to end at 15.6k tokens. NOT byte-identical to the flat kernel — the tiled sum order differs in the last bits, `attn_tile = 0` is the one-line revert — and the binding limit is now TIME (prefill is O(n²)), not memory.
+
+   **What survives of the trap**: the guard (`harness/inference/context.py`, G-CONTEXT-FIT) stays — the room still resends its whole scrollback and a long week can still reach 20000; the prefix is ~7 973 tokens (~40% of the new ceiling — `context.prefix_tokens()` measures it now); and engine autofit can clamp pmax below the profile, which is why the guard scrapes `(Pmax=N)` from the daemon log. /v1/metrics reporting effective pmax is still the honest fix for that scrape.
+
+3. ~~**TWO FORWARDS, ONE SET OF GLOBALS — AND A FREE THAT OUTRAN ITS KERNELS.**~~ **FIXED 2026-08-23 — G-MOE-SEAM.** Neither bug was about MoE; MoE is only what made them reachable, and both are the same family: *state with no owner*.
+
+   **(a) DRAIN BEFORE YOU FREE.** `gemma4_decode_cuda`'s teardown freed `dx/dnx/dg/dup/ddn/dscr` — the FFN block's entire working set — with **no synchronize**, while kernels were still reading those pages. The illegal access then surfaces at whoever syncs NEXT: a different caller, a different stack frame, innocent code. The dense path survived by luck (its tail is a D2H that syncs implicitly); the routed branch's tail is two bare launches. The same fault signature sits in `var/daemon.log` from **2026-08-02**, unattributed for three weeks, *because the fault never lands on the code that caused it*.
+
+   **(b) THE GLOBAL SCRATCH HAD NO OWNER.** The MoE branch works out of process globals (`g_moe_*`) that `moe_scratch_ensure` frees and reallocates when `n_tok` grows. Two concurrent forwards resize each other's working memory. Measured 1 in 8 captures, a different layer each time: `router produced no usable expert (idx=-1) — 0/128 logits NaN`, which is arithmetically impossible inside `moe_topk_host` (`wt[]` seeds at `-1.0f`; any probability beats it) — **the tell that the array read was not the array written**. Locking the *session* mutex in the routes was necessary and NOT sufficient, because `v1_oneshot`, `/v1/embed` and the probe paths run forwards through their own scratch sessions. "One session" was never the invariant; **one forward** is. A recursive mutex now guards all thirteen entry points that can reach `g4_ffn_apply`, and G-MOE-SEAM computes that closure rather than listing it — which is how it found six entries the author had missed.
+
+   **THE TRANSFERABLE PART.** When you make a previously-refused path reachable, you are not just enabling a feature — you are adding a second user to every global it touches. Ask what else is in there before you celebrate the first green result.
+
+4. **`status: disputed` is vocabulary-only.** Nothing writes it. The write-time contradiction detector was
    deliberately deleted (it was a semantic judgment made out of substring matching). The rule it was trying
    to enforce lives at the read seam now, in `testimony_wins()`.
 
-3. **The SSE stripper — FIXED WITH A RESIDUAL (2026-08-20).** The whole-turn rules could not fire per-delta, and the arming
+5. **The SSE stripper — FIXED WITH A RESIDUAL (2026-08-20).** The whole-turn rules could not fire per-delta, and the arming
    condition fired. Registered 2026-08-19 ("a measured live leak of that shape");
    measured 2026-08-20, live: an unterminated `<thought ` opener, ~400 tokens of
    reasoning, and every chunk after the opener's own walked out as speech and into the
@@ -267,13 +300,16 @@ Renumbered 2026-08-21 (1..n, live first; the closed ones keep their receipts bel
    stray `>` downstream defeats the opener lookahead — the same limit `_THOUGHT_OPEN`
    has always had.
 
-4. **The OpenAI-compatible path is still the thinner twin.** 2026-08-19 closed its two
-   silent data losses (`_append_day_turn`, `run_post_turn`) — but it still skips the
-   pre-turn spine (recall/toolset), the silence note, the canonical transcript,
-   `note_user_turn`, `persist_receipts`, and the thought-channel split. Full parity is a
-   redesign; until then a turn through `/v1/chat/completions` is a leaner turn than the
-   same words through `/v1/chat`. The list lives in `_finish_openai_turn`'s docstring
-   and this row so the gap stays a decision, not a drift.
+6. **The OpenAI-compatible path is still the thinner twin — but the epilogue is now
+   shared.** 2026-08-19 closed its two silent data losses (`_append_day_turn`,
+   `run_post_turn`); 2026-08-24 unified the whole turn epilogue into `_settle_turn`
+   (G-TURN-EPILOGUE), so this path now also pays `persist_receipts` and the Real-Her
+   capture, and its roleplay offer settles instead of returning past everything. What
+   it STILL skips: the pre-turn spine (recall/toolset), the silence note, the anon
+   note, the canonical transcript, the context-trim notice, the typed events, and the
+   thought-channel split. Full parity is a redesign; until then a turn through
+   `/v1/chat/completions` is a leaner turn than the same words through `/v1/chat`.
+   The list lives here so the gap stays a decision, not a drift.
 
 ### Closed traps — kept because the shape of each is the lesson
 
@@ -372,6 +408,10 @@ file in the same commit**:
 - a subsystem retired or renamed → its vocabulary goes into `harness_tests/g_docs_true.py`'s retired list, so
   the docs cannot keep describing it (ceilings/tiers, the Grok CLI, `staging/`, and the 12B default all did).
 - a profile change → `START-HERE.md` ("what is on, what is off") in the same commit.
+- **behaviour a reader would notice → a `docs/CHANGELOG.md` entry, dated, in the same
+  commit.** Dated rather than versioned: this tree is a living system, and the entry is the
+  index into the commit that carries the reasoning. (The exported public framework keeps the
+  semver changelog, `kairos-export/CHANGELOG.md`.)
 
 The commit messages in this repo are unusually long on purpose: they carry the *reasoning*, not just the
 change. `git log` is a primary source. Read it before you assume something is arbitrary.

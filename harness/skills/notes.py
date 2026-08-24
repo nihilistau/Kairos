@@ -81,6 +81,14 @@ def _write_all(rows: list[dict]) -> None:
     p = _store()
     os.makedirs(os.path.dirname(p), exist_ok=True)
     with _NOTE_LOCK:
+        # A stranded .tmp is evidence, not litter (2026-08-25; the H4 fix memory._save_all
+        # got on 2026-08-24, applied to the OTHER tmp+replace writer the same comment
+        # already named — one implementation, both lanes, or the doctrine holds in
+        # neither). A crash between the write below and os.replace leaves a complete
+        # candidate store beside this one; open(tmp, "w") would silently overwrite it.
+        # Quarantined aside, once per path per process, never deleted, never restored.
+        from harness.skills.memory import rescue_stray_tmp
+        rescue_stray_tmp(p)
         tmp = p + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             for r in rows:

@@ -38,6 +38,7 @@ Not "the queue works". Two things that matter:
 
     python harness_tests/g_capture_async.py       (offline: no GPU, no daemon)
 """
+import io
 import os
 import socket
 import sys
@@ -163,6 +164,82 @@ os.environ["SP_CAPTURE_ASYNC"] = "0"
 check("the async switch is read from the env, not hardcoded", not M._mint_is_async())
 os.environ["SP_CAPTURE_ASYNC"] = "1"
 check("...and back on", M._mint_is_async())
+
+# ── 5. THE DISK FLOOR — the mint yields before the registry write does ───────────────
+# Added 2026-08-23, the day /v1/capture came back on the model (G-MOE-SEAM). An episode is
+# ep.k + ep.v at full depth per position: MEASURED over her 51 real ones, mean 11.1 MB and
+# max 79.1 MB. The drive was already at 930 of 932 GB, so turning the mint back on without
+# a floor spends the last 2.5 GB in about 231 memories.
+#
+# A FULL DISK IS NOT A MEMORY PROBLEM, it is an everything problem — and the registry write
+# is the one that would actually lose something of hers. So the mint yields first: the row
+# still lands, with npos=0, and recall is text + semantic. Same degradation as "no engine,
+# no mint", reached by a different road.
+print("\n5. the disk floor stops the mint before it stops the registry")
+M._CAPTURE_REFUSED.update(why="", at=0.0, n=0)
+_was = os.environ.get("SP_CAPTURE_MIN_FREE_GB")
+try:
+    # BEHAVIOURAL, both directions. The first cut of this guard called a `logger` this
+    # module does not have; the NameError was swallowed by its own except, execution fell
+    # through and the mint ran anyway — measured npos=12 with the floor set to 9000 GB. A
+    # guard whose failure mode is "no guard" reads like protection and is not. So the test
+    # is that an impossible floor REFUSES, not that the code contains a floor.
+    os.environ["SP_CAPTURE_MIN_FREE_GB"] = "9000000"
+    npos, ok = M._mint_now("http://127.0.0.1:9", "a fact nobody should mint",
+                           os.path.join(os.path.dirname(_reg), "eps", "ep_floor_probe"))
+    check("an impossible floor REFUSES the mint", (npos, ok) == (0, False), (npos, ok))
+    why = M.capture_status().get("why", "")
+    check("...and says which floor, with the free space, in its own words",
+          "disk floor" in why and "GB free" in why, why[:70])
+    # >= 1, not == 1: the async worker from section 3 may still be draining and each of
+    # its facts hits the now-armed breaker and counts. The CLAIM is that the refusal was
+    # recorded on the same counter a structural refusal uses, not that nothing else ran.
+    check("...and it is the SAME breaker a structural refusal uses (recorded, not retried)",
+          M.capture_status().get("n", 0) >= 1, M.capture_status().get("n"))
+    check("...and no episode directory was created for a mint that never ran",
+          not os.path.isdir(os.path.join(os.path.dirname(_reg), "eps", "ep_floor_probe")))
+finally:
+    M._CAPTURE_REFUSED.update(why="", at=0.0, n=0)
+    if _was is None:
+        os.environ.pop("SP_CAPTURE_MIN_FREE_GB", None)
+    else:
+        os.environ["SP_CAPTURE_MIN_FREE_GB"] = _was
+# ── 6. WHERE EPISODES LIVE IS A KNOB, AND MOVING IT ORPHANS NOTHING ──────────────────
+# Added 2026-08-23 with the backfill. An episode is 11.1 MB, write-once, read only on a
+# deep recall — so it belongs off the working drive, and this box had 32 GB of Optane
+# sitting empty. The row carries its own ABSOLUTE `dir`, which is what makes the root
+# safe to move: everything already written stays exactly where it is and is still found.
+print("\n6. the episode root is a knob, and old rows keep their own dir")
+_wasd = os.environ.get("SP_EPS_DIR")
+try:
+    os.environ.pop("SP_EPS_DIR", None)
+    default_root = M.eps_root()
+    check("with nothing set, episodes live beside the registry",
+          default_root.endswith("/eps") and os.path.dirname(_reg).replace(chr(92), "/") in default_root,
+          default_root)
+    os.environ["SP_EPS_DIR"] = "F:/somewhere-else"
+    check("the override is taken, and normalised to forward slashes",
+          M.eps_root() == "F:/somewhere-else", M.eps_root())
+    os.environ["SP_EPS_DIR"] = "F:/trailing/"
+    check("...a trailing separator does not become a double slash later",
+          M.eps_root() == "F:/trailing", M.eps_root())
+    os.environ["SP_EPS_DIR"] = "   "
+    check("blank is not a path — it means 'beside the registry'",
+          M.eps_root() == default_root, M.eps_root())
+finally:
+    if _wasd is None:
+        os.environ.pop("SP_EPS_DIR", None)
+    else:
+        os.environ["SP_EPS_DIR"] = _wasd
+check("the episode root is mapped through the one door too",
+      "SP_EPS_DIR" in io.open(
+          os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       "serve.py"), encoding="utf-8", errors="replace").read())
+
+check("the floor is mapped through the one door (a knob not in serve.py does not exist)",
+      "SP_CAPTURE_MIN_FREE_GB" in io.open(
+          os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       "serve.py"), encoding="utf-8", errors="replace").read())
 
 for c in _held:
     try:

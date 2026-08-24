@@ -6,6 +6,7 @@
   --ink: #c8d6e5; --muted: #5d7086;
   --cyan: #46d9e6; --cyan-dim: #1d5a63; --gold: #e8b64c;
   --ok: #4ad98a; --off: #4a5568; --err: #e2685b;
+  --an: #a78bfa;   /* off the record — its own colour, never the error red */
   --read: #4ad98a; --write: #e8b64c; --world: #46d9e6;
   --machine: #e2685b; --private: #c96ce0;
 }
@@ -977,6 +978,21 @@ body.resizing, body.resizing * { user-select: none !important; cursor: inherit; 
 .act-tool    { color: var(--cyan); background: #46d9e60f; border-color: #46d9e630; }
 .act-look    { color: var(--world); background: #46d9e60f; border-color: #46d9e630; }
 .act-persona { color: var(--private); background: #c96ce00f; border-color: #c96ce030; }
+/* A NOTE ABOUT THE MACHINE, not about her (the context trim). --gold and not --machine
+   (the red): this is not an error, it is a loss he is entitled to know about. It wraps,
+   because unlike every other chip its whole point is the sentence, not the label. */
+.act-notice  { color: var(--gold); background: #e8b64c0f; border-color: #e8b64c30; }
+.act-notice .act-out { white-space: normal; }
+/* what she remembered into the turn (audit D8, 2026-08-24) */
+.act-recall  { color: #9ecbff; background: #4c9be80f; border-color: #4c9be830; }
+/* her thinking, folded (audit R2, 2026-08-24) — quiet by design: it is hers, he
+   opens it when he wants her workings. */
+.thinking { margin: 2px 0 4px; font-size: 12px; }
+.thinking summary { cursor: pointer; opacity: .55; user-select: none; }
+.thinking summary:hover { opacity: .85; }
+.thinking-body { white-space: pre-wrap; opacity: .7; font-style: italic;
+                 border-left: 2px solid #ffffff22; padding: 4px 0 4px 10px;
+                 margin-top: 4px; }
 
 /* ── THE BOARD, WITH HANDS ─────────────────────────────────────────────────────
    It was read-only: /v1/notes/{add,update,remove} were all implemented and reachable
@@ -1303,3 +1319,49 @@ body.resizing, body.resizing * { user-select: none !important; cursor: inherit; 
 .dec-actions input { flex: 1; min-width: 120px; }
 .dec-choice { font-size: 9px; padding: 0 6px; border-radius: 99px; color: var(--cyan); }
 .dec-done { opacity: .55; }
+
+/* ── OFF THE RECORD (2026-08-23, his ask) ─────────────────────────────────────────
+   The switch is drawn three times — dock button, taskbar chip, and a violet rule
+   around the whole room — because the failure mode of a private mode is forgetting
+   which way it is set, in EITHER direction. See ui/src/room/Anon.jsx.
+
+   VIOLET, and not red. Red in this room means error or stop (the shutdown button, the
+   dead LED, the kill option); anonymous mode is neither. It is a deliberate state he
+   chose and it is working correctly while it is on, so it gets its own colour rather
+   than borrowing the one that means something went wrong. */
+.an-wrap { padding: 6px 4px 0; }
+.an-btn { background: transparent; border: 1px solid transparent; color: var(--off);
+  width: 100%; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 0; border-radius: 6px; cursor: pointer; }
+.an-btn:hover:not(:disabled) { color: var(--an); border-color: #a78bfa40;
+  background: #a78bfa0f; }
+.an-btn:disabled { opacity: .5; cursor: default; }
+.an-btn.on { color: var(--an); border-color: #a78bfa66; background: #a78bfa14; }
+.an-btn.on .dock-lb { color: var(--an); }
+.an-receipt { margin: 4px 2px 0; padding: 5px 6px; border-radius: 5px; font-size: 9.5px;
+  line-height: 1.35; color: var(--es-dim); background: #a78bfa0d;
+  border: 1px solid #a78bfa2e; cursor: pointer; }
+
+/* THE CHIP — same furniture as the scene chip, deliberately: a mode that changes what
+   survives the evening belongs in the same row, and read the same way, as one that
+   changes who she is. */
+.an-chip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px;
+  border-radius: 999px; font-size: 10.5px; flex-shrink: 0;
+  color: var(--an); background: rgba(167,139,250,.10);
+  border: 1px solid rgba(167,139,250,.34); }
+.an-chip b { font-size: 9px; letter-spacing: .12em; text-transform: uppercase;
+  opacity: .85; }
+.an-held { color: var(--es-dim); }
+
+/* THE ROOM ITSELF. An inset rule rather than a banner: it is present in peripheral
+   vision on every frame and costs no layout, so it cannot be scrolled past, covered by
+   a window, or mistaken for one more chip in a row of chips. */
+.room.an-on::after { content: ""; position: fixed; inset: 0; pointer-events: none;
+  z-index: 60; border: 1px solid rgba(167,139,250,.42);
+  box-shadow: inset 0 0 44px rgba(167,139,250,.10); }
+
+/* SHE CHANGED HER CLOTHES (2026-08-24). The same hue the [WEAR:] mark's chip uses in
+   Chat.jsx (h 288), because a tool-driven change and a mark-driven change are the same
+   event and must not read as two different things. */
+.act-wear { color: #d8a7ea; background: rgba(216,167,234,.10);
+  border-color: rgba(216,167,234,.34); }

@@ -87,7 +87,13 @@ from harness.kairos.impulse import (SOLO_ACT_TABLE, SOLO_ACTS,  # noqa: E402
 print("1. EVERY ACT DECLARES WHAT IT REQUIRES")
 check("the table and the legacy tuple are the same acts",
       tuple(a for a, _ in SOLO_ACT_TABLE) == SOLO_ACTS, len(SOLO_ACTS))
-check("there are still eight, so the rotation is unchanged", len(SOLO_ACTS) == 8)
+# NINE SINCE 2026-08-23. It was eight, and this line said "unchanged" — which is the
+# right shape of assertion (the rotation is a fixed table, not a thing that drifts)
+# with a number that has to move when a real act is added. `read_something_new`
+# (G-DISCOVER) is the ninth: the only act that can put a subject in front of her she
+# would never have asked for. Every OTHER claim in this section is unchanged, which is
+# what makes the addition safe rather than a rewrite of what her own time is.
+check("there are nine, and the table is the whole rotation", len(SOLO_ACTS) == 9)
 named, free = 0, 0
 for i, (act, needs) in enumerate(SOLO_ACT_TABLE):
     if needs:
@@ -105,7 +111,9 @@ for i, (act, needs) in enumerate(SOLO_ACT_TABLE):
 # own-time turns were 'I read my journal', because that option needed no tool AND COULD NOT
 # FAIL." An ungated act is the one the rotation collapses onto. It names `read_journal` now
 # and is gated with the rest.
-check("seven acts require a tool", named == 7, named)
+# EIGHT SINCE 2026-08-23 — the ninth act (read_something_new) declares its tool like
+# the rest, precisely because an ungated act is the one the rotation collapses onto.
+check("eight acts require a tool", named == 8, named)
 # ONE STAYS FREE, and it has to. "Follow one thought as far as it will go, with nothing to
 # show for it" is a real way to spend an hour; demanding a receipt for it would turn her
 # own time into a chore list, which is the opposite of what it is for.
@@ -157,7 +165,11 @@ check("...and silence is offered as a real answer",
 print("\n4. THE SCHEDULER ASKS ONCE MORE, THEN REFUSES")
 sch = io.open(os.path.join(ROOT, "harness", "kairos", "scheduler.py"),
               encoding="utf-8", errors="replace").read()
-check("it rules with solo_did_the_thing", "solo_did_the_thing(_STATE[session].solo_n" in sch)
+# AMENDED 2026-08-24 (audit K2): the ruling reads the EFFECTIVE act — the rotation
+# unless the discover dial overrode it — so a discovery turn is judged against the
+# act she was handed rather than convicted of skipping one she never owed.
+check("it rules with solo_did_the_thing, on the effective act",
+      "solo_did_the_thing(_n_act" in sch)
 check("...on the tools she actually called", "generate(nudge, called)" in sch)
 check("...re-asks exactly once, naming the tool",
       "asking once more" in sch and "CALL %s FIRST" in sch)

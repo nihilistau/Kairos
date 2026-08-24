@@ -114,6 +114,14 @@ def ask(title: str, body: str = "", options=None, kind: str = "once",
     title = (title or "").strip()
     if not title:
         return {"ok": False, "error": "a decision needs a title"}
+    # ANONYMOUS MODE (2026-08-23). A card carries a title and a body describing what came
+    # up, which is a summary of the conversation filed under a different name. Guarded on
+    # ask() and NOT on _append: decide() appends too, and holding HIS answer would be the
+    # mode reaching past the record and into the room. Same rule as the wardrobe want —
+    # the door that CREATES is held, the door that answers is not.
+    from harness.control import anon as _anon
+    if _anon.holds("decisions.card"):
+        return {"ok": False, "error": _anon.WHY}
     if kind not in KINDS:
         return {"ok": False, "error": "kind must be one of %s" % (KINDS,)}
     ident = (id or "").strip() or uuid.uuid4().hex[:12]

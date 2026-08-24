@@ -71,7 +71,27 @@ MODEL_AUX = "aux-1024-v1"
 # several. The QUERY side (query_embed) must land in whichever space the DOCUMENTS are
 # actually in, or every cosine is 0 — same-space-only is the one rule this file has. On
 # this model that is the aux space, and query_embed says why in full.
-KNOWN_MODELS = (MODEL_HASH, MODEL_AUX, MODEL_L5)
+# ── PRECEDENCE IS MEASURED, NOT CHRONOLOGICAL (2026-08-23) ────────────────────────────
+# load() keeps ONE row per (addr, ts) and later-in-this-tuple wins. That made it a ranking
+# of embedding quality by accident of when each space was added, and on 2026-08-23 the
+# accident bit: the episode backfill gave 259 of her 274 live rows an l5 vector, l5
+# outranked aux by tuple position, and her document index silently swapped spaces.
+#
+# MEASURED on the frozen 50-fact / 160-query scoreboard, same corpus for all three:
+#     l5-512-v1     seam_recall_at_1 0.10     (harness_tests/sem_rank_score.py --keep-index)
+#     lexical floor                  0.46     (fixtures/sem/baseline-receipt.json)
+#     aux-1024-v1                    0.53     (fixtures/sem/aux-receipt.json)
+#
+# l5's cosines LOOK healthy on true pairs (0.73-0.80) and it still ranks at 0.10, because
+# a space that scores everything similar to everything discriminates nothing. So aux wins,
+# and the tuple now says so out loud.
+#
+# This also makes load() agree with query_embed(), which already put aux first and whose
+# comment asked for exactly this: "If capture is ever fixed, measure again and revisit
+# this order." Capture was fixed this morning; this is the revisit. A query is embedded in
+# aux space, so aux documents are what it can match — hiding them behind a better-numbered
+# tag was the whole regression.
+KNOWN_MODELS = (MODEL_HASH, MODEL_L5, MODEL_AUX)
 _HASH_DIM = 256
 _L5_DIM = 512
 _AUX_DIM = 1024

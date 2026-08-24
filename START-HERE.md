@@ -2,7 +2,7 @@
 type: map
 title: "START-HERE — what Kairos is today, in two minutes"
 status: LIVE — update with every profile change (the doc-truth gate reads it)
-updated: 2026-08-21
+updated: 2026-08-25
 ---
 
 # START-HERE — what Kairos is today
@@ -42,16 +42,19 @@ not optional**: `agent` is the smaller 12B profile, still runnable, not her.
 
 Every knob that ships off has a row with the evidence that would arm it in
 [`docs/OFF-BY-DEFAULT.md`](docs/OFF-BY-DEFAULT.md) — it is a live ledger, and
-`harness_tests/g_offledger.py` holds it to the profile. Live today (2026-08-21): kairos (all
-reasons), the xAI voice / images / live search, the ambient eye with its quiet guard, the LFM
-sidecars, wardrobe generate-now. Off: byte-exact mode, the speculative drafter, the daemon's own
-memory writers (refused at boot), the research tier for HER unprompted use, games, voice clone
-(region-locked).
+`harness_tests/g_offledger.py` holds it to the profile. Live today (2026-08-25): kairos (all
+reasons) and the presence modes, the xAI voice / images / live search, the ambient eye with its
+quiet guard, the LFM sidecars, wardrobe generate-now (picture *and* motion in one pass), the
+semantic rank at the recall seam, and the KV reseam. Off: byte-exact mode, the speculative
+drafter, the daemon's own memory writers (refused at boot), the research tier for HER unprompted
+use, games and poker, her music deck (parked 2026-08-25 — unused tools still spend context),
+voice clone (region-locked).
 
 ## The gates
 
 `gates/GATE-INDEX.md` indexes every executable gate in `harness_tests/` — OFFLINE (no GPU),
-LIVE (the stack up), and their run command. The minimum bar after touching memory:
+LIVE (the stack up), and their run command. The whole offline suite is `python tools/sweep.py`
+(~3 min; 135 green / 3 correct skips as of 2026-08-25). The minimum bar after touching memory:
 `g_claim`, `g_durability`, `g_memory_lifecycle`. After touching docs: `g_docs_true`. A gate
 touched gets its index row in the same commit.
 
@@ -59,6 +62,7 @@ touched gets its index row in the same commit.
 
 - **`AGENTS.md`** — the bug class this project keeps paying for, the non-negotiables, the
   traps that are still live, how gates are written. Read before changing anything.
+- **`docs/CHANGELOG.md`** — what changed, by the day it changed.
 - **`docs/README.md`** — every document and which one is authoritative for what.
 - **`ui/README.md`** — the room and its window framework.
 - **The commit log** — it carries the reasoning, on purpose. `git log` is a primary source.

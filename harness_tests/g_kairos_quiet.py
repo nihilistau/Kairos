@@ -196,14 +196,25 @@ print("\n4. AN ATTEMPT CONSUMES THE CLOCK — dropped turns are not free retries
 # did not feel like anything"), and the tick re-proposed solo FIVE SECONDS later —
 # last_solo_at moved only in note_spoke, which a dropped turn never reaches. The
 # pacing clocks must advance where the cost is paid: at generate().
-i_stamp = sched_src.find("AN ATTEMPT CONSUMES THE CLOCK")
-i_worth = sched_src.find("ok, why = worth_saying(text, reply_text)")
-check("the attempt-stamp exists", i_stamp > 0)
-check("...after generate() and before worth_saying can drop the turn",
-      i_gen < i_stamp < i_worth, (i_gen, i_stamp, i_worth))
-stamp_block = sched_src[i_stamp:i_stamp + 1200]
+# AMENDED 2026-08-24 (audit K1): the spend is _spend_attempt now, called from
+# _fire_inner's finally so EVERY drop door pays — the inline stamp block this used
+# to anchor on covered one exit of six. The claim is unchanged and is what is
+# asserted: the arithmetic exists, in one function, and touches no speech fact.
+# The behavioural proof (every door, real _arm, state read back) is G-KAIROS-ATTEMPT.
+i_stamp = sched_src.find("def _spend_attempt(")
+check("the attempt-spend exists, as ONE function", i_stamp > 0)
+check("...and it is paid from _fire_inner's finally (every exit, not one)",
+      "finally:" in sched_src[sched_src.find("def _fire_inner"):
+                              sched_src.find("def _attempt")]
+      and "_spend_attempt(_STATE[session]" in sched_src)
+# 1200 was enough until the block grew a comment (2026-08-24, MODE_TURN joined the
+# two actions this fix originally named) and the code slid out of the window — a
+# grep over a fixed slice measures the PROSE as much as the code. Widened, and the
+# behavioural proof now lives in G-KAIROS-ATTEMPT, which drives the real _arm and
+# reads the state instead of reading the file.
+stamp_block = sched_src[i_stamp:i_stamp + 2400]
 check("it advances last_spoke_at (the check-in/cooldown clock)",
-      "last_spoke_at = time.monotonic()" in stamp_block)
+      "st.last_spoke_at = _now" in stamp_block)
 check("...and last_solo_at for her own time", "last_solo_at" in stamp_block)
 check("...and touches NO speech facts (chain/unanswered/spoken_times stay note_spoke's)",
       all(w not in stamp_block for w in (".chain =", "unanswered +=", "unanswered =",

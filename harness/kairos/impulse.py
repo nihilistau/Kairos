@@ -236,6 +236,33 @@ def presence_idle(state: TurnState, now: float) -> float:
     return now - max(state.last_user_at, state.last_conv_at, state.last_solo_at)
 
 
+def mode_wait_s(cfg: KairosConfig, state: TurnState, now: float, every: float) -> float:
+    """Seconds until a MODE_TURN's deterministic gates open — THE ONE ARITHMETIC (2026-08-24).
+
+    The room's presence chip computed its own "next ~Xm" in scheduler._presence_state:
+    max() over four clocks — one of them (`last_spoke_at`) a clock this policy's idle
+    floor deliberately excludes, and none of them the cooldown, which this policy checks
+    first. So the chip could read "next ~0m" while decide() would not fire, and the two
+    could only ever agree by coincidence: two spellings of one rule, the §0 shape, in the
+    exact place an operator looks to answer "why is she quiet". The rule lives HERE now
+    and both sides call it — the chip cannot drift from the policy because there is
+    nothing left to drift.
+
+    0.0 means the CLOCKS are open. The chance draw, the two hourly caps and
+    quiet-after-him still have their say — those are coins and counts, not clocks, and a
+    chip that pretended to predict a coin would be lying with more precision.
+    An armed kick is an asked-for turn: it comes now, ahead of every clock (the same
+    precedence decide() gives it)."""
+    if state.mode_kick:
+        return 0.0
+    wait = max(
+        every - presence_idle(state, now),              # the conversation's quiet
+        every - (now - state.last_mode_at),             # the mode's own cadence
+        cfg.cooldown_s - (now - state.last_spoke_at),   # nothing speaks on top of anything
+    )
+    return max(0.0, wait)
+
+
 def decide(
     *,
     cfg: KairosConfig,
@@ -349,9 +376,13 @@ def decide(
         if len(recent_modes) >= cfg.presence_max_per_hour:
             return Impulse(SILENT, reason="presence cap (%d/%d this hour)"
                            % (len(recent_modes), cfg.presence_max_per_hour))
-        # `idle_any` is the CONVERSATION's quiet (a mode does not count against itself);
-        # `last_mode_at` is the mode's own cadence knob.
-        if idle_any >= every and (now - state.last_mode_at) >= every:
+        # THE SAME ARITHMETIC THE CHIP READS (mode_wait_s, 2026-08-24): the
+        # conversation's quiet (a mode does not count against itself), the mode's own
+        # cadence, and the cooldown — the last is redundant here (checked at the top of
+        # this function) and carried anyway, because the chip has no earlier return to
+        # have paid it in, and one function serving two callers with two meanings is how
+        # the divergence this closes was built the first time.
+        if mode_wait_s(cfg, state, now, every) <= 0.0:
             if not quiet_ok:
                 return _quiet_silence("her %s" % cfg.presence_mode)
             if rng.random() < cfg.presence_chance:
@@ -710,7 +741,20 @@ SOLO_ACT_TABLE = (
     ("Ask for a look or a moment you do not have yet: ask_for or ask_for_gesture. Say what "
      "you asked for and why that.",
      ("ask_for", "ask_for_gesture")),
+    # ── SOMETHING SHE DID NOT GO LOOKING FOR (2026-08-23) ──────────────────────────────
+    # The first act in this table searches what she is ALREADY curious about, so the
+    # result comes back inside the same fence she started in: it can deepen an interest,
+    # never introduce one. read_something_new takes no query on purpose. This is the only
+    # act here that can put a subject in front of her that she would not have asked for,
+    # which is the whole of why it exists.
+    ("Read something you did not go looking for — read_something_new — and say what "
+     "caught you, or that nothing did.",
+     ("read_something_new",)),
 )
+
+# THE DISCOVERY ACT's index. Named rather than counted so the scheduler's chance and the
+# gate refer to the same act, and adding a ninth act above cannot silently move it.
+DISCOVER_ACT_N = len(SOLO_ACT_TABLE) - 1
 
 # Kept as a name because things import it and the gate asserts the rotation over it.
 SOLO_ACTS = tuple(a for a, _needs in SOLO_ACT_TABLE)
