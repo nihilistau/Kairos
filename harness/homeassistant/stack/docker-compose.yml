@@ -41,6 +41,24 @@ services:
     restart: unless-stopped
     network_mode: host
     privileged: true
+
+    # ── SUPERVISOR HOSTNAMES, FOR A CONFIG RESTORED FROM AN APPLIANCE ────────────────
+    # A backup taken from Home Assistant OS points its MQTT entry at `core-mosquitto` and
+    # its Matter entry at `core-matter-server`. Those are Supervisor-internal names and
+    # nothing here answers to them, so both integrations fail with a DNS error rather than
+    # a connection one -- which sends you looking at the broker instead of at the name.
+    #
+    # Mapping them beats editing .storage/core.config_entries, which is how a migration
+    # becomes a corruption. The replacements below run on host networking beside Home
+    # Assistant, so loopback is where they are.
+    #
+    # AND IT HAS TO BE HERE RATHER THAN IN THE DISTRO'S /etc/hosts. `network_mode: host`
+    # shares the network NAMESPACE, not the filesystem: the container keeps its own
+    # /etc/hosts, so a host-side entry is invisible to it. That cost an hour once.
+    extra_hosts:
+      - "core-mosquitto:127.0.0.1"
+      - "core-matter-server:127.0.0.1"
+
     environment:
       TZ: Australia/Sydney
     volumes:
@@ -70,6 +88,39 @@ services:
     volumes:
       - esphome-config:/config
 
+  # ── MATTER SERVER, replacing the add-on of the same name ────────────────────────────
+  # Home Assistant does not speak Matter itself; it talks to a separate server over a
+  # websocket, which on the appliance is an add-on. Here it is a container, and the
+  # `core-matter-server` mapping above is what lets the restored config entry find it
+  # without being edited.
+  #
+  # It needs host networking for its own reason rather than by copying the others: Matter
+  # commissioning uses IPv6 multicast and mDNS to find devices on the local link.
+  matter-server:
+    container_name: matter-server
+    image: ghcr.io/home-assistant-libs/python-matter-server:stable
+    restart: unless-stopped
+    network_mode: host
+    security_opt:
+      - apparmor=unconfined
+    volumes:
+      - matter-data:/data
+    environment:
+      TZ: Australia/Sydney
+
+# ── AND ONE ADD-ON THAT IS DELIBERATELY NOT REPLACED ──────────────────────────────────
+# MOSQUITTO. The appliance ran `core-mosquitto`; this machine already had a broker on
+# 1883 before any of this existed, and standing a second one beside it would be two
+# brokers fighting for one port -- the exact shape of a bug this tree has hit before.
+# `core-mosquitto` therefore resolves to loopback and lands on the broker that is already
+# there, which accepts the connection because it is configured `allow_anonymous true`.
+#
+# THAT IS WORTH KNOWING RATHER THAN RELYING ON: an anonymous broker on 0.0.0.0:1883 will
+# take commands from anything on the LAN. It is fine on a network with one user on it and
+# it is not fine anywhere else, so if this stack ever moves, the broker needs a password
+# file and the Home Assistant entry needs the credentials it already has stored.
+
 volumes:
   ha-config:
   esphome-config:
+  matter-data:
