@@ -104,6 +104,7 @@ _STORE_ENV = (
     "SP_LEDGER_FILE",
     "SP_TUNING_FILE",         # her live knobs - presence mode, kairos, voice
     "SP_BACKUP_DIR",
+    "SP_TELEMETRY_DIR",         # his body: heart rate, movement, sleep at up to 1 Hz
 )
 
 
@@ -126,6 +127,12 @@ def sandbox(name: str = "gate", persona: str = "") -> str:
     os.environ["SP_SELF_MODEL_ROOT"] = os.path.join(sb, "okf-self")
     os.environ["SP_TELEMETRY_OKF_ROOT"] = os.path.join(sb, "okf-telemetry")
     os.environ["SP_CAPS_OKF_ROOT"] = os.path.join(sb, "okf-caps")
+    # HIS BODY IS A STORE, so a gate must never write into the real one (2026-08-26).
+    # var/telemetry/ holds heart rate, movement and sleep at up to 1 Hz. A gate that
+    # appended three fake heart-rate rows to it would be putting readings of a man who was
+    # not measured into the history she reasons from — and unlike a fabricated wardrobe row
+    # it would look exactly like real data forever after.
+    os.environ["SP_TELEMETRY_DIR"] = os.path.join(sb, "telemetry")
     os.environ["SP_EPS_DIR"] = os.path.join(sb, "episodes")
     os.environ["SP_AVATAR_DIR"] = os.path.join(sb, "avatar")
     os.environ["SP_LEDGER_FILE"] = os.path.join(sb, "ledger.json")

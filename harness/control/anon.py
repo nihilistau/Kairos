@@ -64,6 +64,13 @@ DOORS: Dict[str, tuple] = {
     "lookup.receipt":   ("thing looked up", "things looked up"),
     "spine.receipt":    ("spine receipt", "spine receipts"),
     "decisions.card":   ("decision card", "decision cards"),
+    # HIS BODY IS THE MOST PRIVATE THING THIS SYSTEM TOUCHES (2026-08-26). The
+    # telemetry lane records heart rate, movement and sleep at up to 1 Hz. Off the
+    # record has to mean that too, or the one feature that promises nothing is written
+    # down would be writing the most intimate row in the store while it said so. Held
+    # at `telemetry.ingest.record`, the one writer; HELD, not queued, because a queue
+    # is the same leak with a delay on it.
+    "telemetry.sample": ("reading from his body", "readings from his body"),
     "log.speech":       ("line of her speech in the log", "lines of her speech in the log"),
     # ── EGRESS (2026-08-24, his question: "does anon mode leak anywhere? eg via voice
     # either local or sent to providers such as the xai api?") ────────────────────────
@@ -127,7 +134,7 @@ def on() -> bool:
     return _ON
 
 
-def holds(door: str) -> bool:
+def holds(door: str, n: int = 1) -> bool:
     """THE GUARD. True when this write must not happen — and counts it when it doesn't.
 
     Reads at the call site as what it is::
@@ -139,11 +146,18 @@ def holds(door: str) -> bool:
     because its id was misspelled would be a guard whose failure mode is no guard, which is
     the bug this codebase has now shipped twice (the disk floor, the wardrobe compat shim).
     It is counted under its own name so G-ANON and the room both see it.
+
+    `n` IS HOW MANY THINGS THIS ONE CALL IS HOLDING BACK (2026-08-26). Every door before
+    telemetry held exactly one thing per call — one memory row, one journal note — so the
+    counter incremented by one and was right. `telemetry.ingest` asks once for a whole
+    batch, and with the old counting the room would have said "1 reading from his body"
+    while thirty were held. Under-reporting what was withheld is the one lie this mode
+    cannot afford: the count IS the receipt that off-the-record did something.
     """
     if not _ON:
         return False
     with _LOCK:
-        _HELD[door] = _HELD.get(door, 0) + 1
+        _HELD[door] = _HELD.get(door, 0) + max(1, int(n or 1))
     return True
 
 

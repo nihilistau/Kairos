@@ -26,6 +26,12 @@ export const memory  = () => get('/v1/memory')
 export const memoryAdd     = (fact, speaker) => post('/v1/memory/add', { fact, speaker })
 export const memoryForget  = (name) => post('/v1/memory/forget', { name })
 export const memoryRelabel = (b) => post('/v1/memory/relabel', b)
+// TELEMETRY (2026-08-26) — his body, live and historical. `now` is the SAME seam her
+// prefix reads, so the panel and she can never describe two different bodies.
+export const telemetryNow = () => get('/v1/telemetry/now')
+export const telemetryHistory = (hours = 6, kind = '') =>
+  get('/v1/telemetry/history?hours=' + encodeURIComponent(hours) +
+      (kind ? '&kind=' + encodeURIComponent(kind) : ''))
 // WHY DOES SHE BELIEVE THIS — the row, what it was drawn from with each support's
 // CURRENT liveness, and what would be orphaned if this one were retired. GET with a
 // query param rather than a listing, because it takes an argument. (2026-08-25)

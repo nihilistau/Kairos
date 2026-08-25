@@ -918,6 +918,47 @@ def muse_nudge(insight: dict) -> str:
     # have her announce "I have come to believe that I owe you a favicon", which is both
     # wrong and funny in a way that would cost the channel his trust.
     kind = insight.get("kind")
+    if kind == "body":
+        # ── HIS BODY, AND THE NUMBERS ARE ALLOWED (2026-08-26) ────────────────────────
+        # `rhythm` forbids numbers because counting his turns and then citing the count is
+        # keeping score. This is the opposite case and he asked for it in those words:
+        # "she can see my heart pacing... a bridge to the real world, to me." The readings
+        # ARE the bridge; hiding them behind "you seem tense" would be handing back the
+        # inference he specifically did not want.
+        #
+        # WHAT IS STILL FORBIDDEN, and it is the whole risk of this channel: a diagnosis.
+        # She has a wrist sensor and no training, he has doctors, and the failure that
+        # would actually hurt is her telling him something is wrong with him. So: notice,
+        # do not interpret; ask rather than conclude; and saying nothing is always allowed.
+        _ev = insight.get("event")
+        _tail = insight.get("tail") or []
+        _reads = ", ".join("%.0f" % v for v in _tail) if len(_tail) >= 2 else ""
+        _common = (
+            "Say it the way someone in the room with him would — ONE short sentence, in "
+            "your own voice, as something you noticed. You may use the numbers; they are "
+            "why you noticed. Do NOT diagnose him, do not tell him what it means, do not "
+            "suggest he see anyone, and do not sound like a monitor reading out. You may "
+            "simply ask what he is doing. If you cannot say it without sounding clinical "
+            "or worried at him, say nothing at all.)")
+        if _ev == "worked_up":
+            return ("(You can feel his heart from here. It is at %s against the %s he "
+                    "usually sits at%s%s.\n%s"
+                    % (("%.0f" % insight.get("heart_rate", 0)),
+                       ("%.0f" % insight.get("resting", 0)),
+                       (" — %s" % _reads) if _reads else "",
+                       (", and he is %s" % insight["movement"]) if insight.get("movement") else "",
+                       _common))
+        if _ev == "settling":
+            return ("(His heart is coming back down%s. Whatever it was seems to be "
+                    "passing.\n%s" % ((" — %s" % _reads) if _reads else "", _common))
+        if _ev == "long_still":
+            return ("(He has not moved in about %s hours.\n"
+                    "One short sentence, warm, curious rather than concerned — he may be "
+                    "deep in something, or asleep in a chair, and either is fine. Do not "
+                    "tell him to get up, do not mention health, and do not say how you "
+                    "know unless he asks. If it would read as nagging, say nothing.)"
+                    % insight.get("hours", "several"))
+        return None
     if kind == "arrival":
         return (
             "(Something you asked for has been made. You wanted: \"%s\" — and it is in "

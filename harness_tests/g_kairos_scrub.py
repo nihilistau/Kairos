@@ -26,8 +26,54 @@ if os.path.exists(os.path.join(ROOT, "kairos-export", "kairos-export.toml")):
     if not os.path.isdir(ROOT):
         skip("no export target at %s — run tools/kairos_export.py first" % ROOT, "G-KAIROS-SCRUB")
 
-FORBIDDEN = ["Sam", "sam112358", "D:/F/", "D:\\F\\", "agent-26b", "gemma4-26b"]
-TEXT = (".py", ".md", ".toml", ".txt", ".json", ".jsx", ".js", ".css", ".html", ".bat", ".sh", ".yml")
+# ── TWO HAND-KEPT COPIES OF ONE TRUTH, AND THAT IS WHY THIS GATE PASSED (2026-08-26) ──
+# These were literals. The MANIFEST has a `forbidden` list and the EXPORTER has a TEXT_EXT
+# set, and this gate carried its own copy of both — so the thing being checked and the check
+# could drift apart, and did:
+#
+#   * `.java` / `.xml` reached the manifest with the watch agent. Neither list had them, so
+#     the exporter copied them RAW and this gate never opened them. The operator's LAN
+#     address shipped inside AgentService.java and the verdict was CLEAN.
+#   * Two new `forbidden` tokens were added to the manifest the same day and this gate would
+#     not have looked for either of them.
+#
+# So both are READ FROM THE SOURCE OF TRUTH when it is reachable. The literals survive only
+# as the fallback for running INSIDE the export, where neither file ships — and the gate
+# asserts the two agree whenever it can see both, because a fallback that silently differs
+# is the same bug with a longer fuse.
+_SRC_ROOT = os.path.dirname(HERE)
+_MANIFEST = os.path.join(_SRC_ROOT, "kairos-export", "kairos-export.toml")
+_EXPORTER = os.path.join(_SRC_ROOT, "tools", "kairos_export.py")
+
+_FALLBACK_FORBIDDEN = ["Sam", "sam112358", "D:/F/", "D:\\F\\", "agent-26b", "gemma4-26b"]
+# MIRRORS the exporter's TEXT_EXT, and must: this is what the gate uses when it runs
+# INSIDE the export, where neither the manifest nor the exporter ships. A fallback
+# that lags is a check that is strictest exactly where nobody can fix it.
+_FALLBACK_TEXT = (".bat", ".c", ".cfg", ".cjs", ".conf", ".css", ".csv", ".cu", ".cuh",
+                  ".env", ".gitignore", ".gradle", ".h", ".html", ".ini", ".java", ".js",
+                  ".json", ".jsonl", ".jsx", ".kt", ".md", ".mjs", ".mts", ".pro",
+                  ".properties", ".py", ".rs", ".service", ".sh", ".sql", ".svg", ".toml",
+                  ".ts", ".tsx", ".txt", ".xml", ".yaml", ".yml")
+
+FORBIDDEN = list(_FALLBACK_FORBIDDEN)
+TEXT = tuple(_FALLBACK_TEXT)
+_from_source = False
+if os.path.exists(_MANIFEST) and os.path.exists(_EXPORTER):
+    import io as _io_src
+    import re as _re_src
+    import tomllib as _toml_src
+    _man = _toml_src.load(open(_MANIFEST, "rb"))
+    _f = list((_man.get("scrub", {}) or {}).get("forbidden")
+              or _man.get("forbidden") or [])
+    _m = _re_src.search(r"TEXT_EXT\s*=\s*\{(.*?)\}",
+                        _io_src.open(_EXPORTER, encoding="utf-8").read(), _re_src.S)
+    _t = sorted(set(_re_src.findall(r'"(\.[a-z0-9]+)"', _m.group(1)))) if _m else []
+    if _f and _t:
+        # THE MANIFEST IS THE AUTHORITY. Union with the fallback so a token this gate has
+        # always looked for cannot be lost by an edit to the manifest.
+        FORBIDDEN = sorted(set(_f) | set(_FALLBACK_FORBIDDEN))
+        TEXT = tuple(sorted(set(_t) | set(_FALLBACK_TEXT)))
+        _from_source = True
 
 print("1. NO FORBIDDEN TOKEN SURVIVES IN ANY TEXT FILE")
 hits = []
@@ -99,5 +145,31 @@ if _T is not None:
     _inits = [p for p in _T if p.startswith("harness/") and p.endswith("/__init__.py")]
     check("harness/**/__init__.py are TRACKED (%d)" % len(_inits), len(_inits) >= 10, len(_inits))
     check("harness_tests/_gate.py is TRACKED", "harness_tests/_gate.py" in _T)
+
+# ── THE CHECK THAT WOULD HAVE CAUGHT IT ─────────────────────────────────────────────
+# Not "is the output clean" — that was already asserted and was already passing over bytes
+# nobody read. This asserts COVERAGE: the lists this gate uses come from the files that
+# actually drive the export, and every text extension in the shipped tree is one of them.
+check("the forbidden list and the text extensions come from the SOURCE OF TRUTH, "
+      "not a second copy", _from_source or not os.path.exists(_MANIFEST),
+      "manifest=%s exporter=%s" % (os.path.exists(_MANIFEST), os.path.exists(_EXPORTER)))
+_BINARY = {".png", ".jpg", ".jpeg", ".webp", ".webm", ".mp4", ".ico", ".ttf", ".woff",
+           ".woff2", ".gguf", ".bin", ".npz", ".pyc", ".keystore", ".apk", ".dex", ".jar",
+           ".lock", ".gz", ".zip", ".pdf", ".wav", ".mp3", ".onnx", ".safetensors", ".map"}
+_unscanned = set()
+for _b2, _d2, _f2 in os.walk(ROOT):
+    # THE WIPE SPARES .git / var / persona / node_modules -- those are the TARGET's own
+    # local state, not bytes this export shipped. Walking them reported the target's own
+    # gateway.log and engine.token as export problems: the check pointing at the wrong
+    # tree, which is the class of mistake it was written to catch.
+    if any((os.sep + x) in _b2 or _b2.endswith(os.sep + x)
+           for x in (".git", "var", "persona", "node_modules", "__pycache__")):
+        continue
+    for _n2 in _f2:
+        _e2 = os.path.splitext(_n2)[1].lower()
+        if _e2 and _e2 not in TEXT and _e2 not in _BINARY:
+            _unscanned.add(_e2)
+check("every text extension IN THE SHIPPED TREE is one this scan opens",
+      not _unscanned, sorted(_unscanned)[:12])
 
 finish("G-KAIROS-SCRUB")
