@@ -240,6 +240,29 @@ def carries_marks(reply: str) -> bool:
     return any(rx.search(reply or "") for rx in _MARKS)
 
 
+_MARKS_BY_NAME = (("mood", _MOOD), ("voice", _VOICE), ("trait", _TRAIT),
+                  ("wear", _WEAR), ("show", _SHOW))
+
+
+def marks_present(reply: str) -> frozenset:
+    """WHICH mark families this reply carries — `carries_marks` with the names kept.
+
+    Same recognisers, for the same reason `carries_marks` gives: "is there something to
+    act on", "what exactly", and "which kind" must never be answered by three different
+    readers. This is the third question and it now has the same owner as the other two.
+
+    IT EXISTS FOR HER OWN TIME (2026-08-25). `solo_did_the_thing` rules on whether a solo
+    act actually HAPPENED, and it could only see tool calls — while `persona.md` teaches
+    the wardrobe as a MARK, in as many words: "[WEAR:the silver nightie] changes your
+    clothes... No tool call, no asking, mid-sentence, whenever you mean it." So the one
+    path she is told to use could not satisfy the one law that checks she used it, and the
+    only thing that COULD satisfy it for the wardrobe act was `check_wardrobe` — a read.
+    She looked in the wardrobe, said what she would wear, changed nothing, and the act was
+    ruled performed."""
+    text = reply or ""
+    return frozenset(name for name, rx in _MARKS_BY_NAME if rx.search(text))
+
+
 def _persona_path() -> str:
     from harness.personality.persona_file import persona_path
     return persona_path()          # ONE derivation — see persona_file.persona_path

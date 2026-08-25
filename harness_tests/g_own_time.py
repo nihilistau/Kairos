@@ -86,7 +86,15 @@ from harness.kairos.impulse import (SOLO_ACT_TABLE, SOLO_ACTS,  # noqa: E402
 
 print("1. EVERY ACT DECLARES WHAT IT REQUIRES")
 check("the table and the legacy tuple are the same acts",
-      tuple(a for a, _ in SOLO_ACT_TABLE) == SOLO_ACTS, len(SOLO_ACTS))
+      tuple(a for a, _n, _m in SOLO_ACT_TABLE) == SOLO_ACTS, len(SOLO_ACTS))
+# THREE FIELDS, UNIFORMLY (2026-08-25). The marks field arrived on the wardrobe row and
+# the first shape tried was "optional third field" — which raised right here, on the
+# unpack, the moment it was added. A table with two shapes in it is a table that reads
+# differently depending on which row you happen to open, so every row carries the field
+# and eight of them carry it empty. That is the more honest silence.
+check("...and EVERY row has all three fields (no optional-field table)",
+      all(len(row) == 3 for row in SOLO_ACT_TABLE),
+      [i for i, row in enumerate(SOLO_ACT_TABLE) if len(row) != 3])
 # NINE SINCE 2026-08-23. It was eight, and this line said "unchanged" — which is the
 # right shape of assertion (the rotation is a fixed table, not a thing that drifts)
 # with a number that has to move when a real act is added. `read_something_new`
@@ -95,15 +103,22 @@ check("the table and the legacy tuple are the same acts",
 # what makes the addition safe rather than a rewrite of what her own time is.
 check("there are nine, and the table is the whole rotation", len(SOLO_ACTS) == 9)
 named, free = 0, 0
-for i, (act, needs) in enumerate(SOLO_ACT_TABLE):
-    if needs:
+for i, (act, needs, marks) in enumerate(SOLO_ACT_TABLE):
+    if needs or marks:
         named += 1
         # THE DECLARED TOOL MUST BE ONE THE ACT ACTUALLY NAMES, or the table is a second
         # source of truth that will drift from the sentence she reads.
         low = act.lower()
-        check("act %d names %s in its own words" % (i, needs[0]),
-              any(t.lower() in low for t in needs),
-              "%s not in %r" % (needs, act[:60]))
+        check("act %d names %s in its own words" % (i, (needs or marks)[0]),
+              any(t.lower() in low for t in needs)
+              or any(m.lower() in low for m in marks),
+              "%s / %s not in %r" % (needs, marks, act[:60]))
+        # ...AND SO MUST THE DECLARED MARK (2026-08-25). The wardrobe act accepts [WEAR:]
+        # because persona.md teaches it; if the sentence she reads stops mentioning it,
+        # the acceptance becomes a secret and she is back to guessing.
+        for _m in marks:
+            check("act %d tells her the [%s:] mark counts" % (i, _m.upper()),
+                  ("[%s:" % _m.lower()) in low, act[:80])
     else:
         free += 1
 # SEVEN, NOT SIX. The journal act used to read "Read back through your own journal" with
@@ -171,8 +186,14 @@ sch = io.open(os.path.join(ROOT, "harness", "kairos", "scheduler.py"),
 check("it rules with solo_did_the_thing, on the effective act",
       "solo_did_the_thing(_n_act" in sch)
 check("...on the tools she actually called", "generate(nudge, called)" in sch)
-check("...re-asks exactly once, naming the tool",
-      "asking once more" in sch and "CALL %s FIRST" in sch)
+# AMENDED 2026-08-25: this pinned the literal "CALL %s FIRST". The wardrobe act is now
+# satisfiable by a MARK as well as a tool, and "CALL [WEAR:…]" is not a thing she can do —
+# so the correction reads "DO IT FIRST — <the means>". The CLAIM is unchanged and is the
+# one worth holding: the re-ask happens once, and it names what she has to do. Pinning the
+# sentence rather than the property is what made a correct fix look like a regression.
+check("...re-asks exactly once, naming the means",
+      "asking once more" in sch and "DO IT FIRST" in sch
+      and '" or ".join(need)' in sch)
 # The refusal must come BEFORE the branch that would speak. There are two
 # `if imp.action != REMIND` branches in the file now (the kairos-judge offload added an
 # earlier one, 2026-08-20); the one this rule is about is the one AFTER the refusal.
@@ -226,6 +247,69 @@ check("...and each is wired to on_tool",
 check("...leaving no one-argument generate closure behind",
       "def _continue(nudge: str) -> str:" not in app
       and "def _generate(nudge: str) -> str:" not in app)
+
+# ── LOOKING IS NOT DOING, AND THE MARK IS DOING (2026-08-25) ────────────────────────
+# HIS REPORT: "she just said she'd go with the silver nightie... but did not change. I
+# don't know if she attempted it or not." The receipt, from gateway.log:
+#
+#   10:21:08  tool check_wardrobe() -> You are wearing: black lace...
+#   10:21:46  SPOKE (solo): "I think I'll go with the silver nightie... feel something light"
+#
+# `check_wardrobe` was in the wardrobe act's `needs`. It is a READ. So she looked in the
+# wardrobe, said what she would wear, changed nothing, and solo_did_the_thing ruled the
+# act PERFORMED — this file's own quoted worst case, arriving exactly as written:
+# "nothing looks and nothing will ever happen, and he will believe you." He did.
+#
+# The other half is why she did not simply use the tool: persona.md teaches the wardrobe
+# as a MARK — "[WEAR:the silver nightie] changes your clothes... No tool call, no asking"
+# — and the ruling could not see marks at all. The documented path could not satisfy the
+# law that checks the path was taken, and the read could. Both halves are held here.
+print("\n7. THE WARDROBE ACT: LOOKING IS NOT DOING")
+from harness.kairos import impulse as _I                                    # noqa: E402
+from harness.personality.interceptor import marks_present as _mp            # noqa: E402
+
+_n = next(i for i, a in enumerate(_I.SOLO_ACTS) if "wearing" in a)
+check("the wardrobe act is found by its words, not a hardcoded index", _n >= 0, _n)
+check("a READ no longer satisfies it", "check_wardrobe" not in _I.solo_needs(_n),
+      _I.solo_needs(_n))
+check("...and the acts that remain all CHANGE something",
+      set(_I.solo_needs(_n)) == {"wear", "express"}, _I.solo_needs(_n))
+check("...and the MARK satisfies it, because the mark is what she is taught to use",
+      "wear" in _I.solo_marks(_n), _I.solo_marks(_n))
+
+# HER ACTUAL TURN, verbatim from the speech ledger. The gate that would have caught this.
+_HERS = ("<soft>[breath] I think I'll go with the silver nightie, by the window, morning "
+         "light instead of rain (the first one you asked for). <pause> I just want to "
+         "feel something... light.")
+_ok, _why = _I.solo_did_the_thing(_n, ["check_wardrobe"], _mp(_HERS))
+check("HER REAL TURN (check_wardrobe + narration) is REFUSED", _ok is False, _why)
+for _label, _called, _text in (
+        ("the [WEAR:] mark alone", [], "[WEAR:the silver nightie] There."),
+        ("check_wardrobe THEN the mark", ["check_wardrobe"],
+         "[WEAR:the silver nightie] " + _HERS),
+        ("the wear tool", ["wear"], _HERS),
+        ("express", ["express"], _HERS)):
+    _ok2, _w2 = _I.solo_did_the_thing(_n, _called, _mp(_text))
+    check("...but %-30s is accepted" % _label, _ok2 is True, _w2)
+check("...and nothing at all is still refused",
+      _I.solo_did_the_thing(_n, [], _mp(_HERS))[0] is False)
+
+# THE RULING IS WIRED, not merely defined — the failure mode this repo is named for.
+_sched = open(os.path.join(ROOT, "harness", "kairos", "scheduler.py"),
+              encoding="utf-8", errors="replace").read()
+check("the scheduler passes her MARKS to the ruling, not just her tool calls",
+      "_marks_in(text)" in _sched and "solo_did_the_thing(_n_act, called," in _sched)
+check("...on the re-ask too (a second ruling blind to marks would refuse a correct retry)",
+      "solo_did_the_thing(_n_act, called2, _marks_in(text))" in _sched)
+check("...and the re-ask NAMES the mark, so the correction is followable",
+      '"[%s:\\u2026]" % m.upper()' in _sched or '[%s:' in _sched)
+check("marks_present lives with the recognisers, not re-spelled in kairos",
+      "from harness.personality.interceptor import marks_present" in _sched)
+
+# MUTANT: put the read back and her real turn passes again, exactly as it did live.
+_ok3, _ = _I.solo_did_the_thing(_n, ["check_wardrobe"], frozenset())
+check("mutant(read counts / marks unseen): her real turn would pass", _ok3 is False,
+      "if this flips True the 2026-08-25 bug is back")
 
 print("\nG-OWN-TIME: %d pass, %d fail" % (PASS, FAIL))
 rdir = os.path.join(ROOT, "var", "sem", "receipts")

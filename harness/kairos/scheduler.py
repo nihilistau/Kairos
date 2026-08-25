@@ -34,7 +34,7 @@ from harness.kairos.impulse import (
     muse_nudge,
     Impulse, KairosConfig, TurnState, SOLO, SOLO_NUDGE, solo_nudge, solo_worth_saying,
     DISCOVER_ACT_N,
-    solo_did_the_thing, solo_needs,
+    solo_did_the_thing, solo_needs, solo_marks,
     EXPAND, expand_nudge, MODE_TURN,
     decide, note_spoke, note_user, worth_saying,
 )
@@ -688,6 +688,20 @@ def _spend_attempt(st: "TurnState", action: str, now: "Optional[float]" = None) 
         st.mode_kick = False      # the kick is CONSUMED by the attempt
 
 
+def _marks_in(text: str) -> frozenset:
+    """Which mark families her reply carried, for solo_did_the_thing.
+
+    Best-effort and SILENT on failure: the personality package is optional at import time
+    in some gate environments, and a missing recogniser must never turn into "she did not
+    do it". An empty set simply falls back to the tool-call ruling, which is exactly the
+    behaviour that shipped before marks counted at all."""
+    try:
+        from harness.personality.interceptor import marks_present
+        return marks_present(text or "")
+    except Exception:
+        return frozenset()
+
+
 def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -> None:
     """Wait the delay, generate, and let worth_saying() have the last word."""
     def _fire():
@@ -943,14 +957,23 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
         # which is the whole point. A journal that records things she did not do is worse
         # than no journal, and this one has been doing it since the day it was written.
         if imp.action == SOLO and called is not None:
-            ok_did, why_did = solo_did_the_thing(_n_act, called)   # the EFFECTIVE act (K2)
+            # HER MARKS ARE HER HANDS TOO (2026-08-25). `called` is what she called; this
+            # is what she DID inline. The wardrobe act is performed with [WEAR:…] and
+            # persona.md says so in as many words, so a ruling that saw only tool calls
+            # could not see the act being done the way she is taught to do it — while
+            # `check_wardrobe`, a read, satisfied it. Read through the interceptor's own
+            # recognisers: "is there something to act on" and "which kind" must not be
+            # answered by two different readers.
+            ok_did, why_did = solo_did_the_thing(_n_act, called,
+                                                 _marks_in(text))   # EFFECTIVE act (K2)
             if not ok_did:
-                need = solo_needs(_n_act)
+                need = list(solo_needs(_n_act)) + [
+                    "[%s:…]" % m.upper() for m in solo_marks(_n_act)]
                 logger.info("[kairos] solo: %s — asking once more", why_did)
-                retry = (nudge + "\n\n(You wrote that up without doing it. CALL %s FIRST — "
-                         "one fenced tool_code block, nothing else — and then say what came "
-                         "of it in your own words. If you do not want to do this one, say "
-                         "nothing at all; that is allowed and inventing it is not.)"
+                retry = (nudge + "\n\n(You wrote that up without doing it. DO IT FIRST — "
+                         "%s — and then say what came of it in your own words. If you do "
+                         "not want to do this one, say nothing at all; that is allowed "
+                         "and inventing it is not.)"
                          % " or ".join(need))
                 called2: list = []
                 try:
@@ -958,7 +981,7 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
                 except Exception as exc:
                     logger.warning("[kairos] solo retry failed: %s", exc)
                     return
-                ok_did, why_did = solo_did_the_thing(_n_act, called2)
+                ok_did, why_did = solo_did_the_thing(_n_act, called2, _marks_in(text))
                 if not ok_did:
                     logger.info("[kairos] solo REFUSED — %s (asked twice)", why_did)
                     try:

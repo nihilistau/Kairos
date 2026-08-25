@@ -11,7 +11,7 @@ codebase keeps getting hit by (AGENTS.md §0).**
   `python tools/sweep.py` (~3 min, no GPU). **A green suite is not an audit** — the 2026-08-25
   pass found ~50 defects under 133 green gates (AGENTS.md §0).
 - What is deliberately off: `docs/OFF-BY-DEFAULT.md`.
-- What changed and when: `docs/CHANGELOG.md` — and **behaviour a reader would notice gets an
+- What changed and when: `CHANGELOG.md` — and **behaviour a reader would notice gets an
   entry there in the same commit**.
 - New gates use `_gate.py`: `sandbox()` FIRST (before any `harness.` import), then
   `check()`/`finish()` so the verdict reaches the exit code.

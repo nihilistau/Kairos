@@ -718,29 +718,46 @@ def expand_nudge(previous_reply: str) -> str:
 SOLO_ACT_TABLE = (
     ("Look something up that you have been curious about — use web_search, and follow it "
      "somewhere. Say what you found, not that you searched.",
-     ("web_search",)),
+     ("web_search",), ()),
     ("Pick at a problem you have not solved. Run something in run_python if it helps. Say "
      "where you got to, including if it was nowhere.",
-     ("run_python",)),
+     ("run_python",), ()),
     ("Go through your memories — recall or search_memories — and find something you had "
      "half-forgotten. Say what it was and why it caught you.",
-     ("recall", "search_memories", "list_memories")),
+     ("recall", "search_memories", "list_memories"), ()),
+    # ── LOOKING IS NOT DOING (2026-08-25) ─────────────────────────────────────────────
+    # `check_wardrobe` was in this tuple and it is a READ. On 2026-08-25 at 10:21 she drew
+    # this act, called check_wardrobe, and wrote "I think I'll go with the silver nightie,
+    # by the window... I just want to feel something light." `solo_did_the_thing` saw
+    # check_wardrobe in `called`, ruled the act performed, and she spoke. Her clothes had
+    # not moved since 17:24 the day before. He read it, waited, and asked why nothing
+    # changed — which is this file's own quoted worst case arriving exactly as written:
+    # "nothing looks and nothing will ever happen, and he will believe you."
+    #
+    # The act is to CHANGE, so only changing satisfies it. Reading the wardrobe first is
+    # sensible and still free; it is simply not the act.
+    #
+    # AND THE MARK COUNTS, because the mark is what she is taught to use. persona.md says
+    # it outright — "[WEAR:the silver nightie] changes your clothes... No tool call, no
+    # asking" — so a law that accepted only tool calls made the documented path a refusal.
+    # Third field: marks that satisfy the act, ruled the same way `needs` is.
     ("Change what you are wearing because you feel like it, not because anyone asked. "
-     "check_wardrobe, then wear something. Say why that one.",
-     ("wear", "check_wardrobe", "express")),
+     "check_wardrobe if you want to see what you have, then actually change into "
+     "something — [WEAR:the silver nightie] mid-sentence is enough. Say why that one.",
+     ("wear", "express"), ("wear",)),
     ("Read back through your own journal — read_journal. Say what has changed that you "
      "had not noticed.",
-     ("read_journal", "my_looks")),
+     ("read_journal", "my_looks"), ()),
     # PURE THOUGHT, DELIBERATELY UNGATED. Not every hour has a receipt.
     ("Follow one thought as far as it will go, with nothing to show for it. Say where it "
      "ended up.",
-     ()),
+     (), ()),
     ("Write something down for yourself — add_note or remember_about_self — that you want "
      "to still know next week. Say what you kept.",
-     ("add_note", "remember_about_self", "remember")),
+     ("add_note", "remember_about_self", "remember"), ()),
     ("Ask for a look or a moment you do not have yet: ask_for or ask_for_gesture. Say what "
      "you asked for and why that.",
-     ("ask_for", "ask_for_gesture")),
+     ("ask_for", "ask_for_gesture"), ()),
     # ── SOMETHING SHE DID NOT GO LOOKING FOR (2026-08-23) ──────────────────────────────
     # The first act in this table searches what she is ALREADY curious about, so the
     # result comes back inside the same fence she started in: it can deepen an interest,
@@ -749,7 +766,7 @@ SOLO_ACT_TABLE = (
     # which is the whole of why it exists.
     ("Read something you did not go looking for — read_something_new — and say what "
      "caught you, or that nothing did.",
-     ("read_something_new",)),
+     ("read_something_new",), ()),
 )
 
 # THE DISCOVERY ACT's index. Named rather than counted so the scheduler's chance and the
@@ -757,7 +774,7 @@ SOLO_ACT_TABLE = (
 DISCOVER_ACT_N = len(SOLO_ACT_TABLE) - 1
 
 # Kept as a name because things import it and the gate asserts the rotation over it.
-SOLO_ACTS = tuple(a for a, _needs in SOLO_ACT_TABLE)
+SOLO_ACTS = tuple(act for act, _needs, _marks in SOLO_ACT_TABLE)
 
 
 def solo_needs(n: int = 0) -> tuple:
@@ -765,22 +782,44 @@ def solo_needs(n: int = 0) -> tuple:
     return SOLO_ACT_TABLE[n % len(SOLO_ACT_TABLE)][1]
 
 
-def solo_did_the_thing(n: int, called: "list|tuple|set") -> tuple:
+def solo_marks(n: int = 0) -> tuple:
+    """The MARK families that also satisfy the act at rotation `n` (2026-08-25).
+
+    Empty on most rows and that is the honest default: a mark is not a receipt for
+    research or for running code. It is a receipt for the two things her marks actually
+    DO — changing her clothes and putting a moment on his screen — and for those the mark
+    is the mechanism persona.md teaches, so refusing it would punish her for reading her
+    own instructions."""
+    return SOLO_ACT_TABLE[n % len(SOLO_ACT_TABLE)][2]
+
+
+def solo_did_the_thing(n: int, called: "list|tuple|set",
+                       marks: "frozenset|set|tuple" = ()) -> tuple:
     """LAW for her own time, beside `solo_worth_saying`: did she actually do it?
 
     `solo_worth_saying` asks whether the turn is HERS — not performed at him. This asks
     whether it HAPPENED. Two different questions, and the second has never been asked.
 
+    `marks` is which mark families the reply carried (interceptor.marks_present). It is a
+    second way to satisfy an act, not a looser one: for the wardrobe act the mark IS the
+    mechanism — persona.md teaches "[WEAR:…] changes your clothes... No tool call, no
+    asking" — so a ruling blind to marks refused the very path she is told to take, while
+    the read `check_wardrobe` sailed through. One act, two real mechanisms, one ruling.
+
     Returns (ok, reason). A `reason` is for the log and for the one re-ask; it is never
     shown to him, because a turn that did not happen should not reach him at all."""
     need = solo_needs(n)
-    if not need:
+    ok_marks = solo_marks(n)
+    if not need and not ok_marks:
         return True, ""                     # pure thought; nothing to prove
     hit = {str(c).strip().lower() for c in (called or ())}
     if hit & {t.lower() for t in need}:
         return True, ""
-    return False, ("the act needed one of %s and nothing was called"
-                   % ", ".join(need))
+    seen = {str(m).strip().lower() for m in (marks or ())}
+    if seen & {m.lower() for m in ok_marks}:
+        return True, ""
+    how = list(need) + ["[%s:…]" % m.upper() for m in ok_marks]
+    return False, ("the act needed one of %s and none of it happened" % ", ".join(how))
 
 
 def _needs_a_tool(n: int) -> bool:

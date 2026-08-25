@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.4.1 — looking is not doing, and a front door that pointed at files it does not have (2026-08-25)
+
+**She announced a wardrobe change in her own time and nothing changed.** The receipt:
+
+```
+10:21:08  tool check_wardrobe() -> You are wearing: black lace...
+10:21:46  SPOKE (solo): "I think I'll go with the silver nightie..."
+```
+
+Her own time runs on an act table, and each act declares what it `needs` before
+`solo_did_the_thing` will let the turn reach him. The wardrobe act declared
+`("wear", "check_wardrobe", "express")` — and **`check_wardrobe` is a read**. The act whose
+entire point is to *change* her clothes was satisfied by opening the wardrobe and looking at
+them. That is this project's own quoted worst case, arriving exactly as written: *"nothing
+looks and nothing will ever happen, and he will believe you."*
+
+The second half is why she reached for the read rather than the tool: the persona teaches the
+wardrobe as a **mark** — *"[WEAR:…] changes your clothes… No tool call, no asking"* — and the
+ruling could only see tool calls. The one path she is told to take could not satisfy the one
+law that checks she took it, while the read sailed through.
+
+Both closed. `check_wardrobe` no longer satisfies the act; `interceptor.marks_present()`
+reports *which* mark families a reply carried, from the same recognisers `carries_marks`
+already uses, and the scheduler passes them into the ruling on the first pass and on the
+re-ask. The act sentence must name any mark that satisfies it, and a gate holds it there — an
+acceptance she is not told about is a secret. G-OWN-TIME 51 → 67, with the real turn as the
+fixture and a mutant that restores the old ruling and shows it passing again.
+
+**And 24 relative links in this repo resolved to nothing.** `README.md → ui/README.md` (never
+in the manifest), five files naming `docs/CHANGELOG.md` (this repo carries a semver
+`CHANGELOG.md` at the root instead), and thirteen rows of the documentation *index* listing
+engine ADRs, session receipts and research essays that stay in the source tree. A newcomer's
+first click, on the front page.
+
+Fixed as a class: **G-DOCS-TRUE §5** requires every relative markdown link in a shipped doc to
+resolve, and runs in both trees off the same list. Real markdown links only — backticked bare
+names like `app.py` are prose shorthand, not promises, and gating those would have failed on
+235 innocent mentions and been switched off within a day. `docs/ANON-MODE.md` now ships (the
+code ships, and the deepest memory doc links to it), `ui/README.md` ships, and the exporter
+drops index *rows* for unshipped documents while *de-linking* prose mentions — a row in an
+index is a pointer and drops cleanly; a link inside a sentence is part of someone's writing,
+so it keeps its words and loses its href.
+
+Sweep in this repo: **109 green, 1 correct skip, 0 red.**
+
 ## 0.4.0 — the MCP release: what a server may see, and what it may become (2026-08-25)
 
 An audit of the MCP layer in both directions, and the read side of provenance. **If you run
