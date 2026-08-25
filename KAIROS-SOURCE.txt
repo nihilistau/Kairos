@@ -1,2 +1,2 @@
-exported from shannon-prime-kairos@89439178c621818770c29d22d9997ccf5138e885
+exported from shannon-prime-kairos@487f201d11f507aafb21c63680e82f7b51c5beb0
 by tools/kairos_export.py

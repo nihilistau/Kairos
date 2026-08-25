@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.6.0 — Home Assistant, as its own framework (2026-08-26)
+
+The sleep socket added in 0.5.2 now has something that can fill it. A **separate pluggable
+framework** (`harness/homeassistant/`), sitting beside `harness/telemetry/` rather than
+inside it — the telemetry agent is yours and posts to you, Home Assistant is somebody else's
+server you ask, with a credential, over a network.
+
+**Why it is worth wiring up:** Home Assistant's *Sleep Confidence* sensor is Google's Sleep
+API — a calibrated classifier inside Play Services, refreshed about every ten minutes. It is
+not a sensor, so no amount of `SensorManager` reaches it, and on a Samsung watch every
+sleep-capable sensor is behind a signature permission. This is the realistic way to know
+whether someone is asleep.
+
+- **It is not a second door.** Everything crosses through `telemetry.ingest.record()`,
+  because that is where the anon gate sits. Off the record a reading is **held**, and held is
+  not marked handled — the value that lands when you come back on the record is the current
+  one, not the one you were hiding.
+- **Off until configured, and off means silent.** No token: no thread, no socket opened.
+- **The credential is not configuration.** `var/ha_token` or `SP_HA_TOKEN` — never a
+  profile, because everything in `profiles/` is committed. The gate walks every profile for
+  token-*shaped values* and asserts via the AST that the client cannot import the config
+  system at all.
+- **Matched by entity suffix**, so renaming your phone does not silently break it — and a
+  missing row looks exactly like a person who is awake.
+- **Two mappings only**: `sleep_confidence` and `activity`. Battery and steps are
+  deliberately not taken though HA has them, because the bundled agent already posts them.
+- **It cannot turn anything on.** Nothing calls a service, and the gate asserts it. Giving a
+  companion the light switches is a different product with different failure modes.
+- **The house watch list ships empty.** Nothing is said about your home until you name
+  entities, because which lights matter is not something a default can know.
+
+### `last_updated` is not when it was measured
+
+Worth knowing before you build anything on Home Assistant's API. A sensor read 79 with
+`last_updated` twenty-five minutes old; its actual reading was **133 days** old. After a
+restart HA restores states and re-stamps `last_updated`, so **every stale sensor in the house
+looks brand new**. `measured_at_of()` prefers the entity's own `attributes.timestamp`, then
+`last_changed`, then `last_updated`; the dedupe is keyed on the measurement, so a restart
+cannot rewrite the whole house as freshly measured; and a reading with no usable clock is
+refused rather than dated to now.
+
+`ingest.record()` gained a bounded `measured_at` for this — clamped to [-2 h, +2 min] and
+unreachable from the HTTP door, so it does not reopen the one-clock rule.
+
+### The stack
+
+`harness/homeassistant/stack/docker-compose.yml` — Home Assistant and ESPHome as containers,
+not the appliance VM. On Windows it must run under Docker Engine **inside WSL2**: under
+Docker Desktop, `network_mode: host` means the host of the *Docker* VM, and the LAN stays
+invisible, which breaks every multicast discovery protocol HA depends on. The file documents
+both halves of what is required, and `docs/HOME-ASSISTANT.md` has the whole story including
+how to pin the distro open so the containers are not torn down seconds after they start.
+
+G-HOMEASSISTANT **45 checks**, ten mutants.
+
 ## 0.5.2 — sleep, and what a percentage is allowed to mean (2026-08-26)
 
 **A sleep confidence has three possible sources and they are not the same claim.** The seam

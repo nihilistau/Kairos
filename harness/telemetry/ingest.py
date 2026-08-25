@@ -15,6 +15,18 @@ WHAT THIS DOOR IS FOR, in order of how badly it is needed:
      of "now" produce a history that cannot be plotted, and a watch that has been in a drawer
      for a week comes back with a clock that is confidently wrong. `at_hint` lets a source
      say when it thinks a sample was taken; it is kept in meta, never trusted as `at`.
+
+     ONE EXCEPTION, added 2026-08-26 and bounded so it cannot become a hole: `measured_at`,
+     for a caller that did not measure the value itself but READ IT FROM SOMEWHERE THAT DID.
+     Home Assistant is the case — its sleep confidence refreshes every ten minutes, so
+     stamping it on arrival dates a nine-minute-old reading to now and every freshness
+     decision downstream is then made against the wrong number.
+
+     It is not a device's clock and no device can reach it: nothing arriving over
+     /v1/telemetry/ingest passes it, only in-process callers do. It is clamped to
+     [now - MAX_BACKDATE_S, now + MAX_SKEW_S], so a foreign clock can neither reach back to
+     rewrite history nor forward to look fresh, and a batch outside that window is stamped
+     on arrival with `clock_ignored` returned to the caller.
   3. SHAPE. A number is a number, a state is one of its allowed words, unknown kinds are
      stored anyway and reported. A door that refuses data it does not recognise loses the
      data; a door that refuses to SAY it did not recognise it loses the bug.
@@ -35,6 +47,7 @@ STATES = {
     "screen":      ("on", "off"),
     "motion":      ("still", "moving", "vehicle"),
     "sleep_stage": ("awake", "light", "deep", "rem"),
+    "activity": ("still", "walking", "running", "cycling", "vehicle"),
 }
 
 SOURCES = ("watch", "phone", "pc")
@@ -54,9 +67,32 @@ BOUNDS = {
 }
 
 
+# ── HOW OLD A FOREIGN READING MAY BE AND STILL BE DATED HONESTLY (2026-08-26) ─────────
+# See `measured_at` in record(). Two hours is generous for a signal that refreshes every
+# ten minutes; the point of the bound is not precision, it is that a clock we do not own
+# can never reach far enough back to rewrite history or far enough forward to look fresh.
+MAX_BACKDATE_S = 2 * 3600
+MAX_SKEW_S = 120
+
+
 def record(samples: List[Dict[str, Any]], *, source: str = "",
-           allow_anon: bool = False) -> Dict[str, Any]:
+           allow_anon: bool = False,
+           measured_at: Optional[float] = None) -> Dict[str, Any]:
     """Store a batch. Returns {stored, rejected:[{sample, why}], held}.
+
+    `measured_at` (epoch seconds) is for ONE kind of caller: a source that read the value
+    from somewhere else and knows when that somewhere else measured it. Home Assistant is
+    the case — its sleep confidence refreshes every ten minutes, so stamping it on arrival
+    would date a nine-minute-old reading to now, and every freshness decision downstream
+    would then be made against the wrong number. That is the same defect as `latest()`
+    returning yesterday's heart rate, arriving by a different road.
+
+    IT DOES NOT REOPEN THE ONE-CLOCK RULE. A device's own clock is still never trusted —
+    the watch does not get to pass this, and nothing that posts to /v1/telemetry/ingest can
+    reach it. It is bounded on both sides: not more than MAX_BACKDATE_S in the past, and
+    not more than MAX_SKEW_S in the future. Outside that window the batch is stamped on
+    arrival exactly as before, because a foreign clock that is wildly wrong is more likely
+    to be wrong than to be interesting.
 
     NEVER RAISES. A source that crashes the gateway because it sent a malformed row is a
     source that takes the whole room down from a watch on a wrist, so every failure here is
@@ -81,6 +117,14 @@ def record(samples: List[Dict[str, Any]], *, source: str = "",
             pass                       # anon unavailable is not a licence to write
 
     at = store.now_iso()
+    if measured_at is not None:
+        now = time.time()
+        if now - MAX_BACKDATE_S <= float(measured_at) <= now + MAX_SKEW_S:
+            at = store.now_iso(float(measured_at))
+        else:
+            # Not an error and not silent: the row still lands, stamped on arrival, and
+            # the caller is told its clock was not believed.
+            out["clock_ignored"] = True
     ok: List[Dict[str, Any]] = []
     for s in (samples or []):
         try:

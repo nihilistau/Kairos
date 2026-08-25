@@ -563,6 +563,16 @@ KNOBS: list[Knob] = [
          "key, so noticing never becomes nagging. She is handed the READINGS, never a "
          "diagnosis. Off means she still sees his body on a turn (telemetry.turn_note) "
          "but never opens her mouth about it unprompted."),
+    Knob("homeassistant.house_note", "Home Assistant", "Let her notice the house",
+         "bool", False,
+         "OFF, and the framework ships with an EMPTY watch list, so this knob has nothing "
+         "to switch on until he names entities in `house.WATCH`. Two dials rather than one "
+         "because they answer different questions: WHICH entities are worth her attention "
+         "is a decision he makes once, per light; WHETHER she may mention any of them is a "
+         "mood he might change tonight. Note that the sleep confidence this framework "
+         "exists to carry is NOT governed here — it goes into his body's history through "
+         "the telemetry door and is governed by telemetry.turn_note, because a sleep "
+         "reading is a fact about HIM and not about his house."),
     Knob("wardrobe.turn_note", "Wardrobe", "A per-turn line about what she has on",
          "bool", False,
          "OFF, and armed only for a measured trial (2026-08-24 audit, W4). The 2026-08-19 "

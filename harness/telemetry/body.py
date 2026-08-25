@@ -49,6 +49,9 @@ FRESH_S = {
     # AN EVENT, not a state. Short on purpose: the entire value of "he just looked at his
     # watch" is that it was JUST — a tilt an hour ago says nothing about now.
     "wrist_tilt": 10 * 60,
+    # A CLASSIFIER's verdict about what he is doing. Updates on change, so it is allowed
+    # to be older than a measurement would be.
+    "activity": 30 * 60,
     "light": 60 * 60,
 }
 _DEFAULT_FRESH = 30 * 60
@@ -220,6 +223,7 @@ _SLEEP_MIN_SIGNALS = 2     # below this the answer is None — see why in the do
 def sleep_estimate(rows: List[dict], now: float,
                    hr: Optional[dict] = None,
                    light: Optional[dict] = None, charging: Optional[dict] = None,
+                   activity: Optional[dict] = None,
                    rest: Optional[float] = None,
                    awake_now: bool = False) -> Tuple[Optional[float], List[str]]:
     """(confidence 0-100, [why, ...]) — or (None, []) when too little is known.
@@ -287,6 +291,23 @@ def sleep_estimate(rows: List[dict], now: float,
         score += 5.0
         terms.append("the phone is on charge")
 
+    # WHAT GOOGLE'S CLASSIFIER SAYS HE IS DOING, when the Home Assistant framework is
+    # feeding it. This is the one signal here that is trained rather than thresholded, so
+    # locomotion from it is treated as near-certain: a man the phone believes is WALKING is
+    # not asleep, whatever the wrist and the screen have been doing. Stillness from it is
+    # only weak corroboration, because a still phone is still just a phone.
+    if activity is not None:
+        a = activity.get("value")
+        if a in ("walking", "running", "cycling", "vehicle"):
+            score -= 60.0
+            terms.append("his phone says he is %s" % ("in a vehicle" if a == "vehicle"
+                                                      else a))
+            signals += 1
+        elif a == "still":
+            score += 5.0
+            terms.append("his phone says he is still")
+            signals += 1
+
     if signals < _SLEEP_MIN_SIGNALS:
         return None, []
 
@@ -318,11 +339,15 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
     screen = latest("screen", window, now, DEVICE_SOURCE)
     charging = latest("charging", window, now, DEVICE_SOURCE)
     light = latest("light", window, now, DEVICE_SOURCE)
+    # A CLASSIFIER's, arriving through the Home Assistant framework. Absent unless that
+    # framework is configured, which is the normal case.
+    activity = latest("activity", window, now, DEVICE_SOURCE)
 
     observed: Dict[str, Any] = {}
     for name, row in (("heart_rate", hr), ("on_body", body), ("motion", motion),
                       ("sleep_stage", sleep), ("screen", screen),
-                      ("charging", charging), ("light", light)):
+                      ("charging", charging), ("light", light),
+                      ("activity", activity)):
         if row is not None:
             observed[name] = row.get("value")
 
@@ -390,8 +415,8 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
             why.append("a sleep classifier put it at %d%%" % int(c))
         else:
             c, terms = sleep_estimate(window, now, hr=hr, light=light,
-                                      charging=charging, rest=resting(now),
-                                      awake_now=awake_now)
+                                      charging=charging, activity=activity,
+                                      rest=resting(now), awake_now=awake_now)
             if c is not None:
                 facts["sleep_source"] = "inferred"
                 facts["sleep_terms"] = terms

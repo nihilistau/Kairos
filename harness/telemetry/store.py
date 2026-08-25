@@ -64,6 +64,13 @@ KINDS = {
     # person in the room would actually notice — pacing, fidgeting, turning over in bed.
     "gyro_rms":        ("rad/s",   "number"),
     "motion":          ("",        "state"),    # still | moving | vehicle
+    # WHAT A CLASSIFIER SAYS HE IS DOING, as opposed to what an accelerometer measured.
+    # Google's Activity Recognition, arriving through the Home Assistant framework. Kept
+    # under its OWN name rather than folded into `motion` because it is a different KIND of
+    # claim -- a trained guess about the person, not a reduction of raw movement -- and
+    # because it comes from the phone, whose opinion about his body is not authoritative
+    # (harness/telemetry/body.py: a phone on a desk is not a man sitting still).
+    "activity":        ("",        "state"),    # still|walking|running|cycling|vehicle
     # HE LOOKED AT HIS WATCH. A special-trigger sensor (type 26) and one of the few on the
     # Watch4 that is NOT behind com.samsung.permission.SSENSOR, so we can actually have it.
     # It is the wrist's answer to the phone screen: a man asleep does not raise his arm to

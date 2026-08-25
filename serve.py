@@ -891,6 +891,14 @@ def build_env(c: dict) -> dict:
         # that widens it is making a decision about who can reach her, and it should look
         # like one in the file.
         "SP_GATEWAY_BIND": (c.get("serve", {}).get("bind") or "127.0.0.1"),
+        # HOME ASSISTANT (2026-08-26). The URL and the interval are operator config and
+        # belong in the profile like everything else. THE TOKEN IS NOT HERE and must never
+        # be: everything in profiles/ is committed and everything committed is exported, so
+        # a long-lived token in a TOML file is a token in the public repo a fortnight later.
+        # Only the PATH to it is mapped; the secret itself lives in var/, which is neither.
+        "SP_HA_URL": str(c.get("homeassistant", {}).get("url", "") or ""),
+        "SP_HA_POLL_S": str(c.get("homeassistant", {}).get("poll_s", 60)),
+        "SP_HA_TOKEN_FILE": os.path.join(VAR, "ha_token"),
         "SP_TELEMETRY_DIR": os.path.join(VAR, "telemetry"),
         "SP_TELEMETRY_KEEP_DAYS": str(c.get("telemetry", {}).get("keep_days", 0)),
 
