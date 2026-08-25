@@ -1198,6 +1198,34 @@ def request(want: str, made_in: str = AV.DEFAULT_OUTFIT, by: str = "her",
     want = (want or "").strip()
     if not want:
         return {"ok": False, "error": "say what you would like"}
+    # ── A CONTROL MARK IS NOT A GARMENT (2026-08-25) ────────────────────────────────
+    # Live on his machine: w033 is a real, generated, permanent wardrobe item whose want
+    # text is `[gesture:"kneeling/leaning forward"]`. The prompt built from it reads
+    # `Wearing: [gesture:"kneeling/leaning forward"]. This is what she is wearing — the
+    # clothes are the subject of this picture`, so an image generation was spent on a
+    # mark. It has an empty `calls` list, which means nothing she could say will ever
+    # reach it: an item in her wardrobe that she cannot ask for, forever.
+    #
+    # It got there because this door takes `want` verbatim. Marks reach it two ways — a
+    # known one ([WEAR:…], [SHOW:…], [MOOD:…]) that some caller forgot to strip, and an
+    # improvised one like the above, which the stripper does not know and cannot know.
+    # So the rule is not a list of marks to remove; it is a shape to refuse: after the
+    # record strip, a want that is nothing but a single bracketed token is machinery, and
+    # machinery is not clothing.
+    #
+    # REFUSE, never silently rewrite. If a caller passed a mark, the caller has a bug,
+    # and a want quietly turned into something she did not ask for is worse than an
+    # error message. Her real wants are unaffected — they are prose.
+    try:
+        from harness.inference.stream_processor import strip_for_record as _sfr
+        _clean = _sfr(want).strip()
+    except Exception:
+        _clean = want
+    if not _clean or (_clean.startswith("[") and _clean.endswith("]")
+                      and "]" not in _clean[1:-1]):
+        return {"ok": False,
+                "error": "that reads as a control mark rather than something to wear "
+                         "(%s) — say it in words" % want[:60]}
     rows = wants()
     # ── SHE CANNOT SEE HER OWN QUEUE WHILE SHE IS ASKING (2026-08-04) ───────────────
     # w001 and w006 carry IDENTICAL want text — "the silver nightie, by the window,

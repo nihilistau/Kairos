@@ -64,6 +64,26 @@ def build_server(unsandboxed: bool | None = None) -> FastMCP:
         except Exception as exc:  # pragma: no cover
             print(f"[mcp_server] memory tools skipped: {exc}", file=sys.stderr)
 
+    # ── HER, not just her machine (2026-08-25) ────────────────────────────────────────
+    # docs/MCP.md has said since 2026-07-31 that this server "exposes her memory, her
+    # board and her skills". Two thirds of that was aspiration: the surface was a
+    # workspace filesystem, web, a clock, and five memory tools. An external client could
+    # read her FILES and knew nothing about HER — not what she believes or why, not what
+    # she is wearing, not what she did with her own time, not what is on the board. The
+    # doc was corrected by building the thing rather than deleting the sentence.
+    #
+    # Same condition as the memory tools, because it is the same precondition: without
+    # SP_RECALL_REGISTRY there is no store to answer from and these would all return the
+    # empty-store string. Read-only, deliberately — see her_tools.py's header for why the
+    # outbound write surface is not being widened here.
+    if os.environ.get("SP_RECALL_REGISTRY"):
+        try:
+            from harness.mcp_server.her_tools import HER_TOOLS
+            for fn in HER_TOOLS:
+                reg(fn)
+        except Exception as exc:  # pragma: no cover
+            print(f"[mcp_server] her tools skipped: {exc}", file=sys.stderr)
+
     # Operator-defined tools from custom_tools.py (easily customizable).
     try:
         from harness.mcp_server import custom_tools

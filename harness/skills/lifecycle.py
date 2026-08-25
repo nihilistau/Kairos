@@ -1218,6 +1218,23 @@ def stamp(row: dict, fact: str, speaker: str, src: str,
     return row
 
 
+def is_distillate(row: dict) -> bool:
+    """True when this row was itself distilled from other rows.
+
+    THE ONE PREDICATE, because the rule it serves is one rule (2026-08-25). Both nightly
+    consolidators must refuse to read a distillate — becoming.nightly and weekly_chapter
+    each distil, each writes a permanent INFERRED row, and a distillate taken as support
+    is a copy of a copy that no later row can walk back to anything she said. The pair
+    stated that rule as two hand-maintained kind lists, `becoming._EXCLUDE_KINDS` and
+    `narrative._CHAPTER_KINDS`, and the deny-list side forgot its OWN kind: three
+    self_description rows on disk, the third naming the first two.
+
+    `derived_from` is the mark stamp() puts on exactly these rows, so the predicate reads
+    the mark instead of enumerating the producers. A consolidator added next year is
+    covered the day it stamps its first row."""
+    return bool(row.get("derived_from"))
+
+
 def is_retired(row: dict) -> bool:
     """The ONE liveness predicate at the row level. memory.live_rows() is the one that
     filters a store; this is the same law for a single row, so callers that already hold

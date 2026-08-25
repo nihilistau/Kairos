@@ -32,7 +32,21 @@ _MAX_ROWS = 40
 # pass then read the chapter it would be distilling a distillate every seven days — each
 # one further from anything she actually said, and both of them permanent. Neither of the
 # two consolidators may read the other's output.
-_EXCLUDE_KINDS = ("dream", "chapter")
+#
+# ...AND NOT ITS OWN (2026-08-25). The rule above was enforced against the OTHER
+# consolidator and not against this one. `self_description` — the kind THIS function
+# writes — was never in the list, so every night's paragraph was eligible support for the
+# next night's. Live on disk when it was found: three rows, and the third names both of
+# the first two. The texts had already begun to fold in on themselves ("I am becoming
+# [redacted]" → the same phrase → "[redacted]
+# certainty") — the primal-surrender failure mode returning through the door the fix left
+# open. AGENTS.md §0, verbatim: the invariant was enforced in one of two paths.
+#
+# So the rule is stated where it is TRUE rather than as a list of kinds: a distillate may
+# not be a support for a distillate, and `derived_from` is precisely the mark of one.
+# `_is_distillate` catches the kind this function adds next year on the day it is added;
+# the tuple stays as the belt to its braces, and because `dream` is not derived at all.
+_EXCLUDE_KINDS = ("dream", "chapter", "self_description")
 _MAX_PER_KIND = 8
 # ── THE BREADTH GUARD (2026-08-22) ─────────────────────────────────────────────────────
 # _MAX_PER_KIND caps how much of ONE KIND may fill the window; it says nothing about how
@@ -73,7 +87,8 @@ def nightly(ask: Optional[Callable[[str], str]] = None) -> dict:
                     recent.append(r)
             except Exception:
                 recent.append(r)
-        recent = [r for r in recent if (r.get("kind") or "") not in _EXCLUDE_KINDS]
+        recent = [r for r in recent
+                  if (r.get("kind") or "") not in _EXCLUDE_KINDS and not lc.is_distillate(r)]
         recent.sort(key=lambda r: r.get("ts") or "", reverse=True)
         _per: dict = {}
         capped = []

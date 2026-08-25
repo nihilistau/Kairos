@@ -468,6 +468,58 @@ def all_rows(path: str = "") -> List[dict]:
     return _load(path)
 
 
+def supports_of(row_or_name, path: str = "") -> List[dict]:
+    """The rows a distillate was drawn FROM, resolved to actual rows — TOMBSTONES INCLUDED.
+
+    THE GAP THIS CLOSES (2026-08-25 audit). `derived_from` has been written since
+    2026-08-22, enforced nightly by orphaned_distillates/retire_orphans, and gated by
+    G-PROVENANCE. Nothing could READ it. The only code in the tree that resolved a name
+    to a row was a private dict inside `lifecycle.orphaned_distillates`, and the only
+    place the names ever left the process was a maintenance POST body listing rows it had
+    just killed. The receipts were on disk and nothing could print them, so "why do you
+    believe that?" got exactly zero steps.
+
+    RETIRED SUPPORTS ARE THE POINT, not an edge case: a conclusion resting on things she
+    no longer holds is the single most useful thing this can say. Callers decide what to
+    do with them — `lifecycle.is_retired()` is right there. A name that matches no row is
+    dropped rather than faked; unknown is not dead (the same narrowness
+    orphaned_distillates keeps), and `missing_supports` names them for anyone who cares.
+
+    Order follows `derived_from`, which is the order the consolidator read them in."""
+    row = row_or_name if isinstance(row_or_name, dict) else None
+    rows = _load(path)
+    if row is None:
+        row = next((r for r in rows if r.get("name") == row_or_name), {})
+    names = row.get("derived_from") or []
+    by_name = {r.get("name"): r for r in rows}
+    return [by_name[n] for n in names if n in by_name]
+
+
+def missing_supports(row_or_name, path: str = "") -> List[str]:
+    """Support names that resolve to no row at all — see supports_of. Unknown, not dead."""
+    row = row_or_name if isinstance(row_or_name, dict) else None
+    rows = _load(path)
+    if row is None:
+        row = next((r for r in rows if r.get("name") == row_or_name), {})
+    have = {r.get("name") for r in rows}
+    return [n for n in (row.get("derived_from") or []) if n not in have]
+
+
+def dependents_of(row_or_name, path: str = "") -> List[dict]:
+    """The other direction: every distillate that names THIS row among its supports.
+
+    The forward walk answers "what is this conclusion made of". This one answers the
+    question a curate panel actually asks before he retires something — "what rests on
+    this, if I take it away?" — and it is what makes the nightly orphan sweep legible
+    BEFORE it fires rather than only in the log line after. Tombstoned distillates are
+    included: a dead conclusion still rested on this row, and hiding that would be the
+    audit lane lying to make a listing tidier."""
+    name = row_or_name.get("name") if isinstance(row_or_name, dict) else row_or_name
+    if not name:
+        return []
+    return [r for r in _load(path) if name in (r.get("derived_from") or [])]
+
+
 def orphan_tombstones(path: str = "") -> List[dict]:
     """AUDIT: tombstones with no `superseded_by` breadcrumb (2026-08-24 audit, H5).
     The live store carries 25 of them (repair-era retirements; forget() before it grew
@@ -943,7 +995,38 @@ def provenance(fact: str) -> str:
     # 2026-08-19: the code catches up to the doc. It also quoted a private-secret's text
     # verbatim; now the secret rule runs first, and a direct ask (attribute present)
     # still answers, because provenance carries the query. G-MEMORY-LIFECYCLE / G-SECRET §5.
-    return f"{_present_row(hit, fact)} — learned from {src} at {ts}"
+    out = f"{_present_row(hit, fact)} — learned from {src} at {ts}"
+    # ── AND IF IT IS A CONCLUSION, WHAT IT RESTS ON (2026-08-25) ─────────────────────
+    # `src` is prose and the doc forbids branching on it, so asked about a nightly
+    # becoming paragraph this door used to answer "learned from reflection on myself
+    # (nightly becoming)" — true, and useless, and the one question it exists for.
+    # `derived_from` is the structured answer and was sitting on the row untouched.
+    #
+    # THE TOMBSTONE RULE STILL HOLDS, which is why this counts rather than quotes: a
+    # retired support is NAMED IN THE TALLY and never spoken. "Two of them I no longer
+    # hold" is the honest sentence — it tells him the conclusion is standing on thinner
+    # ground than it was without her reading a dead row back as current. Every live
+    # support goes through _present_row, so the framing and the secret rule apply here
+    # exactly as they do at the four other doors.
+    from harness.skills import lifecycle as _lc
+    if _lc.is_distillate(hit):
+        sup = supports_of(hit)
+        live = [s for s in sup if not _lc.is_retired(s)]
+        dead = len(sup) - len(live)
+        gone = len(missing_supports(hit))
+        bits = ["drawn from %d thing%s I'd kept" % (len(sup), "" if len(sup) == 1 else "s")]
+        if hit.get("support_days"):
+            bits.append("across %d days" % int(hit["support_days"]))
+        if dead:
+            bits.append("%d of which I no longer hold" % dead)
+        if gone:
+            bits.append("%d I can no longer find" % gone)
+        out += "\n  " + ", ".join(bits) + "."
+        for s in live[:5]:
+            out += "\n    · " + _present_row(s, fact)
+        if len(live) > 5:
+            out += "\n    · ...and %d more." % (len(live) - 5)
+    return out
 
 
 def forget(fact: str) -> str:

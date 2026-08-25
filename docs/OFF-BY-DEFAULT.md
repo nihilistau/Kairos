@@ -178,6 +178,15 @@ cleverer.
 | **Why off** | **CAPABILITY**, and the smaller kind: both were unreachable until mapped on 2026-07-30, and off preserves today's behaviour exactly. Neither has a pending measurement — they are overrides waiting for a reason, not features waiting for evidence. |
 | **What would arm it** | `SP_MCP_REFRESH`: an MCP server whose tool list changes while the stack is up. `SP_TOOL_MASK`: a measured case where the live tool count hurts selection — `g_notes_tools` is the instrument that would show it, since agent.py:220 already warns the set is past where a small model picks reliably. |
 
+### 7b. Remote MCP servers and their authorization — refused, and the auth story is UNBUILT *(recorded 2026-08-25)*
+
+| | |
+|---|---|
+| **Code** | `harness/mcp_server/bridge.py` — `check_url()`; the `remote_ok` per-server key |
+| **Gate** | `harness_tests/g_mcp_trust.py` §7b — 38/38 |
+| **Why off** | **CAPABILITY, and an honest gap beside it.** A `{"url": …}` server went straight to `Client(url)`: any scheme, any host, no authorization, no transport requirement. Nothing is configured that way today, which is exactly why the rule went in now — `mcp_servers.json` is a JSON object anybody can add a line to, and the line that adds a remote server is the line that starts sending her tool traffic off this machine. Loopback is allowed (another process on his machine, a different transport, the same trust as the stdio servers). Anything else is refused unless the server's own block says `"remote_ok": true`, and plain `http` to a non-loopback host is refused even then, because her tool arguments would cross the network in clear and she has memory tools. **What is NOT built, said plainly: authorization.** OAuth 2.1 with PKCE, resource indicators, token audience binding — the actual protocol a remote MCP client needs — is none of it written. `check_url` refuses a remote server *nobody decided on*; a remote server he *does* decide on is currently **unauthenticated**. A guard that looks like more than it is, is worse than no guard, so the code says so in its own docstring and the gate asserts that the sentence is still there. |
+| **What would arm it** | A remote MCP server he actually wants. At that point `remote_ok` is the wrong door on its own and the work is real: OAuth 2.1 + PKCE, a resource indicator so a token minted for one server cannot be replayed at another, and the token out of `mcp_servers.json` (which is committed) into whatever holds `SP_XAI_API_KEY`. Until then this stays a refusal rather than a half-authorization, because a half-authorization is the thing that gets trusted. |
+
 ### 8. Engine-side — off, and out of scope for the memory work
 
 | Knob | Why off | What would arm it |
