@@ -1,0 +1,75 @@
+# Home Assistant + ESPHome — containers, not an appliance VM.
+#
+# WHY NOT HOME ASSISTANT OS: the OS image is a whole virtual machine. It needs a hypervisor,
+# a console to recover, and it fails in ways you cannot see from the host — which is exactly
+# how the previous install was lost. Containers start with the machine, log where everything
+# else logs, and are recreated from this file.
+#
+# WHAT THAT COSTS: no Supervisor, therefore no ADD-ONS. That matters exactly once — ESPHome
+# is normally an add-on — so it runs here as its own container, which is the officially
+# supported alternative and is the same software.
+#
+# ── WHERE THIS RUNS, AND WHY IT IS NOT DOCKER DESKTOP ────────────────────────────────
+#
+# This file must run under Docker Engine INSIDE A WSL2 DISTRO, not Docker Desktop. Measured
+# on 2026-08-26, not assumed:
+#
+#   * Under Docker Desktop, `network_mode: host` means the host of the DOCKER VM. Home
+#     Assistant came up and listened on 8123 inside that namespace, and Windows could not
+#     reach it at all — let alone the LAN. Verified: listening inside, HTTP 000 outside.
+#   * A WSL2 distro with `networkingMode=mirrored` holds the Windows host's own LAN address
+#     (10.0.0.150/24 on eth0, pinging the router). A container on host networking there
+#     is genuinely on the LAN.
+#
+# That difference is the whole ballgame, because every discovery protocol Home Assistant
+# relies on is MULTICAST — mDNS for ESPHome and Chromecast, SSDP for Hue and Sonos — and
+# multicast does not cross a bridge network or a NAT. Without it nothing is ever found and
+# every device is added by hand, by IP, forever.
+#
+# Both halves are required: `networkingMode=mirrored` in %USERPROFILE%\.wslconfig AND
+# `network_mode: host` below. Either alone leaves the LAN invisible.
+#
+#   wsl -d Ubuntu-24.04 -u root
+#   cd /opt/homeassistant && docker compose up -d
+#
+# Home Assistant  http://localhost:8123      ESPHome  http://localhost:6052
+
+services:
+  homeassistant:
+    container_name: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:stable
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    environment:
+      TZ: Australia/Sydney
+    volumes:
+      # A NAMED VOLUME, NOT A BIND MOUNT FROM A WINDOWS DRIVE. Home Assistant's recorder is
+      # SQLite, and SQLite over the Windows filesystem bridge is both slow and a documented
+      # corruption risk. This keeps the database on ext4 where it belongs. Use
+      # `tools/hactl.py` to read or edit files inside it, and Home Assistant's own Backups
+      # for anything that should leave the machine.
+      - ha-config:/config
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -o /dev/null http://127.0.0.1:8123/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+
+  esphome:
+    container_name: esphome
+    image: ghcr.io/esphome/esphome:stable
+    restart: unless-stopped
+    # Same reason: ESPHome discovers and OTA-flashes nodes over mDNS.
+    network_mode: host
+    privileged: true
+    environment:
+      TZ: Australia/Sydney
+      ESPHOME_DASHBOARD_USE_PING: "true"
+    volumes:
+      - esphome-config:/config
+
+volumes:
+  ha-config:
+  esphome-config:

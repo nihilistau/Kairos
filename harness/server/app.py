@@ -2488,6 +2488,61 @@ def _quiet_for(seconds: float) -> bool:
         return True
 
 
+def start_ha_poller() -> None:
+    """Ask Home Assistant for the handful of things no sensor of ours can produce.
+
+    OFF UNLESS CONFIGURED. No token means this returns immediately and no thread is made,
+    so shipping the framework enabled costs nothing and surprises nobody.
+
+    WHY POLL AT ALL, rather than have Home Assistant push. A push needs a webhook, which
+    needs a URL that Home Assistant can reach and a secret to authenticate it, which is two
+    more things to configure and one more thing that can be pointed at from outside. Pulling
+    needs a token we already have. The cost is latency, and the poll interval bounds it.
+
+    WHY SIXTY SECONDS for a signal that refreshes every ten minutes. Not to catch it sooner
+    than it changes — to bound how badly it can be MISDATED. The bridge records each reading
+    with Home Assistant's own timestamp, and skips anything too old to date honestly; a slow
+    poll would mean routinely arriving at a reading that has already aged out."""
+    try:
+        from harness.homeassistant import bridge as _ha_bridge
+        from harness.homeassistant import client as _ha_client
+    except Exception as exc:                          # pragma: no cover - import guard
+        logger.warning("[home-assistant] framework unavailable: %s", exc)
+        return
+    if not _ha_client.configured():
+        logger.info("[home-assistant] off (no token) — nothing will be polled")
+        return
+    try:
+        every = float(os.environ.get("SP_HA_POLL_S", "60") or 60)
+    except ValueError:
+        every = 60.0
+
+    def _loop():
+        # A COUNTER, NOT A LOG LINE PER POLL. Sixty seconds forever is 1,440 lines a day
+        # saying "nothing changed", which is how the one line that matters gets lost.
+        quiet = 0
+        while True:
+            time.sleep(every)
+            try:
+                r = _ha_bridge.poll_once()
+                if r.get("stored"):
+                    logger.info("[home-assistant] stored %d reading(s) from %d entit(ies)",
+                                r["stored"], r.get("seen") or 0)
+                    quiet = 0
+                elif not r.get("ok"):
+                    quiet += 1
+                    # Only on the first failure and then hourly: Home Assistant restarting
+                    # for an upgrade should not fill the log, but a token revoked three
+                    # weeks ago should not be invisible either.
+                    if quiet == 1 or quiet % 60 == 0:
+                        logger.warning("[home-assistant] %s", r.get("why") or "unreachable")
+            except Exception as exc:
+                logger.warning("[home-assistant] tick failed: %s", exc)
+
+    _thr.Thread(target=_loop, name="home-assistant", daemon=True).start()
+    logger.info("[home-assistant] polling %s every %ds", _ha_client.url(), int(every))
+
+
 def start_consolidation_ticker() -> None:
     """Fire `run_consolidation()` once per day, at or after SP_CONSOLIDATE_HOUR local.
 
@@ -2523,6 +2578,20 @@ def start_consolidation_ticker() -> None:
     t = _thr.Thread(target=_loop, name="consolidate", daemon=True)
     t.start()
     logger.info("[consolidate] day boundary armed: hour=%02d, quiet>=%ds", hour, int(quiet_s))
+
+
+def _house_now_json() -> Dict[str, Any]:
+    """One seam for the room, exactly as /v1/telemetry/now is. NEVER RAISES.
+
+    What Home Assistant is, whether it is reachable, which of his entities this framework
+    would take and what each becomes. The last part is the useful one: it answers "why is
+    she not being told I am asleep" without anyone having to read the mapping table."""
+    try:
+        from harness.homeassistant import house as _house
+        return _house.status()
+    except Exception as exc:
+        return {"configured": False, "alive": False,
+                "why": "the framework failed to load: %s" % str(exc)[:160]}
 
 
 def _voice_status() -> Dict[str, Any]:
@@ -5060,6 +5129,10 @@ def _run_stdlib(host: str, port: int) -> None:
                 # bodies. `history` is the chart's series and is deliberately separate:
                 # it is allowed to be big and slow, `now` is not.
                 "/v1/telemetry/now": _telemetry_now_json,
+                # HOME ASSISTANT (2026-08-26). Status, reachability, and what the bridge
+                # would take — so "she does not know I am asleep" has an answer that is not
+                # "read the source".
+                "/v1/house/now": _house_now_json,
                 "/v1/telemetry/health": lambda: __import__(
                     "harness.telemetry.store", fromlist=["x"]).verify(),
                 "/v1/memory": _memory_json,      # PK2 §U1 memory-browser data
@@ -5630,6 +5703,13 @@ def _run_stdlib(host: str, port: int) -> None:
         start_consolidation_ticker()
     except Exception as exc:
         logger.warning("[gateway] day boundary not armed: %s", exc)
+    # HOME ASSISTANT (2026-08-26). Self-disarming: no token, no thread. It carries the one
+    # thing no sensor we can reach produces — whether he is asleep — and it must never be
+    # able to stop the gateway coming up, so its own failure is a warning and nothing more.
+    try:
+        start_ha_poller()
+    except Exception as exc:
+        logger.warning("[gateway] home assistant not armed: %s", exc)
     ThreadingHTTPServer((host, port), Handler).serve_forever()
 
 

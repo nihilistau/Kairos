@@ -66,6 +66,7 @@ CONVICTED = [
 # reasoned around, the same answer this repo gave the wardrobe matcher.
 NOT_A_STORE = {
     "SP_AUX_API_KEY_FILE": "a credential, read-only",
+    "SP_HA_TOKEN_FILE": "a credential, read-only",
     "SP_XAI_KEY_FILE": "a credential, read-only",
     "SP_AUX_INDEX_DIR": "a rebuildable index, and every aux gate points it at a temp dir",
     "SP_MUSIC_DIR": "his media library, read-only",
