@@ -48,7 +48,7 @@ since the day that was discovered. This framework is the piece that carries one 
 | `harness/homeassistant/bridge.py` | The suffix table and the poll. Writes only via `ingest.record`. |
 | `harness/homeassistant/house.py` | What she may *say* about the house. Empty by default. |
 | `harness/homeassistant/stack/` | The containers, and why they are containers. |
-| `harness_tests/g_homeassistant.py` | 36 checks. |
+| `harness_tests/g_homeassistant.py` | 45 checks. |
 
 ## The five rules it inherits
 
@@ -190,11 +190,80 @@ one real cost of not using the appliance. It is the same software, officially su
 way, at `:6052`, and it needs host networking for exactly the same reason Home Assistant
 does — it discovers and OTA-flashes nodes over mDNS.
 
-## Migrating from an existing instance
+## Migrating an appliance backup into the container stack
 
-Restore rather than re-pair. On the old instance: **Settings → System → Backups → Create**,
-download the `.tar`, then in the new instance's onboarding choose **Restore from backup**.
-That carries every device, entity, area and automation across.
+Done here on 2026-08-26: a Home Assistant OS backup, 415 MB, **76 devices and 626 entities**,
+moved off a VM. Result: **334 of 353 entities**, all 4 lights, all 10 switches, all 11
+automations, and the existing long-lived token still authenticating.
 
-USB radios (Zigbee, Z-Wave) need `usbipd-win` to attach the dongle to the WSL distro before
-the container can see it; that is a separate step and is not automatic.
+**The UI's "restore from backup" does not apply.** That flow belongs to the appliance. The
+core config is a plain directory inside `homeassistant.tar.gz` (as `data/`), so the restore
+is a directory copy — done **before Home Assistant has ever started**, so it never generates
+a default config that then has to be deleted. One fewer destructive step in the sequence.
+
+### The add-ons do not come across, and that is the real cost
+
+Sixteen of them, in that backup. There is no Supervisor, so nothing manages them. They fall
+into three groups, and only the middle one is work:
+
+| | |
+|---|---|
+| **Gone, and fine** | `samba`, `ssh`, `vscode`, `configurator`, `jupyterlab`, `nginx_proxy`, `letsencrypt` — conveniences with ordinary replacements |
+| **Need a container** | `mosquitto`, `matter_server`, `esphome`, `nodered`, `influxdb` — real services something depends on |
+| **Structural** | `hassio` itself, and `backup`/`cloud` which depend on it |
+
+### Supervisor hostnames, and where the mapping has to go
+
+A restored config points MQTT at `core-mosquitto` and Matter at `ws://core-matter-server:5580/ws`.
+Nothing answers to those, so both fail with a **DNS error rather than a connection one** —
+which sends you looking at the broker instead of at the name.
+
+Map the names rather than editing `.storage`. But **it has to be `extra_hosts` in the compose
+file, not the distro's `/etc/hosts`**: `network_mode: host` shares the network *namespace*,
+not the filesystem, so the container keeps its own `/etc/hosts` and a host-side entry is
+invisible to it.
+
+### The one edit that cannot be avoided
+
+Matter's entry carries `use_addon: true`, which means *"I own an add-on and will start it"* —
+Home Assistant calls `get_addon_manager()`, needs a Supervisor, and fails **before it ever
+reads the URL**. No hostname mapping helps. The flag has to become `false` and the URL has to
+point at the container, and the two go together.
+
+That is done with Home Assistant **stopped**, the store **copied first**, and the result read
+straight back to confirm it still parses. The alternative — deleting and re-adding the
+integration — would mean re-commissioning every Matter device, because the credentials live
+in that entry.
+
+### What is left for a person
+
+- **Tuya** cloud auth expires; re-authenticate in the UI.
+- **The companion app** must be pointed at the new server. Its sensors are per-install, and
+  a sensor that has not reported in months gets pruned from the registry — which is exactly
+  what happened to `sleep_confidence` here. Re-enable it under *Manage sensors*, along with
+  *Activity*, and grant Activity Recognition.
+- **`sensors.yaml`** may fail schema validation after a long version jump (2026.2 → 2026.8
+  here). Its error names the line.
+- **Automations referencing entities from failed integrations** disable themselves and come
+  back when the integration does.
+
+### And check the disk before you start
+
+This migration ran the system drive to **zero bytes free** mid-restore. WSL's ext4 went
+read-only, Docker's metadata store followed, and the errors pointed at Docker rather than at
+the disk. A 415 MB backup unpacks to over 1 GB of config, on top of ~3.5 GB of images.
+
+WSL virtual disks **grow but never shrink on their own**: deleting files inside a distro
+frees nothing on the host until the VHDX is compacted (`diskpart` → `compact vdisk`, with
+WSL shut down). Reclaiming 45 GB inside a distro here returned 44.6 GB to the host only
+after compaction.
+
+The stack therefore lives on a **data drive, with `--vhd-size` capped**, so Home Assistant
+cannot fill the system drive again:
+
+```bash
+wsl --install Ubuntu-24.04 --name homeassistant --location F:\wsl\homeassistant --vhd-size 16GB --no-launch
+```
+
+USB radios (Zigbee, Z-Wave) need `usbipd-win` to attach the dongle to the distro before the
+container can see it; that is a separate step and is not automatic.

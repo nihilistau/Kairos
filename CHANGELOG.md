@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.6.1 — migrating an appliance backup into the container stack (2026-08-26)
+
+Done for real, and the notes are what came out of it. `docs/HOME-ASSISTANT.md` has the
+section; the summary:
+
+- **The UI's "restore from backup" does not apply** to a Home Assistant OS backup being
+  moved into containers — that flow belongs to the appliance. The core config is a plain
+  directory inside `homeassistant.tar.gz`, so the restore is a directory copy done **before
+  Home Assistant has ever started**, which means it never generates a default config that
+  then has to be deleted.
+- **The add-ons do not come across.** That is the real cost of leaving the appliance. The
+  stack now carries a **Matter Server** container in place of the add-on, and documents why
+  Mosquitto is deliberately *not* added when a broker already holds 1883.
+- **Supervisor hostnames** (`core-mosquitto`, `core-matter-server`) fail with a **DNS** error
+  rather than a connection one, which sends you looking at the broker instead of at the name.
+  Map them with **`extra_hosts` in compose, not the distro's `/etc/hosts`** —
+  `network_mode: host` shares the network *namespace*, not the filesystem, so the container
+  keeps its own hosts file.
+- **Matter's entry needs one real edit**: `use_addon: true` makes HA call
+  `get_addon_manager()` and fail *before it reads the URL*, so no mapping helps. Stop HA,
+  copy the store, change it, read it back.
+- **Check the disk first.** WSL virtual disks grow but never shrink; deleting files inside a
+  distro frees nothing on the host until the VHDX is compacted. The stack belongs on a data
+  drive with `--vhd-size` capped so Home Assistant cannot fill the system drive.
+
 ## 0.6.0 — Home Assistant, as its own framework (2026-08-26)
 
 The sleep socket added in 0.5.2 now has something that can fill it. A **separate pluggable
