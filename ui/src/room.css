@@ -1418,3 +1418,21 @@ body.resizing, body.resizing * { user-select: none !important; cursor: inherit; 
                       vector-effect: non-scaling-stroke; }
 .tel-spark text { font-size: 7px; fill: currentColor; opacity: .45; }
 .tel-spark-empty { font-size: 10px; opacity: .45; width: 260px; }
+
+/* ── the sleep readout: a number that has to show its working ─────────────────────── */
+.tel-sleep { margin-top: 6px; }
+.tel-sleep-bar {
+  height: 4px; border-radius: 2px; overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+.tel-sleep-bar i { display: block; height: 100%; border-radius: 2px; }
+/* THE COLOUR CARRIES THE PROVENANCE. A measured reading and our own guess must not look
+   alike at a glance, because the glance is all this panel usually gets. */
+.tel-sleep-bar i.src-watch      { background: #6ee7b7; }
+.tel-sleep-bar i.src-classifier { background: #7dd3fc; }
+.tel-sleep-bar i.src-inferred   { background: #6b7280; }
+.tel-terms {
+  margin: 4px 0 0; padding-left: 14px;
+  font-size: 11px; line-height: 1.45; color: var(--dim, #8b8b8b);
+}
+.tel-terms li { list-style: '· '; }

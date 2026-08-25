@@ -56,7 +56,7 @@ Two facts that shape all of it, both found by looking rather than assuming:
 | `harness/telemetry/body.py` | The seam: measurements → the few sentences she may read. |
 | `harness/telemetry/watch-agent/` | The Wear OS app and its gradle-free build. |
 | `ui/src/apps/Body.jsx` | The ♥ panel. |
-| `harness_tests/g_telemetry.py` | 70 checks. |
+| `harness_tests/g_telemetry.py` | 113 checks. |
 
 ## What she is allowed to know
 
@@ -94,6 +94,85 @@ about ten minutes while he was up, and a count-only guard let `resting` come bac
 A wrong baseline is worse than none — every later reading is then measured against a number
 saying he is always calm, so nothing ever fires. It is the same shape as a bug
 `becoming.py` fixed four days earlier: *a cap on volume says nothing about span*.
+
+## Sleep has three possible sources, and they are not the same claim
+
+His question — *"there is a sleeping sensor... it returns a pretty accurate percentage
+chance of being asleep"* — turned out to have a precise answer, and it is not a sensor.
+
+| Rank | Source | Kind | State |
+|---|---|---|---|
+| 1 | The watch's own staging | `sleep_stage` | **unavailable** — see below |
+| 2 | A classifier's confidence | `sleep_confidence` | **socket built, nothing fills it** |
+| 3 | Ours | `sleep_confidence` + `sleep_terms` | **live**, and labelled `inferred` |
+
+**The watch cannot tell us.** Enumerating the Watch4's own sensor list rather than trusting
+a spec sheet: every sleep-capable sensor on it — `SContext`, `movement`, `wrist_down`, and
+with them ECG, BIA and the thermistor — is marked `perm: com.samsung.permission.SSENSOR`. A
+signature permission, held only by apps Samsung signed. Not grantable, not `adb`-able.
+
+**Home Assistant's "Sleep Confidence" is Google's Sleep API.** Not a sensor at all: a
+Play Services classifier on the *phone*, updating about every ten minutes, Play-Store
+flavour only. It is genuinely good and it is the right thing to want. Two ways it can reach
+us — the HA framework when that lands, or an agent linked against `play-services-location`
+— and both write the same `sleep_confidence` row, which is why the kind exists now with a
+reader already behind it. **Linking GMS costs the gradle-free build**: androidx, a
+dependency chain, and an APK that goes from 16 KB to megabytes. That is a decision, not an
+oversight, and it is his to make.
+
+### So we estimate it, and the estimate shows its working
+
+A number invented in `body.py` and printed with a `%` after it is exactly the failure this
+module exists to prevent — a confident guess wearing a measurement's clothes. So
+`sleep_estimate()` returns **the terms that produced it** alongside the number, and the
+panel and the seam both render them:
+
+> 78% — *phone untouched for 94 min; his wrist still for 51 min; heart at his resting band
+> (57)*
+
+If she could only say "78%" she would be bluffing. With the terms, the number is a summary
+of things that were actually measured and he can contradict any one of them.
+
+Four rules hold it honest:
+
+- **`None` is not `0`.** Too little evidence returns `None`, never a low confidence.
+  "We have no idea" and "he is awake" are different claims, and an empty store supports
+  only the first. Returning `0.0` would have her quietly certain he was up all night, every
+  night the watch sat on its charger.
+- **Between the bands she says nothing.** Above 70 she may say it; below 30 he is awake;
+  in between `asleep` is left **unset** rather than set to `False`, and every reader
+  downstream treats a missing key as *do not claim it*.
+- **The wrist and the screen are vetoes, not weights.** A man who just looked at his watch
+  is awake, and no amount of accumulated stillness gets to outvote him.
+- **No time-of-day prior.** Every sleep model wants one; for this user it would be actively
+  harmful. He is routinely working at 03:00, so "it is 3am, therefore asleep" would make her
+  confidently wrong at exactly the hour she is most likely to be talking to him.
+
+### He looked at his watch
+
+`wrist_tilt_gesture` — sensor type 26, and one of the few on this watch that is **not**
+permission-locked. It fires when he raises his arm to check the time, and it is the only
+free awake-signal that comes from *his body* rather than from a device he might have put
+down: a phone screen can be lit by a notification, a wrist tilt cannot happen without him.
+
+The constant is spelled out as `26` in the agent because `Sensor.TYPE_WRIST_TILT_GESTURE`
+is hidden from the public `android.jar` — it exists on the device and compiling against the
+name fails. The number was read off this watch's own `dumpsys`, not a doc page.
+
+### `motion` is derived, because nothing posts it
+
+The `motion` state kind has **never had a single row** — 0 in 6,820 live samples. The agent
+reduces to `gyro_rms` per window and posts that; the state was something the seam invented
+for itself and then depended on, so `moving`, `motion_for_s` and the stillness term were all
+reading a key that is never there. `still_run()` derives it from the RMS rows, still prefers
+a classified `motion` state if any source ever posts one, and both it and `movement_word`
+share a single `MOVE_RMS` threshold.
+
+### The wrist alone cannot conclude sleep
+
+A still wrist and a resting heart rate describe a sleeping man and a man reading in a chair
+equally well. The phone is what tells them apart, so watch-only data sits in the unsure band
+and she says nothing. That is not a gap — it is the honest reading, and the gate asserts it.
 
 ## How she is handed it
 
@@ -205,8 +284,14 @@ what she was told about your body before she says anything.
 
 ## What is not built
 
-- **Sleep staging from the watch's own classifier.** The `sleep_stage` kind exists and the
-  seam prefers it; the agent does not yet read it, so sleep is inferred from stillness and
-  labelled as inferred when it is.
-- **ECG, BIA, skin temperature.** Present on the hardware, behind
-  `com.samsung.permission.SSENSOR` — a signature permission, not grantable to us.
+- **Sleep staging from the watch.** Not "not built" — **not available**. Verified by
+  enumerating the device: every sleep-capable sensor is behind
+  `com.samsung.permission.SSENSOR`. The `sleep_stage` kind and its reader stay, because a
+  future watch or a rooted one would fill them.
+- **ECG, BIA, skin temperature.** Same wall, same permission.
+- **Google's Sleep API.** The socket (`sleep_confidence`) is built and read; nothing writes
+  it. Filling it means either the Home Assistant framework or linking `play-services-
+  location` into the agent, and the second one ends the gradle-free 16 KB build.
+- **The watch's own screen, light and pressure.** It posts all three, and the seam reads
+  them from the phone only — a watch spends its life inside a sleeve, so its light reading
+  describes his cuff. The rows are kept; nothing reads them yet.

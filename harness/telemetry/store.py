@@ -43,6 +43,16 @@ KINDS = {
     "skin_temp":       ("C",       "number"),
     "on_body":         ("",        "state"),    # on | off
     "sleep_stage":     ("",        "state"),    # awake | light | deep | rem
+    # A CLASSIFIER'S CONFIDENCE, 0-100, and never our own guess (2026-08-26).
+    # This is the shape Google's Sleep API produces and therefore the shape Home
+    # Assistant's "Sleep Confidence" sensor produces, since that sensor IS the Sleep API
+    # with a different label. It updates about every ten minutes.
+    #
+    # Nothing writes it yet. It is here so that when something does — the HA framework,
+    # or an agent built against Play Services — it lands in a socket that already has a
+    # reader, rather than arriving as a new kind that half the seam has never heard of.
+    # Our OWN estimate deliberately does not use this name: see body.sleep_estimate.
+    "sleep_confidence": ("%",      "number"),
     "stress":          ("",        "number"),
     # ── movement (either device) ────────────────────────────────────────────────────
     "steps":           ("count",   "number"),   # cumulative since boot; deltas on read
@@ -54,6 +64,12 @@ KINDS = {
     # person in the room would actually notice — pacing, fidgeting, turning over in bed.
     "gyro_rms":        ("rad/s",   "number"),
     "motion":          ("",        "state"),    # still | moving | vehicle
+    # HE LOOKED AT HIS WATCH. A special-trigger sensor (type 26) and one of the few on the
+    # Watch4 that is NOT behind com.samsung.permission.SSENSOR, so we can actually have it.
+    # It is the wrist's answer to the phone screen: a man asleep does not raise his arm to
+    # check the time. Recorded as an event — the value is always 1 and the timestamp is
+    # the whole point.
+    "wrist_tilt":      ("",        "number"),
     "calories":        ("kcal",    "number"),
     "distance":        ("m",       "number"),
     # ── device state (adb / companion) ──────────────────────────────────────────────

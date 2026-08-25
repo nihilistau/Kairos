@@ -122,13 +122,38 @@ export default function Body() {
                         {o.on_body === 'on' ? 'on wrist' : 'off wrist'}</span> : null}
                       {f.asleep === true ? <span className="tel-pill p-sleep">
                         asleep{f.crude ? '?' : ''}</span> : null}
+                      {f.awake_by_wrist ? <span className="tel-pill">just looked at it</span>
+                        : null}
                       {o.sleep_stage ? <span className="tel-pill">{o.sleep_stage}</span> : null}
                       {o.motion ? <span className="tel-pill">{o.motion}</span> : null}
                     </div>
-                    {/* INFERRED IS SAID OUT LOUD, here as everywhere else. */}
-                    {f.crude ? <div className="tel-sub">
-                      sleep inferred from stillness — the watch did not say
-                    </div> : null}
+
+                    {/* THE NUMBER, AND WHERE IT CAME FROM — never the number alone.
+                        A percentage with no provenance is the most confident-looking thing
+                        on the panel and the least accountable, so the source is rendered
+                        beside it every time: the watch measured it, a classifier decided
+                        it, or we guessed. Only the last one is ours. */}
+                    {typeof f.sleep_confidence === 'number' ? (
+                      <div className="tel-sleep">
+                        <div className="tel-sleep-bar">
+                          <i style={{ width: Math.max(2, f.sleep_confidence) + '%' }}
+                             className={'src-' + (f.sleep_source || 'inferred')} />
+                        </div>
+                        <div className="tel-sub">
+                          {Math.round(f.sleep_confidence)}% asleep
+                          {f.sleep_source === 'watch' ? ' — the watch measured it'
+                            : f.sleep_source === 'classifier' ? ' — a sleep classifier said so'
+                            : ' — our own reading, not a measurement'}
+                        </div>
+                        {/* Every term that produced the number. This is the part that
+                            makes the number arguable, which is the point of showing it. */}
+                        {(f.sleep_terms || []).length ? (
+                          <ul className="tel-terms">
+                            {f.sleep_terms.map((t, i) => <li key={i}>{t}</li>)}
+                          </ul>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 {d.why ? <div className="tel-why">{d.why}</div> : null}

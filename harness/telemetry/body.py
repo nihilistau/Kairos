@@ -26,7 +26,7 @@ up — the things a person in the same room would notice. He has doctors; she ha
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from harness.telemetry import store
 
@@ -44,6 +44,12 @@ FRESH_S = {
     "skin_temp": 60 * 60,
     "accel_rms": 15 * 60,
     "gyro_rms": 15 * 60,
+    # A CLASSIFIER's verdict, refreshed about every ten minutes by whatever produces it.
+    "sleep_confidence": 25 * 60,
+    # AN EVENT, not a state. Short on purpose: the entire value of "he just looked at his
+    # watch" is that it was JUST — a tilt an hour ago says nothing about now.
+    "wrist_tilt": 10 * 60,
+    "light": 60 * 60,
 }
 _DEFAULT_FRESH = 30 * 60
 
@@ -180,6 +186,118 @@ def resting(now: Optional[float] = None) -> Optional[float]:
     return round(hr[max(0, int(len(hr) * 0.10) - 1)], 1)
 
 
+# ── SLEEP HAS THREE POSSIBLE SOURCES AND THEY ARE NOT THE SAME CLAIM (2026-08-26) ─────
+#
+#   1. THE WATCH'S OWN STAGING (`sleep_stage`) — a measurement, and the best answer there
+#      is. Nothing produces it: every sleep-capable sensor on the Watch4 (SContext,
+#      `movement`, `wrist_down`) sits behind com.samsung.permission.SSENSOR, a signature
+#      permission we cannot hold. Verified by enumerating the device, not assumed.
+#
+#   2. A CLASSIFIER'S CONFIDENCE (`sleep_confidence`) — Google's Sleep API, which is what
+#      Home Assistant's "Sleep Confidence" sensor is. Trained, calibrated, ~10 minutes,
+#      and it lives in Play Services on the PHONE rather than in any sensor. The socket is
+#      here and has a reader; nothing fills it yet.
+#
+#   3. OURS, below. INFERRED, and not calibrated against anything.
+#
+# The estimate exists because the ask was for a percentage rather than a boolean. But a
+# number invented in this file and printed with a % after it is precisely the failure this
+# module was written to avoid — a confident guess wearing a measurement's clothes — so the
+# TERMS THAT PRODUCED IT ARE RETURNED WITH IT. If the seam can only say "78%" it is
+# bluffing. If it can say "phone untouched 2h; his wrist still 90min; heart at his resting
+# band" then the number is a summary of things that were genuinely measured, and he can
+# contradict any single one of them.
+#
+# NO TIME-OF-DAY PRIOR, deliberately. Every sleep model wants one and for this user it
+# would be actively harmful: he is routinely up and working at 03:00, so a prior saying
+# "it is 3am, therefore asleep" would make her confidently wrong at exactly the hour she
+# is most likely to be talking to him.
+SLEEP_SURE = 70.0          # at or above: she may say he seems asleep
+SLEEP_AWAKE = 30.0         # at or below: he is awake
+_SLEEP_MIN_SIGNALS = 2     # below this the answer is None — see why in the docstring
+
+
+def sleep_estimate(rows: List[dict], now: float,
+                   hr: Optional[dict] = None,
+                   light: Optional[dict] = None, charging: Optional[dict] = None,
+                   rest: Optional[float] = None,
+                   awake_now: bool = False) -> Tuple[Optional[float], List[str]]:
+    """(confidence 0-100, [why, ...]) — or (None, []) when too little is known.
+
+    None is a different answer from a low number and the distinction is the whole guard:
+    "we have no idea" and "he is awake" are separate claims, and an empty store supports
+    only the first. Returning 0.0 for an empty store would have her quietly certain he is
+    up, all night, every night the watch is on the charger."""
+    terms: List[str] = []
+    score = 0.0
+    signals = 0
+
+    # THE PHONE, UNTOUCHED — the strongest thing we have and it costs nothing.
+    row, age = _last_state(rows, "screen", now, DEVICE_SOURCE)
+    if row is not None:
+        signals += 1
+        if row.get("value") == "off":
+            if age >= 45 * 60:
+                score += 25.0
+                terms.append("phone untouched for %d min" % int(age // 60))
+            if age >= 3 * 3600:
+                score += 10.0
+                terms.append("...and for over three hours")
+        else:
+            score -= 40.0
+            terms.append("the phone screen is on")
+
+    # STILL, AND FOR HOW LONG — HIS WRIST, never the phone, and via `still_run` because
+    # the `motion` state this used to read is never posted by anything (see above).
+    is_still, run = still_run(rows, now, BODY_SOURCE)
+    if is_still is not None:
+        signals += 1
+        if is_still:
+            if run >= 30 * 60:
+                score += 25.0
+                terms.append("his wrist still for %d min" % int(run // 60))
+            if run >= 90 * 60:
+                score += 10.0
+                terms.append("...and still for well over an hour")
+        else:
+            score -= 40.0
+            terms.append("he is moving")
+
+    # HIS OWN RESTING BAND, never a table's number.
+    if hr is not None and rest is not None:
+        signals += 1
+        v = float(hr.get("value") or 0)
+        if v <= rest + 3:
+            score += 25.0
+            terms.append("heart at his resting band (%d)" % int(v))
+        elif v <= rest + 8:
+            score += 10.0
+            terms.append("heart near his resting band (%d)" % int(v))
+        elif v >= rest + 20:
+            score -= 30.0
+            terms.append("heart well above his resting band (%d)" % int(v))
+
+    # THE ROOM IS DARK. Weak, and only the phone can say it.
+    if light is not None and float(light.get("value") or 0) < 5.0:
+        score += 10.0
+        terms.append("the room is dark")
+
+    # ON CHARGE. The weakest of the lot — people plug the phone in overnight.
+    if charging is not None and charging.get("value") == "on":
+        score += 5.0
+        terms.append("the phone is on charge")
+
+    if signals < _SLEEP_MIN_SIGNALS:
+        return None, []
+
+    # ── THE VETOES. Not weights. A man who just looked at his watch is awake and no
+    # amount of accumulated stillness gets to outvote him.
+    if awake_now:
+        score = min(score, 5.0)
+
+    return max(0.0, min(100.0, score)), terms
+
+
 def read(now: Optional[float] = None) -> Dict[str, Any]:
     """Everything the seam knows, as data. `present()` renders; this decides.
 
@@ -187,7 +305,10 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
     measured; `facts` is what was concluded and is always INFERRED. Two dicts because they
     are two kinds of claim and collapsing them is how one becomes the other."""
     now = time.time() if now is None else now
-    window = store.read_since(6 * 3600, now)
+    # TWELVE HOURS, not six. `latest()` still applies FRESH_S so nothing here gets to
+    # claim a stale reading — but a night's screen-off run is eight hours long, and a
+    # window that cannot see the start of it cannot measure it.
+    window = store.read_since(12 * 3600, now)
     hr = latest("heart_rate", window, now)               # only the watch makes these
     body = latest("on_body", window, now)
     sleep = latest("sleep_stage", window, now)
@@ -217,6 +338,16 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
     awake_by_screen = (screen is not None and screen.get("value") == "on"
                        and _age(screen, now) <= 300)
 
+    # ── AND THE WRIST'S VERSION OF THE SAME THING (2026-08-26) ──────────────────────
+    # `wrist_tilt_gesture` fires when he raises his arm to look at the watch. It is one of
+    # the handful of Watch4 sensors NOT behind Samsung's signature permission, and it is
+    # the only free awake-signal that comes from HIS BODY rather than from a device he
+    # might have left on a table. A phone screen can be woken by a notification; a wrist
+    # tilt cannot happen without him.
+    tilt = latest("wrist_tilt", window, now, BODY_SOURCE)
+    awake_by_wrist = tilt is not None and _age(tilt, now) <= 300
+    awake_now = awake_by_screen or awake_by_wrist
+
     # ── IS HE WEARING IT? Everything about his BODY is worthless if he is not. ───────
     if body is not None and body.get("value") == "off":
         out = {"facts": {}, "observed": observed, "since": {},
@@ -240,29 +371,50 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
         facts["phone_charging"] = charging.get("value")
     if awake_by_screen:
         facts["awake_by_screen"] = True
+    if awake_by_wrist:
+        facts["awake_by_wrist"] = True
+
+    # ── ONE SLEEP DECISION, THREE SOURCES, BEST FIRST. There used to be two rules here
+    # (the staging branch and a separate crude boolean) and two rules over one question is
+    # how they drift apart. Everything now lands on a confidence and a named source.
     if sleep is not None:
         facts["asleep"] = sleep.get("value") != "awake"
         facts["sleep_stage"] = sleep.get("value")
+        facts["sleep_source"] = "watch"
         why.append("the watch reported sleep staging")
-    elif motion is not None and hr is not None:
-        rest = resting(now)
-        still = motion.get("value") == "still"
-        low = rest is not None and float(hr["value"]) <= rest + 5
-        if still and low and not awake_by_screen:
-            facts["asleep"] = True
-            facts["crude"] = True
-            why.append("still, and his heart rate is at his own resting band — inferred, "
-                       "not measured; the watch did not say")
+    else:
+        conf = latest("sleep_confidence", window, now)
+        if conf is not None:
+            c = float(conf.get("value") or 0)
+            facts["sleep_source"] = "classifier"
+            why.append("a sleep classifier put it at %d%%" % int(c))
         else:
-            facts["asleep"] = False
+            c, terms = sleep_estimate(window, now, hr=hr, light=light,
+                                      charging=charging, rest=resting(now),
+                                      awake_now=awake_now)
+            if c is not None:
+                facts["sleep_source"] = "inferred"
+                facts["sleep_terms"] = terms
+                facts["crude"] = True
+                why.append("nothing measured his sleep, so this is our own reading at "
+                           "%d%% from: %s" % (int(c), "; ".join(terms) or "very little"))
+        if c is not None:
+            facts["sleep_confidence"] = round(c, 1)
+            # BETWEEN THE BANDS SHE SAYS NOTHING. `asleep` is left UNSET rather than set
+            # to False, because "we are not sure" is not "he is awake" and the readers
+            # downstream all treat a missing key as "do not claim it".
+            if c >= SLEEP_SURE:
+                facts["asleep"] = True
+            elif c <= SLEEP_AWAKE:
+                facts["asleep"] = False
 
     # ── MOVING / STILL, and HOW LONG. "How long" is the half that makes it presence
     # rather than a status line: "still" is a state, "still for two hours" is a person.
-    if motion is not None:
-        facts["moving"] = motion.get("value") in ("moving", "vehicle")
-        run = _run_length(window, "motion", motion.get("value"), now)
-        if run:
-            facts["motion_for_s"] = run
+    _still, _for = still_run(window, now, BODY_SOURCE)
+    if _still is not None:
+        facts["moving"] = not _still
+        if _for:
+            facts["motion_for_s"] = _for
 
     # ── THE TAIL, so she sees the shape and not my conclusion (2026-08-26) ──────────
     # Kept in `observed`, because that is what it is: three things the watch measured.
@@ -292,10 +444,7 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
             observed["movement_tail"] = gvals
             facts["movement"] = round(sum(gvals) / len(gvals), 2)
             # Bands, not a scale: "a lot" is a thing a person says, 0.62 rad/s is not.
-            m = facts["movement"]
-            facts["movement_word"] = ("still" if m < 0.15 else
-                                      "shifting" if m < 0.5 else
-                                      "moving about" if m < 1.2 else "moving a lot")
+            facts["movement_word"] = _move_word(facts["movement"])
 
     # ── WORKED UP, against HIS OWN baseline and never a table's ──────────────────────
     if hr is not None:
@@ -315,9 +464,88 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
                       "motion": motion.get("at") if motion else None}}
 
 
-def _run_length(rows: List[dict], kind: str, value: Any, now: float) -> int:
-    """How long the newest run of this value has been going, in seconds. 0 if unknown."""
-    seq = [r for r in rows if r.get("kind") == kind]
+# ── `motion` IS A PHANTOM KIND, AND EVERYTHING KEYED ON IT WAS DEAD (2026-08-26) ──────
+# Measured, not suspected: ZERO `motion` rows in 6,820 live samples. The agent posts
+# `gyro_rms` and `accel_rms` once per window and has never posted a motion STATE — the
+# state was a convenience the seam invented for itself and then relied on. So `moving`,
+# `motion_for_s` and the stillness term in the sleep estimate were all reading a key that
+# is never present, on every real turn, while the gates stayed green — because the gates
+# recorded `motion` themselves before asking. A gate that supplies its own precondition is
+# testing the fixture (AGENTS.md §0).
+#
+# The kind stays: an external source (Home Assistant, another agent) can legitimately post
+# a classified state, and when one does it should win. But nothing may DEPEND on it, so
+# `still_run` prefers it and derives from the RMS rows when it is absent — which today is
+# always.
+MOVE_RMS = 0.15          # rad/s. Below this the wrist is still. ONE spelling of the number.
+
+
+def _move_word(m: float) -> str:
+    """Bands, not a scale: "a lot" is a thing a person says, 0.62 rad/s is not."""
+    return ("still" if m < MOVE_RMS else
+            "shifting" if m < 0.5 else
+            "moving about" if m < 1.2 else "moving a lot")
+
+
+def still_run(rows: List[dict], now: float,
+              source: str = "watch") -> Tuple[Optional[bool], int]:
+    """(is he still?, for how many seconds) — or (None, 0) when nothing says.
+
+    Prefers a classified `motion` state if some source posts one; otherwise walks the
+    `gyro_rms` rows the agent really sends, newest first, for as long as they stay under
+    MOVE_RMS. Duration is the half that matters: "still" is a state, "still for two hours"
+    is a person, and only the second one is evidence about sleep."""
+    mo = [r for r in rows if r.get("kind") == "motion" and r.get("source") == source]
+    if mo:
+        newest = max(mo, key=lambda r: r.get("at") or "")
+        val = newest.get("value")
+        return val == "still", _run_length(rows, "motion", val, now, source)
+
+    gy = [r for r in rows if r.get("kind") in ("gyro_rms", "accel_rms")
+          and r.get("source") == source]
+    if not gy:
+        return None, 0
+    gy.sort(key=lambda r: r.get("at") or "")
+    if float(gy[-1].get("value") or 0) >= MOVE_RMS:
+        return False, 0
+    start = gy[-1]
+    for r in reversed(gy):
+        if float(r.get("value") or 0) >= MOVE_RMS:
+            break
+        start = r
+    return True, int(_age(start, now))
+
+
+def _last_state(rows: List[dict], kind: str, now: float,
+                source: Optional[str] = None) -> Tuple[Optional[dict], float]:
+    """The newest row of a kind IGNORING freshness, with its age in seconds.
+
+    Deliberately not `latest()`. Freshness answers "what is true now" and is wrong for
+    "how long has this been so": a phone screen that went off three hours ago is stale by
+    every rule in FRESH_S, and it is simultaneously the most informative row in the store
+    about whether he is asleep. Two questions, two readers — collapsing them would either
+    make the sleep estimate blind after thirty minutes or make `latest()` willing to claim
+    yesterday's heart rate."""
+    seq = [r for r in rows if r.get("kind") == kind
+           and (not source or r.get("source") == source)]
+    if not seq:
+        return None, 0.0
+    seq.sort(key=lambda r: r.get("at") or "")
+    return seq[-1], _age(seq[-1], now)
+
+
+def _run_length(rows: List[dict], kind: str, value: Any, now: float,
+                source: Optional[str] = None) -> int:
+    """How long the newest run of this value has been going, in seconds. 0 if unknown.
+
+    `source` for exactly the reason `latest()` takes one, and this is the sibling that got
+    MISSED when that fix landed (2026-08-26). `motion` arrives from both devices under one
+    kind name; a run computed across the pair is a run of nothing. Live, that reads as
+    "still for two hours" off a phone lying on a desk while the watch is out for a run —
+    the same defect, in the same file, one function along. Fixing the instance and not the
+    class is the house bug (AGENTS.md §0) and this is what it looks like in miniature."""
+    seq = [r for r in rows if r.get("kind") == kind
+           and (not source or r.get("source") == source)]
     if not seq:
         return 0
     seq.sort(key=lambda r: r.get("at") or "")
