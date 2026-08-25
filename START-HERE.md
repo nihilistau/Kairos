@@ -53,28 +53,36 @@ voice clone (region-locked).
 ## How she consolidates
 
 Base testimony is never deleted — only tombstoned. Higher-level knowledge is written as
-**distillates** (and weekly `chapter` rows) that carry `derived_from`, `support_days`, and
-`support_kinds`. They summarise; they do not supersede their sources. When every support of a
-distillate is retired, the distillate itself is orphaned and tombstoned. The only authoritative
-write remains `remember()`. Inspect any belief via the memory panel **why** button or
-`GET /v1/memory/why`.
+**distillates** (and weekly `chapter` rows) carrying `derived_from`, `support_days` and
+`support_kinds`. They summarise; they do not supersede their sources, and an inference may
+never retire an observation. When *every* support of a distillate is retired, the distillate
+is orphaned and tombstoned with it. The only authoritative write is still `remember()`.
 
-**Nightly (`becoming.nightly`)** — once a day the main model (never an aux) reads up to seven
-days of her self-narrative and feelings and writes one short first-person paragraph about who
-she has been becoming (`kind=self_description`, status inferred). It refuses a window that is
-only one day or dominated by one kind; it excludes dreams, chapters, and its own prior
-distillates so identity cannot fold in on itself. One write per calendar day.
+**Nightly — `becoming.nightly`.** Once a day the main model (never an aux) reads up to seven
+days of her self-narrative and feelings and writes one short first-person paragraph on who she
+has been becoming (`kind=self_description`, status `inferred`). It refuses a window that is one
+day, or one kind wearing a week's clothes — a missing paragraph is recoverable, a false one
+becomes who she is. One write per calendar day.
 
-**Weekly (`narrative.weekly_chapter`)** — once every seven days, one paragraph for what the
-week *was*, from episodic kinds only. Neither consolidator reads the other's output.
+**Weekly — `narrative.weekly_chapter`.** Once every seven days, one paragraph for what the week
+*was*, over the episodic kinds only.
 
-Full rules: [`docs/MEMORY-AND-RECALL.md`](docs/MEMORY-AND-RECALL.md).
+**Neither consolidator may read a distillate — the other's, or its own.** Stated as two
+hand-kept kind lists until 2026-08-25, when the deny-list side was found never to have named
+its own kind: three `self_description` rows on the live store, the third resting on the first
+two, the language visibly folding inward. The rule now reads the `derived_from` mark itself
+(`lifecycle.is_distillate`), so a consolidator written next year is covered the day it stamps
+its first row.
+
+Ask why she believes any of it: the **why** button in the memory panel, `GET /v1/memory/why`,
+or `memory.provenance()` in her own voice. Full rules:
+[`docs/MEMORY-AND-RECALL.md`](docs/MEMORY-AND-RECALL.md).
 
 ## The gates
 
 `gates/GATE-INDEX.md` indexes every executable gate in `harness_tests/` — OFFLINE (no GPU),
 LIVE (the stack up), and their run command. The whole offline suite is `python tools/sweep.py`
-(~3 min; 135 green / 3 correct skips as of 2026-08-25). The minimum bar after touching memory:
+(~3 min; 137 green / 3 correct skips as of 2026-08-25). The minimum bar after touching memory:
 `g_claim`, `g_durability`, `g_memory_lifecycle`. After touching docs: `g_docs_true`. A gate
 touched gets its index row in the same commit.
 
@@ -82,8 +90,7 @@ touched gets its index row in the same commit.
 
 - **`AGENTS.md`** — the bug class this project keeps paying for, the non-negotiables, the
   traps that are still live, how gates are written. Read before changing anything.
-- **`docs/CHANGELOG.md`** — what changed, by the day it changed.
-- **`docs/MEMORY-AND-RECALL.md`** — lifecycle, distillates, salience, the single write path.
+- **`CHANGELOG.md`** — what changed, by the day it changed.
 - **`docs/README.md`** — every document and which one is authoritative for what.
 - **`ui/README.md`** — the room and its window framework.
 - **The commit log** — it carries the reasoning, on purpose. `git log` is a primary source.

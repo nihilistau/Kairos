@@ -127,7 +127,7 @@ check("AGENTS.md §2 table names ui/, console/, tools/", all(("| `%s` |" % d) in
 import datetime as _dt  # noqa: E402
 
 # TWO TREES, TWO SHAPES, ONE CLAIM (2026-08-25). This gate SHIPS in the Kairos export,
-# where `docs/CHANGELOG.md` deliberately does not: the dated log is this tree's history,
+# where the DATED log under docs/ deliberately does not: that log is this tree's history,
 # including engine work the framework has no engine for, and the export carries a semver
 # `CHANGELOG.md` at the root instead. Asserting the upstream shape unconditionally would
 # have shipped a red gate to the public repo — which is the exact failure 0.2.1 was
@@ -157,5 +157,38 @@ elif os.path.exists(chpath):
           [h for i, h in enumerate(heads[:-1]) if h < heads[i + 1]][:4])
     check("...and the semver changelog is the EXPORT's, named as such",
           "kairos-export/CHANGELOG.md" in ch)
+
+# ── 5. A LINK THAT GOES NOWHERE IS A DOC DESCRIBING SOMETHING THAT IS NOT THERE ──────
+# THE SAME CLASS THIS FILE IS ABOUT, one layer down (2026-08-25). Sections 1-4 hold what
+# the prose SAYS; nothing held where it POINTS. Measured in the public export the day this
+# was written: 24 relative markdown links resolving to nothing — including `README.md ->
+# ui/README.md` (never in the manifest) and five files naming `CHANGELOG.md`, which
+# that tree deliberately does not ship. A newcomer's first click, on the front page.
+#
+# RELATIVE LINKS ONLY, and deliberately only real markdown links: backticked bare names
+# like `app.py` are prose shorthand, not promises, and gating them would fail on 235
+# innocent mentions and be switched off within a day. http(s), mailto and pure anchors
+# are somebody else's problem.
+#
+# It runs in BOTH trees off the same list, so the export cannot drift into dangling links
+# again without a red — which is exactly the 0.2.1 lesson (upstream-green is not
+# export-green) applied to prose instead of to gates.
+print("\n5. EVERY RELATIVE LINK IN A SHIPPED DOC RESOLVES")
+_LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)")
+_dangling = []
+for p in PROSE:
+    base = os.path.dirname(p)
+    rel = os.path.relpath(p, ROOT).replace("\\", "/")
+    for n, line in _prose_lines(p):
+        for m in _LINK.finditer(line):
+            t = m.group(1).split("#")[0].strip()
+            if not t or t.startswith(("http://", "https://", "mailto:", "#")):
+                continue
+            if not os.path.exists(os.path.join(base, t)):
+                _dangling.append("%s:%d -> %s" % (rel, n, t))
+for d in _dangling[:12]:
+    print("       " + d)
+check("no shipped doc links to a file that is not there", not _dangling,
+      "%d dangling" % len(_dangling))
 
 finish("G-DOCS-TRUE")

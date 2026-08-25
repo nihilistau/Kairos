@@ -408,7 +408,7 @@ file in the same commit**:
 - a subsystem retired or renamed → its vocabulary goes into `harness_tests/g_docs_true.py`'s retired list, so
   the docs cannot keep describing it (ceilings/tiers, the Grok CLI, `staging/`, and the 12B default all did).
 - a profile change → `START-HERE.md` ("what is on, what is off") in the same commit.
-- **behaviour a reader would notice → a `docs/CHANGELOG.md` entry, dated, in the same
+- **behaviour a reader would notice → a `CHANGELOG.md` entry, dated, in the same
   commit.** Dated rather than versioned: this tree is a living system, and the entry is the
   index into the commit that carries the reasoning. (The exported public framework keeps the
   semver changelog, `kairos-export/CHANGELOG.md`.)

@@ -18,7 +18,7 @@ G-SEM-CLAIM 6/6, G-SEM-CONSERVE), the engine seams are live (`/v1/embed` with QK
 provenance; `SP_CAPTURE_L5` mints `ep.l5` on `/v1/capture` — grown episodes are no longer
 L5-invisible), and the scoreboard was run against every reachable embedding space: hash-space
 (= lexical exactly), l5 raw (hit 0.14 but precision 0.0167), l5 centered (precision 0.0000),
-l5 re-provenanced (argmax 2/10). **Full negatives + diagnosis: [`gates/G-SEM-SCOREBOARD.md`](../gates/G-SEM-SCOREBOARD.md).**
+l5 re-provenanced (argmax 2/10). **Full negatives + diagnosis: `gates/G-SEM-SCOREBOARD.md`.**
 The two findings: L5 cosine is a ranking signal the engine only uses inside its learned selector,
 and foreign-query rejection is an ABSENCE judgment no similarity threshold can make.
 **A fourth contender was run and lost, 2026-07-30** — query→keyword expansion from store
@@ -181,14 +181,14 @@ semantic index for them to compete with.
 > section was written (`3ee6333`, plus two CUDA lifetime bugs that were never about MoE) —
 > her memories mint real episodes again, `ep.k` / `ep.v` / `ep.mf` / `ep.q` and **`ep.l5`**,
 > the last of which had not been written in three weeks. Receipt:
-> [`ENGINE-SESSION-2026-08-23.md`](ENGINE-SESSION-2026-08-23.md); the 247 owed episodes were
-> backfilled the same day ([`../gates/EPISODE-BACKFILL-2026-08-23.md`](../gates/EPISODE-BACKFILL-2026-08-23.md),
+> `ENGINE-SESSION-2026-08-23.md`; the 247 owed episodes were
+> backfilled the same day (`../gates/EPISODE-BACKFILL-2026-08-23.md`,
 > L5 coverage 21% → 95%). **The finding above survives the correction and is not weakened by
 > it**: the four contenders WERE measured against a bag-of-words floor, because at the time
 > they were measured there was no document index to compete with. That is why S1 was reopened,
 > and it stays the reason. What the fix changed is which space then had to prove itself — see
 > the note under point 3 below, and the l5 space's first real measurement in
-> [`../gates/SEM-L5-VS-AUX-2026-08-23.md`](../gates/SEM-L5-VS-AUX-2026-08-23.md) (l5 0.10
+> `../gates/SEM-L5-VS-AUX-2026-08-23.md` (l5 0.10
 > against aux's 0.53 — measured, not assumed).
 
 It failed silently because `_mint_now` wrapped the whole call in a bare `except`, which
@@ -202,7 +202,7 @@ archive uses, off the GPU, ~13 s to embed the whole live store. It was the only 
 embedder this box had while capture was refused — and it stayed the armed one after capture
 came back, on a measurement rather than on inertia: the l5 space, scored for the first time
 once there were fresh `ep.l5` rows to score, came in at **0.10 against aux's 0.53**
-(2026-08-23, [`../gates/SEM-L5-VS-AUX-2026-08-23.md`](../gates/SEM-L5-VS-AUX-2026-08-23.md)).
+(2026-08-23, `../gates/SEM-L5-VS-AUX-2026-08-23.md`).
 
 **The receipt** (`fixtures/sem/aux-receipt.json`, scored by `harness_tests/sem_aux.py`
 through the REAL seam, on the same frozen 160-query corpus that set the bar):
@@ -239,7 +239,7 @@ was a wrong answer first:
    > on the document side to match* — stopped holding within hours. The re-measurement the
    > clause demanded was then actually run, l5 query against l5 documents through the REAL
    > seam, on the same frozen corpus:
-   > [`../gates/SEM-L5-VS-AUX-2026-08-23.md`](../gates/SEM-L5-VS-AUX-2026-08-23.md) —
+   > `../gates/SEM-L5-VS-AUX-2026-08-23.md` —
    > **l5 `seam_recall@1` 0.10, against lexical 0.46 and aux 0.53.** `query_embed`'s order is
    > therefore **re-earned rather than inherited**, which is the whole thing this escape hatch
    > was written to prevent, and the correct reading of the bullet above is now *"aux wins on
@@ -522,3 +522,5 @@ Second Order Arithmetic*, 2nd ed. (2009) — WKL₀ is Π¹₁-conservative over
 *Ontological Proof* (1970); Anderson (1990); Benzmüller & Woltzenlogel Paleo, arXiv:1308.4526 ·
 Sørensen & Glück (ILPS'95); Leuschel, SAS'98 / LOPSTR'98 / 2002 survey — the whistle ·
 Kairos PPT-ARM Papers I–IV (2026), esp. III §11.6 (Kruskal → Dickson) and IV (KSTE spec).
+
+*Some documents listed in the source tree are not carried in this export (engine ADRs, session receipts, research essays); their rows are omitted here rather than left as dead links.*
