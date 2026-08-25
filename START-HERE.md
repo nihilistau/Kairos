@@ -50,6 +50,16 @@ drafter, the daemon's own memory writers (refused at boot), the research tier fo
 use, games and poker, her music deck (parked 2026-08-25 — unused tools still spend context),
 voice clone (region-locked).
 
+## How she consolidates
+
+Base testimony is never deleted — only tombstoned. Higher-level knowledge is written as
+**distillates** (and weekly `chapter` rows) that carry `derived_from`, `support_days`, and
+`support_kinds`. They summarise; they do not supersede their sources. When every support of a
+distillate is retired, the distillate itself is orphaned and tombstoned. Nightly
+(`becoming.nightly`) and weekly (`narrative.weekly_chapter`) consolidators own this path; the
+only authoritative write remains `remember()`. Inspect any belief via the memory panel **why**
+button or `GET /v1/memory/why`. Full rules: [`docs/MEMORY-AND-RECALL.md`](docs/MEMORY-AND-RECALL.md).
+
 ## The gates
 
 `gates/GATE-INDEX.md` indexes every executable gate in `harness_tests/` — OFFLINE (no GPU),
@@ -63,6 +73,7 @@ touched gets its index row in the same commit.
 - **`AGENTS.md`** — the bug class this project keeps paying for, the non-negotiables, the
   traps that are still live, how gates are written. Read before changing anything.
 - **`docs/CHANGELOG.md`** — what changed, by the day it changed.
+- **`docs/MEMORY-AND-RECALL.md`** — lifecycle, distillates, salience, the single write path.
 - **`docs/README.md`** — every document and which one is authoritative for what.
 - **`ui/README.md`** — the room and its window framework.
 - **The commit log** — it carries the reasoning, on purpose. `git log` is a primary source.
