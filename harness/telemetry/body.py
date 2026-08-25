@@ -76,15 +76,34 @@ def _age(row: Dict[str, Any], now: float) -> float:
     return 1e9 if t <= 0 else max(0.0, now - t)
 
 
+# ── A PHONE ON A DESK IS NOT A MAN SITTING STILL (2026-08-26) ─────────────────────────
+# The phone agent posts `motion`, `accel_rms` and `steps` under the same KIND names the
+# watch uses, and they are not the same claim. A still watch on his wrist means HE is still.
+# A still phone means the phone is on a table, which is compatible with him being out for a
+# run in the watch. Mixing them would have her say "he has not moved in two hours" about a
+# desk.
+#
+# So the claims are SOURCED. Body claims come from the watch only; the phone speaks about
+# the phone and about the room, which are real signals with a different subject.
+BODY_SOURCE = "watch"
+DEVICE_SOURCE = "phone"
+
+
 def latest(kind: str, rows: Optional[List[dict]] = None,
-           now: Optional[float] = None) -> Optional[Dict[str, Any]]:
+           now: Optional[float] = None,
+           source: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """The newest sample of a kind, or None if there is none FRESH ENOUGH TO MEAN ANYTHING.
 
     The freshness test is the point. A `latest()` that happily returns yesterday's heart
-    rate is how "you seem calm" gets said about a man who took the watch off at lunch."""
+    rate is how "you seem calm" gets said about a man who took the watch off at lunch.
+
+    `source` narrows it to one device. Unset means any, which is right for kinds only one
+    device produces (heart rate) and wrong for the ones both do — see BODY_SOURCE above."""
     now = time.time() if now is None else now
     if rows is None:
         rows = store.read_since(max(FRESH_S.get(kind, _DEFAULT_FRESH) * 2, 3600), now)
+    if source:
+        rows = [r for r in rows if r.get("source") == source]
     best = None
     for r in rows:
         # `>=` NOT `>`: rows arrive in stable order, so on an exact tie the later-appended
@@ -118,7 +137,7 @@ _TAIL_WORTH_SHOWING = {"heart_rate": 6.0, "gyro_rms": 0.35, "accel_rms": 1.5}
 
 
 def tail(kind: str, n: int = TAIL_N, rows: Optional[List[dict]] = None,
-         now: Optional[float] = None) -> List[Dict[str, Any]]:
+         now: Optional[float] = None, source: Optional[str] = None) -> List[Dict[str, Any]]:
     """The last `n` readings of a kind, oldest first, each fresh enough to mean anything.
 
     Oldest first because that is the direction a trend reads in: 72, 81, 94 climbs; the
@@ -127,6 +146,7 @@ def tail(kind: str, n: int = TAIL_N, rows: Optional[List[dict]] = None,
     if rows is None:
         rows = store.read_since(max(FRESH_S.get(kind, _DEFAULT_FRESH), 900), now)
     seq = [r for r in rows if r.get("kind") == kind
+           and (not source or r.get("source") == source)
            and _age(r, now) <= FRESH_S.get(kind, _DEFAULT_FRESH)]
     seq.sort(key=lambda r: r.get("at") or "")
     return seq[-max(1, n):]
@@ -168,30 +188,58 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
     are two kinds of claim and collapsing them is how one becomes the other."""
     now = time.time() if now is None else now
     window = store.read_since(6 * 3600, now)
-    hr = latest("heart_rate", window, now)
+    hr = latest("heart_rate", window, now)               # only the watch makes these
     body = latest("on_body", window, now)
-    motion = latest("motion", window, now)
     sleep = latest("sleep_stage", window, now)
-    screen = latest("screen", window, now)
+    # HIS body, so HIS wrist. The phone posts `motion` too and it means something else.
+    motion = latest("motion", window, now, BODY_SOURCE)
+    # The phone's, and about the phone: screen, charging, and the light in the room.
+    screen = latest("screen", window, now, DEVICE_SOURCE)
+    charging = latest("charging", window, now, DEVICE_SOURCE)
+    light = latest("light", window, now, DEVICE_SOURCE)
 
     observed: Dict[str, Any] = {}
     for name, row in (("heart_rate", hr), ("on_body", body), ("motion", motion),
-                      ("sleep_stage", sleep), ("screen", screen)):
+                      ("sleep_stage", sleep), ("screen", screen),
+                      ("charging", charging), ("light", light)):
         if row is not None:
             observed[name] = row.get("value")
 
     facts: Dict[str, Any] = {}
     why: List[str] = []
 
-    # ── IS HE WEARING IT? Everything below is worthless if he is not. ────────────────
+    # ── THE PHONE'S SCREEN IS THE CHEAPEST TRUTH IN THE BUILDING (2026-08-26) ───────
+    # A screen that came on two minutes ago is a man who is awake, and it beats any amount
+    # of stillness inferred from an accelerometer. Computed BEFORE the sleep rules so it can
+    # veto them: the crude fallback ("still, and his heart is at his resting band") is
+    # exactly the inference a person reading in bed would break, and this is what catches
+    # that without another sensor.
+    awake_by_screen = (screen is not None and screen.get("value") == "on"
+                       and _age(screen, now) <= 300)
+
+    # ── IS HE WEARING IT? Everything about his BODY is worthless if he is not. ───────
     if body is not None and body.get("value") == "off":
-        return {"facts": {}, "observed": observed, "since": {},
-                "why": "the watch is off his wrist, so there is nothing to say about him"}
+        out = {"facts": {}, "observed": observed, "since": {},
+               "why": "the watch is off his wrist, so there is nothing to say about him"}
+        # ...but the PHONE is still a fact, and it is about the phone, not about him.
+        if screen is not None or charging is not None:
+            out["facts"] = {k: v for k, v in (
+                ("phone_screen", screen.get("value") if screen else None),
+                ("phone_charging", charging.get("value") if charging else None),
+                ("awake_by_screen", awake_by_screen or None)) if v is not None}
+            out["why"] += " — the phone still says what the phone is doing"
+        return out
 
     # ── ASLEEP / AWAKE. Prefer the watch's own staging when it exists; fall back to a
     # deliberately CRUDE stillness rule, and label it so, because inventing sleep staging
     # from an accelerometer and calling it sleep would be a confident guess wearing a
     # measurement's clothes.
+    if screen is not None:
+        facts["phone_screen"] = screen.get("value")
+    if charging is not None:
+        facts["phone_charging"] = charging.get("value")
+    if awake_by_screen:
+        facts["awake_by_screen"] = True
     if sleep is not None:
         facts["asleep"] = sleep.get("value") != "awake"
         facts["sleep_stage"] = sleep.get("value")
@@ -200,7 +248,7 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
         rest = resting(now)
         still = motion.get("value") == "still"
         low = rest is not None and float(hr["value"]) <= rest + 5
-        if still and low:
+        if still and low and not awake_by_screen:
             facts["asleep"] = True
             facts["crude"] = True
             why.append("still, and his heart rate is at his own resting band — inferred, "
@@ -231,10 +279,14 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
     # ── HOW MUCH HE IS MOVING, not just whether ─────────────────────────────────────
     # his ask: "gyroscopes activity so she can see you are moving around a lot". One
     # number per window; the watch does the reducing, she gets the feeling.
-    gy = latest("gyro_rms", window, now)
-    ac = latest("accel_rms", window, now)
+    # HIS WRIST, not his phone. gyro_rms from a phone is the phone being picked up, put in
+    # a pocket, or waved at a cat -- and it arrives under the same kind name. Caught in
+    # testing: the watch said still, the phone was moved, and she said "he is moving a lot".
+    gy = latest("gyro_rms", window, now, BODY_SOURCE)
+    ac = latest("accel_rms", window, now, BODY_SOURCE)
     if gy is not None or ac is not None:
-        gt = tail("gyro_rms", TAIL_N, window, now) or tail("accel_rms", TAIL_N, window, now)
+        gt = (tail("gyro_rms", TAIL_N, window, now, BODY_SOURCE)
+              or tail("accel_rms", TAIL_N, window, now, BODY_SOURCE))
         if gt:
             gvals = [float(t["value"]) for t in gt]
             observed["movement_tail"] = gvals

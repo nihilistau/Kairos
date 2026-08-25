@@ -320,6 +320,70 @@ check("the reason reads its knob",
       '"telemetry.reasons"' in open(os.path.join(ROOT, "harness", "kairos", "reasons.py"),
                                     encoding="utf-8").read())
 
+print("\n8b. A PHONE ON A DESK IS NOT A MAN SITTING STILL")
+# The phone agent posts `motion`, `gyro_rms` and `steps` under the SAME KIND NAMES the watch
+# uses, and they are not the same claim. A still watch on his wrist means HE is still; a
+# still phone means the phone is on a table, which is perfectly compatible with him being
+# out for a run in the watch. Caught in testing before it ever ran: the watch said still,
+# the phone was moved, and she said "he is moving a lot".
+_ss = os.path.join(SB, "sources")
+os.environ["SP_TELEMETRY_DIR"] = _ss
+ingest.record([{"kind": "on_body", "value": "on"}, {"kind": "motion", "value": "still"},
+               {"kind": "heart_rate", "value": 58}], source="watch")
+ingest.record([{"kind": "gyro_rms", "value": 2.4}, {"kind": "motion", "value": "moving"},
+               {"kind": "steps", "value": 9999}], source="phone")
+_f8b = body.read()["facts"]
+check("the PHONE moving does not make HIM moving",
+      _f8b.get("moving") is False and "movement_word" not in _f8b, _f8b)
+check("...and she says nothing about his body from it", "moving" not in body.present(),
+      body.present())
+ingest.record([{"kind": "gyro_rms", "value": 1.6}], source="watch")
+check("...but the WATCH moving does", "moving" in body.present(), body.present())
+check("body claims are sourced to the wrist, structurally",
+      body.BODY_SOURCE == "watch" and body.DEVICE_SOURCE == "phone")
+
+print("\n   the phone's screen is the cheapest truth in the building")
+# A screen that came on two minutes ago is a man who is awake, and it beats any amount of
+# stillness inferred from an accelerometer. This is the case the crude sleep rule gets
+# wrong on its own: a man reading in bed is still, and his heart is at his resting band.
+_sc = os.path.join(SB, "screen")
+os.environ["SP_TELEMETRY_DIR"] = _sc
+import json as _json8b                                                     # noqa: E402
+import datetime as _dt8b                                                   # noqa: E402
+os.makedirs(_sc, exist_ok=True)
+_t8b = _dt8b.datetime.utcnow().date()
+for _bk in (3, 2, 1):
+    _dy = (_t8b - _dt8b.timedelta(days=_bk)).strftime("%Y-%m-%d")
+    with io.open(os.path.join(_sc, _dy + ".jsonl"), "w", encoding="utf-8", newline="\n") as _fh:
+        for _i in range(100):
+            _fh.write(_json8b.dumps({"at": "%sT09:%02d:%02d.000Z" % (_dy, _i // 60, _i % 60),
+                                     "source": "watch", "kind": "heart_rate",
+                                     "value": 57 + (_i % 8)}) + "\n")
+ingest.record([{"kind": "on_body", "value": "on"}, {"kind": "motion", "value": "still"},
+               {"kind": "heart_rate", "value": 58}], source="watch")
+check("still + at his resting band, with no phone: she infers sleep",
+      body.read()["facts"].get("asleep") is True and body.read()["facts"].get("crude") is True)
+ingest.record([{"kind": "screen", "value": "on"}], source="phone")
+_f2 = body.read()["facts"]
+check("...and his SCREEN coming on vetoes it", _f2.get("asleep") is False, _f2)
+check("...saying why, so the veto is visible", _f2.get("awake_by_screen") is True)
+check("...and she stops saying he is asleep", "asleep" not in body.present(), body.present())
+
+print("\n   one agent, two bodies")
+_ag = open(os.path.join(ROOT, "harness", "telemetry", "watch-agent", "java", "com",
+                        "telemetry", "agent", "AgentService.java"), encoding="utf-8").read()
+check("the agent DETECTS which device it is on", "FEATURE_WATCH" in _ag and 'source = ' in _ag,
+      "a second phone app would be a second implementation of read-reduce-batch-retry")
+check("...and declares it in the batch", '"source":"" + source' in _ag or "+ source +" in _ag)
+_mf = open(os.path.join(ROOT, "harness", "telemetry", "watch-agent", "AndroidManifest.xml"),
+           encoding="utf-8").read()
+check("...and the watch feature is NOT required, or it could not install on a phone",
+      'android.hardware.type.watch" android:required="false"' in _mf)
+check("the phone's device state is broadcasts, not sensors",
+      "ACTION_SCREEN_ON" in _ag and "ACTION_BATTERY_CHANGED" in _ag)
+check("...and ambient light is rate-limited (a room does not change sixty times a minute)",
+      "lastLight" in _ag)
+
 print("\n9. WHERE SHE LISTENS IS A DECISION, AND IT IS WRITTEN DOWN")
 # The watch reached her through `adb reverse` until 2026-08-26, which dies with the adb
 # session — so the telemetry lane was only alive while a cable-equivalent was attached. He
