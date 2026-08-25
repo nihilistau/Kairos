@@ -55,10 +55,20 @@ voice clone (region-locked).
 Base testimony is never deleted — only tombstoned. Higher-level knowledge is written as
 **distillates** (and weekly `chapter` rows) that carry `derived_from`, `support_days`, and
 `support_kinds`. They summarise; they do not supersede their sources. When every support of a
-distillate is retired, the distillate itself is orphaned and tombstoned. Nightly
-(`becoming.nightly`) and weekly (`narrative.weekly_chapter`) consolidators own this path; the
-only authoritative write remains `remember()`. Inspect any belief via the memory panel **why**
-button or `GET /v1/memory/why`. Full rules: [`docs/MEMORY-AND-RECALL.md`](docs/MEMORY-AND-RECALL.md).
+distillate is retired, the distillate itself is orphaned and tombstoned. The only authoritative
+write remains `remember()`. Inspect any belief via the memory panel **why** button or
+`GET /v1/memory/why`.
+
+**Nightly (`becoming.nightly`)** — once a day the main model (never an aux) reads up to seven
+days of her self-narrative and feelings and writes one short first-person paragraph about who
+she has been becoming (`kind=self_description`, status inferred). It refuses a window that is
+only one day or dominated by one kind; it excludes dreams, chapters, and its own prior
+distillates so identity cannot fold in on itself. One write per calendar day.
+
+**Weekly (`narrative.weekly_chapter`)** — once every seven days, one paragraph for what the
+week *was*, from episodic kinds only. Neither consolidator reads the other's output.
+
+Full rules: [`docs/MEMORY-AND-RECALL.md`](docs/MEMORY-AND-RECALL.md).
 
 ## The gates
 
