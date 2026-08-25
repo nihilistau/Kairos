@@ -359,13 +359,42 @@ for _bk in (3, 2, 1):
             _fh.write(_json8b.dumps({"at": "%sT09:%02d:%02d.000Z" % (_dy, _i // 60, _i % 60),
                                      "source": "watch", "kind": "heart_rate",
                                      "value": 57 + (_i % 8)}) + "\n")
+_today8b = _t8b.strftime("%Y-%m-%d")
+_now8b = time.time()
+with io.open(os.path.join(_sc, _today8b + ".jsonl"), "a", encoding="utf-8",
+             newline="\n") as _fh:
+    for _mins in (45, 30, 15):                       # his wrist, still, for three quarters
+        _fh.write(_json8b.dumps({"at": store.now_iso(_now8b - _mins * 60),
+                                 "source": "watch", "kind": "motion",
+                                 "value": "still"}) + "\n")
 ingest.record([{"kind": "on_body", "value": "on"}, {"kind": "motion", "value": "still"},
                {"kind": "heart_rate", "value": 58}], source="watch")
-check("still + at his resting band, with no phone: she infers sleep",
-      body.read()["facts"].get("asleep") is True and body.read()["facts"].get("crude") is True)
+
+# THE WATCH ALONE CANNOT CONCLUDE SLEEP, and that is the honest answer rather than a gap.
+# A still wrist and a resting heart rate describe a man asleep and a man reading in a chair
+# equally well. The phone is what tells them apart, so without it the seam sits in the
+# unsure band and she says nothing -- which is the whole doctrine, applied to a number.
+_f1 = body.read()["facts"]
+check("wrist-only: still 45 min at his resting band is NOT enough to call it sleep",
+      _f1.get("sleep_confidence") is not None
+      and body.SLEEP_AWAKE < _f1["sleep_confidence"] < body.SLEEP_SURE, _f1)
+check("...so `asleep` is left unset and she says nothing either way",
+      "asleep" not in _f1 and "asleep" not in body.present(), (_f1, body.present()))
+
+# ADD THE PHONE and it becomes sayable.
+with io.open(os.path.join(_sc, _today8b + ".jsonl"), "a", encoding="utf-8",
+             newline="\n") as _fh:
+    _fh.write(_json8b.dumps({"at": store.now_iso(_now8b - 60 * 60), "source": "phone",
+                             "kind": "screen", "value": "off"}) + "\n")
+_f1b = body.read()["facts"]
+check("...but an untouched phone for an hour on top of it is",
+      _f1b.get("asleep") is True and _f1b.get("sleep_confidence", 0) >= body.SLEEP_SURE, _f1b)
+check("...labelled as ours, not as a measurement", _f1b.get("sleep_source") == "inferred"
+      and _f1b.get("crude") is True, _f1b)
+
 ingest.record([{"kind": "screen", "value": "on"}], source="phone")
 _f2 = body.read()["facts"]
-check("...and his SCREEN coming on vetoes it", _f2.get("asleep") is False, _f2)
+check("...and his SCREEN coming on vetoes the lot", _f2.get("asleep") is False, _f2)
 check("...saying why, so the veto is visible", _f2.get("awake_by_screen") is True)
 check("...and she stops saying he is asleep", "asleep" not in body.present(), body.present())
 
@@ -383,6 +412,193 @@ check("the phone's device state is broadcasts, not sensors",
       "ACTION_SCREEN_ON" in _ag and "ACTION_BATTERY_CHANGED" in _ag)
 check("...and ambient light is rate-limited (a room does not change sixty times a minute)",
       "lastLight" in _ag)
+
+print("\n8c. SLEEP HAS THREE SOURCES AND THEY ARE NOT THE SAME CLAIM")
+# The best answer (the watch's own staging) is unavailable: every sleep-capable sensor on
+# the Watch4 sits behind com.samsung.permission.SSENSOR, verified by enumerating the device.
+# The second best (Google's Sleep API, which is what Home Assistant's "Sleep Confidence"
+# sensor is) lives in Play Services on the phone and nothing fills it yet. So the seam has
+# to rank three sources and be honest about which one answered.
+_sl = os.path.join(SB, "sleep")
+os.environ["SP_TELEMETRY_DIR"] = _sl
+import json as _js8c                                                       # noqa: E402
+import datetime as _dt8c                                                   # noqa: E402
+os.makedirs(_sl, exist_ok=True)
+# three days of his own resting data, so resting() will answer at all
+_td8c = _dt8c.datetime.utcnow().date()
+for _bk in (3, 2, 1):
+    _dy = (_td8c - _dt8c.timedelta(days=_bk)).strftime("%Y-%m-%d")
+    with io.open(os.path.join(_sl, _dy + ".jsonl"), "w", encoding="utf-8", newline="\n") as _fh:
+        for _i in range(100):
+            _fh.write(_js8c.dumps({"at": "%sT09:%02d:%02d.000Z" % (_dy, _i // 60, _i % 60),
+                                   "source": "watch", "kind": "heart_rate",
+                                   "value": 57 + (_i % 8)}) + "\n")
+
+check("`sleep_confidence` is a first-class kind, so a classifier has somewhere to land",
+      "sleep_confidence" in store.KINDS and "sleep_confidence" in ingest.BOUNDS)
+_r = ingest.record([{"kind": "sleep_confidence", "value": 140}], source="phone")
+check("...and it is bounded — 140% asleep is refused", _r.get("stored") == 0, _r)
+
+print("\n   none is not zero")
+# An empty store must not read as "he is awake". "We have no idea" and "he is up" are
+# different claims and only the first is supportable from nothing.
+_c, _t = body.sleep_estimate([], 0.0)
+check("too little to say -> None, NOT a low confidence", _c is None and _t == [], (_c, _t))
+
+print("\n   the number arrives with its reasons")
+_now8c = time.time()
+# THE ROWS THE AGENT ACTUALLY SENDS. The first version of this fixture posted a `motion`
+# state, which nothing on any device has ever produced — 0 rows in 6,820 live samples — so
+# it proved the estimate worked on data that does not exist.
+_rows8c = [{"at": store.now_iso(_now8c - 4 * 3600), "source": "phone", "kind": "screen",
+            "value": "off"}]
+_rows8c += [{"at": store.now_iso(_now8c - _m * 60), "source": "watch", "kind": "gyro_rms",
+             "value": 0.02} for _m in range(180, -1, -10)]
+_c, _t = body.sleep_estimate(_rows8c, _now8c,
+                             hr={"at": store.now_iso(_now8c - 60), "value": 58}, rest=58.0)
+check("a confident reading is produced from real evidence", _c is not None and _c >= 70, _c)
+check("...and every term that produced it comes back with it", len(_t) >= 3, _t)
+check("...naming the phone, the wrist and his own resting band — not a magic number",
+      any("phone" in x for x in _t) and any("wrist" in x for x in _t)
+      and any("resting" in x for x in _t), _t)
+
+print("\n   between the bands she says nothing")
+ingest.record([{"kind": "on_body", "value": "on"}, {"kind": "motion", "value": "still"},
+               {"kind": "heart_rate", "value": 58}], source="watch")
+_f8c = body.read()["facts"]
+check("an UNSURE reading leaves `asleep` unset rather than False",
+      _f8c.get("sleep_confidence") is not None
+      and (_f8c["sleep_confidence"] < body.SLEEP_SURE), _f8c)
+check("...and she does not claim either way", "asleep" not in body.present(), body.present())
+check("...while the source of the guess is named as ours", _f8c.get("sleep_source") == "inferred"
+      and _f8c.get("crude") is True, _f8c)
+
+print("\n   a real classifier outranks our guess")
+ingest.record([{"kind": "sleep_confidence", "value": 91}], source="phone")
+_f8c = body.read()["facts"]
+check("a classifier's confidence wins over our own estimate",
+      _f8c.get("sleep_source") == "classifier" and _f8c.get("sleep_confidence") == 91.0, _f8c)
+check("...and it is NOT labelled crude, because it was not our guess",
+      "crude" not in _f8c and "sleep_terms" not in _f8c, _f8c)
+check("...and at 91% she may say it", _f8c.get("asleep") is True)
+ingest.record([{"kind": "sleep_stage", "value": "deep"}], source="watch")
+check("the watch's own staging outranks even that",
+      body.read()["facts"].get("sleep_source") == "watch")
+
+print("\n   he looked at his watch")
+_wt = os.path.join(SB, "tilt")
+os.environ["SP_TELEMETRY_DIR"] = _wt
+_c, _t = body.sleep_estimate(_rows8c, _now8c,
+                             hr={"at": store.now_iso(_now8c - 60), "value": 58}, rest=58.0,
+                             awake_now=True)
+check("a wrist tilt vetoes the whole accumulation, it does not merely subtract",
+      _c is not None and _c <= 5.0, _c)
+check("`wrist_tilt` is a kind, and it is the wrist's answer to the phone screen",
+      "wrist_tilt" in store.KINDS and body.FRESH_S.get("wrist_tilt", 99999) <= 15 * 60)
+_ag8c = open(os.path.join(ROOT, "harness", "telemetry", "watch-agent", "java", "com",
+                          "telemetry", "agent", "AgentService.java"), encoding="utf-8").read()
+check("...and the agent actually registers it (type 26, the one Samsung left unlocked)",
+      "TYPE_WRIST_TILT_GESTURE = 26" in _ag8c and "wrist_tilt" in _ag8c)
+
+print("\n   no time-of-day prior, on purpose")
+# Every sleep model wants one. For a man who is routinely working at 03:00 it would make her
+# confidently wrong at exactly the hour she is most likely to be talking to him.
+import inspect as _insp8c                                                  # noqa: E402
+_src8c = _insp8c.getsource(body.sleep_estimate)
+# Named APIs, not the word "hour" -- the first spelling of this check matched the comment
+# "...and for over three hours" and went red on its own documentation.
+check("the estimate never looks at the clock",
+      not any(x in _src8c for x in ("localtime", "gmtime", "datetime", ".hour", "strftime")),
+      "a 3am prior would be wrong for this user specifically")
+
+print("\n   the run-length reads one wrist, not two devices")
+# _run_length was the SIBLING that got missed when latest() was made source-aware: it read
+# the same mixed rows, so "still for two hours" could come off a phone on a desk.
+# THE SHAPE THAT ACTUALLY BITES, and the first fixture here did not have it. A run is the
+# NEWEST run, so interleaving the two devices just truncates it and looks harmless. The
+# dangerous case is the quiet one: the phone reports stillness for hours and the WATCH SAYS
+# NOTHING AT ALL -- exactly what happens when it is on the charger or out of range. Read
+# unsourced, a phone on a desk becomes two hours of HIS stillness, and that is the number
+# the sleep estimate would have leaned on.
+_mixed = [{"at": store.now_iso(_now8c - 7200), "source": "phone", "kind": "motion",
+           "value": "still"},
+          {"at": store.now_iso(_now8c - 3600), "source": "phone", "kind": "motion",
+           "value": "still"},
+          {"at": store.now_iso(_now8c - 60), "source": "phone", "kind": "motion",
+           "value": "still"}]
+check("a phone lying still does not become HIS two hours of stillness",
+      body._run_length(_mixed, "motion", "still", _now8c, body.BODY_SOURCE) == 0,
+      body._run_length(_mixed, "motion", "still", _now8c, body.BODY_SOURCE))
+check("...while unsourced it reads as two hours, which is why every call site names one",
+      body._run_length(_mixed, "motion", "still", _now8c) >= 7200,
+      body._run_length(_mixed, "motion", "still", _now8c))
+
+# ── AND NOW THE PATH THAT ACTUALLY RUNS ─────────────────────────────────────────────
+# The two checks above call `_run_length` directly with the source spelled out, which
+# proves the function can do it and proves nothing about whether anybody asks. A mutant
+# that dropped BODY_SOURCE from the CALL SITE inside sleep_estimate left this gate green:
+# the rule was enforced in the path the test drove and not in the path the product uses,
+# which is the house bug (AGENTS.md §0) caught in its natural habitat.
+_desk = [{"at": store.now_iso(_now8c - 90 * 60), "source": "phone", "kind": "screen",
+          "value": "off"}]
+_desk += [{"at": store.now_iso(_now8c - _m * 60), "source": "phone", "kind": "gyro_rms",
+           "value": 0.01} for _m in range(120, -1, -10)]      # the phone, flat on a desk
+_c, _t = body.sleep_estimate(_desk, _now8c,
+                             hr={"at": store.now_iso(_now8c - 60), "value": 58}, rest=58.0)
+check("the ESTIMATE names the source too — a desk phone cannot lend him its stillness",
+      _c is not None and _c < body.SLEEP_SURE, (_c, _t))
+check("...so no duration term appears in its reasons at all",
+      not any("still for" in x for x in _t), _t)
+
+print("\n   `motion` is a phantom kind, so stillness comes from what arrives")
+# ZERO `motion` rows in 6,820 live samples. The agent posts `gyro_rms` once per window and
+# has never posted a motion STATE, so `moving`, `motion_for_s` and the stillness term were
+# all reading a key that is never there — on every real turn — while this gate stayed green,
+# because the gate recorded `motion` itself before asking. A gate that supplies its own
+# precondition is testing the fixture.
+_gyro = [{"at": store.now_iso(_now8c - _m * 60), "source": "watch", "kind": "gyro_rms",
+          "value": 0.02} for _m in range(120, -1, -10)]
+_st, _run = body.still_run(_gyro, _now8c, body.BODY_SOURCE)
+check("stillness is derived from gyro_rms when no `motion` row exists — which is always",
+      _st is True and _run >= 110 * 60, (_st, _run))
+check("...and a classified `motion` state still wins when something posts one",
+      body.still_run(_gyro + [{"at": store.now_iso(_now8c), "source": "watch",
+                               "kind": "motion", "value": "moving"}],
+                     _now8c, body.BODY_SOURCE)[0] is False)
+check("...and a phone's rows are never his wrist's",
+      body.still_run([dict(r, source="phone") for r in _gyro], _now8c,
+                     body.BODY_SOURCE) == (None, 0))
+check("...and a wrist that is moving reports no run at all",
+      body.still_run([{"at": store.now_iso(_now8c), "source": "watch", "kind": "gyro_rms",
+                       "value": 1.4}], _now8c, body.BODY_SOURCE) == (False, 0))
+check("one threshold and one band table, not a number copied twice",
+      body.MOVE_RMS == 0.15 and body._move_word(0.02) == "still"
+      and body._move_word(1.5) == "moving a lot")
+
+# the other call site, through read(), for the same reason
+_ds = os.path.join(SB, "desk")
+os.environ["SP_TELEMETRY_DIR"] = _ds
+os.makedirs(_ds, exist_ok=True)
+_dnow = time.time()
+with io.open(os.path.join(_ds, _dt8c.datetime.utcnow().strftime("%Y-%m-%d") + ".jsonl"),
+             "a", encoding="utf-8", newline="\n") as _fh:
+    for _secs in (7200, 3600, 600):
+        _fh.write(_js8c.dumps({"at": store.now_iso(_dnow - _secs), "source": "phone",
+                               "kind": "motion", "value": "still"}) + "\n")
+ingest.record([{"kind": "on_body", "value": "on"}, {"kind": "motion", "value": "still"}],
+              source="watch")
+_fd = body.read()["facts"]
+check("`motion_for_s` is his wrist's run, not the phone's two hours on a desk",
+      _fd.get("motion_for_s", 0) < 300, _fd.get("motion_for_s"))
+
+print("\n   freshness answers a different question from duration")
+_old = [{"at": store.now_iso(_now8c - 3 * 3600), "source": "phone", "kind": "screen",
+         "value": "off"}]
+check("a screen-off three hours stale is invisible to latest()",
+      body.latest("screen", _old, _now8c, body.DEVICE_SOURCE) is None)
+_row, _age8c = body._last_state(_old, "screen", _now8c, body.DEVICE_SOURCE)
+check("...and readable by _last_state, which is the row the sleep estimate needs",
+      _row is not None and _age8c >= 3 * 3600 - 5, _age8c)
 
 print("\n9. WHERE SHE LISTENS IS A DECISION, AND IT IS WRITTEN DOWN")
 # The watch reached her through `adb reverse` until 2026-08-26, which dies with the adb

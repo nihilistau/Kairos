@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.5.2 — sleep, and what a percentage is allowed to mean (2026-08-26)
+
+**A sleep confidence has three possible sources and they are not the same claim.** The seam
+now ranks them and always names which one answered.
+
+- **`sleep_confidence` is a first-class kind** (0–100, bounded, refused outside) with a
+  reader already behind it — so whichever classifier eventually fills it lands in a socket
+  rather than arriving as a kind half the seam has never heard of. **Nothing fills it by
+  default.**
+- **The watch cannot tell you**, and this is worth knowing before you go looking: on a
+  Galaxy Watch4 every sleep-capable sensor (`SContext`, `movement`, `wrist_down`, and with
+  them ECG, BIA, thermistor) is behind `com.samsung.permission.SSENSOR`, a signature
+  permission. Verified by enumerating the device.
+- **Home Assistant's "Sleep Confidence" is Google's Sleep API** — a Play Services classifier
+  on the *phone*, ~10 minutes, not a sensor. Posting it to `/v1/telemetry/ingest` as this
+  kind needs no app change at all, which is the cheapest way to fill the socket.
+- **The bundled estimate returns the terms that produced it** — *"phone untouched for 94
+  min; his wrist still for 51 min; heart at their resting band (57)"*. A number printed with
+  a `%` and no provenance is the most confident-looking thing on a panel and the least
+  accountable, so the panel colours the bar by source and lists the terms beneath.
+- **`None` is not `0`.** Too little evidence returns `None`, never a low confidence — an
+  empty store must not read as "they are awake".
+- **Between the bands nothing is claimed.** Above 70 sayable, below 30 awake, in between
+  `asleep` is left *unset* and every reader treats a missing key as do-not-claim-it.
+- **No time-of-day prior**, deliberately — it makes a companion confidently wrong about
+  anyone who keeps unusual hours, which is a large share of the people who would run this.
+- **`wrist_tilt_gesture`** (sensor type 26, one of the few not permission-locked) is a veto,
+  not a weight: someone who just looked at their watch is awake. It is the only free
+  awake-signal that comes from the body rather than a device that might be on a table.
+- **`motion` is derived, not posted.** The agent sends `gyro_rms` per window; `still_run()`
+  derives the state from that and prefers a classified `motion` row only if some source
+  actually posts one.
+
+`docs/TELEMETRY.md` carries the whole story. G-TELEMETRY 118 checks.
+
 ## 0.5.1 — the phone side, and one agent for two bodies (2026-08-26)
 
 The **same APK** now runs on a phone as well as a watch. It detects which device it is in

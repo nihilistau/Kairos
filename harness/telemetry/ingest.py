@@ -50,6 +50,7 @@ BOUNDS = {
     "battery": (0.0, 100.0),
     "battery_temp": (-20.0, 80.0),
     "hr_variability": (0.0, 500.0),
+    "sleep_confidence": (0.0, 100.0),
 }
 
 

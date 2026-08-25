@@ -82,6 +82,18 @@ public class AgentService extends Service implements SensorEventListener {
     private double gyroSq = 0.0; private int gyroN = 0;
     private double accSq = 0.0;  private int accN = 0;
     private long windowStart = 0L;
+    /** android.sensor.wrist_tilt_gesture.
+     *
+     *  SPELLED OUT because `Sensor.TYPE_WRIST_TILT_GESTURE` is not in the public
+     *  android.jar -- it exists on the device and is hidden from the SDK, so compiling
+     *  against the constant fails while calling it at runtime works fine. The number is not
+     *  from a doc page: it was read off this watch's own `dumpsys sensorservice`, which
+     *  lists it as type 26, `perm: n/a`, alongside the dozen Samsung sensors that ARE
+     *  permission-locked. `reg()` skips it silently on hardware that lacks it, so the phone
+     *  build is unaffected. */
+    private static final int TYPE_WRIST_TILT_GESTURE = 26;
+
+    private long lastTilt = 0L;
     private long lastLight = 0L;
     private long lastPressure = 0L;
 
@@ -165,6 +177,18 @@ public class AgentService extends Service implements SensorEventListener {
         // its light reading says more about his cuff than about the room.
         reg(Sensor.TYPE_LIGHT, SensorManager.SENSOR_DELAY_NORMAL);
         reg(Sensor.TYPE_PRESSURE, SensorManager.SENSOR_DELAY_NORMAL);
+        // HE LOOKED AT HIS WATCH.
+        //
+        // Worth having because of what it ISN'T: nearly every sleep-capable sensor on this
+        // watch (SContext, `movement`, `wrist_down`) sits behind
+        // com.samsung.permission.SSENSOR, a signature permission we cannot hold. This one
+        // is `perm: n/a` -- free -- and it carries most of the same information for the one
+        // question that matters. A man asleep does not raise his arm to check the time.
+        //
+        // It is also the only free AWAKE signal that comes from his body rather than from a
+        // device he may have put down: a phone screen can be lit by a notification, a wrist
+        // tilt cannot happen without him.
+        reg(TYPE_WRIST_TILT_GESTURE, SensorManager.SENSOR_DELAY_NORMAL);
     }
 
     /** Screen, charging and battery. NOT sensors — broadcasts — and worth having because
@@ -235,6 +259,13 @@ public class AgentService extends Service implements SensorEventListener {
                 break;
             case Sensor.TYPE_STEP_COUNTER:
                 push("steps", e.values[0]);
+                break;
+            case TYPE_WRIST_TILT_GESTURE:
+                // AN EVENT, not a measurement -- the value is meaningless and the TIMESTAMP
+                // is the entire content. Rate-limited because looking at a watch is rarely
+                // a single tilt, and thirty near-identical rows say nothing the first one
+                // did not.
+                if (now - lastTilt >= 30_000L) { lastTilt = now; push("wrist_tilt", 1f); }
                 break;
             case Sensor.TYPE_LIGHT:
                 // RATE-LIMITED: an ambient light sensor fires on every flicker and a room

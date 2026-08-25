@@ -305,6 +305,18 @@ the ledger's own invariant: default-off in `build_env`, on only where a profile 
 | **Why engine stays default** | the model's own vision tower is the one that knows her room; the VL door is the cheaper eye for the hourly look when the GPU is busy — his call, measured look by look |
 | **Gate** | `python harness_tests/g_sight_backends.py` |
 
+### 16. `sleep_confidence` — the socket is built and nothing fills it *(recorded 2026-08-26)*
+
+| | |
+|---|---|
+| **Code** | `harness/telemetry/store.py` (the kind), `ingest.py` (bounded 0–100), `body.py` (`read()` ranks it above our own estimate and labels the source), `ui/src/apps/Body.jsx` (rendered with its provenance) |
+| **Default** | **nothing writes it.** The seam falls through to `sleep_estimate()`, which is labelled `inferred` / `crude` and returns the terms that produced it |
+| **Why it is empty** | the only two sources are both out of reach today. **The watch cannot**: every sleep-capable sensor on the Watch4 (`SContext`, `movement`, `wrist_down`) is `perm: com.samsung.permission.SSENSOR`, a signature permission — verified by enumerating the device, not assumed. **Google's Sleep API can**, and it is what Home Assistant's "Sleep Confidence" sensor is — a Play Services classifier on the phone, ~10 min cadence — but reaching it means linking `play-services-location` |
+| **What arming it costs** | the gradle-free build. The agent is **16 KB** and builds with `aapt2 → javac → d8 → apksigner` *only because it touches no androidx*. GMS drags in androidx, a dependency chain, core-library desugaring, and an APK in the megabytes. That is a real trade and it is **his to make**, not a thing to slip in |
+| **Arming condition — either** | (a) the **Home Assistant framework** lands (deferred to its own framework by his call, 2026-08-26) and posts its `sensor.sleep_confidence` into `/v1/telemetry/ingest` as this kind — no APK change at all, which is why this is the preferred lever; or (b) he decides the accuracy is worth the build, and the agent gains a GMS variant with the size measured and recorded here |
+| **What must stay true either way** | the estimate keeps its own name and its `sleep_terms`. A classifier's number and ours must never render alike — the panel colours the bar by source for exactly this reason |
+| **Gate** | `python harness_tests/g_telemetry.py` §8c |
+
 ## DARK CODE — named, and given a deadline rather than a shrug
 
 `harness/skills/invariance.py` — 170 lines implementing Friedman FIN/USE §3.6.6 and
