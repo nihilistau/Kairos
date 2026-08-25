@@ -121,7 +121,7 @@ re-shown and never re-sent) — this is its second instance, which is a good sig
 real and not a patch.
 
 **The lesson, and it is the one to carry into the next feature.** This door is not in
-`anon.DOORS`, and it should not be: the seventeen ids there (twelve write, five egress) are
+`anon.DOORS`, and it should not be: the eighteen ids there (thirteen write, five egress) are
 all places that write or send, and this one does neither. It is a door because **it is a way
 the evening survives the switch** — and that is the definition the next audit should use.
 Ask of any new surface: *after the switch goes off, can this thing still put the private hour

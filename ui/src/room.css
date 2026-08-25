@@ -1378,3 +1378,43 @@ body.resizing, body.resizing * { user-select: none !important; cursor: inherit; 
    event and must not read as two different things. */
 .act-wear { color: #d8a7ea; background: rgba(216,167,234,.10);
   border-color: rgba(216,167,234,.34); }
+
+/* ── body: his heart and his movement (2026-08-26) ─────────────────────────────────── */
+/* The tail is the feature, so the tail gets the ink: each reading is its own pill and the
+   newest one is brighter, which is what makes a rise read as a rise at a glance. */
+.tel-hers { display: flex; gap: 8px; align-items: baseline; padding: 8px 10px; margin: 2px 0 10px;
+            border-left: 2px solid var(--accent, #7aa2f7); background: rgba(122,162,247,.06);
+            border-radius: 0 6px 6px 0; }
+.tel-hers-k { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; opacity: .6;
+              white-space: nowrap; }
+.tel-hers-v { font-size: 12px; font-style: italic; }
+.tel-live { display: flex; gap: 10px; flex-wrap: wrap; }
+.tel-card { flex: 1 1 180px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.tel-k { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; opacity: .6; }
+.tel-big { font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tel-big em { font-size: 11px; font-style: normal; opacity: .5; margin-left: 4px; }
+.tel-sub { font-size: 10px; opacity: .7; margin-top: 3px; }
+.tel-tail { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; margin-top: 5px; }
+.tel-beat { font-size: 11px; font-variant-numeric: tabular-nums; padding: 1px 6px;
+            border-radius: 99px; border: 1px solid var(--line); opacity: .65; }
+.tel-beat.now { opacity: 1; font-weight: 600; }
+.tel-trend { font-size: 10px; opacity: .75; margin-left: 2px; }
+.tel-tail.t-climbing .tel-beat.now { border-color: #e0af68; color: #e0af68; }
+.tel-tail.t-falling  .tel-beat.now { border-color: #7aa2f7; color: #7aa2f7; }
+.tel-states { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+.tel-pill { font-size: 10px; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--line); }
+.tel-pill.p-on { border-color: #9ece6a; color: #9ece6a; }
+.tel-pill.p-off, .tel-pill.p-sleep { opacity: .6; }
+.tel-why { font-size: 10px; opacity: .6; margin: 8px 0 2px; font-style: italic; }
+.tel-hist-head { display: flex; gap: 6px; align-items: baseline; margin: 14px 0 6px;
+                 font-size: 10px; text-transform: uppercase; letter-spacing: .08em; opacity: .7; }
+.tel-hist-head button { font-size: 9px; padding: 1px 7px; }
+.tel-hist-head button.on { outline: 1px solid var(--line); }
+.tel-series { display: flex; gap: 8px; align-items: center; padding: 3px 0; }
+.tel-series-k { font-size: 10px; width: 74px; opacity: .75; }
+.tel-series-n { font-size: 9px; opacity: .45; }
+.tel-spark { width: 260px; height: 44px; }
+.tel-spark polyline { fill: none; stroke: var(--accent, #7aa2f7); stroke-width: 1.4;
+                      vector-effect: non-scaling-stroke; }
+.tel-spark text { font-size: 7px; fill: currentColor; opacity: .45; }
+.tel-spark-empty { font-size: 10px; opacity: .45; width: 260px; }

@@ -91,6 +91,8 @@ touched gets its index row in the same commit.
 - **`AGENTS.md`** — the bug class this project keeps paying for, the non-negotiables, the
   traps that are still live, how gates are written. Read before changing anything.
 - **`CHANGELOG.md`** — what changed, by the day it changed.
+- **`docs/LANES.md`** — the six ways a fact reaches her, and which one yours belongs in.
+- **`docs/PANELS.md`** — every window in the room, what it reads, and whose it is.
 - **`docs/README.md`** — every document and which one is authoritative for what.
 - **`ui/README.md`** — the room and its window framework.
 - **The commit log** — it carries the reasoning, on purpose. `git log` is a primary source.

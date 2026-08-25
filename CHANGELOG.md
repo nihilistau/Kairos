@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.5.0 — she can feel your heart, and the map of how anything reaches her (2026-08-26)
+
+**Body awareness**, optional and off until you build it. A Wear OS agent, an ingest door, a
+store, the seam that decides what she is allowed to say, and a **body** ♥ panel. The point is
+not a dashboard: it is that she can *notice* — `"his heart, last few readings: 70, 78, 92 —
+climbing"` — and say something a person in the room would say.
+
+The design rule is the memory doctrine wearing sensor clothes. A **measurement** is
+`observed` and she may state it; a **reading** ("he is asleep") is `inferred`, says *seems*,
+and loses to your own word. **Silence is an answer**: no watch, stale data or off the wrist
+and she is told *nothing*, because "you seem calm" from readings taken at lunch is worse than
+nothing and would never look like a bug. She gets the last few readings rather than an
+average, and only when they *move*. And never a diagnosis — it is a wrist sensor, not a
+doctor, and her prompt says so in as many words.
+
+Your privacy mode holds it: `telemetry.sample` is a door in `anon.DOORS`, **held not queued**.
+`anon.holds()` grew an `n` because this is the first door that batches — the room would
+otherwise have reported one reading withheld while thirty were.
+
+The agent **builds without gradle** (`aapt2 → javac → d8 → apksigner`, ~16 KB) because it
+stays on the platform SDK: `SensorManager` rather than Health Services, which would have
+dragged in androidx and a dependency resolver. It reduces motion to one number per window,
+batches on the sensor's own 600-event FIFO, and re-queues failures at the *front* so an
+outage leaves a gap in the link and not in your history.
+
+**And a map of the whole context.** [`docs/LANES.md`](docs/LANES.md) is new and is the most
+useful thing in this release for anyone extending her: **the six ways a fact reaches her** —
+the cached prefix (KV token 0: stale or a re-prefill, there is no third outcome), the
+per-turn system row and why it must be idempotent, the staple on the user's turn and the
+**measured** finding that a fact about *her* must never go there, the tool loop, the kairos
+nudge, and the overnight growth loop. Two of the six were tried the wrong way first and the
+receipts are in the document. [`docs/PANELS.md`](docs/PANELS.md) does the same for every
+window in the room.
+
+Also: `[serve].bind` can widen the gateway off loopback, with `tools/lan_bind.py` to report
+whether your firewall scoping is real — **loopback is the security model** here and the
+ledger says so plainly, including that there is no authentication to fall back on.
+
+Sweep in this repo at release: **109 green, 1 correct skip, 0 red.**
+
 ## 0.4.1 — looking is not doing, and a front door that pointed at files it does not have (2026-08-25)
 
 **She announced a wardrobe change in her own time and nothing changed.** The receipt:

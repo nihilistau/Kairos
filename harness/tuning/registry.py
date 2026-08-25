@@ -545,6 +545,24 @@ KNOBS: list[Knob] = [
     # Asking is free and making costs him, so this is the dial on the cost. It runs at
     # the day boundary, after the room has been quiet — never mid-conversation, because
     # it takes minutes of the one GPU she also talks with.
+    Knob("telemetry.turn_note", "Telemetry", "Let her feel his heart and his movement",
+         "bool", True,
+         "ON, his ask: \"she can see my heart pacing... a bridge to the real world, to "
+         "me.\" A SYSTEM row per turn, never a staple on his message — the wardrobe "
+         "staple was measured out in 2026-08-19 because she read a parenthetical on his "
+         "words as an order. It is SELF-LIMITING and that is what makes it safe where "
+         "that one was not: body.present() is EMPTY unless something is happening, so an "
+         "ordinary quiet turn costs nothing. Off means she stops being handed his body; "
+         "the watch keeps recording and the panel keeps showing it."),
+    Knob("telemetry.reasons", "Telemetry", "Let her SPEAK when his body does something",
+         "bool", True,
+         "ON, his ask. Adds a kairos reason ahead of the others, because a heart rate is "
+         "stale in three minutes where a look that arrived is stale in three days. Fires "
+         "on three events only — his heart well above HIS OWN resting, his heart coming "
+         "back down, and hours without moving — each bounded to once an hour by its raise "
+         "key, so noticing never becomes nagging. She is handed the READINGS, never a "
+         "diagnosis. Off means she still sees his body on a turn (telemetry.turn_note) "
+         "but never opens her mouth about it unprompted."),
     Knob("wardrobe.turn_note", "Wardrobe", "A per-turn line about what she has on",
          "bool", False,
          "OFF, and armed only for a measured trial (2026-08-24 audit, W4). The 2026-08-19 "

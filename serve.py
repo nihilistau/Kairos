@@ -880,6 +880,20 @@ def build_env(c: dict) -> dict:
         # a legitimate change is `python tools/mcp_pin.py --accept <server> <tool>`, which
         # is what the refusal message tells you to run.
         "SP_MCP_PIN": b(c.get("mcp", {}).get("pin", True)),
+        # ── TELEMETRY (2026-08-26) ──────────────────────────────────────────────
+        # His body and his devices, as a source she can be present to. The store is a
+        # day-per-file JSONL under var/, same shape as her speech ledger. RETENTION IS
+        # DELIBERATELY OFF: "nothing is ever deleted" is a rule about what she BELIEVES,
+        # and instrument data at 1 Hz is a different question — so the knob exists, the
+        # default keeps everything, and `store.prune()` is the only remover.
+        # WHERE THE GATEWAY LISTENS. 127.0.0.1 unless a profile says otherwise, because
+        # loopback IS the security model (app.py's __main__ says why in full). A profile
+        # that widens it is making a decision about who can reach her, and it should look
+        # like one in the file.
+        "SP_GATEWAY_BIND": (c.get("serve", {}).get("bind") or "127.0.0.1"),
+        "SP_TELEMETRY_DIR": os.path.join(VAR, "telemetry"),
+        "SP_TELEMETRY_KEEP_DAYS": str(c.get("telemetry", {}).get("keep_days", 0)),
+
         "SP_MCP_PINS": os.path.join(VAR, "mcp", "pins.json"),
         "SP_DAEMON_LOG": os.path.join(VAR, "daemon.log"),
         # ── SENSES (2026-07-31) ────────────────────────────────────────────────

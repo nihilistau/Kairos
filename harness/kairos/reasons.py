@@ -54,7 +54,15 @@ logger = logging.getLogger(__name__)
 # she asked for and has now been given is a small event with a moment attached to it, and
 # an event that is mentioned three days late is not the same event. It is also the only
 # reason on this list that is unambiguously good news.
-_ORDER = ("arrival", "commitment", "journal", "rhythm")
+# `body` goes FIRST, ahead even of arrival, and the reason is staleness: "your heart is
+# going" is only true for about a minute. A look that arrived is stale in three days; a
+# heart rate is stale in three minutes, and a companion who mentions it late is describing
+# a stranger. It is also the most intimate thing on this list — an observation about him he
+# did not volunteer in words, which is what makes `rhythm` delicate and last — so it is
+# bounded harder than anything else here: it fires only on a real event, it carries the
+# READINGS rather than a diagnosis, and its raise key is bucketed by the hour so noticing
+# never becomes nagging. He asked for it in those words: "a bridge to the real world, to me."
+_ORDER = ("body", "arrival", "commitment", "journal", "rhythm")
 
 # ── SEVEN, AND THE COUNT IS NOT WHAT PROTECTS HIM (2026-08-01, backtested) ───────────
 # `silence.py` requires 14 and this requires 7, which looks like two authorities on one
@@ -124,6 +132,81 @@ def mark_raised(key: str) -> None:
 
 
 # ── the sources. Each is PURE: given its data, it proposes or it does not. ────────────
+# How far above HIS OWN resting counts as worth a word. Not a table's number: `resting` is
+# the 10th percentile of his last fortnight, so this is "well above what he usually sits
+# at", and it is None until the store knows him well enough to say.
+_BODY_OVER_RESTING = 22.0
+_BODY_STILL_HOURS = 3.0
+
+
+def from_body(read: Optional[dict], raised: set, now: Optional[float] = None) -> Optional[dict]:
+    """His body did something worth a word. `read` is `telemetry.body.read()`.
+
+    THREE EVENTS AND NO MORE, because the failure mode here is not missing something, it
+    is narrating a man to himself. Each one is something a person in the same room would
+    actually remark on:
+
+        worked_up   his heart is well above his own resting and he is not asleep
+        settling    it was up, and now it is coming down — the other half, and the kinder
+                    half; noticing only the spike is how this becomes an alarm
+        long_still  hours without moving, which is worth a word exactly once
+
+    WHAT IT HANDS HER IS THE READINGS. Not "he is stressed" — she gets `70, 78, 92` and the
+    trend word, because a diagnosis from a wrist sensor is a confident guess wearing a
+    measurement's clothes, and because the noticing being HERS is the whole point of the
+    tail. She says it in her own words or she does not say it.
+
+    NEVER FROM A STALE READ: `body.read()` already returns nothing when the watch is off
+    his wrist or the data has aged out, so an empty `facts` is a full stop here.
+    """
+    import time as _t
+    now = _t.time() if now is None else now
+    f = (read or {}).get("facts") or {}
+    o = (read or {}).get("observed") or {}
+    if not f:
+        return None                      # off his wrist, or nothing fresh. Say nothing.
+    tail = o.get("heart_rate_tail") or []
+    # HOURLY BUCKET. She may notice his heart racing this hour and again next hour; she may
+    # not say it twice in ten minutes. The key is the bound.
+    hour = _t.strftime("%Y-%m-%dT%H", _t.gmtime(now))
+    hr, rest = f.get("heart_rate"), f.get("resting")
+
+    if (hr is not None and rest is not None and not f.get("asleep")
+            and hr - rest >= _BODY_OVER_RESTING):
+        key = "body:worked_up:" + hour
+        if key not in raised:
+            return {"kind": "body", "raise_key": key, "event": "worked_up",
+                    "tail": tail, "trend": f.get("hr_trend", ""),
+                    "heart_rate": hr, "resting": rest,
+                    "movement": f.get("movement_word", ""),
+                    "text": "his heart is at %.0f against his resting %.0f%s"
+                            % (hr, rest, (" — " + ", ".join("%.0f" % v for v in tail))
+                               if len(tail) >= 2 else "")}
+
+    # THE OTHER HALF. A companion that only ever remarks on the spike is a monitor with a
+    # personality; noticing him coming back down is the half that makes it care.
+    if (f.get("hr_trend") == "falling" and rest is not None and hr is not None
+            and f.get("hr_swing", 0) >= 12 and hr - rest < _BODY_OVER_RESTING
+            and not f.get("asleep")):
+        key = "body:settling:" + hour
+        if key not in raised:
+            return {"kind": "body", "raise_key": key, "event": "settling",
+                    "tail": tail, "trend": "falling", "heart_rate": hr, "resting": rest,
+                    "text": "his heart is coming back down%s"
+                            % ((" — " + ", ".join("%.0f" % v for v in tail))
+                               if len(tail) >= 2 else "")}
+
+    still_s = f.get("motion_for_s", 0)
+    if (not f.get("moving") and not f.get("asleep")
+            and still_s >= _BODY_STILL_HOURS * 3600):
+        key = "body:still:" + _t.strftime("%Y-%m-%d", _t.gmtime(now))
+        if key not in raised:
+            return {"kind": "body", "raise_key": key, "event": "long_still",
+                    "hours": round(still_s / 3600.0, 1),
+                    "text": "he has not moved in %.1f hours" % (still_s / 3600.0)}
+    return None
+
+
 def from_arrival(new: List[dict], raised: set) -> Optional[dict]:
     """A look she asked for has been made, and she has not seen it yet.
 
@@ -257,6 +340,16 @@ def propose(today: str = "") -> Optional[dict]:
     today = today or time.strftime("%Y-%m-%d")
     raised = raised_keys()
     built = {}
+    try:
+        # OFF-BY-DEFAULT KNOB, ON by his ask. `telemetry.reasons` exists so this can be
+        # silenced without unplugging the watch — noticing his body is the one reason here
+        # he might want to turn off for an evening without losing the history.
+        from harness.tuning import registry as _tr_b
+        if bool(_tr_b.get("telemetry.reasons", True)):
+            from harness.telemetry import body as _tb
+            built["body"] = from_body(_tb.read(), raised)
+    except Exception as exc:
+        logger.warning("[reasons] body source: %s", exc)
     try:
         from harness.control import wardrobe as WD
         # ── UNTOLD ONLY (2026-08-05) ───────────────────────────────────────────────

@@ -1439,6 +1439,63 @@ def _decisions_json() -> Dict[str, Any]:
         return {"ok": False, "error": str(exc)[:200], "open": [], "decided": []}
 
 
+def _telemetry_now_json() -> Dict[str, Any]:
+    """What his body is doing, for the room AND for her — the same seam.
+
+    Two panels reading two different functions is how the chip and the prefix end up
+    describing different people. `body.read()` decides; this renders; `body.present()` is
+    the same decision rendered for her instead of for a screen."""
+    try:
+        from harness.telemetry import body as _b
+        from harness.telemetry import store as _s
+        r = _b.read()
+        return {"ok": True, "observed": r.get("observed", {}), "facts": r.get("facts", {}),
+                "why": r.get("why", ""), "since": r.get("since", {}),
+                "she_reads": _b.present(), "resting": _b.resting(),
+                "health": _s.verify()}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:200]}
+
+
+def _telemetry_history_json(hours: float = 6.0, kind: str = "") -> Dict[str, Any]:
+    """The series behind the chart. Down-sampled per minute, because a browser asked for
+    six hours of 1 Hz heart rate is a browser that stops responding — and because a chart
+    with 21,600 points is not more honest than one with 360, it is just slower."""
+    try:
+        from harness.telemetry import store as _s
+        rows = _s.read_since(max(0.0, min(float(hours), 24 * 14)) * 3600.0)
+        if kind:
+            rows = [r for r in rows if r.get("kind") == kind]
+        buckets: Dict[str, Dict[str, Any]] = {}
+        for r in rows:
+            k, at = r.get("kind", "?"), (r.get("at") or "")[:16]     # to the minute
+            key = "%s|%s" % (k, at)
+            b = buckets.setdefault(key, {"kind": k, "at": at, "n": 0,
+                                         "sum": 0.0, "min": None, "max": None,
+                                         "state": None})
+            b["n"] += 1
+            v = r.get("value")
+            if isinstance(v, (int, float)):
+                b["sum"] += float(v)
+                b["min"] = float(v) if b["min"] is None else min(b["min"], float(v))
+                b["max"] = float(v) if b["max"] is None else max(b["max"], float(v))
+            else:
+                b["state"] = v
+        series: Dict[str, list] = {}
+        for b in sorted(buckets.values(), key=lambda x: x["at"]):
+            point = {"at": b["at"] + "Z", "n": b["n"]}
+            if b["min"] is not None:
+                point.update({"avg": round(b["sum"] / b["n"], 2),
+                              "min": b["min"], "max": b["max"]})
+            if b["state"] is not None:
+                point["state"] = b["state"]
+            series.setdefault(b["kind"], []).append(point)
+        return {"ok": True, "hours": hours, "series": series,
+                "kinds": sorted(series.keys())}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:200]}
+
+
 def _mem_row_json(e: Dict[str, Any]) -> Dict[str, Any]:
     """ONE registry row as the panel's JSON — the single shape (2026-08-25).
 
@@ -3195,6 +3252,50 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
     except Exception as exc:
         logger.warning("[gateway] anon note skipped: %s", exc)
 
+    # ── HIS BODY, PER TURN, IN THE SYSTEM LANE (2026-08-26) ─────────────────────────
+    # THREE PLACES THIS COULD HAVE GONE, and two of them are already known to be wrong:
+    #
+    #   the cached prefix   NO. It is KV token 0 and frozen between the 04:00 refreshes.
+    #                       A heart rate in it is either stale within the minute or
+    #                       re-prefills the whole conversation every time it moves —
+    #                       exactly what system_bundle() and the "when this session began"
+    #                       relabel were built to stop.
+    #   stapled to his turn NO, and this one is measured. The wardrobe staple taught her to
+    #                       read a parenthetical as HIS assertion and as an order, and cost
+    #                       2142 + 2293 characters of scratchpad instead of talking
+    #                       (2026-08-19). The comment eighty lines below says it plainly:
+    #                       do not put the staple back.
+    #   a system row        YES — the shape the roleplay director note already uses. It
+    #                       does not ride on his words, so it cannot read as him telling
+    #                       her something, and the `_tel` sentinel makes it IDEMPOTENT:
+    #                       removed and re-inserted each turn, so notes never stack and
+    #                       the persist-KV cache never diverges on stale ones.
+    #
+    # AND IT IS SELF-LIMITING, which is why it is safe where the wardrobe note was not.
+    # `body.present()` is EMPTY unless something is actually happening — no watch, stale
+    # readings, off the wrist, or a heart sitting flat all return "". On an ordinary quiet
+    # turn this costs zero tokens, so it is not a standing tax on every turn the way a
+    # wardrobe line was; it appears when there is something to notice and vanishes again.
+    msgs[:] = [m for m in msgs if not m.get("_tel")]
+    try:
+        from harness.tuning import registry as _tr_b
+        if bool(_tr_b.get("telemetry.turn_note", True)) and len(msgs) >= 1:
+            from harness.telemetry import body as _tel_b
+            _said = _tel_b.present()
+            if _said:
+                # you-grammar and HIS body: "he" here, because she is being told about him,
+                # not about herself. present_for_her's rule is about facts addressed TO
+                # her; this is an observation she is being handed.
+                msgs.insert(len(msgs) - 1, {
+                    "role": "system", "_tel": 1,
+                    "content": "(From his watch, right now: %s. You noticed; you did not "
+                               "measure. Use it only if it is worth a word — never "
+                               "diagnose him, and never recite it back.)" % _said})
+                if typed:
+                    yield ("data: " + json.dumps({"body": _said}) + "\n\n").encode()
+    except Exception as exc:
+        logger.warning("[gateway] body note skipped: %s", exc)
+
     # ── THE MEASURED TRIAL OF THE WARDROBE NOTE (2026-08-24 audit, W4b) ──────────────
     # OFF by default (wardrobe.turn_note): the 2026-08-19 staple is the receipt below
     # for why. His call on 2026-08-24 was standing-world line AS the answer (world.py
@@ -4098,6 +4199,38 @@ def _run_stdlib(host: str, port: int) -> None:
                 self.end_headers()
                 self.wfile.write(payload)
 
+            elif self.path == "/v1/telemetry/ingest":
+                # ── HIS BODY COMES IN HERE (2026-08-26) ─────────────────────────────
+                # The watch agent and the phone companion post batches. Deliberately the
+                # ONLY write path: `telemetry.ingest.record` is where the anon gate, the
+                # one clock and the shape rules live, and a second door would be a second
+                # set of rules within a month.
+                #
+                # NO AUTH, AND THAT IS A RECORDED DECISION, not an oversight. The gateway
+                # already binds where it binds and the LAN is the trust boundary for every
+                # other route on it; adding a shared secret HERE and nowhere else would be
+                # security theatre with a key to lose. If the gateway is ever exposed
+                # beyond the LAN this needs a real answer and so does everything else on
+                # :8800 — see docs/OFF-BY-DEFAULT.md.
+                body = self._body()
+                code, res = 200, {}
+                try:
+                    from harness.telemetry import ingest as _tel
+                    samples = body.get("samples")
+                    if samples is None and body.get("kind"):
+                        samples = [body]           # a single sample, unwrapped
+                    res = _tel.record(list(samples or []),
+                                      source=str(body.get("source") or ""))
+                    res["ok"] = True
+                except Exception as exc:
+                    code, res = 500, {"ok": False, "error": str(exc)[:200]}
+                payload = json.dumps(res).encode()
+                self.send_response(code); _cors(self)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
             elif self.path.startswith("/v1/presence/"):
                 # PRESENCE (2026-08-22): the shelf's two verbs from the window
                 body = self._body()
@@ -4922,6 +5055,13 @@ def _run_stdlib(host: str, port: int) -> None:
                 # G-PF-PERSONA was telling, so age ships alongside the verdict.
                 "/v1/health/gates": lambda: __import__(
                     "harness.control.ledger", fromlist=["x"]).gate_health(),
+                # TELEMETRY (2026-08-26). `now` is what the panel and she both read —
+                # one seam, so the room and her prefix can never describe two different
+                # bodies. `history` is the chart's series and is deliberately separate:
+                # it is allowed to be big and slow, `now` is not.
+                "/v1/telemetry/now": _telemetry_now_json,
+                "/v1/telemetry/health": lambda: __import__(
+                    "harness.telemetry.store", fromlist=["x"]).verify(),
                 "/v1/memory": _memory_json,      # PK2 §U1 memory-browser data
                 "/v1/decisions": _decisions_json,
                 "/v1/tasks": _tasks_json,        # PK2 §U1 task-queue data
@@ -5033,6 +5173,22 @@ def _run_stdlib(host: str, port: int) -> None:
             # current liveness, and what rests on it. A GET with a query param rather
             # than a map entry because it takes an argument; the map is for the fixed
             # listings. (2026-08-25 audit: the read side of `derived_from`.)
+            if _base == "/v1/telemetry/history":
+                from urllib.parse import parse_qs, urlparse as _up2
+                _q = parse_qs(_up2(self.path).query)
+                try:
+                    _hrs = float((_q.get("hours") or ["6"])[0])
+                except ValueError:
+                    _hrs = 6.0
+                res = _telemetry_history_json(_hrs, (_q.get("kind") or [""])[0])
+                payload = json.dumps(res).encode()
+                self.send_response(200 if res.get("ok") else 400); _cors(self)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                if self.command != "HEAD":
+                    self.wfile.write(payload)
+                return
             if _base == "/v1/memory/why":
                 from urllib.parse import parse_qs, urlparse as _up
                 res = _memory_why_json(
@@ -5483,5 +5639,22 @@ def run(host: str = "127.0.0.1", port: int = 8800) -> None:
 
 
 if __name__ == "__main__":
-    # the port is the profile's [serve].gateway_port, mapped once in serve.py build_env
-    run(port=int(os.environ.get("SP_GATEWAY_PORT") or "8800"))
+    # ── WHERE IT LISTENS IS A DECISION, AND IT IS HIS (2026-08-26) ──────────────────
+    # LOOPBACK IS THE SECURITY MODEL. `_origin_ok` returns True when there is NO Origin
+    # header — curl, a script, the watch agent — so the origin check defends against a
+    # BROWSER and nothing else. On loopback that is complete. Off loopback it is not: any
+    # device that can reach this port can POST /v1/chat, which has shell access and file
+    # write through the tool loop, read /v1/memory, and call /v1/shutdown.
+    #
+    # He asked for the LAN and accepted that, in his words: "I am the only one who uses
+    # the network." So the default here is unchanged — 127.0.0.1, for anyone who runs this
+    # framework and has not made that decision — and the knob is what carries it.
+    #
+    # SCOPING IS STILL DONE, because "the network" means ONE of his networks. This machine
+    # is on Control (10.0.0.0/24, his) and also on 192.168.1.0/24, which is a GUEST
+    # connection, plus three virtual switches. `0.0.0.0` would put her on all of them. The
+    # bind is broad because loopback must keep working for the room; a firewall rule scoped
+    # to the Control subnet is what keeps her off the network that is not his.
+    # See docs/OFF-BY-DEFAULT.md and tools/lan_bind.py.
+    run(host=os.environ.get("SP_GATEWAY_BIND") or "127.0.0.1",
+        port=int(os.environ.get("SP_GATEWAY_PORT") or "8800"))

@@ -299,6 +299,27 @@ check("spine: the flush writes nothing", SP.persist_receipts() == 0)
 check("...and the WATERMARK MOVED PAST THEM, so they can never be flushed later",
       SP._PERSISTED_SEQ >= SP._SEQ, (_hi_before, SP._PERSISTED_SEQ, SP._SEQ))
 
+print("\n5b. HIS BODY IS OFF THE RECORD TOO (2026-08-26)")
+# THE MOST PRIVATE ROW THIS SYSTEM WRITES. The telemetry lane records heart rate, movement
+# and sleep at up to 1 Hz; a private hour that kept logging it would be off-the-record
+# writing the most intimate thing in the store while the room said nothing was kept.
+import tempfile as _tf                                                     # noqa: E402
+os.environ["SP_TELEMETRY_DIR"] = os.path.join(_tf.mkdtemp(prefix="g_anon_tel_"), "tel")
+from harness.telemetry import ingest as TEL, store as TELS                 # noqa: E402
+_r = TEL.record([{"kind": "heart_rate", "value": 88},
+                 {"kind": "sleep_stage", "value": "deep"},
+                 {"kind": "steps", "value": 4211}], source="watch")
+check("telemetry: nothing from his body is written", _r["stored"] == 0, _r)
+check("...and the store on disk is still empty", TELS.verify()["samples"] == 0)
+# THE COUNT IS THE RECEIPT. Every door before this one held exactly one thing per call, so
+# the counter incremented by one and was right. This door asks ONCE for a whole batch, and
+# under-reporting what was withheld is the one lie this mode cannot afford.
+check("...and the room is told the TRUE number held, not the number of calls",
+      AN.state()["held"].get("telemetry.sample") == 3,
+      AN.state()["held"].get("telemetry.sample"))
+check("...phrased for him", AN.phrase("telemetry.sample", 3) == "3 readings from his body",
+      AN.phrase("telemetry.sample", 3))
+
 print("\n6. SHE IS STILL HER, AND THE ROOM STILL WORKS")
 check("she recalls what she knew before — reads are untouched",
       "forge42" in M.recall("what is the workshop called").lower(),

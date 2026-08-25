@@ -96,6 +96,68 @@ The two connect: what the night writes is folded into her prefix at the same bou
 wakes up having taken in what she became — for a long time the write half worked and the read
 half did not, which is the kind of thing a suite of green tests will not tell you.
 
+## Her body-awareness — optional, and off unless you build it
+
+A companion that can *notice* — "his heart, last few readings: 70, 78, 92 — climbing" — and
+say something a person in the room would say. It ships as a framework plus a Wear OS agent
+you build yourself; nothing is running until you do.
+
+```
+  watch agent (APK)  --HTTP-->  POST /v1/telemetry/ingest
+                                     |
+                                ingest.record()      <- one door: privacy gate, one clock, shape
+                                     |
+                                store (one JSONL per day)
+                                     |
+                     +---------------+----------------+
+                     |                                |
+               body.read() / present()         GET /v1/telemetry/{now,history}
+                     |                                |
+              her prefix + reasons                body panel  ♥
+```
+
+**Build the agent** (no gradle needed — it stays on the platform SDK on purpose, so
+`aapt2 → javac → d8 → apksigner` is the whole toolchain, about 16 KB):
+
+```bash
+cd harness/telemetry/watch-agent
+python build.py --install --arm        # --arm grants the sensors and starts it
+```
+
+`--arm` is a separate word deliberately: installing an app that reads your heart is one
+decision, turning it on is another. Set `TELEMETRY_ENDPOINT` to your harness — the default
+in the source is an example and will not resolve on your network.
+
+**What it does and does not do.** It reduces motion to one number per window rather than
+posting 100 Hz of raw accelerometer; it batches on the heart-rate sensor's own 600-event
+FIFO rather than posting per beat; and it puts failed batches back at the *front* of the
+queue, so an outage leaves a gap in the link and not in your history.
+
+**What she is allowed to do with it** is the part worth reading before you turn it on:
+
+- a **measurement** is `observed` — she may state it plainly;
+- a **reading** ("he is asleep") is `inferred` — it says *seems*, and your own word
+  outranks it the moment you speak;
+- **silence is an answer** — no watch, stale data, or off the wrist and she is told
+  *nothing*, because "you seem calm" from readings taken at lunch is worse than nothing;
+- she gets the **last few readings**, not an average, and only when they *move* — a flat
+  tail costs context to say nothing;
+- **never a diagnosis.** Nothing computes a medical claim and her prompt forbids one in as
+  many words. It is a wrist sensor, not a doctor.
+
+Your privacy mode holds it: `telemetry.sample` is a door in `anon.DOORS`, and readings taken
+off the record are **held, not queued** — a queue is the same leak with a delay on it.
+
+Two knobs, both on once data arrives: `telemetry.turn_note` (she is handed it per turn) and
+`telemetry.reasons` (she may speak first about it). Full detail, including the three tiers
+and what the hardware will and will not give you: [`docs/TELEMETRY.md`](docs/TELEMETRY.md).
+
+> **Reaching the gateway.** It binds `127.0.0.1` and **loopback is its security model** — the
+> origin check defends against a browser, not against a script. A watch is not on that
+> machine, so either tunnel (`adb reverse tcp:8800 tcp:8800`) or widen `[serve].bind` and
+> scope it with a firewall rule. That second one is a real decision about who can reach her;
+> `python tools/lan_bind.py --status` tells you whether your scoping is actually in place.
+
 ## What works, and what the custom engine adds
 
 Everything here runs engine-agnostically: memory with tombstones and verdicts, the recall seam,
@@ -120,6 +182,12 @@ with a stated loss — see `docs/BACKENDS.md` and `docs/OFF-BY-DEFAULT.md` §12.
 | what proves it still works | [`gates/GATE-INDEX.md`](gates/GATE-INDEX.md) |
 | what is deliberately off, and what would turn it on | [`docs/OFF-BY-DEFAULT.md`](docs/OFF-BY-DEFAULT.md) |
 | the room | [`ui/README.md`](ui/README.md) |
+
+- [`docs/LANES.md`](docs/LANES.md) — **the six ways a fact reaches her**, and which one
+  yours belongs in. Two of the six have already been measured wrong; the receipts are in
+  there. Read it before adding anything to her context.
+- [`docs/PANELS.md`](docs/PANELS.md) — every window in the room, what it reads, and whose
+  it is.
 
 ## Before you say you are done
 

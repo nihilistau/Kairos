@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The watch agent. Reads his body on the wrist and posts it to the harness.
+
+  NO ANDROIDX, AND THAT IS THE DESIGN. Health Services would be the modern API and it
+  would drag in androidx.health:health-services-client, which means an AAR, which means
+  dependency resolution, which means gradle — and there is no gradle on this machine.
+  Everything here is platform SDK only, so the whole app builds with aapt2 + javac + d8 +
+  apksigner and nothing else. SensorManager gives heart rate, gyro, accelerometer, step
+  counter and off-body directly; that is the whole requirement.
+
+  minSdk 30 = Wear OS 3. The watch is on Wear OS 6 / API 36, but nothing here needs it.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.telemetry.agent"
+    android:versionCode="1"
+    android:versionName="0.1.0">
+
+    <uses-sdk android:minSdkVersion="30" android:targetSdkVersion="33" />
+
+    <uses-feature android:name="android.hardware.type.watch" />
+
+    <!-- HIS BODY. READ_HEART_RATE is the modern spelling (the sensor dump on this watch
+         lists it as the guard on android.sensor.heart_rate); BODY_SENSORS is the older
+         one and both are declared because the watch has spanned the change. Both are
+         grantable with `adb shell pm grant`, which is how this gets armed without a
+         tap on a 1.4-inch screen. -->
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <uses-permission android:name="android.permission.BODY_SENSORS_BACKGROUND" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:label="Telemetry"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="true"
+        android:icon="@android:drawable/ic_menu_compass">
+
+        <!-- CLEARTEXT TO THE LAN, DELIBERATELY. The harness is on his own wire and the
+             Control network has no uplink of its own; a TLS story here would mean a cert
+             to distribute to a watch, and the threat it defends against is someone
+             already inside the LAN. Said out loud rather than left as a default. -->
+        <meta-data android:name="android.webkit.WebView.MetricsOptOut" android:value="true" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="Telemetry">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- dataSync, NOT health: the `health` foreground service type arrived in API 34
+             and this compiles against 33. targetSdk 33 means the stricter typing does not
+             apply on the API 36 watch either, so this is the correct value rather than a
+             downgrade. (A comment inside an attribute list is not XML, which aapt2 said
+             plainly and I should have known.) -->
+        <service
+            android:name=".AgentService"
+            android:exported="true"
+            android:foregroundServiceType="dataSync" />
+
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
