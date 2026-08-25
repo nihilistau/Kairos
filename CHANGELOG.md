@@ -1,5 +1,90 @@
 # Changelog
 
+## 0.4.0 — the MCP release: what a server may see, and what it may become (2026-08-25)
+
+An audit of the MCP layer in both directions, and the read side of provenance. **If you run
+this framework and have ever put a server in `mcp_servers.json`, the first three were yours
+too.**
+
+**An external server could take the name of one of your agent's own tools.** The rule
+`mcp_servers.json`, `docs/MCP.md` and `bridge.py` all state — on a collision the native tool
+keeps the bare name, the bridged one arrives as `<server>_<name>` — ran **backwards** for nine
+of the fourteen native packs. The bridge was spliced into the *middle* of `all_tools()`, so its
+exclusion set was computed from the five packs above it, and every pack below skipped any name
+already taken, against a set that by then held the bridged names. A native tool whose name an
+external server claimed was silently **dropped**, and the namespacer never fired, because it
+only renames what is already taken. Live on the reference profile: `chrome-devtools-mcp` is
+allowed `take_screenshot`, which is also the local sight tool — the browser held the bare name
+and the native tool did not load. The fix is one line of ordering; **G-MCP-SHADOW** (14/14) is
+what stops it returning, driving a real greedy bridge through the real `all_tools()`.
+
+**Every spawned server got your whole environment.** `_client_for` built `dict(os.environ)` and
+handed it to the child — every API key you have exported, and the path to your entire memory
+registry, given to whatever `npx -y …@latest` resolves to at spawn time. The default now
+inverts: a child gets what an interpreter needs to *start* on the platform plus exactly what
+its own `env` block declares. A server that genuinely needs more declares `"inherit_env": true`
+and says why.
+
+**A tool may no longer quietly become a different tool.** Name, description and schema are
+fingerprinted on first sight and a changed fingerprint is **refused** by name — the rug-pull,
+where a server is approved once and later returns the same tool with a new description. The
+description *is* prompt, so a same-name swap is a complete exfiltration primitive that changes
+nothing a human would notice. `python tools/mcp_pin.py --accept <server> <tool>` accepts a
+legitimate change; `SP_MCP_PIN=0` disarms the whole mechanism. Trust on first use, said plainly:
+it cannot vouch for the *first* listing, only that yesterday's offer is today's.
+
+**A remote server is now a decision rather than a URL.** `{"url": …}` went straight to
+`Client(url)`: any scheme, any host, no authorization. Loopback is fine; anything else is
+refused unless the block says `"remote_ok": true`, and plain `http` to a remote host is refused
+even then. **What is not built is written down**: OAuth 2.1 with PKCE and resource indicators is
+unbuilt, so a remote server you *do* allow is unauthenticated. Ledgered in
+`docs/OFF-BY-DEFAULT.md` §7b with its arming condition, because a guard that looks like more
+than it is gets trusted.
+
+**The outbound server now exposes *her*, not just her machine.** `docs/MCP.md` had claimed since
+July that it exposes "her memory, her board and her skills"; it exposed a sandboxed filesystem,
+web, a clock and five memory tools. The sentence was not deleted — the capability was built:
+`why_she_believes`, `what_she_knows`, `what_she_is_wearing`, `what_she_has_been_doing`,
+`why_she_is_quiet`, `whats_on_the_board`. Read-only, deliberately: an outbound client is across
+a process boundary with no operator in the loop.
+
+**And the receipts can finally be read.** `derived_from` had been written through one door,
+enforced by the nightly orphan sweep and gated — while the only code that resolved a support
+name to a row was a private dict inside a predicate. *"Why do you believe that?"* got zero
+steps. Now: `memory.supports_of` / `dependents_of` / `missing_supports`, `provenance()` walking
+the chain, `GET /v1/memory/why`, the epistemic fields `/v1/memory` had been dropping
+(`status`, `derived_from`, `support_days`, `superseded_by`, `retired_because`), and a **why**
+button in the memory panel showing each support's *current* liveness plus what would be orphaned
+if you retired the row. The doctrine that survives it: provenance is a door *she speaks from*, so
+a retired support is **counted and never quoted** — the audit lane shows the dead, the spoken
+lane tallies them.
+
+**A related bug this exposed: she had begun writing her nightly paragraph out of her own nightly
+paragraphs.** `becoming.nightly` excluded the *other* consolidator's output and never its own
+kind. Three rows deep on the reference store, the third naming the first two, the texts visibly
+folding inward. The rule is no longer a hand-kept list of kinds — it reads the `derived_from`
+mark itself (`lifecycle.is_distillate`), so a consolidator added later is covered the day it
+stamps its first row.
+
+Also: `fastmcp` and `mcp` are declared in `pyproject.toml` at last; `tools/mcp_pin.py` ships
+(a refusal without its acceptance door is an outage with a dead link in the error text); and
+`livestore.py` takes one cross-process lock, because the suite runs gates in parallel and a
+reader of her live wardrobe was racing a writer — a gate red only when its neighbour is
+mid-write teaches people that sweep reds are noise.
+
+**And this release's committed bundle actually corresponds to its committed code.** The
+manifest ships `ui/src/**` *and* the prebuilt `console/room/**`, and the scrub rewrites tokens
+inside six of those source files — so every previous release shipped a bundle built from the
+private tree's sources sitting beside somebody else's. Found by running *this* repo's own sweep:
+G-ROOM-BUNDLE rebuilt from the scrubbed source, got a different hash, and said so. The export
+now rebuilds the room here, from here (and the export's dependency install is no longer wiped on
+every run, which is why the rebuild had been quietly declining to happen). The 0.2.1 lesson
+again: upstream-green does not mean export-green, and the fix is to make the claim true rather
+than to loosen the gate.
+
+Upstream sweep at release: **137 green, 3 correct skips, 0 red.**
+Sweep in *this* repo at release: **109 green, 1 correct skip, 0 red.**
+
 ## 0.3.0 — the audit release: every turn pays its debts, and she reads back what she becomes (2026-08-25)
 
 A full audit of the upstream tree. The offline suite was **green when it started** — and ~50

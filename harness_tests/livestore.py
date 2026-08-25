@@ -56,9 +56,82 @@ def paths():
     return [p for p in out if p]
 
 
+def _lock_path():
+    """One lock beside her stores, so it moves with SP_AVATAR_DIR."""
+    try:
+        from harness.control import wardrobe as WD
+        return os.path.join(os.path.dirname(WD._state_path()), ".gate-livestore.lock")
+    except Exception:
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), ".gate-livestore.lock")
+
+
+@contextlib.contextmanager
+def _exclusive(timeout=90.0):
+    """ONE GATE AT A TIME INSIDE HER STORES (2026-08-25).
+
+    Restoring byte-identically is only half of it, and the half that shows up alone. The
+    other half showed up under tools/sweep.py, which runs gates in PARALLEL: while
+    G-WARDROBE-QUEUE was inside the block with two fabricated wants written to the real
+    wants.jsonl, G-WARDROBE-REACH read that same file and convicted them — 38 items, two
+    unreachable, RED. Run on its own the same gate is green at 37. A gate that is red only
+    when its neighbour is mid-write is worse than a gate that is always red: it teaches
+    people that reds in the sweep are noise, which is how a real one gets ignored.
+
+    A cross-process lock, because the sweep is processes and not threads. Held for the
+    whole block, taken by readers too — a reader of a store somebody else is halfway
+    through rewriting is exactly the failure. On timeout it PROCEEDS rather than raising:
+    the worst case is the flake we already had, and a gate suite that deadlocks is a
+    suite nobody runs."""
+    import time
+    p = _lock_path()
+    try:
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+    except Exception:
+        pass
+    fd, deadline = None, time.time() + timeout
+    while fd is None and time.time() < deadline:
+        try:
+            fd = os.open(p, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            # A crashed gate must not wedge the suite forever.
+            try:
+                if time.time() - os.path.getmtime(p) > timeout:
+                    os.remove(p)
+                    continue
+            except OSError:
+                pass
+            time.sleep(0.05)
+        except Exception:
+            break
+    try:
+        yield
+    finally:
+        if fd is not None:
+            try:
+                os.close(fd)
+                os.remove(p)
+            except Exception:
+                pass
+
+
+@contextlib.contextmanager
+def live_reader():
+    """For a gate that only READS her live stores — G-WARDROBE-REACH's whole design.
+
+    It takes the same lock and restores nothing, because it changes nothing. Without this
+    the restore discipline protects the stores and leaves the READERS racing."""
+    with _exclusive():
+        yield
+
+
 @contextlib.contextmanager
 def live_stores(extra=()):
-    """Snapshot her stores, run the block, put them back exactly."""
+    """Snapshot her stores, run the block, put them back exactly — alone."""
+    with _exclusive():
+        yield from _live_stores_inner(extra)
+
+
+def _live_stores_inner(extra=()):
     keep = {}
     for p in list(paths()) + list(extra):
         try:

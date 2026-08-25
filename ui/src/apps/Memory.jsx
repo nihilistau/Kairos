@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePoll, Body } from './panel.jsx'
 import * as api from '../api.js'
 
@@ -26,11 +26,73 @@ const CLASSES = ['fact', 'preference', 'relationship', 'identity', 'event',
 const KINDS = ['', 'journal', 'thought', 'narration', 'dream', 'self_description',
                'spoke_up', 'feeling', 'chapter']
 
+/* WHY — the read side of provenance (2026-08-25).
+ *
+ * `derived_from` had been written through one door, enforced by the 04:00 orphan sweep and
+ * gated for three days, and NOTHING COULD PRINT IT. This panel could show a conclusion she
+ * had drawn and had no way to say what it was drawn from, or that two of those things were
+ * no longer true. Now a row that carries supports gets a `why` button, and it shows them
+ * with their CURRENT liveness plus what rests on this row if he retires it — which is the
+ * question the retire button right beside it makes him ask. */
+function Why({ name, onClose }) {
+  const [d, setD] = useState(null)
+  const [err, setErr] = useState('')
+  // In an EFFECT, not in render. Fetching during render re-fires on every render and the
+  // setState re-renders — an infinite request loop against her own gateway, from a panel
+  // whose whole job is to be safe to open.
+  useEffect(() => {
+    let live = true
+    api.memoryWhy(name)
+      .then(r => { if (live) setD(r) })
+      .catch(e => { if (live) setErr(String(e).slice(0, 90)) })
+    return () => { live = false }
+  }, [name])
+  if (err) return <div className="mem-why err">{err}</div>
+  if (!d) return <div className="mem-why muted">reading the receipts…</div>
+  if (d.ok === false) return <div className="mem-why err">{d.error}</div>
+  const sup = d.supports || []
+  const dead = sup.filter(s => s.lifecycle)
+  const dep = d.dependents || []
+  return (
+    <div className="mem-why">
+      <div className="why-head">
+        drawn from {sup.length} row{sup.length === 1 ? '' : 's'}
+        {d.row.support_days ? ' across ' + d.row.support_days + ' days' : ''}
+        {dead.length ? ' — ' + dead.length + ' since retired' : ''}
+        {(d.missing_supports || []).length
+          ? ' — ' + d.missing_supports.length + ' no longer findable' : ''}
+        <button className="mem-edit" onClick={onClose}>×</button>
+      </div>
+      {sup.map((s, i) => (
+        <div key={s.name || i} className={'why-row' + (s.lifecycle ? ' gone' : '')}>
+          <span className="cls c-kind">{s.kind || s.mem_class}</span>
+          <span>{s.text}</span>
+          {s.lifecycle ? <em className="muted"> — retired{
+            s.retired_because ? ': ' + s.retired_because : ''}</em> : null}
+        </div>
+      ))}
+      {dep.length ? (
+        <div className="why-head">
+          {dep.length} conclusion{dep.length === 1 ? '' : 's'} rest on this row — retiring it
+          may orphan {dep.length === 1 ? 'it' : 'them'}
+        </div>
+      ) : null}
+      {dep.map((s, i) => (
+        <div key={'d' + i} className={'why-row dep' + (s.lifecycle ? ' gone' : '')}>
+          <span className="cls c-kind">{s.kind || s.mem_class}</span><span>{s.text}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function MemRow({ r, onDone }) {
   const [open, setOpen] = useState(false)
+  const [why, setWhy] = useState(false)
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
   const hers = r.speaker === 'self'
+  const derived = (r.derived_from || []).length > 0
 
   async function send(body) {
     setBusy('…'); setErr('')
@@ -62,8 +124,19 @@ function MemRow({ r, onDone }) {
           <span className="sal" title={'salience ' + r.salience}>
             <i style={{ width: Math.min(100, r.salience * 14) + '%' }} /></span>
         ) : null}
+        {/* STATUS, which this panel could never see. lifecycle.render frames from it and
+            verdict.may_supersede rules on it — an inference must never look like
+            testimony here, of all places, where he decides what to keep. */}
+        {r.status && r.status !== 'observed' && r.status !== 'confirmed'
+          ? <span className={'cls c-st-' + r.status} title="how this claim was arrived at">
+              {r.status}</span> : null}
+        {derived
+          ? <button className="mem-edit" onClick={() => setWhy(!why)}
+                    title="what this conclusion was drawn from">{why ? '×' : 'why'}</button>
+          : null}
         <button className="mem-edit" onClick={() => setOpen(!open)}>{open ? '×' : 're-file'}</button>
       </div>
+      {why ? <Why name={r.name} onClose={() => setWhy(false)} /> : null}
       {open ? (
         <div className="mem-edit-box">
           <label>whose
@@ -148,8 +221,22 @@ export default function Memory() {
               <p className="muted">…{shown.length - 200} more; narrow the filter.</p>
             ) : null}
             {gone.length ? <h4 className="muted">retired — kept, never deleted</h4> : null}
+            {/* ...AND WHY IT DIED (2026-08-25). A tombstone rendered as bare text answers
+                the audit lane's only question with silence, while `retired_because` and
+                `superseded_by` sat on the row this list was already reading. The 25 rows
+                with no breadcrumb at all are the repair-era ones (memory.orphan_tombstones);
+                they say nothing here because there is nothing to say, which is itself
+                worth seeing. */}
             {gone.slice(0, 60).map((r, i) => (
-              <div key={'g' + i} className="mem gone">{r.text}</div>
+              <div key={'g' + i} className="mem gone">
+                {r.text}
+                {r.retired_because || r.superseded_by ? (
+                  <em className="muted"> — {r.retired_because
+                    || (r.superseded_by === 'supports-retired'
+                        ? 'its supports were retired'
+                        : 'replaced by a later row')}</em>
+                ) : null}
+              </div>
             ))}
           </>
         )

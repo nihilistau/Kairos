@@ -26,6 +26,10 @@ export const memory  = () => get('/v1/memory')
 export const memoryAdd     = (fact, speaker) => post('/v1/memory/add', { fact, speaker })
 export const memoryForget  = (name) => post('/v1/memory/forget', { name })
 export const memoryRelabel = (b) => post('/v1/memory/relabel', b)
+// WHY DOES SHE BELIEVE THIS — the row, what it was drawn from with each support's
+// CURRENT liveness, and what would be orphaned if this one were retired. GET with a
+// query param rather than a listing, because it takes an argument. (2026-08-25)
+export const memoryWhy = (name) => get('/v1/memory/why?name=' + encodeURIComponent(name))
 /* HIS QUEUE (2026-08-23) - what is UNDECIDED, as against the ledger's what-is-off. */
 export const decisions     = () => get('/v1/decisions')
 export const decide        = (id, choice, note) => post('/v1/decisions/decide', { id, choice, note })

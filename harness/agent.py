@@ -362,16 +362,6 @@ def all_tools() -> List[ToolSpec]:
         if s.name not in seen:
             seen.add(s.name)
             specs.append(s)
-    # MCP bridge (AUDIT 2026-07-10): tools from mcp_servers.json join the set when
-    # SP_MCP_TOOLS=1. Native names win on collision; bridged extras land in the
-    # extra_tools index tier (load_tools on demand), so the ≤6-tool rule holds.
-    if os.environ.get("SP_MCP_TOOLS", "0") == "1":
-        try:
-            from harness.mcp_server.bridge import mcp_toolspecs
-            specs = specs + mcp_toolspecs(exclude_names={s.name for s in specs})
-        except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning("MCP bridge unavailable: %s", exc)
     # DELEGATION (SP_DELEGATE=1): `delegate_code` hands a goal to the Grok CLI in an isolated
     # git worktree, gates the result, and reports — it never merges, and the diff verdict
     # refuses anything outside harness/tests/docs (G-DELEGATE). It joins the EXTRA tier, not
@@ -471,6 +461,32 @@ def all_tools() -> List[ToolSpec]:
     except Exception as exc:
         import logging
         logging.getLogger(__name__).warning("looking notes unavailable: %s", exc)
+
+    # ── THE BRIDGE GOES LAST, AND THAT IS THE WHOLE RULE (2026-08-25) ─────────────
+    # Tools from mcp_servers.json join when SP_MCP_TOOLS=1. Three documents say
+    # "native always keeps the bare name on a collision" — mcp_servers.json, docs/MCP.md
+    # and bridge.py's own header — and it was true of exactly the five packs assembled
+    # ABOVE the old call site. Everything added after it (sight, wardrobe, music, games,
+    # poker, journal, delegate, research, looking) used `if s.name not in names`, where
+    # `names` already contained the BRIDGED names — so a native tool whose name an
+    # external server had taken was silently DROPPED.
+    #
+    # Live example on the running profile, found by audit 2026-08-25: the browser server
+    # allows `take_screenshot`, sight_tools() provides `take_screenshot`, and the browser's
+    # won the bare name — her own screen/camera tool did not load at all, and
+    # `browser_take_screenshot` was never minted because the namespacer only fires when
+    # the name is ALREADY taken. The documented example of the rule was running backwards.
+    #
+    # An external process cannot be allowed to capture the name of one of her own hands.
+    # Assembled LAST, the exclusion set is every native tool there will be, so the rule
+    # the docs state is the rule the code runs. G-MCP-SHADOW holds it, per pack.
+    if os.environ.get("SP_MCP_TOOLS", "0") == "1":
+        try:
+            from harness.mcp_server.bridge import mcp_toolspecs
+            specs = specs + mcp_toolspecs(exclude_names={s.name for s in specs})
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("MCP bridge unavailable: %s", exc)
     return specs
 
 

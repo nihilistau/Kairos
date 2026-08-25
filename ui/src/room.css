@@ -1303,6 +1303,19 @@ body.resizing, body.resizing * { user-select: none !important; cursor: inherit; 
 .mem-edit-box select { font-size: 10px; }
 .mem .c-kind { opacity: .75; }
 
+/* ── why does she believe it: the read side of provenance (2026-08-25) ────────────── */
+/* Two rules only, because the tell here is TYPOGRAPHIC and not decorative: a retired
+   support is struck through exactly the way a retired row is in the list above, so the
+   sentence "this conclusion is standing on two things that are no longer true" is a
+   thing he SEES rather than a thing he has to work out. */
+.mem-why { margin: 6px 0 2px; padding: 6px 8px; font-size: 10px;
+           border-left: 2px solid var(--line); }
+.why-head { display: flex; gap: 6px; align-items: baseline; opacity: .75; margin: 2px 0 6px; }
+.why-row { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; }
+.why-row.gone { color: var(--off); text-decoration: line-through; }
+.why-row.dep { opacity: .85; }
+.mem .c-st-inferred, .mem .c-st-disputed { opacity: .7; font-style: italic; }
+
 /* ── decisions: what is waiting on him (2026-08-23) ───────────────────────────────── */
 .dec { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
 .dec-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }

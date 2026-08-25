@@ -9,5 +9,7 @@ Two directions:
     loop, so the SERVED MODEL can call them like native tools.
 
 Customize by editing custom_tools.py (drop plain functions there) and
-mcp_servers.json (add external servers). See MCP-README.md.
+mcp_servers.json (add external servers). The reference is docs/MCP.md
+(MCP-README.md was renamed there and three files went on naming a file that
+does not exist — a dangling pointer reads as a missing doc, 2026-08-25).
 """

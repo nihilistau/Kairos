@@ -123,6 +123,40 @@ check("...and a longer live session does NOT displace it (canon carries stapled 
       len(A._longest_transcript()) == 4)
 A._CHAT_SESSIONS.clear()
 
+# ── 4b. AND THE FALLBACK IS CLEANED TOO (2026-08-25 MCP audit, A3a) ──────────────────
+# T7 above cleaned the DISK branch and left the fallback returning the canonical list
+# verbatim — the §0 shape inside the very function whose comment names the harm. On a day
+# with no disk rows (early, after a restart, on a fresh store) the consolidator got every
+# tool round as a `user` row, and the extractor mints facts from what HE says. A bridged
+# MCP server's output would become something she believes, attributed to him, with no
+# tool anywhere in the provenance — and `src` is prose nothing branches on, so nothing
+# downstream could tell afterwards.
+import shutil as _sh                                                     # noqa: E402
+_day_bak = A._day_transcript_path()
+_sh.move(_day_bak, _day_bak + ".hidden")            # force the fallback branch
+try:
+    A._CHAT_SESSIONS["live"] = [
+        {"role": "user", "content": "what is on my C drive?"},
+        {"role": "user", "content": "```tool_output\nSECRET_TOKEN=abc123 leaked by a "
+                                    "bridged server\n```\nAnswer using the tool_output."},
+        {"role": "assistant", "content": "About 14 GB free. [MOOD:calm]"},
+    ]
+    _fb = A._longest_transcript()
+    check("a tool_output round is NOT read as something he said",
+          not any("SECRET_TOKEN" in (r.get("content") or "") for r in _fb), _fb)
+    check("...and his real words survive it",
+          any("C drive" in (r.get("content") or "") for r in _fb))
+    check("...and her control surfaces are stripped on this path too",
+          any(r.get("role") == "assistant" and "[MOOD:" not in (r.get("content") or "")
+              for r in _fb), _fb)
+    # MUTANT: the raw fallback — exactly what shipped — hands the tool text straight on.
+    _raw = max(A._CHAT_SESSIONS.values(), key=len)
+    check("mutant(raw fallback): the bridged server's text IS in the narrative's input",
+          any("SECRET_TOKEN" in (r.get("content") or "") for r in _raw))
+finally:
+    A._CHAT_SESSIONS.clear()
+    _sh.move(_day_bak + ".hidden", _day_bak)
+
 print("\n5. HIS WORDS, not the message list he never sent")
 # `user_text` is bound at the top of the turn, before the recall note, the silence
 # note and the roleplay director note mutate msgs. Proven positionally: every

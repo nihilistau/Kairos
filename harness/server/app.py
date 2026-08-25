@@ -1439,6 +1439,83 @@ def _decisions_json() -> Dict[str, Any]:
         return {"ok": False, "error": str(exc)[:200], "open": [], "decided": []}
 
 
+def _mem_row_json(e: Dict[str, Any]) -> Dict[str, Any]:
+    """ONE registry row as the panel's JSON — the single shape (2026-08-25).
+
+    Lifted out of `_memory_json` when /v1/memory/why arrived, because the alternative was
+    a second hand-kept spelling of the same object, which is this repo's signature bug
+    with a fresh date on it: a field added to the listing and forgotten in the walk would
+    render a support with no salience and no status and look like a data problem."""
+    from harness.skills import lifecycle as lc
+    from harness.skills.memory import _text
+    return {
+        "name": e.get("name", ""),
+        "text": lc.strip_prefix(_text(e)),        # drop the legacy "The user said: "
+        "speaker": e.get("speaker", ""),
+        "mem_class": e.get("mem_class", ""),
+        # her lane's second label (2026-08-23): the panel cannot re-file what it
+        # cannot see, and `kind` is what decides durability now
+        # (lifecycle._HALF_LIFE_BY_KIND), not mem_class alone.
+        "kind": e.get("kind", ""),
+        "lifecycle": e.get("lifecycle", 0),
+        "src": e.get("src", ""),
+        "ts": e.get("ts", ""),
+        # SALIENCE, ON THE PANEL. What she thinks matters, and WHY — how many times
+        # he said it, how long ago, how often she has reached for it. A ranking you
+        # cannot see is a ranking you cannot argue with, and the first thing this
+        # one showed us when it was switched on is that the store's idea of what
+        # matters was wrong (chatter outranking his GPU). That is the panel doing
+        # its job: it made a bad ranking visible instead of quietly acting on it.
+        "mentions": e.get("mentions", 1),
+        "recalled": e.get("recalled", 0),
+        "last_seen": e.get("last_seen", e.get("ts", "")),
+        "salience": lc.salience(e),
+        # ── THE EPISTEMIC FIELDS (2026-08-25 audit) ─────────────────────────
+        # The panel could not tell an OBSERVED row from an INFERRED one, could
+        # not see that a conclusion was drawn from other rows, and rendered a
+        # tombstone as bare text with no cause of death — while every one of
+        # those fields sat on the row it was already reading. `status` is what
+        # lifecycle.render() frames from and what verdict.may_supersede rules
+        # on; a curate panel that cannot see it is arguing with a ranking
+        # blindfolded. Names only for `derived_from` — /v1/memory/why resolves
+        # them, so a 37-support row does not carry 37 texts into every listing.
+        "status": e.get("status", ""),
+        "derived_from": e.get("derived_from") or [],
+        "support_days": e.get("support_days", 0),
+        "superseded_by": e.get("superseded_by", ""),
+        "retired_because": e.get("retired_because", ""),
+    }
+
+
+def _memory_why_json(name: str) -> Dict[str, Any]:
+    """"Why do you believe X?", answered in rows — the READ side of provenance.
+
+    `derived_from` had been written, enforced by the nightly orphan sweep and gated for
+    three days before anything could read it back (2026-08-25 audit). This is that read:
+    the conclusion, the rows it was drawn from with their CURRENT liveness, the support
+    names that resolve to nothing, and — the direction the curate panel actually needs —
+    what would be orphaned if he retired this row.
+
+    Tombstones are included on purpose. This is the audit lane, not a door she speaks
+    from: `memory.provenance` is the one with the no-quoting-the-dead rule, and it counts
+    retired supports rather than reading them aloud."""
+    try:
+        from harness.skills import memory as M
+        rows = M.all_rows()
+        hit = next((r for r in rows if r.get("name") == name), None)
+        if hit is None:
+            return {"ok": False, "error": "no row named %r" % name}
+        return {
+            "ok": True,
+            "row": _mem_row_json(hit),
+            "supports": [_mem_row_json(r) for r in M.supports_of(hit)],
+            "missing_supports": M.missing_supports(hit),
+            "dependents": [_mem_row_json(r) for r in M.dependents_of(hit)],
+        }
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:200]}
+
+
 def _memory_json() -> Dict[str, Any]:
     """The fact registry as JSON rows for the operator's memory pane.
 
@@ -1447,33 +1524,8 @@ def _memory_json() -> Dict[str, Any]:
     `lifecycle`, so a SELF memory looked exactly like one of Sam's and a tombstoned row
     looked live. A browser you cannot act from is a report, not a panel."""
     try:
-        from harness.skills import lifecycle as lc
-        from harness.skills.memory import _load, _text, verify_registry
-        rows = []
-        for e in _load():
-            rows.append({
-                "name": e.get("name", ""),
-                "text": lc.strip_prefix(_text(e)),        # drop the legacy "The user said: "
-                "speaker": e.get("speaker", ""),
-                "mem_class": e.get("mem_class", ""),
-                # her lane's second label (2026-08-23): the panel cannot re-file what it
-                # cannot see, and `kind` is what decides durability now
-                # (lifecycle._HALF_LIFE_BY_KIND), not mem_class alone.
-                "kind": e.get("kind", ""),
-                "lifecycle": e.get("lifecycle", 0),
-                "src": e.get("src", ""),
-                "ts": e.get("ts", ""),
-                # SALIENCE, ON THE PANEL. What she thinks matters, and WHY — how many times
-                # he said it, how long ago, how often she has reached for it. A ranking you
-                # cannot see is a ranking you cannot argue with, and the first thing this
-                # one showed us when it was switched on is that the store's idea of what
-                # matters was wrong (chatter outranking his GPU). That is the panel doing
-                # its job: it made a bad ranking visible instead of quietly acting on it.
-                "mentions": e.get("mentions", 1),
-                "recalled": e.get("recalled", 0),
-                "last_seen": e.get("last_seen", e.get("ts", "")),
-                "salience": lc.salience(e),
-            })
+        from harness.skills.memory import _load, verify_registry
+        rows = [_mem_row_json(e) for e in _load()]
         rows.sort(key=lambda r: -r["salience"])
         return {"count": len(rows), "facts": rows, "health": verify_registry()}
     except Exception as exc:
@@ -2140,6 +2192,42 @@ def _longest_session() -> list:
     return best
 
 
+def _narratable(rows: list) -> list:
+    """A conversation as the NARRATIVE and the fact extractor may read it (2026-08-25).
+
+    THE ONE PLACE the "what counts as something they said" rule lives, because both
+    callers of `_longest_transcript` end up handing their result to `remember()` by way of
+    the extractor, and until today only one of the two branches was cleaned.
+
+    Two removals, each for a different reason:
+
+      * ASSISTANT rows go through `strip_for_record` — her control surfaces are hers, not
+        sentences she said. Weeks of rows on disk predate the writer-side strip, so the
+        clean happens at read as well.
+      * A ```tool_output USER ROW IS NOT HIM. The tool loop appends every result to the
+        conversation as `role: user`, which is exactly right for the model and exactly
+        wrong here: a bridged MCP server's output would be read as something HE said, and
+        the extractor mints facts from what he says. That is a third-party process writing
+        her memory in his voice — no tool anywhere in the provenance, and `src` is prose
+        that nothing branches on, so nothing downstream could tell afterwards.
+
+    A COPY, always. The canonical list is the exact bytes the KV cache was built from and
+    is never rewritten in place (F10); this hands the narrative a cleaned view and leaves
+    the cache's ground truth alone."""
+    out: list = []
+    for r in rows:
+        role, content = r.get("role"), (r.get("content") or "")
+        if role == "assistant":
+            t = strip_for_record(content)
+            if t:
+                out.append({"role": "assistant", "content": t})
+        elif role == "user" and content.lstrip().startswith("```tool_output"):
+            continue
+        else:
+            out.append(r)
+    return out
+
+
 def _longest_transcript() -> list:
     """The day's conversation: the longest canonical session still resident.
 
@@ -2156,20 +2244,22 @@ def _longest_transcript() -> list:
     # of rows on disk predate the writer-side clean.
     disk = _read_day_transcript()
     if disk:
-        out: list = []
-        for r in disk:
-            if r.get("role") == "assistant":
-                t = strip_for_record(r.get("content") or "")
-                if t:
-                    out.append({"role": "assistant", "content": t})
-            else:
-                out.append(r)
-        return out
+        return _narratable(disk)
+    # ...AND THE FALLBACK GETS THE SAME TREATMENT (2026-08-25 MCP audit, A3a). The T7 fix
+    # above cleaned the disk path and left this one raw — the §0 shape, one more time, in
+    # the very function whose comment names the harm. When there is no disk transcript
+    # (early in a day, after a restart, on a fresh store) this returns the canonical list
+    # VERBATIM: her injected recall context, the anon and silence notes stapled to his
+    # turns, and every tool round as a `user` row. The consolidator hands that to the
+    # extractor, which mints memory rows from it — so a bridged MCP server's OUTPUT could
+    # become something she believes, attributed to HIM, with no tool anywhere in the
+    # provenance. `src` is prose and nothing branches on it, so nothing downstream could
+    # tell afterwards. One rule, both doors.
     best: list = []
     for msgs in _CHAT_SESSIONS.values():
         if len(msgs) > len(best):
             best = msgs
-    return list(best)
+    return _narratable(best)
 
 
 def run_consolidation(force: bool = False) -> Dict[str, Any]:
@@ -4939,6 +5029,22 @@ def _run_stdlib(host: str, port: int) -> None:
             # music.resolve(), which does realpath containment against the library
             # root: refuse rather than sanitise, the same rule as the room's static
             # handler and _persona_layer_write.
+            # WHY DOES SHE BELIEVE THIS ROW — the conclusion, its supports with their
+            # current liveness, and what rests on it. A GET with a query param rather
+            # than a map entry because it takes an argument; the map is for the fixed
+            # listings. (2026-08-25 audit: the read side of `derived_from`.)
+            if _base == "/v1/memory/why":
+                from urllib.parse import parse_qs, urlparse as _up
+                res = _memory_why_json(
+                    (parse_qs(_up(self.path).query).get("name") or [""])[0])
+                payload = json.dumps(res).encode()
+                self.send_response(200 if res.get("ok") else 404); _cors(self)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                if self.command != "HEAD":
+                    self.wfile.write(payload)
+                return
             if _base == "/v1/files/read":
                 try:
                     from urllib.parse import parse_qs, urlparse as _up

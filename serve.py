@@ -873,6 +873,14 @@ def build_env(c: dict) -> dict:
         # which is slow and known-good.
         "SP_MCP_POOL": b(c.get("mcp", {}).get("pool", True)),
         "SP_MCP_CALL_TIMEOUT": str(c.get("mcp", {}).get("call_timeout_s", 60)),
+        # TOOL PINNING (2026-08-25). Every bridged tool's name + description + schema is
+        # fingerprinted on first sight and a CHANGED fingerprint is refused by name — the
+        # rug-pull defence, because a tool's description is prompt. ON by default; this is
+        # the hatch, so a refusal is never the reason the stack is down at 3am. Accepting
+        # a legitimate change is `python tools/mcp_pin.py --accept <server> <tool>`, which
+        # is what the refusal message tells you to run.
+        "SP_MCP_PIN": b(c.get("mcp", {}).get("pin", True)),
+        "SP_MCP_PINS": os.path.join(VAR, "mcp", "pins.json"),
         "SP_DAEMON_LOG": os.path.join(VAR, "daemon.log"),
         # ── SENSES (2026-07-31) ────────────────────────────────────────────────
         # WHAT THE SERVED MODEL CAN RECEIVE, ruled from a committed table rather

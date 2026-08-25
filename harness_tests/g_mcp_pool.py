@@ -55,7 +55,7 @@ def ok(cond, name, detail=""):
 
 from harness.mcp_server import bridge, pool  # noqa: E402
 
-MARKER = "disk_free"   # the one bridged-only tool; see MCP-README
+MARKER = "disk_free"   # the one bridged-only tool; see docs/MCP.md
 
 print("1. the pool is armed by default")
 ok(pool.enabled(), "SP_MCP_POOL defaults on")

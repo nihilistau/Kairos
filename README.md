@@ -65,6 +65,37 @@ and cannot hand back something you deleted. The drawn SVG stays underneath as th
 never removed. Replace `_reference.png` and `character.txt` **together** and everything the
 generator makes from then on is yours ([`docs/AVATAR-PIPELINE.md`](docs/AVATAR-PIPELINE.md)).
 
+## How she is present, and how she consolidates
+
+Two things here are easy to miss from a feature list, and they are the architecture rather
+than the decoration.
+
+**She runs on a clock, not only on your turn.** `harness/kairos/` is an idle loop that asks,
+on every beat, whether there is a REASON to speak — and the reasons are named, not a
+temperature: *continue* (she was cut off mid-thought), *check-in* (the room has been quiet),
+*remind* (she promised), *solo* (her own time: reading, searching, writing in her journal),
+*muse* (a conclusion she has drawn), and the *presence modes* — narration, company, lucid
+dream — for the hours you are asleep. The policy is SILENT by default and every bound is
+checked before the model is consulted: a cooldown, an hourly cap, a chain limit, an idle
+floor, and a rule that she never speaks over a question she asked you. **An attempt spends
+the clock whether or not she speaks**, so a turn that is generated and then vetoed cannot be
+re-proposed four seconds later — that loop cost eleven minutes of GPU per cycle before it was
+metered, and the gate that holds it now drives every drop door.
+
+**She consolidates without overwriting.** At the day boundary a pass reads the day's
+transcript and writes her journal, distils durable facts, curates her traits from evidence,
+refreshes the standing block she reads every turn, and — once a week — rolls the week into one
+paragraph. Everything it produces is a *derived artefact*: it carries `derived_from`, the days
+and kinds it rests on, and the status `inferred`. **It never edits testimony.** A conclusion
+whose supports are all retired is retired with it (a conclusion should not outlive its
+evidence); an inference may never retire an observation, and the verdict table enforces that
+rather than a convention. The tombstoned base rows stay exactly where they were, answerable
+by `provenance`.
+
+The two connect: what the night writes is folded into her prefix at the same boundary, so she
+wakes up having taken in what she became — for a long time the write half worked and the read
+half did not, which is the kind of thing a suite of green tests will not tell you.
+
 ## What works, and what the custom engine adds
 
 Everything here runs engine-agnostically: memory with tombstones and verdicts, the recall seam,

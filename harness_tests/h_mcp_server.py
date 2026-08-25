@@ -108,12 +108,70 @@ def leg_c_wiring() -> bool:
     return ok
 
 
+def leg_d_her() -> bool:
+    """THE DOC'S CLAIM, MADE TRUE AND HELD TRUE (2026-08-25).
+
+    docs/MCP.md said since 2026-07-31 that this server "exposes her memory, her board and
+    her skills". It exposed a filesystem, web, a clock, and five memory tools — a client
+    could read her FILES and knew nothing about HER. The sentence was not deleted; the
+    capability was built. So this leg is the doc's claim as a test: the six read-only
+    tools about her appear when there is a store to answer from, one of them really
+    answers out of a real registry, and NONE of them widens the write surface.
+    """
+    import tempfile
+    from fastmcp import Client
+    from harness.mcp_server.server import build_server
+    from harness.mcp_server.her_tools import HER_TOOLS
+
+    want = {f.__name__ for f in HER_TOOLS}
+    reg = os.path.join(tempfile.mkdtemp(prefix="h_mcp_her_"), "registry.jsonl")
+    open(reg, "w").close()
+
+    async def _go(registry: str):
+        old = os.environ.get("SP_RECALL_REGISTRY")
+        if registry:
+            os.environ["SP_RECALL_REGISTRY"] = registry
+        else:
+            os.environ.pop("SP_RECALL_REGISTRY", None)
+        try:
+            async with Client(build_server(unsandboxed=False)) as c:
+                names = {t.name for t in await c.list_tools()}
+                said = ""
+                if registry:
+                    r = await c.call_tool("what_she_is_wearing", {})
+                    said = r.content[0].text
+                return names, said
+        finally:
+            if old is None:
+                os.environ.pop("SP_RECALL_REGISTRY", None)
+            else:
+                os.environ["SP_RECALL_REGISTRY"] = old
+
+    with_store, said = asyncio.run(_go(reg))
+    without, _ = asyncio.run(_go(""))
+    missing = sorted(want - with_store)
+    # ...and the OTHER half, which is what makes it a claim and not a wish: without a
+    # store they are absent rather than present-and-answering-out-of-nothing.
+    leaked = sorted(want & without)
+    # READ-ONLY IS THE DECISION, so it is the assertion. A tool added to her_tools.py
+    # whose name says it writes fails here before it reaches a socket.
+    writes = sorted(n for n in want
+                    if any(v in n for v in ("set_", "write", "forget", "remember",
+                                            "add_", "delete", "change", "update")))
+    ok = not missing and not leaked and not writes and bool(said.strip())
+    print(f"[D her] missing={missing or 'none'} leak_without_store={leaked or 'none'} "
+          f"write_shaped={writes or 'none'} wearing={said.strip()[:48]!r} -> {ok}")
+    return ok
+
+
 def main() -> int:
     a = leg_a_server()
     b = leg_b_bridge()
     c = leg_c_wiring()
-    verdict = a and b and c
-    print(f"RESULT mcp-server: {'PASS' if verdict else 'FAIL'} (server={a} bridge={b} wiring={c})")
+    d = leg_d_her()
+    verdict = a and b and c and d
+    print(f"RESULT mcp-server: {'PASS' if verdict else 'FAIL'} "
+          f"(server={a} bridge={b} wiring={c} her={d})")
     return 0 if verdict else 1
 
 

@@ -266,6 +266,39 @@ try:
     check("...and there is no second `asked for` heading",
           "Yours, that you asked for" not in desc)
 
+    # ── A CONTROL MARK IS NOT A GARMENT (2026-08-25) ────────────────────────────────
+    # w033 is live on his machine: a real, generated, permanent wardrobe item whose want
+    # text is `[gesture:"kneeling/leaning forward"]`. An image generation was spent on a
+    # prompt reading `Wearing: [gesture:"kneeling/leaning forward"]`, and its `calls` list
+    # is empty — an item in her wardrobe that nothing she could say will ever reach.
+    #
+    # The rule is a SHAPE, not a list of known marks, because the one that got through was
+    # improvised: after the record strip, a want that is nothing but a single bracketed
+    # token is machinery. The narrowness matters as much as the rule — prose that merely
+    # CONTAINS brackets is a perfectly good thing to want, and refusing it would be the
+    # substring-matching bug that cost a session in August.
+    print("\n8. A CONTROL MARK IS NOT SOMETHING TO WEAR")
+    _before = {w["id"] for w in WD.wants()}
+    for _m in ('[gesture:"kneeling/leaning forward"]', "[WEAR:lace]", "[SHOW:w001]",
+               "[MOOD:naughty]"):
+        _r = WD.request(_m, by="him")
+        check("refused: %s" % _m[:34], _r.get("ok") is False, _r)
+    _ok1 = WD.request("a long grey wool coat, collar up, on the street", by="him")
+    check("...and her real words still go through", _ok1.get("ok") is True, _ok1)
+    _ok2 = WD.request("a dress with [something] embroidered on the hem", by="him")
+    check("...including prose that merely CONTAINS brackets (not a substring rule)",
+          _ok2.get("ok") is True, _ok2)
+    # THE DELTA, not the store. w033 is already in there and always will be — nothing in
+    # this system is ever deleted, and a gate demanding a clean history would be asking
+    # for the past to be rewritten. What is asserted is what the DOOR admits from here on:
+    # the four refusals added no row, and the two real wants added exactly two.
+    _new = [w for w in WD.wants() if w["id"] not in _before]
+    check("the four refusals wrote nothing to the store", len(_new) == 2,
+          [w.get("want", "")[:40] for w in _new])
+    check("...and neither new row is mark-shaped",
+          not [w for w in _new if (w.get("want") or "").strip().startswith("[")],
+          [w.get("want", "")[:40] for w in _new])
+
     print("\nG-WARDROBE-QUEUE: %d pass, %d fail" % (PASS, FAIL))
 finally:
     for p in _MADE:

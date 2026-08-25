@@ -252,10 +252,14 @@ def weekly_chapter(ask=None) -> dict:
 
     WHAT IT IS NOT. It is not becoming.nightly. That one asks who she has been BECOMING,
     over everything of hers; this one asks what the WEEK WAS, over the episodic kinds only
-    (journal / narration / spoke_up). The one rule they share and must keep: NEITHER READS
-    THE OTHER'S OUTPUT. `_CHAPTER_KINDS` excludes self_description, and becoming excludes
-    chapter — otherwise each would distil the other's distillate every week and the pair
-    would become the hall of mirrors note_own's docstring already warns about.
+    (journal / narration / spoke_up). The one rule they share and must keep: NEITHER
+    CONSOLIDATOR READS A DISTILLATE — the other's or its OWN. Otherwise each distils a
+    distillate every week and the pair becomes the hall of mirrors note_own's docstring
+    already warns about. Stated as two hand-kept kind lists until 2026-08-25, when the
+    deny-list side was found to have omitted its own kind for three nights running; the
+    rule now lives at `lifecycle.is_distillate`, which reads the `derived_from` mark
+    stamp() puts on exactly these rows, and both consolidators call it. `_CHAPTER_KINDS`
+    stays an allow-list on top — this pass wants the episodic kinds and only those.
 
     IT MAY NOT RETIRE WHAT IT SUMMARISES. The chapter is INFERRED and her moments are
     OBSERVED, and verdict.may_supersede refuses an inference retiring ground truth — as it
@@ -274,8 +278,10 @@ def weekly_chapter(ask=None) -> dict:
         for r in rows:
             if r.get("kind") == "chapter" and _days_ago(r.get("ts") or "") < _CHAPTER_EVERY_DAYS - 1:
                 return {"written": False, "why": "a chapter already stands for this week"}
+        from harness.skills import lifecycle as _lc
         recent = [r for r in rows
                   if (r.get("kind") or "") in _CHAPTER_KINDS
+                  and not _lc.is_distillate(r)          # the one rule, said once (lifecycle)
                   and _days_ago(r.get("ts") or "") <= _CHAPTER_EVERY_DAYS]
         recent.sort(key=lambda r: r.get("ts") or "")            # OLDEST first: it is a week
         recent = recent[-_CHAPTER_MAX_ROWS:]
