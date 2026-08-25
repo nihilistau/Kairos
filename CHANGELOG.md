@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.5.1 — the phone side, and one agent for two bodies (2026-08-26)
+
+The **same APK** now runs on a phone as well as a watch. It detects which device it is in
+and registers whatever sensors exist — a phone reports no heart rate and no off-body
+detector, and picks up gyroscope, accelerometer, step counter, ambient light and barometer
+instead. A separate phone app would have been a second implementation of *read, reduce,
+batch, retry*.
+
+It adds device state, which is broadcasts rather than sensors: **screen**, **charging**,
+battery level and temperature. Ambient light is rate-limited to once a minute — a room does
+not change sixty times a minute.
+
+**A phone on a desk is not a person sitting still.** Both devices post `motion`, `gyro_rms`
+and `steps` under the same kind names, and they are not the same claim: a still watch on a
+wrist means *you* are still, a still phone means the phone is on a table. Caught in testing
+before it ran live — the watch said still, the phone was moved, and she said *"he is moving
+a lot."* Body facts are sourced to the wrist now; the phone speaks about the phone and the
+room.
+
+**And the cross-source check that earns the most:** the phone's screen coming on **vetoes**
+the crude sleep inference. "Still, and the heart is at its resting band" is exactly what
+someone reading in bed looks like. `SCREEN_ON/OFF` are transitions and not sticky, so the
+agent pushes the current state at startup — without that the veto was silently unavailable
+after every restart.
+
+Also: the build script resolves `adb` from `TELEMETRY_ADB` → the SDK → `PATH`, rather than
+assuming it is on `PATH` (it usually is not).
+
+Sweep in this repo: **110 green, 1 correct skip, 0 red.**
+
 ## 0.5.0 — she can feel your heart, and the map of how anything reaches her (2026-08-26)
 
 **Body awareness**, optional and off until you build it. A Wear OS agent, an ingest door, a

@@ -35,7 +35,24 @@ PKG = "com.telemetry.agent"
 SDK = os.environ.get("ANDROID_SDK_ROOT") or os.environ.get("ANDROID_HOME") or \
     os.path.join(os.environ.get("LOCALAPPDATA", ""), "Android", "Sdk")
 JAVA_HOME = os.environ.get("JAVA_HOME") or r"C:\Program Files\Android\Android Studio\jre"
-ADB = os.environ.get("TELEMETRY_ADB") or "adb"
+def _find_adb() -> str:
+    """TELEMETRY_ADB, then the SDK's platform-tools, then PATH.
+
+    It was just `"adb"` for one commit and that broke the moment it ran on a machine where
+    adb is installed but not on PATH -- which is the normal state of an Android SDK. A
+    default that only works if the user has already done something is not a default."""
+    env = os.environ.get("TELEMETRY_ADB")
+    if env and os.path.exists(env):
+        return env
+    exe = "adb.exe" if os.name == "nt" else "adb"
+    cand = os.path.join(SDK, "platform-tools", exe)
+    if os.path.exists(cand):
+        return cand
+    found = shutil.which("adb")
+    return found or exe
+
+
+ADB = _find_adb()
 
 
 def _newest(pattern: str) -> str:

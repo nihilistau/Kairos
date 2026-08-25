@@ -21,8 +21,8 @@ They are not the same kind of claim and they do not arrive the same way.
 
 | Tier | What | How |
 |---|---|---|
-| **device state** | screen, charging, battery temperature, connectivity | adb, or a companion |
-| **phone sensors** | steps, motion, light, orientation | an app with permissions |
+| **device state** | screen, charging, battery level and temperature | **the same agent** (broadcasts) |
+| **phone sensors** | steps, motion, light, barometric pressure | **the same agent** |
 | **body** | heart rate, movement, on-body, sleep, SpO2 | **the watch agent** |
 
 Two facts that shape all of it, both found by looking rather than assuming:
@@ -116,7 +116,40 @@ Both are knobs: `telemetry.turn_note`, `telemetry.reasons`.
 down, and this is the most intimate row in the store. **Held, not queued** — a queue is the
 same leak with a delay. The room is told the true number withheld.
 
-## The watch agent
+## One agent, two bodies
+
+The **same APK** runs on the watch and on the phone. It detects which it is in
+(`PackageManager.FEATURE_WATCH`), reports `source: "watch"` or `"phone"`, and registers
+whatever sensors exist — a phone has no heart rate and no off-body detector, a watch has no
+ambient light worth reading inside a sleeve, and absent sensors are simply skipped.
+
+A separate phone app would have been a second implementation of *read, reduce, batch,
+retry*, and this codebase knows what two implementations of one thing cost.
+
+### A phone on a desk is not a man sitting still
+
+Both devices post `motion`, `gyro_rms` and `steps` under the **same kind names**, and they
+are not the same claim. A still watch on his wrist means *he* is still. A still phone means
+the phone is on a table — perfectly compatible with him being out for a run wearing the
+watch. Caught in testing before it ever ran live: the watch said still, the phone was moved,
+and she said *"he is moving a lot."*
+
+So the claims are **sourced**. Body facts — asleep, moving, worked up, heart — come from the
+wrist only (`BODY_SOURCE`). The phone speaks about the phone and about the room, which are
+real signals with a different subject.
+
+### The phone's screen is the cheapest truth in the building
+
+A screen that came on two minutes ago is a man who is **awake**, and it beats any amount of
+stillness inferred from an accelerometer. It is computed before the sleep rules so it can
+**veto** them — the crude fallback ("still, and his heart is at his resting band") is exactly
+what a man reading in bed would break.
+
+`ACTION_SCREEN_ON/OFF` are transitions and not sticky, so the agent pushes the **current**
+state at startup. Without that the veto was silently unavailable after every restart until
+he next toggled the screen — found by watching for a `screen` row that never came.
+
+## The agent
 
 Wear OS, **built without gradle** — `aapt2 → javac → d8 → apksigner`, about 16 KB. That is
 only possible because it touches **no androidx**, which is why it uses `SensorManager`
@@ -172,8 +205,6 @@ what she was told about your body before she says anything.
 
 ## What is not built
 
-- **The phone-side agent.** Device state and phone sensors are designed for and have a place
-  in the store; nothing writes them yet.
 - **Sleep staging from the watch's own classifier.** The `sleep_stage` kind exists and the
   seam prefers it; the agent does not yet read it, so sleep is inferred from stillness and
   labelled as inferred when it is.

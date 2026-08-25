@@ -6,7 +6,11 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.os.BatteryManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -78,9 +82,22 @@ public class AgentService extends Service implements SensorEventListener {
     private double gyroSq = 0.0; private int gyroN = 0;
     private double accSq = 0.0;  private int accN = 0;
     private long windowStart = 0L;
+    private long lastLight = 0L;
+    private long lastPressure = 0L;
 
     private String endpoint = DEFAULT_URL;
     private volatile boolean running = false;
+
+    /** "watch" or "phone" — DETECTED, not configured.
+     *
+     *  ONE AGENT FOR BOTH, and that is the whole reason this field exists. A separate phone
+     *  app would be a second implementation of "read sensors, reduce, batch, retry" and this
+     *  codebase already knows what two implementations of one thing cost. The sensor set
+     *  differs (a phone has no heart rate; a watch has no useful ambient light in a sleeve)
+     *  and `reg()` already skips what is absent, so the only real difference is what the
+     *  readings MEAN — and that is a question for the harness, which is why the source is
+     *  reported rather than assumed. */
+    private String source = "phone";
 
     @Override public IBinder onBind(Intent i) { return null; }
 
@@ -111,12 +128,16 @@ public class AgentService extends Service implements SensorEventListener {
         thread.start();
         handler = new Handler(thread.getLooper());
 
+        source = getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH)
+                ? "watch" : "phone";
+
         sm = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         windowStart = System.currentTimeMillis();
         register();
+        registerDeviceState();
         running = true;
         handler.postDelayed(poster, POST_EVERY_MS);
-        Log.i(TAG, "started, posting to " + endpoint);
+        Log.i(TAG, "started as " + source + ", posting to " + endpoint);
     }
 
     private void reg(int type, int usDelay) {
@@ -132,11 +153,63 @@ public class AgentService extends Service implements SensorEventListener {
     }
 
     private void register() {
+        // Absent sensors are skipped by reg(), so this list is the UNION of both devices
+        // rather than two lists that have to be kept in step. A phone has no heart rate and
+        // no off-body detector; a watch usually has no barometer worth reading indoors.
         reg(Sensor.TYPE_HEART_RATE, SensorManager.SENSOR_DELAY_NORMAL);
         reg(Sensor.TYPE_GYROSCOPE, SensorManager.SENSOR_DELAY_NORMAL);
         reg(Sensor.TYPE_ACCELEROMETER, SensorManager.SENSOR_DELAY_NORMAL);
         reg(Sensor.TYPE_STEP_COUNTER, SensorManager.SENSOR_DELAY_NORMAL);
         reg(Sensor.TYPE_LOW_LATENCY_OFFBODY_DETECT, SensorManager.SENSOR_DELAY_NORMAL);
+        // AMBIENT, and mostly a phone's job: a watch spends its life inside a sleeve, so
+        // its light reading says more about his cuff than about the room.
+        reg(Sensor.TYPE_LIGHT, SensorManager.SENSOR_DELAY_NORMAL);
+        reg(Sensor.TYPE_PRESSURE, SensorManager.SENSOR_DELAY_NORMAL);
+    }
+
+    /** Screen, charging and battery. NOT sensors — broadcasts — and worth having because
+     *  they are the cheapest presence signal there is: a screen that came on thirty seconds
+     *  ago is a person who is awake, whatever anything else thinks. */
+    private final BroadcastReceiver deviceState = new BroadcastReceiver() {
+        @Override public void onReceive(Context c, Intent i) {
+            String a = i.getAction();
+            if (Intent.ACTION_SCREEN_ON.equals(a)) {
+                pushState("screen", "on");
+            } else if (Intent.ACTION_SCREEN_OFF.equals(a)) {
+                pushState("screen", "off");
+            } else if (Intent.ACTION_BATTERY_CHANGED.equals(a)) {
+                int lvl = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+                int scale = i.getIntExtra(BatteryManager.EXTRA_SCALE, 100);
+                if (lvl >= 0 && scale > 0) push("battery", 100f * lvl / scale);
+                int t = i.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1);
+                if (t > 0) push("battery_temp", t / 10f);      // tenths of a degree
+                int st = i.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+                pushState("charging", (st == BatteryManager.BATTERY_STATUS_CHARGING
+                        || st == BatteryManager.BATTERY_STATUS_FULL) ? "on" : "off");
+            }
+        }
+    };
+
+    private void registerDeviceState() {
+        IntentFilter f = new IntentFilter();
+        f.addAction(Intent.ACTION_SCREEN_ON);
+        f.addAction(Intent.ACTION_SCREEN_OFF);
+        // BATTERY_CHANGED is sticky and CHATTY -- it fires on every percent and every
+        // temperature wobble. That is fine: the store is one line per sample and the panel
+        // wants the shape, but it is the reason batteries are not polled on top of this.
+        f.addAction(Intent.ACTION_BATTERY_CHANGED);
+        registerReceiver(deviceState, f);
+        // ── AND THE STATE IT IS IN RIGHT NOW (2026-08-26) ────────────────────────────
+        // SCREEN_ON/OFF are TRANSITIONS, not sticky. Registering alone means the harness
+        // learns nothing about the screen until he next toggles it -- so after every
+        // restart the screen veto (the cheapest "he is awake" signal there is, and the one
+        // that stops her calling a man reading in bed asleep) was silently unavailable for
+        // an unbounded time. Found by watching for a `screen` row that never came.
+        // BATTERY_CHANGED is sticky and needs no equivalent; the receiver got it at once.
+        try {
+            PowerManager p2 = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            pushState("screen", p2.isInteractive() ? "on" : "off");
+        } catch (Throwable ignored) { }
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -162,6 +235,15 @@ public class AgentService extends Service implements SensorEventListener {
                 break;
             case Sensor.TYPE_STEP_COUNTER:
                 push("steps", e.values[0]);
+                break;
+            case Sensor.TYPE_LIGHT:
+                // RATE-LIMITED: an ambient light sensor fires on every flicker and a room
+                // does not change that often. One reading a minute is the shape she can use
+                // ("the room went dark"); sixty a minute is a firehose about a lamp.
+                if (now - lastLight >= 60_000L) { lastLight = now; push("light", e.values[0]); }
+                break;
+            case Sensor.TYPE_PRESSURE:
+                if (now - lastPressure >= 60_000L) { lastPressure = now; push("pressure", e.values[0]); }
                 break;
             case Sensor.TYPE_LOW_LATENCY_OFFBODY_DETECT:
                 pushState("on_body", e.values[0] > 0.5f ? "on" : "off");
@@ -224,7 +306,7 @@ public class AgentService extends Service implements SensorEventListener {
             queue.clear();
         }
         StringBuilder b = new StringBuilder();
-        b.append("{\"source\":\"watch\",\"samples\":[");
+        b.append("{\"source\":\"" + source + "\",\"samples\":[");
         for (int i = 0; i < batch.size(); i++) {
             if (i > 0) b.append(',');
             b.append(batch.get(i));
@@ -260,6 +342,7 @@ public class AgentService extends Service implements SensorEventListener {
     @Override public void onDestroy() {
         running = false;
         try { sm.unregisterListener(this); } catch (Throwable ignored) { }
+        try { unregisterReceiver(deviceState); } catch (Throwable ignored) { }
         try { if (wake.isHeld()) wake.release(); } catch (Throwable ignored) { }
         try { thread.quitSafely(); } catch (Throwable ignored) { }
         super.onDestroy();

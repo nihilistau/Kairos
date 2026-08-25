@@ -18,7 +18,12 @@
 
     <uses-sdk android:minSdkVersion="30" android:targetSdkVersion="33" />
 
-    <uses-feature android:name="android.hardware.type.watch" />
+    <!-- NOT REQUIRED (2026-08-26). A bare uses-feature defaults to required="true",
+         which makes the package refuse to install on a phone — and this is ONE agent
+         for both, detecting at runtime which body it is in. The feature is still
+         declared because a watch build wants it for store filtering; it is simply not
+         a condition of installing. -->
+    <uses-feature android:name="android.hardware.type.watch" android:required="false" />
 
     <!-- HIS BODY. READ_HEART_RATE is the modern spelling (the sensor dump on this watch
          lists it as the guard on android.sensor.heart_rate); BODY_SENSORS is the older
