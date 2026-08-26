@@ -150,6 +150,9 @@ def from_body(read: Optional[dict], raised: set, now: Optional[float] = None) ->
         settling    it was up, and now it is coming down — the other half, and the kinder
                     half; noticing only the spike is how this becomes an alarm
         long_still  hours without moving, which is worth a word exactly once
+        just_woke   he was asleep and is not now (2026-08-26, his ask). The ONE thing
+                    worth saying unprompted about sleep, because "you are asleep" is
+                    something he already knows and cannot hear anyway.
 
     WHAT IT HANDS HER IS THE READINGS. Not "he is stressed" — she gets `70, 78, 92` and the
     trend word, because a diagnosis from a wrist sensor is a confident guess wearing a
@@ -170,6 +173,26 @@ def from_body(read: Optional[dict], raised: set, now: Optional[float] = None) ->
     # not say it twice in ten minutes. The key is the bound.
     hour = _t.strftime("%Y-%m-%dT%H", _t.gmtime(now))
     hr, rest = f.get("heart_rate"), f.get("resting")
+
+    # ── HE JUST WOKE UP. First, because it is the most perishable ───────────────────
+    # His ask, in his words: "calling me sleepy head when I wake up". This is the only
+    # thing about sleep worth saying unprompted -- "you are asleep" is something he already
+    # knows and cannot hear, and "you are awake" is true all day.
+    #
+    # KEYED ON WHEN HE WOKE, not on the current hour, so it is once per waking rather than
+    # once per hour: the fact stays true for ninety minutes and she should mention it once
+    # in that time, not twice either side of an hour boundary.
+    if f.get("just_woke"):
+        woke_at = now - float(f.get("woke_mins_ago") or 0) * 60.0
+        key = "body:just_woke:" + _t.strftime("%Y-%m-%dT%H", _t.gmtime(woke_at))
+        if key not in raised:
+            m = f.get("woke_mins_ago") or 0
+            return {"kind": "body", "raise_key": key, "event": "just_woke",
+                    "tail": tail, "woke_mins_ago": m,
+                    "heart_rate": f.get("heart_rate"),
+                    "movement": f.get("movement_word", ""),
+                    "text": "he was asleep until about %s and is up now"
+                            % ("a few minutes ago" if m < 10 else "%d minutes ago" % m)}
 
     if (hr is not None and rest is not None and not f.get("asleep")
             and hr - rest >= _BODY_OVER_RESTING):

@@ -215,6 +215,11 @@ def resting(now: Optional[float] = None) -> Optional[float]:
 # would be actively harmful: he is routinely up and working at 03:00, so a prior saying
 # "it is 3am, therefore asleep" would make her confidently wrong at exactly the hour she
 # is most likely to be talking to him.
+# HOW LONG AFTER WAKING IT IS STILL WORTH MENTIONING. Ninety minutes: long enough that she
+# does not have to catch the exact moment, short enough that "morning, sleepy head" at four
+# in the afternoon does not happen.
+WOKE_WINDOW_S = 90 * 60
+
 SLEEP_SURE = 70.0          # at or above: she may say he seems asleep
 SLEEP_AWAKE = 30.0         # at or below: he is awake
 _SLEEP_MIN_SIGNALS = 2     # below this the answer is None — see why in the docstring
@@ -423,6 +428,28 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
                 facts["crude"] = True
                 why.append("nothing measured his sleep, so this is our own reading at "
                            "%d%% from: %s" % (int(c), "; ".join(terms) or "very little"))
+        # ── HE JUST WOKE UP (2026-08-26, his ask: "calling me sleepy head when I wake") ──
+        # A TRANSITION, not a state, and the difference is the whole point: "he is awake"
+        # is true all day and worth saying never; "he was asleep twenty minutes ago and is
+        # not now" is worth saying once, and only for a little while.
+        #
+        # Read out of the window rather than remembered, so it survives a restart and there
+        # is no second copy of the truth to drift. If the confidence was above the sure
+        # line at any point in the last WOKE_WINDOW_S and is below the awake line now, he
+        # got up in between.
+        conf_rows = [r for r in window
+                     if r.get("kind") == "sleep_confidence"
+                     and _age(r, now) <= WOKE_WINDOW_S]
+        if conf_rows and c is not None and c <= SLEEP_AWAKE:
+            peak = max(conf_rows, key=lambda r: float(r.get("value") or 0))
+            if float(peak.get("value") or 0) >= SLEEP_SURE:
+                # when it was last still asleep, which is roughly when he woke
+                asleep_rows = [r for r in conf_rows
+                               if float(r.get("value") or 0) >= SLEEP_SURE]
+                last_asleep = max(asleep_rows, key=lambda r: r.get("at") or "")
+                facts["just_woke"] = True
+                facts["woke_mins_ago"] = int(_age(last_asleep, now) / 60)
+
         if c is not None:
             facts["sleep_confidence"] = round(c, 1)
             # BETWEEN THE BANDS SHE SAYS NOTHING. `asleep` is left UNSET rather than set
@@ -594,6 +621,12 @@ def present() -> str:
         return ""
     o = r.get("observed") or {}
     bits: List[str] = []
+    # THE ONE THING WORTH SAYING UNPROMPTED ABOUT SLEEP, and it is not "you are asleep" --
+    # he knows. It is that he has just stopped being.
+    if f.get("just_woke"):
+        m = f.get("woke_mins_ago")
+        bits.append("he was asleep until about %s"
+                    % ("a few minutes ago" if not m or m < 10 else "%d minutes ago" % m))
     if f.get("asleep") is True:
         bits.append("he seems to be asleep" + (" (going by stillness, not the watch)"
                                                if f.get("crude") else ""))

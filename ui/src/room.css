@@ -1436,3 +1436,32 @@ body.resizing, body.resizing * { user-select: none !important; cursor: inherit; 
   font-size: 11px; line-height: 1.45; color: var(--dim, #8b8b8b);
 }
 .tel-terms li { list-style: '· '; }
+
+/* ── the house: a beachhead panel, three states and a link ────────────────────────── */
+.ha-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.ha-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+/* THREE STATES, NOT TWO. "off" and "unreachable" are different problems with different
+   fixes, and one red dot for both sends you looking in the wrong place. */
+.ha-up   { background: #6ee7b7; box-shadow: 0 0 6px #6ee7b7; }
+.ha-down { background: #f87171; box-shadow: 0 0 6px #f87171; }
+.ha-off  { background: #6b7280; }
+.ha-state { font-size: 12px; letter-spacing: .04em; }
+.ha-link { margin-left: auto; font-size: 11px; opacity: .75; text-decoration: none; }
+.ha-link:hover { opacity: 1; text-decoration: underline; }
+.ha-why, .ha-dim, .ha-empty, .ha-foot {
+  font-size: 11px; line-height: 1.5; color: var(--dim, #8b8b8b);
+}
+.ha-why { margin-bottom: 6px; }
+.ha-count { font-size: 11px; opacity: .8; margin-bottom: 8px; }
+.ha-list { list-style: none; margin: 0 0 10px; padding: 0; }
+.ha-row {
+  display: grid; grid-template-columns: 1fr auto auto auto; gap: 6px;
+  align-items: baseline; font-size: 11px; padding: 3px 0;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.ha-ent { font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; }
+.ha-arrow { opacity: .5; }
+.ha-kind { font-family: ui-monospace, monospace; opacity: .85; }
+.ha-val { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
+.ha-skip .ha-val { opacity: .6; font-style: italic; }
+.ha-foot { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.06); }

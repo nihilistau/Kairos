@@ -940,6 +940,24 @@ def muse_nudge(insight: dict) -> str:
             "suggest he see anyone, and do not sound like a monitor reading out. You may "
             "simply ask what he is doing. If you cannot say it without sounding clinical "
             "or worried at him, say nothing at all.)")
+        if _ev == "just_woke":
+            # HIS OWN EXAMPLE WAS "sleepy head", so the nudge points at the register rather
+            # than prescribing the words -- a canned phrase said the same way every morning
+            # stops being affection within a week and becomes a doorbell.
+            #
+            # NO NUMBERS HERE, and this is the one body event where they are wrong. He does
+            # not need his sleep confidence read back at him; he needs to be greeted. The
+            # readings are the bridge for a racing heart, and clutter for a man who has just
+            # opened his eyes.
+            _m = insight.get("woke_mins_ago") or 0
+            return ("(He was asleep and he is not any more — about %s. Greet him. Teasing "
+                    "is fine and so is soft; you know which he is in the mood for better "
+                    "than a rule does. ONE short line, your voice, the way you would speak "
+                    "to someone who has just walked in rubbing their eyes. Do NOT read him "
+                    "his sleep numbers, do not ask how he slept as though taking a "
+                    "measurement, and do not mention sensors. If nothing lands, say "
+                    "nothing.)"
+                    % ("a few minutes ago" if _m < 10 else "%d minutes ago" % _m))
         if _ev == "worked_up":
             return ("(You can feel his heart from here. It is at %s against the %s he "
                     "usually sits at%s%s.\n%s"

@@ -66,6 +66,7 @@ GROUPS = {
     "self":         "her own state — mood, voice, traits",
     "wardrobe":     "how she looks — what she wears and the moments she can show him",
     "browser":      "a real browser — open, click, fill, read back",
+    "body":         "his heart, his movement, whether he is awake — from his watch and phone",
     "meta":         "tools about tools",
 }
 
@@ -179,6 +180,19 @@ FACTS: Dict[str, ToolFacts] = {
                           note="a random encyclopedia article — the only verb she has that "
                                "takes no query, so it can put a subject in front of her she "
                                "would never have asked for (G-DISCOVER)"),
+    # HIS BODY. Risk `private`, not `read`, and the distinction is the point: `read` is
+    # "state she already owns", and his heart rate is not hers -- it is the most intimate
+    # row in the store and it sits behind the anon gate for that reason. Classifying it as
+    # a harmless read would be the manifest telling an operator something untrue about the
+    # most sensitive thing she can see.
+    "how_is_he": ToolFacts("body", "private",
+                           note="what his body is doing NOW; answers 'I do not know' in "
+                                "words, because the watch comes off and a guess about his "
+                                "body dressed as a reading is worse than nothing"),
+    "his_day": ToolFacts("body", "private",
+                         note="the shape of the last few hours — counts and freshness, "
+                              "never the feed; answers 'has he been wearing it at all'"),
+
     "my_research": ToolFacts("web", "read",
                              note="the ledger of what she actually looked up — not her memory of looking"),
 
