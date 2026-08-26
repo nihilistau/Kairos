@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.7.0 — she can ask about his body, and be told when he wakes (2026-08-26)
+
+The telemetry framework could always TELL her. It had no way for her to ASK — and the gap
+only showed when he mentioned it directly and she went looking for a folder.
+
+- **Two tools, `how_is_he` and `his_day`.** The per-turn note speaks only when something is
+  worth noticing, which is deliberately rare, so on a quiet day she had no way to learn the
+  channel exists at all. Both answer "I do not know" in words, because the watch comes off
+  and a guess about someone's body dressed as a reading is worse than nothing. Classified
+  `private`, not `read`: his heart rate is not state she already owns.
+- **A standing line in the prefix** telling her the channel exists, what the tools are, and
+  the manners — notice, do not recite, never diagnose. It went in its own slot rather than
+  the standing-world block, because that block is gated off on this profile and the line
+  would have been dead code.
+- **`just_woke`.** A TRANSITION rather than a state, and the only thing about sleep worth
+  saying unprompted: "you are asleep" is something a person already knows and cannot hear,
+  and "you are awake" is true all day. Read out of the sleep-confidence history rather than
+  remembered, so it survives a restart with no second copy of the truth, keyed on when he
+  woke so it is said once per waking. Its nudge carries no numbers — the readings are the
+  bridge for a racing heart and clutter for someone who just opened their eyes.
+- **A `house` panel**: is Home Assistant reachable, what of it reaches her, and a link out.
+  Deliberately not a second Home Assistant, and it cannot switch anything on.
+- **`radar-trails-card`**: both radar nodes on one plan, sensor at the bottom facing up the
+  page, three minutes of fading trail per target. The bearing-less sensor is drawn as an arc
+  at its radius rather than a dot pretending to a direction.
+
 ## 0.6.3 — mmWave radar, and four silent faults (2026-08-26)
 
 Notes from getting two ESP32 radar nodes working after three abandoned dashboard attempts.

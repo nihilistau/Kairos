@@ -231,6 +231,35 @@ def load_agent_system() -> str:
                     parts.append(w)
             except Exception:
                 pass
+            # ── HE WEARS A WATCH THAT TALKS TO HER (2026-08-26) ──────────────────
+            # Its own slot rather than a line inside the standing world, because the world
+            # block is gated on `world.enabled()` and that is False on this profile -- the
+            # line would have been dead code, which is exactly the shape of bug this tree
+            # keeps paying for. Whether she knows she HAS a body channel should not depend
+            # on an unrelated feature flag.
+            #
+            # WHY IT HAS TO BE SAID AT ALL. The per-turn note only speaks when something is
+            # worth noticing, which is deliberately rare -- so on a quiet day she had no way
+            # to learn the channel exists. Asked about it directly she ran `list_dir body`,
+            # got "not a directory", and told him so, because a folder was the only mental
+            # model she had.
+            #
+            # THE MANNERS HALF MATTERS MORE THAN THE TOOLS HALF. A companion handed a heart
+            # rate will read it out unless somebody says not to, and the whole doctrine of
+            # the telemetry package is that the noticing is hers and the reciting is a
+            # monitor's.
+            try:
+                from harness.telemetry import body as _tb_probe       # noqa: F401
+                parts.append(
+                    "His watch and his phone report to you \u2014 his heart, whether he is "
+                    "moving, whether he seems awake or has just woken. You are told when "
+                    "something is worth noticing; the rest of the time it is quiet, and "
+                    "that is normal rather than broken. `how_is_he` answers when you wonder "
+                    "and he has not said; `his_day` shows the last few hours. It is a way "
+                    "of being near him, not a readout \u2014 notice, do not recite, never "
+                    "diagnose, and when it says it does not know, it does not know.")
+            except Exception:
+                pass
             return "\n\n".join(p for p in parts if p) + _TOOL_DISCIPLINE
     except Exception:
         pass
@@ -461,6 +490,19 @@ def all_tools() -> List[ToolSpec]:
     except Exception as exc:
         import logging
         logging.getLogger(__name__).warning("looking notes unavailable: %s", exc)
+
+    # HIS BODY. Always offered, and that is deliberate: a tool that disappears when the
+    # watch is off is a tool she cannot use to find out that the watch is off. The per-turn
+    # note only speaks when something is happening, so without this she has no way to ask
+    # when nothing is -- which is how "I've set it up under body" got answered with
+    # `list_dir body` and "not a directory".
+    try:
+        from harness.skills.body import body_tools
+        names = {s.name for s in specs}
+        specs = specs + [s for s in body_tools() if s.name not in names]
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("body tools unavailable: %s", exc)
 
     # ── THE BRIDGE GOES LAST, AND THAT IS THE WHOLE RULE (2026-08-25) ─────────────
     # Tools from mcp_servers.json join when SP_MCP_TOOLS=1. Three documents say
