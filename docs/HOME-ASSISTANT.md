@@ -289,6 +289,68 @@ A regex over line-structured text has to reason about the end of the file. Walki
 not. Take a backup, make the edit, and **parse the result before restarting** — the parse is
 what turns a mistake into a retry instead of an outage.
 
+### mmWave radar: four faults, and why every one of them was silent
+
+Two ESP32 nodes in one room — an **LD2450** (tracks up to three targets, X/Y/speed) and an
+**LD2410** (presence only: moving, still, and return strength). Three dashboards had been
+built and abandoned over them. All four faults shared a shape: **nothing errored where
+anyone would look.**
+
+**1. A state longer than 255 characters is thrown away.** The firmware publishes a rich
+JSON snapshot — room geometry plus three targets — and it is **393 characters**. Home
+Assistant caps a state at 255, logs `is longer than 255, falling back to unknown`, and
+stores nothing. At the sensor's 250 ms update interval that is **four errors a second,
+forever**, and the custom radar card sees only `unknown`. That single limit is why three
+dashboards never rendered.
+
+The fix needs no reflash: rebuild the object in a **template attribute**, which has no
+length limit, and leave the state as the short target count. The card already falls back to
+`attributes.snapshot`.
+
+**2. Units come from measurement, not from declarations.** The firmware declares target
+speed as `m/s`. It reports **mm/s** — a person walking reads `-320`. Distance, meanwhile,
+*is* metres, because it is a template sensor doing `hypot(x,y)/1000` in the firmware, while
+X and Y beside it are millimetres. Three units, one device, one of them mislabelled.
+
+The original template compared `300 < y < 350` (centimetres) and `speed < -50`; a first
+rewrite trusted the declared `m/s` and used `-0.25`, which no human can reach. **Both were
+silent** — a threshold that never fires looks exactly like a room with nobody in it. Read
+the live values before writing a comparison against them.
+
+**3. `unique_id` is the identity; `name` is cosmetic.** Rewriting a template block while
+reusing a `unique_id` does **not** rename the entity — it keeps the old `entity_id`, so a
+sensor called "LD2450 Target 1 Approaching" carries on living at
+`binary_sensor.target_1_approaching_fast`, reporting the right value at the wrong address.
+Changing the `unique_id` instead orphans the old entity (which keeps the good name, now
+`unavailable`) and the new one settles for `..._2`. Deleting the registry row and reloading
+does not free the name either, because the integration re-registers immediately. **Renaming
+is the operation that actually moves an entity.**
+
+**4. An offline node must read `unavailable`, not "empty room".** Every template here has an
+`availability:` template. Without one, a node that has been unplugged for a week reports a
+confident, cheerful *nobody is here* — the same failure as a stale heart rate, in a
+different costume.
+
+### What the two sensors are for, and why both
+
+A tracker loses a person who lies still; a presence sensor never knew where they were. The
+LD2450 answers **where**, the LD2410 answers **whether** — and the LD2410 keeps answering
+about someone asleep, which is precisely when the LD2450's target lock drops.
+
+The LD2410 is deliberately **not** plotted on the map. It reports a distance and no
+direction, so drawing it at an assumed angle would invent a coordinate the hardware never
+produced.
+
+### Zones belong in helpers, not in YAML
+
+The original doorway zone was hard-coded with the comment *"adjust coordinates to match your
+reality"*. Nobody ever did — adjusting meant editing YAML and restarting to find out whether
+the guess was right, and the units were wrong anyway.
+
+As `input_number` helpers on the dashboard it can be calibrated the only honest way: stand
+in the doorway and watch the live coordinates while nudging the bounds. All three targets
+are tested, because the radar renumbers them as people move.
+
 ### And check the disk before you start
 
 This migration ran the system drive to **zero bytes free** mid-restore. WSL's ext4 went
