@@ -1075,6 +1075,138 @@ def _wants_path() -> str:
     return os.path.join(root(), _WANTS)
 
 
+def _norm_want(s: str) -> str:
+    """The 'is this the same want' key: case, punctuation, articles and spacing away."""
+    s = re.sub(r"[^a-z0-9 ]+", " ", (s or "").lower())
+    return " ".join(t for t in s.split() if t not in ("the", "a", "an", "my", "in", "of"))
+
+
+# ── AN IMPROVISED MARK IS AN INTENTION, NOT A GARMENT AND NOT A MISTAKE ──────────────
+# `ask_for` refuses a want that is nothing but a bracketed token, and it is right to:
+# w033 is a real generated wardrobe item whose want text is `[gesture:"kneeling/leaning
+# forward"]`, with an empty `calls` list, so nothing she can say will ever reach it.
+#
+# But a refusal throws the INTENTION away. She wrote "kneeling/leaning forward" and meant
+# it; the brackets were her reaching for a control surface that does not have that verb.
+# Measured 2026-08-27 across 17 days: she improvises constantly and it is not noise —
+# `<voice:whispering>` (92 uses) was a sound generalisation of two vocabularies she was
+# given. The prosody lane now canonicalises those (voice/expressive.normalize_tags).
+#
+# THIS LANE IS DIFFERENT AND THE DIFFERENCE IS WHY THIS IS A SUGGESTION. Prosody changes
+# how she SOUNDS — a wrong guess is one oddly delivered line. A gesture or a garment
+# changes STATE: it persists, it is in her wardrobe, she sees it next turn, and a picture
+# was spent on it. So her intention is preserved as a QUEUE SUGGESTION with the nearest
+# existing thing attached and the operator decides. Never auto-adopted.
+#
+# TWO INDEPENDENT GUARDS keep a suggestion from being generated: `state="suggested"` is
+# not the `"asked"` that run_wants() consumes, AND the row carries no `prompt` — the
+# prompt is composed at ACCEPT time, so even a mis-read state cannot spend an image.
+_MARK_VALUE = re.compile(r'^\[\s*([A-Za-z_][A-Za-z0-9_ -]{0,24})\s*[:=]\s*["\']?(.+?)["\']?\s*\]$')
+_MARK_BARE = re.compile(r'^\[\s*([A-Za-z][A-Za-z0-9_ -]{1,31})\s*\]$')
+
+
+def read_mark(raw: str) -> tuple:
+    """`[gesture:"kneeling/leaning forward"]` -> ("gesture", "kneeling/leaning forward").
+    `[LEANING_IN]` -> ("", "leaning in"). Anything that is not a lone mark -> ("", "")."""
+    t = (raw or "").strip()
+    m = _MARK_VALUE.match(t)
+    if m:
+        return m.group(1).strip().lower(), " ".join(m.group(2).replace("_", " ").split())
+    m = _MARK_BARE.match(t)
+    if m:
+        return "", " ".join(m.group(1).replace("_", " ").split()).lower()
+    return "", ""
+
+
+# A KNOWN mark is not an improvisation and its VALUE is not a gesture. `[MOOD:tender]`
+# read as a suggestion would put "tender" in her wardrobe queue as something to DO —
+# the exact class of nonsense w033 already is, arriving by a new door. These verbs are
+# already handled upstream (stream_processor / tags.js); only what the system has NO
+# verb for can become a suggestion.
+_DECLARED_VERBS = frozenset({"mood", "voice", "trait", "wear", "show", "image", "selfie",
+                             "photo", "action", "stat", "thinking", "channel"})
+
+
+def suggest_from_mark(raw: str, by: str = "her", made_in: str = "") -> Dict[str, Any]:
+    """File an improvised mark as a SUGGESTION in the queue. Never generates anything."""
+    verb, prose = read_mark(raw)
+    if verb in _DECLARED_VERBS:
+        return {}
+    # a lone bare word that IS a declared verb ([WEAR], [MOOD]) is machinery too
+    if not verb and prose.replace(" ", "") in _DECLARED_VERBS:
+        return {}
+    if not prose or len(prose) < 3:
+        return {}
+    rows = wants()
+    key = _norm_want(prose)
+    if not key:
+        return {}
+    # DISMISSED COUNTS. The row is kept precisely so the same mark does not come back
+    # every time she reaches for it — a suggestion he has already said no to, re-offered
+    # nightly, is a worse queue than no queue. Only an explicit `refused` (a want that was
+    # rejected on content) leaves the door open.
+    for r in rows:
+        if r.get("state") != "refused" and _norm_want(r.get("want")) == key:
+            return {"ok": True, "dup": True, **r}
+    near = {}
+    try:
+        near = match(prose, prefer="gesture") or {}
+        # ── DO NOT POINT HER AT THE BUG (2026-08-27) ────────────────────────────────
+        # The first run of this suggested "kneeling/leaning forward" and helpfully
+        # attached w033 as the nearest thing she already owns — w033 being the row whose
+        # want text IS `[gesture:"kneeling/leaning forward"]`, the malformed item this
+        # whole path exists because of. A near-match that is itself machinery is not a
+        # thing she owns; it is the same mark wearing an id.
+        if near.get("id"):
+            _n = next((r for r in rows if r.get("id") == near["id"]), None)
+            if _n and read_mark(str(_n.get("want") or ""))[1]:
+                near = {}
+    except Exception:
+        near = {}
+    nums = [int(m.group(1)) for r in rows
+            for m in [re.match(r"w(\d+)$", str(r.get("id") or ""))] if m]
+    wid = "w%03d" % ((max(nums) if nums else 0) + 1)
+    row = {"id": wid, "want": prose, "state": "suggested", "kind": "gesture",
+           "by": by, "from_mark": (raw or "")[:120], "mark_verb": verb,
+           "made_in": AV.canon(made_in) if AV.canon(made_in) in TIER_WORDS else AV.DEFAULT_OUTFIT,
+           "subject": "", "calls": [],
+           # what she may already have that means this — shown, never acted on
+           "near": {k: near.get(k) for k in ("kind", "id", "outfit") if near.get(k)},
+           "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    rows.append(row)
+    _write_wants(rows)
+    return {"ok": True, **row}
+
+
+def accept_suggestion(wid: str, by: str = "him") -> Dict[str, Any]:
+    """His call, and the ONLY door from suggestion to queue. The prompt is composed here
+    rather than at suggestion time, so nothing generatable exists until he says so."""
+    rows = wants()
+    for r in rows:
+        if r.get("id") != wid:
+            continue
+        if r.get("state") != "suggested":
+            return {"ok": False, "error": "w%s is %s, not a suggestion"
+                                          % (wid, r.get("state"))}
+        r["state"] = "asked"
+        r["by"] = by
+        r["accepted_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        r["prompt"] = compose_prompt(r.get("want") or "", r.get("made_in") or "",
+                                     r.get("kind") or "gesture", r.get("subject") or "")
+        _write_wants(rows)
+        return {"ok": True, **r}
+    return {"ok": False, "error": "no want %r" % wid}
+
+
+# NO `dismiss_suggestion` (2026-08-27). One was written, and it was a SECOND COPY of
+# `dismiss()` further down this file — his broom for the queue, which already sets
+# state="dismissed" and keeps the row. Two implementations of "take this off the list"
+# is the bug this repo keeps getting hit by, and writing one while adding a guard against
+# that very class would have been its own joke. Suggestions are dismissed with `dismiss()`
+# like anything else; `_norm_want` dedupe treats a dismissed row as spoken for, so a
+# suggestion he has said no to is not re-offered.
+
+
 def wants(state: str = "") -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     try:
@@ -1223,9 +1355,25 @@ def request(want: str, made_in: str = AV.DEFAULT_OUTFIT, by: str = "her",
         _clean = want
     if not _clean or (_clean.startswith("[") and _clean.endswith("]")
                       and "]" not in _clean[1:-1]):
-        return {"ok": False,
-                "error": "that reads as a control mark rather than something to wear "
-                         "(%s) — say it in words" % want[:60]}
+        # ── REFUSED, BUT NOT THROWN AWAY (2026-08-27) ───────────────────────────────
+        # The refusal above is right and stays: a mark is not a garment. But she wrote
+        # "kneeling/leaning forward" and MEANT it — the brackets were her reaching for a
+        # verb the control surface does not have. Discarding the refused text loses the
+        # only record of what she was trying to do. It becomes a SUGGESTION instead:
+        # inert (state="suggested", no prompt), with the nearest thing she already owns
+        # attached, for him to accept or dismiss. Still a refusal to the caller — the
+        # caller has a bug and must be told so.
+        _s = {}
+        try:
+            _s = suggest_from_mark(want, by=by, made_in=made_in) or {}
+        except Exception:
+            _s = {}
+        err = ("that reads as a control mark rather than something to wear "
+               "(%s) — say it in words" % want[:60])
+        if _s.get("id") and not _s.get("dup"):
+            err += ("; kept what you meant as a suggestion (%s: %r) for him to look at"
+                    % (_s["id"], _s.get("want", "")[:48]))
+        return {"ok": False, "error": err, "suggestion": _s or None}
     rows = wants()
     # ── SHE CANNOT SEE HER OWN QUEUE WHILE SHE IS ASKING (2026-08-04) ───────────────
     # w001 and w006 carry IDENTICAL want text — "the silver nightie, by the window,
@@ -1244,11 +1392,9 @@ def request(want: str, made_in: str = AV.DEFAULT_OUTFIT, by: str = "her",
     # garment is the same and the moment is not, which is most of what she asks for.
     # Those go through, with `similar` attached so she can be TOLD what she already owns
     # and decide for herself. Deciding is the point; this is her wardrobe.
-    def _norm(s: str) -> str:
-        s = re.sub(r"[^a-z0-9 ]+", " ", (s or "").lower())
-        return " ".join(t for t in s.split() if t not in ("the", "a", "an", "my", "in", "of"))
-
-    key = _norm(want)
+    _norm = _norm_want          # ONE normaliser (module level) — suggest_from_mark needs
+    key = _norm(want)           # the same key, and two copies of "is this the same want"
+                                # is the bug this file has been bitten by twice.
     for r in rows:
         if r.get("state") != "refused" and _norm(r.get("want")) == key:
             return {"ok": True, "dup": True, **r}
@@ -1604,13 +1750,25 @@ def waiting() -> List[Dict[str, Any]]:
       delayed — a generation failed for a reason that will pass (a usage limit). It is
                 still queued; the boundary will try again.
       refused — it will not be made.
+      suggested — she reached for something the control surface has no verb for, and the
+                PROSE was kept. Nothing is ordered and nothing is being made until he
+                accepts it. (2026-08-27)
     """
     disk = _scan_dir()
     out = []
     for w in wants():
         if w.get("state") == "dismissed":
             continue                        # taken off the list by hand; row kept on disk
-        if w.get("state") == "refused":
+        if w.get("state") == "suggested":
+            # ── AND IT MUST NOT MASQUERADE AS AN ORDER (2026-08-27) ─────────────────
+            # Without this it fell to the else-branch, found no files on disk, and was
+            # staged "ordered" — which the panel renders as "ordered — picture being
+            # made". Both halves false: nothing was ordered and nothing is being made.
+            # A queue that describes an unaccepted suggestion as work in progress is
+            # exactly the "silently drops the rows that need attention" failure the
+            # stage vocabulary was written to end.
+            stage = "suggested"
+        elif w.get("state") == "refused":
             stage = "refused"
         elif w.get("state") == "delayed":
             stage = "delayed"

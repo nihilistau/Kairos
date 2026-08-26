@@ -241,7 +241,7 @@ def _compose() -> str:
     for _sal, r in candidates:
         # ── SPEAK THE PREFIX'S GRAMMAR (field bug, 2026-07-15) ──────────────────────
         # v1 rendered lc.render(r): "Sam told me: My cat's name is Tuffy." — HIS
-        # first person, quoted verbatim, AMBIENT in her prompt every turn. A 12B skims
+        # first person, quoted verbatim, AMBIENT in her prompt every turn. A retired reference model skims
         # the frame and absorbs the "my": she answered "I'm Kairos — a cat person
         # with Tuffy as my pet." The identity blur render() exists to stop, re-created
         # by making it standing. The system prompt speaks in you/he — so must this

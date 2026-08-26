@@ -202,7 +202,7 @@ silence — so a wrong link costs a sentence and can never make her speak over h
 retire. **G-SEM-SLOT 11/11** is the ladders finding end-to-end: leak reproduced, then closed by a
 link + enforcement, his words standing, registry byte-identical.
 
-The honest ledger on the live oracle: the greedy 12B `/v1/oneshot` judge, across four prompt
+The honest ledger on the live oracle: the retired greedy reference model `/v1/oneshot` judge, across four prompt
 designs, produced **zero false "same" verdicts and zero true ones** — every miss fell in the safe
 direction (unparseable/NO ⇒ no link ⇒ today's behaviour), and the boundary thesis holds one more
 time: a hand-worded prompt is a hand-built signal. Successors, in order: an OPERATOR oracle (the

@@ -1,6 +1,6 @@
 """G-SENSES — a sense answers to the model that is actually served. OFFLINE.
 
-Guards the 2026-07-31 defect: `var/voice/embed_audio.npz` is the 12B's [3840,640]
+Guards the 2026-07-31 defect: `var/voice/embed_audio.npz` is the retired reference model's [3840,640]
 audio projection; the served your model has hidden size 2816 and
 `audio_config: null`. The harness emitted 3840-wide frames anyway, and neither
 side caught it — native.py never compared E, and routes.rs took `e_dim` from
@@ -77,16 +77,41 @@ ok(not cu.known, "unlisted model reports known=False")
 refuses(lambda: cu.require("vision"), "unlisted model refuses sight", "not in")
 refuses(lambda: cu.require("audio"), "unlisted model refuses hearing", "not in")
 
-print("\n4. the 12b still hears (the table is a ruling, not a blanket ban)")
-os.environ["SP_MODEL_PATH"] = "D:/x/gemma4-12b.sp-model"
+print("\n4. a LISTED model hears (the table is a ruling, not a blanket ban)")
+# ── THE FIXTURE WAS A SHIPPED MODEL ENTRY (2026-08-27) ───────────────────────────────
+# This drove the ruling and the alias through a retired model whose profiles were
+# deleted on 2026-08-26 and whose capability entries went with them. What section 4
+# actually tests is the TABLE's mechanics — that a listed model gets its declared width,
+# and that `alias_of` resolves — neither of which is about any particular model. So the
+# table is synthesised here through the SP_CAPABILITY_TABLE door the module already
+# exposes. Same lesson as G-PROFILE-GUARD: a gate that borrows its fixture from shipped
+# content goes red when the shipping changes, for reasons unrelated to what it guards.
+import json as _json
+import tempfile as _tf
+_tbl = os.path.join(_tf.mkdtemp(prefix="g_senses-cap-"), "capability.json")
+with open(_tbl, "w", encoding="utf-8") as _f:
+    _json.dump({"models": {
+        "listed-audio-ref":      {"audio": True, "e": 3840},
+        "listed-audio-ref-q4b":  {"alias_of": "listed-audio-ref"},
+    }}, _f)
+_old_tbl = os.environ.get("SP_CAPABILITY_TABLE")
+os.environ["SP_CAPABILITY_TABLE"] = _tbl
+cap.TABLE = _tbl
+os.environ["SP_MODEL_PATH"] = "D:/x/listed-audio-ref.sp-model"
 cap.reset_cache()
 c12 = cap.for_model()
-ok(bool(c12.audio) and c12.e == 3840, "12b declares audio at E=3840", f"e={c12.e}")
+ok(bool(c12.audio) and c12.e == 3840, "a listed model declares audio at E=3840", f"e={c12.e}")
 c12.assert_width("audio", 3840)
-ok(True, "12b accepts its own 3840-wide frames")
-os.environ["SP_MODEL_PATH"] = "D:/x/gemma4-12b-q4b.sp-model"
+ok(True, "...and accepts its own 3840-wide frames")
+os.environ["SP_MODEL_PATH"] = "D:/x/listed-audio-ref-q4b.sp-model"
 cap.reset_cache()
-ok(cap.for_model().e == 3840, "alias_of resolves (q4b -> 12b)")
+ok(cap.for_model().e == 3840, "alias_of resolves to the aliased entry")
+if _old_tbl is None:
+    os.environ.pop("SP_CAPABILITY_TABLE", None)
+else:
+    os.environ["SP_CAPABILITY_TABLE"] = _old_tbl
+cap.TABLE = _old_tbl or os.path.join(ROOT, "config", "model_capability.json")
+cap.reset_cache()
 
 print("\n5. native.py CALLS the guard — checked as code, not prose")
 src = open(os.path.join(ROOT, "harness", "voice", "native.py"), encoding="utf-8").read()

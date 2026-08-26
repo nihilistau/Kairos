@@ -40,14 +40,14 @@ ROOT = os.path.dirname(HERE)
 FIX = os.path.join(HERE, "fixtures", "voice")
 sys.path.insert(0, ROOT)
 
-# ── THE 12B CONFIGS DO NOT TRANSFER TO THE 26B (2026-07-30) ──────────────────────────────
+# ── A RETIRED MODEL'S CONFIGS DO NOT TRANSFER TO THE 26B (2026-07-30) ──────────────────────────────
 # Every config below with eot_bias=4.0 measures NOTHING on your model: at 4.0 the FIRST
 # sampled token is a stop, so every reply comes back EMPTY. That was found the hard way on
 # 2026-07-29 (the console answered every message with silence while daemon-direct probes,
 # which pass eot_bias explicitly, looked fine) and the live profile now runs eot_bias = 0.0
 # with continue_margin recalibrated to -18.50.
 #
-# The 12B receipt (fixtures/voice/baseline-receipt.json, median 21.5 words) is KEPT as
+# The retired reference model receipt (fixtures/voice/baseline-receipt.json, median 21.5 words) is KEPT as
 # history, not as a bar: it is a different model on a different dial. `26b` below mirrors
 # what the console actually runs, so N3 has something honest to move from.
 CONFIGS = {

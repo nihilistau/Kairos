@@ -51,7 +51,7 @@ def main() -> int:
                      {"edit_file", "run_tests"} <= {t.name for t in core}))
     core2, _ = toolset_for("memory")
     # MEMORY_TOOLS (5) + EXTRA[:2] (provenance, search_memories) = 7. The banked
-    # "<=6" was a 12B pick-reliability rule; asserting it here after the slice
+    # "<=6" was a small model pick-reliability rule; asserting it here after the slice
     # grew is the past. The live invariant is the declared slice, not a wish.
     res.append(check("memory hot set is the declared 7 (5 + EXTRA[:2])",
                      core2 is not None and len(core2) == 7))

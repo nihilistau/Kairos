@@ -4,7 +4,7 @@ Inference Router
 
 Priority-aware front door to inference. Ported (slimmed) from CosySim's
 3-tier router. The harness typically serves a single big resident model
-(Gemma-4-12B) so tiers collapse to a priority queue + optional draft/small
+(the retired reference model) so tiers collapse to a priority queue + optional draft/small
 model affinity, but the seam is kept so additional daemons can be bound later.
 """
 

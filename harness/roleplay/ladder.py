@@ -3,7 +3,7 @@
 The operator's ask: R-rated roleplay, any theme, "use the python system and harness to
 create structure and stay on track".
 
-STRUCTURE IS THE FEATURE. A 12B told "you may be explicit" will either refuse, or lurch
+STRUCTURE IS THE FEATURE. A retired reference model told "you may be explicit" will either refuse, or lurch
 straight to explicit on turn two and stay there — both of which kill the scene. The
 Neon-City design solved this with a LADDER: intimacy has levels, each level has a GATE,
 and a gate only opens when the fiction has earned it. That is what makes a scene feel

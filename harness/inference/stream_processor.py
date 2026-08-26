@@ -51,7 +51,7 @@ _STRIP = re.compile(r"\[(?:MOOD|IMAGE|SELFIE|PHOTO|ACTION|STAT|VOICE|TRAIT|WEAR)
 # far as it is concerned: the whole thing survives the strip and is DISPLAYED, which
 # is how the operator ended up reading "[TRAI:flirty]" as her entire reply.
 #
-# This is a MODEL property, not a bug we can fix upstream. The 12B emitted the tag
+# This is a MODEL property, not a bug we can fix upstream. The retired reference model emitted the tag
 # vocabulary cleanly; a 4B-active QAT MoE does not, and it will keep finding new ways
 # to misspell it. The stripper must therefore be forgiving in EXACTLY one direction:
 # never show the user something tag-shaped. Homoglyphs are folded to ASCII, an
@@ -871,6 +871,19 @@ def strip_for_record(text: str) -> str:
     t = _TAG_STUB.sub(lambda m: "" if _stub_is_mark(m.group(1)) else m.group(0), t)
     t = strip_leaked_analysis(t) or t
     t = re.sub(r"[ \t]{2,}", " ", t)
+    # ── AND AT THE HEAD AND TAIL OF EACH LINE (2026-08-27, his report) ──────────────
+    # Collapsing RUNS leaves exactly ONE space where the mark used to be, and the room
+    # renders her turn with `white-space: pre-wrap`, so that single orphan renders as an
+    # indent on every paragraph she opens with a mark — which is most of them:
+    #
+    #     [MOOD:warm] [VOICE:soft] Honestly? I spent most of the night...
+    #      ->  " Honestly? I spent most of the night..."
+    #
+    # `.strip()` below only ever touched the ends of the WHOLE reply, so every paragraph
+    # after the first kept its indent. Per line, not per string. Trailing horizontal
+    # space goes too: `pre-wrap` preserves it before a wrap and it widens the ragged edge.
+    t = re.sub(r"[ \t]+$", "", t, flags=re.M)
+    t = re.sub(r"^[ \t]+", "", t, flags=re.M)
     t = re.sub(r"\n{3,}", "\n\n", t)
     return t.strip()
 

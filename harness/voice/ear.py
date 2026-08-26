@@ -121,7 +121,7 @@ def hear(mel: np.ndarray) -> np.ndarray:
 
     # HARD-SELECT the argmax embed row per kept frame (KAI-4 P1 fix): at V=217 the
     # softmax(τ=0.2) blend is too soft — injecting a blurry mix of embed rows is
-    # harder for the 12B to read than the EXACT row it was trained on. os.environ
+    # harder for the retired reference model to read than the EXACT row it was trained on. os.environ
     # SP_VOICE_SOFT=1 restores the soft blend (KAI-3 V=32 behaviour).
     if os.environ.get("SP_VOICE_SOFT") == "1":
         lg = logits[kept, :v] / tau

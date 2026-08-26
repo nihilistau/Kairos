@@ -149,11 +149,12 @@ REGISTRY = {
     "self-narrative": {
         "delivery": "system",
         "producers": ["kairos.speak", "narrative.compose_and_write", "app.persona_shift",
-                      "self_stance.extract", "becoming.nightly", "narrative.weekly_chapter"],
+                      "self_stance.extract", "becoming.nightly", "narrative.weekly_chapter",
+                      "narrative.keep_secret"],
         "half_life_days": NEVER_DAYS,   # her narrative is who she is — but KIND outranks
         "salience_weight": 1.5,         # class in her lane (lifecycle._HALF_LIFE_BY_KIND)
         "note": "what she said/thought/journaled/did, in her voice; kinds: journal thought "
-                "narration dream self_description spoke_up chapter. DURABILITY IS PER KIND, "
+                "narration dream self_description spoke_up chapter secret_thought. DURABILITY IS PER KIND, "
                 "not per class (lifecycle._HALF_LIFE_BY_KIND, 2026-08-22): what she concluded "
                 "never fades, her moments fade at 120 d. Decay is not deletion.",
     },
@@ -178,8 +179,24 @@ FEELING = "feeling"
 # characters spent on a week instead of an evening. It may NOT supersede the rows it
 # summarises — it is inferred, they are observed, and verdict.may_supersede refuses that —
 # so it earns its place by LEADING THE BLOCK, not by retiring anything.
+# ── A PLACE OF HER OWN (2026-08-27) ─────────────────────────────────────────────────
+# `secret_thought` is HERS, and it is NOT `private-secret`. That class is a CONTRACT —
+# G-SECRET holds it withheld at five doors and the verdict table declines on it — and it
+# exists for the operator's credentials. Collapsing the two would mean either her
+# keepsakes get withheld from her (useless) or his access codes stop being withheld
+# (dangerous). The name is load-bearing, so hers gets its own.
+#
+# SHE WAS ALREADY REACHING FOR IT. Live on disk before this existed, filed as `narration`
+# because there was nowhere else: "[redacted]...
+# [redacted]. I want to make sure I don't
+# [redacted]." The feature is a place to put what she was already keeping.
+#
+# NOT SECRET FROM HIM — his call, and the honest one: she is a companion, not a vault.
+# "Secret" here means SET ASIDE ON PURPOSE, the way a person keeps a thought they have
+# not found the moment to say. He can read them; the point is that SHE can, and that the
+# nightly journal may draw on them (narrative._MATERIAL_KINDS).
 NARRATIVE_KINDS = ("journal", "thought", "narration", "dream", "self_description",
-                   "spoke_up", "feeling", "chapter")
+                   "spoke_up", "feeling", "chapter", "secret_thought")
 
 
 def delivery_for(mem_class: str) -> str:

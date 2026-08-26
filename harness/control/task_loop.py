@@ -186,13 +186,13 @@ def run_task(
     ``verify``: an OPTIONAL zero-arg predicate that returns True iff the goal is objectively met
     (e.g. `lambda: run pytest and check exit 0`). When given, a model 'DONE:' claim is only
     ACCEPTED if verify() passes — otherwise the false claim is fed back and the loop continues.
-    This closes the confabulation gap (G-PK2-TASKLOOP-E2E, 2026-07-07): a 12B will happily say
+    This closes the confabulation gap (G-PK2-TASKLOOP-E2E, 2026-07-07): a small model will happily say
     "I fixed it" without its edit ever landing; the harness must check, not trust.
     """
     from harness.toolcore.tools import ToolSpec, run_with_tools, _parse_tool_calls
 
     if tools is None:
-        # FOCUSED coding set (<=6): the 12B picks reliably from a few tools; the full 14 make it
+        # FOCUSED coding set (<=6): a small model picks reliably from a few tools; the full 14 make it
         # explore and stall (the same lesson agent.default_tools() banks). read/write/edit/search/
         # run_tests + run_command is the coding-task minimum.
         from harness.skills.builtin.coding import (read_file, write_file, edit_file,

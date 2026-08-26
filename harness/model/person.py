@@ -33,7 +33,7 @@ model retains 0.770 of gold evidence where recency alone retains 0.368. Less tha
 A fact is important TO THE DEGREE IT CHANGES THE MODEL.
 
 That is Bayesian surprise / information gain, and it makes importance DERIVABLE instead of
-guessed at. It matters that it is derivable: the alternative on offer (ask the 12B to score
+guessed at. It matters that it is derivable: the alternative on offer (ask a small model to score
 1-10) is a judgement, and this system has already been badly burned trusting her judgement —
 she told the operator she had added notes she had not added. A number she invents is a
 number nobody can check. A number computed from what the model did and did not already know

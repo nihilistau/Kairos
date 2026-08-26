@@ -180,7 +180,7 @@ def frame_link(text_a: str, text_b: str):
 def ask_oracle(text_a: str, text_b: str):
     """One greedy /v1/oneshot judgment: 'same' | 'different' | None (unreachable/unparseable).
     None is recorded nowhere — an unreachable oracle proposes nothing."""
-    # Few-shot with a NEUTRAL on-domain exemplar — the mint_question_l5 cure for a 12B
+    # Few-shot with a NEUTRAL on-domain exemplar — the mint_question_l5 cure for a small model
     # drifting into prose on hard pairs (the first prompt got back 'The same person is
     # referred to in both' on the ladders pair; unparseable proposes nothing, so the
     # failure was safe — but a mute judge is a useless one).

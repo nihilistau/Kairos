@@ -28,7 +28,7 @@ def main() -> int:
 
     # self-facts (the agent's self-model)
     store.remember_self("I can read and write memories.")
-    store.remember_self("I run a 12B model on an RTX 2060 and classify my own memories.")
+    store.remember_self("I run a small model model on an RTX 2060 and classify my own memories.")
     # user-facts (about the operator)
     store.remember_user("The user's name is Sam.")
     store.remember_user("The user prefers tea over coffee.", mem_class="preference")

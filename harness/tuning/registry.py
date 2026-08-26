@@ -72,7 +72,7 @@ class Knob:
     #
     # So the panel was serving `End-of-turn bias 4.00` under a header promising "the next
     # turn reads the new value", while the value that actually reached the sampler came
-    # from SP_EOT_BIAS — and 4.00 is the 12B tune, which on this MoE makes the first
+    # from SP_EOT_BIAS — and 4.00 is a retired model's tune, which on this MoE makes the first
     # sampled token a stop and the turn come back EMPTY. A control that displays a stale
     # number and changes nothing is worse than no control.
     #
@@ -111,7 +111,7 @@ KNOBS: list[Knob] = [
          "Continue margin (logits)", "float", -18.50,
          "How reluctantly she must have stopped before she picks the thread back up. "
          "This is the RAW stop-vs-continue logit gap from the forward itself. "
-         "THE SCALE IS PER-MODEL and it moves a long way: on gemma4-12b (eot_bias 4.0) "
+         "THE SCALE IS PER-MODEL and it moves a long way: on a smaller retired model (eot_bias 4.0) "
          "finished turns sat around +2.8 and guillotined ones around -14.1; on "
          "your model (eot_bias 0.0) they sit at +13.10 and -28.43. Same signal, "
          "different scale — which is exactly why this number is re-measured per model "
@@ -121,7 +121,7 @@ KNOBS: list[Knob] = [
          provenance="measured",
          receipt="tools/kairos/calibrate.py on your model (2026-07-30): FINISHED median "
                  "+13.10 (min +8.96), CUT OFF median -28.43 (max -18.54), gap 41.5 -> "
-                 "0/6 finished turns interrupted, 6/6 genuine cut-offs resumed. The 12B's "
+                 "0/6 finished turns interrupted, 6/6 genuine cut-offs resumed. The retired reference model's "
                  "-11.75 was calibrated at eot_bias 4.0 and does not transfer. Re-run after "
                  "ANY change to eot_bias, sampler, or model.",
          danger="Model-specific. Carrying a value across a model swap silently mis-classifies "
@@ -172,7 +172,7 @@ KNOBS: list[Knob] = [
     # thing people do: finish the message, then send the bit you thought of afterwards.
     # The band between a guillotined turn and a finished one was never read by anything,
     # and it is exactly where that lives. (This comment quoted -14.8 / +2.0 when it was
-    # written a few hours earlier — the 12B's medians, on a knob for the model. The live
+    # written a few hours earlier — a retired model's medians, on a knob for the model. The live
     # numbers are in the receipt below, and they are measured from her own log rather
     # than from a calibration that has since drifted.)
     Knob("kairos.expand_margin", "Kairos — speaking unprompted", "Follow-on band (below)",
@@ -245,7 +245,7 @@ KNOBS: list[Knob] = [
          min=0.0, max=1.0, step=0.05),
     Knob("kairos.discover_tool", "Kairos - her own time",
          "Offer read_something_new", "bool", True,
-         "The verb itself. The live tool set is already ~18 and a 12B picks reliably from "
+         "The verb itself. The live tool set is already ~18 and a small model picks reliably from "
          "about six, so this is the trim if selection suffers - turning it off also makes "
          "the discovery act unrunnable, which solo_did_the_thing will correctly refuse."),
     # ── PRESENCE MODES (2026-08-22, his ask): narration / company / lucid dream ──────
@@ -507,13 +507,13 @@ KNOBS: list[Knob] = [
                  "AUC 0.8 this comes out again."),
 
     # ── DECODE: the knobs that bit us ─────────────────────────────────────────────
-    # ── THE DEFAULT WAS A 12B LITERAL, AND IT MEANS SILENCE HERE (2026-07-30) ─────────
-    # This declared 4.0 — the value gemma4-12b was tuned to. On your model, 4.0 makes
+    # ── THE DEFAULT WAS A retired reference model LITERAL, AND IT MEANS SILENCE HERE (2026-07-30) ─────────
+    # This declared 4.0 — the value a retired model was tuned to. On your model, 4.0 makes
     # the FIRST SAMPLED TOKEN a stop, so the turn comes back EMPTY. The live profile sets
     # 0.0, so the served stack was fine; anything falling back to this default was not.
     #
     # The declared default is now 0.0 — the null floor, no bias at all. It is more verbose
-    # than the 12B's tuned value, and the PROFILE restores that (`[decode] eot_bias`, which
+    # than that retired model's tuned value, and the PROFILE restores that (`[decode] eot_bias`, which
     # serve.py maps to SP_EOT_BIAS); what 0.0 can never do is produce silence. Same
     # reasoning as the byteexact resolution in inference_config: AN UNCONFIGURED CALLER
     # MUST NOT GET NOTHING.
@@ -526,7 +526,7 @@ KNOBS: list[Knob] = [
          "A nudge on the stop token so she actually ends her turn instead of running on. "
          "This is what makes 'cut off' turns cut off — kairos.continue_margin is measured "
          "AGAINST it, so if you change this, RE-RUN THE CALIBRATION. "
-         "PER-MODEL: 12B was tuned to 4.0; on the model MoE 4.0 yields an empty turn and the "
+         "PER-MODEL: the retired reference model was tuned to 4.0; on the model MoE 4.0 yields an empty turn and the "
          "profile ships 0.0. The default here follows SP_EOT_BIAS rather than a literal.",
          min=0.0, max=12.0, step=0.5, scope="profile", env="SP_EOT_BIAS",
          danger="Changing this invalidates the kairos continue_margin calibration.",
@@ -633,7 +633,7 @@ KNOBS: list[Knob] = [
     # UNSET MEANS UNSENT. These two are read through _knob_set, not _knob: until you move
     # them the gateway sends nothing and the DAEMON's own values apply, which is how this
     # path ran before they existed. The declared defaults below are the console page's
-    # 12B tuning and are shown only so the sliders have somewhere to start — sending them
+    # retired-model tuning and are shown only so the sliders have somewhere to start — sending them
     # on this MoE is what degenerated her on 2026-08-02.
     Knob("decode.top_p", "Decode — sampling", "top_p (nucleus)", "float", 0.95,
          "Sample from the smallest set of tokens whose probability sums to this. UNSET "

@@ -95,7 +95,7 @@ def main() -> int:
           f"enabled={cfg.enabled} max_chain={cfg.max_chain}")
 
     # THE CUT-OFF MARGIN IS DERIVED, NOT HARDCODED (2026-07-30). This said -15.0, a
-    # number chosen because it sat below the 12B's calibrated -11.75. The margin scale is
+    # number chosen because it sat below the retired reference model's calibrated -11.75. The margin scale is
     # PER MODEL: re-calibrating on your model moved the threshold to -18.50, and -15.0
     # silently flipped to the FINISHED side — so this gate failed on a correct threshold
     # and a correct knob. A fixture that encodes a measured constant breaks every time the

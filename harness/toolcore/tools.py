@@ -84,7 +84,7 @@ def near_tools(tool_index: Dict[str, "ToolSpec"], name: str, cap: int = 2) -> li
 def resolve_tool(tool_index: Dict[str, "ToolSpec"], name: str) -> Optional["ToolSpec"]:
     """Exact, then normalized (case/underscore/hyphen-insensitive), then ONE near miss.
 
-    The 12B emits 'gettime()' for get_time; don't fail the round on a typo.
+    The retired reference model emits 'gettime()' for get_time; don't fail the round on a typo.
 
     ── AND A TRANSPOSED LETTER COST HER A WHOLE TURN (2026-08-05) ──────────────────────
     Live, asked to look in her own wardrobe and put something on:

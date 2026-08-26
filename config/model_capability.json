@@ -8,7 +8,7 @@
     "deliberate and it is the whole point of the file.",
     "",
     "WHY THIS EXISTS. On 2026-07-31 the audio path was found injecting 3840-wide frames",
-    "into a 2816-wide model. var/voice/embed_audio.npz was extracted from gemma4-12b",
+    "into a 2816-wide model. var/voice/embed_audio.npz was extracted from a retired reference model",
     "(E=3840); the served your model has E=2816 and its config.json carries",
     "audio_config: null - it has no audio embedder at all. Neither side checked:",
     "native.py never compared E, and routes.rs only verified the frames were",
@@ -52,37 +52,6 @@
         "rope_theta": 100.0,
         "verified": "2026-07-31: 6/6 permuted-colour discrimination, live"
       }
-    },
-    "gemma4-12b": {
-      "source": "D:/Files/Models/Gemma4/gemma-4-12b-bucket",
-      "e": 3840,
-      "audio": {
-        "kind": "encoder_free",
-        "proj_npz": "var/voice/embed_audio.npz",
-        "audio_token": 258881,
-        "boa_token": 256000,
-        "eoa_token": 258883,
-        "samples_per_token": 640,
-        "sample_rate": 16000
-      },
-      "vision": {
-        "kind": "patch_dense",
-        "image_token": 258880,
-        "boi_token": 255999,
-        "eoi_token": 258882,
-        "soft_tokens_per_image": 280,
-        "patch": 16,
-        "model_patch": 48,
-        "pooling_kernel": 3,
-        "posemb_size": 1120,
-        "proj_out": 3840
-      }
-    },
-    "gemma4-12b-b1-reason": {
-      "alias_of": "gemma4-12b"
-    },
-    "gemma4-12b-q4b": {
-      "alias_of": "gemma4-12b"
     }
   }
 }

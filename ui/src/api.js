@@ -92,6 +92,10 @@ export const wardrobeSet  = (b) => post('/v1/wardrobe', b)
 export const wardrobeWant     = (want) => post('/v1/wardrobe/want', { want, by: 'him' })
 export const wardrobeGenerate = (id)   => post('/v1/wardrobe/generate', id ? { id } : {})
 export const wardrobeDismiss  = (id)   => post('/v1/wardrobe/want/dismiss', { id, by: 'him' })
+// A SUGGESTION IS NOT A WANT UNTIL HE SAYS SO (2026-08-27). She improvised a mark the
+// control surface has no verb for; the prose was kept, inert. This is the only door
+// from suggestion to queue, and the prompt is composed server-side at THIS moment.
+export const wardrobeAccept   = (id)   => post('/v1/wardrobe/want/accept', { id, by: 'him' })
 // 2026-08-21: the settings window — the whole tuning registry, live
 export const tuning    = () => get('/v1/tuning')
 export const tuningSet = (values) => post('/v1/tuning', { values })

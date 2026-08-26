@@ -122,7 +122,7 @@ def check(note: dict, judge=None) -> dict:
     # twice and the kairos hooks six times.
     #
     # So it is here now, where every judge must pass through it: a YES whose proof does not
-    # actually appear in the page she was shown is not a YES. She is a 12B — if she has
+    # actually appear in the page she was shown is not a YES. She is a small model — if she has
     # invented the evidence, the invention will not be in the evidence, and that is checkable.
     # A watch that can fire on nothing is worse than no watch, because he would believe it.
     if fired and not _grounded(why, evidence):

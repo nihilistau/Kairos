@@ -110,8 +110,14 @@ export default function Wardrobe() {
                 ) : null}
                 <span className="wr-t">{(w.kind || 'look') === 'gesture' ? 'moment' : 'look'}</span>
                 {w.want}
-                <span className="wr-half" title={w.delay_reason || ''}>
-                  {w.stage === 'ordered' ? 'ordered — picture being made'
+                <span className="wr-half" title={w.stage === 'suggested' ? (w.from_mark || '') : (w.delay_reason || '')}>
+                  {w.stage === 'suggested'
+                     ? (/* SHE REACHED FOR A VERB THAT DOES NOT EXIST (2026-08-27). The
+                           prose was kept; nothing is ordered and nothing is being made.
+                           Say what she wrote, so the offer can be judged on her words. */
+                        <>she reached for this{w.from_mark ? <> — she wrote <code className="wr-mark">{w.from_mark}</code></> : null}
+                          {w.near?.id ? <> · nearest she has: {w.near.id}</> : null}</>)
+                   : w.stage === 'ordered' ? 'ordered — picture being made'
                    : w.stage === 'making' ? 'picture done · motion still owed'
                    : w.stage === 'delayed' ? 'delayed' + (w.tries > 1 ? ` · ${w.tries} tries` : '')
                    : 'not going to be made'}
@@ -123,7 +129,20 @@ export default function Wardrobe() {
                           try { await api.wardrobeDismiss(w.id); w.refresh() }
                           finally { setBusy('') }
                         }}>✕</button>
-                {w.stage !== 'refused' ? (
+                {w.stage === 'suggested' ? (
+                  /* ACCEPT IS THE ONLY DOOR (2026-08-27). Not "make it now": accepting and
+                     generating are two decisions and collapsing them would spend an image
+                     on a single click. Accept puts it in the queue as an ordinary want —
+                     the server composes its prompt at that moment — and "make it now" is
+                     then available on the next render like any other row. */
+                  <button className="wr-gen wr-accept" disabled={!!busy}
+                          title="put it in the queue as a want — nothing is generated yet"
+                          onClick={async () => {
+                            setBusy('a' + w.id)
+                            try { await api.wardrobeAccept(w.id); w.refresh() }
+                            finally { setBusy('') }
+                          }}>accept</button>
+                ) : w.stage !== 'refused' ? (
                   /* GENERATE NOW (2026-08-21): one click, this want, via the API —
                      the day-boundary wait is a fallback, not the plan. */
                   <button className="wr-gen" disabled={!!busy || d.genstatus?.running}

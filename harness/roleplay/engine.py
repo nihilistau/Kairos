@@ -5,7 +5,7 @@ The operator's ask: "a mode that the model flips to when you ask for roleplay sc
 tier feature".
 
 The last two clauses are the whole job. Anyone can put "you are a character" in a system
-prompt; that is not a feature, it is a sentence, and a 12B will drift out of it in four
+prompt; that is not a feature, it is a sentence, and a small model will drift out of it in four
 turns — narrating instead of being, asking "what would you like to do next?", forgetting
 where the room is, escalating to explicit on turn two and having nowhere left to go.
 

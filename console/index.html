@@ -392,10 +392,10 @@
            stop token won at that boundary. Same replay at 0.0: 8/8 with real bodies.
            serve.py strips every SP_* the profile did not set; a console input that silently
            beats the profile is the same bug wearing a UI. Leave it blank and the profile's
-           SP_EOT_BIAS governs (12B: 4.0, 26B: 0.0). Type a number to override deliberately. -->
-      <label title="eot_bias: stop-token logit bias. BLANK = use the profile default (12B 4.0, 26B 0.0). 0=off, ~4=stop sooner.">eot <input type="number" id="s-eot" min="-10" max="20" step="0.5" value="" placeholder="auto"></label>
+           SP_EOT_BIAS governs (the retired reference model: 4.0, 26B: 0.0). Type a number to override deliberately. -->
+      <label title="eot_bias: stop-token logit bias. BLANK = use the profile default (26B 0.0). 0=off, ~4=stop sooner.">eot <input type="number" id="s-eot" min="-10" max="20" step="0.5" value="" placeholder="auto"></label>
       <!-- 900, was 128. Her replies were being guillotined mid-sentence — and a guillotined
-           reply is also a turn kairos then spends a whole 12B generation stitching back
+           reply is also a turn kairos then spends a whole the retired reference model generation stitching back
            together. Cheap to raise: max_tokens is a CEILING, not a target. She stops when
            she is done, and eot_bias is what makes sure she does. -->
       <label title="max_tokens per turn (a ceiling, not a target).">max <input type="number" id="s-maxtok" min="8" max="4096" step="8" value="900"></label>
@@ -847,10 +847,10 @@
   let SESSION_ID = 'ui-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
 
   // ── THE LABEL THAT LIED (2026-07-29) ────────────────────────────────────────
-  // Every reply header read "gemma-4-12B" because that string was hardcoded in four
+  // Every reply header read "the retired reference model" because that string was hardcoded in four
   // places. On 2026-07-29 a whole field session was conducted against the model while
-  // the console attributed every word of it to the 12B — and the transcript was then
-  // read back as 12B behaviour. A UI that asserts which model spoke must ASK, not
+  // the console attributed every word of it to the retired reference model — and the transcript was then
+  // read back as the retired reference model behaviour. A UI that asserts which model spoke must ASK, not
   // assume. Falls back to the family name, which is true of both, never to a
   // specific model we have not confirmed.
   let MODEL_LABEL = 'gemma-4';
@@ -1339,7 +1339,7 @@
 
   /* ===== VOICE CHANNEL (ADR-KAI4 P0) ============================== *
    * mic 16k → client VAD segmentation → PCM16 b64 → gateway /v1/voice
-   * (GNA ear → inject_frames → 12B) → streamed reply → v0 TTS out
+   * (GNA ear → inject_frames → the retired reference model) → streamed reply → v0 TTS out
    * (speechSynthesis stopgap; replaced by OUR vocoder in P2).
    * Modes: off → push-to-talk (click to arm, speak, auto-sends on
    * silence) → auto (always listening, any-voice trip; speaking while

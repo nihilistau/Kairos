@@ -247,7 +247,7 @@ pre-registered 0.80 auto-bar, because shared-word-different-dimension pairs (moo
 height-at-beach) are structurally indistinguishable at bag-of-words granularity. The receipt says
 ships:false and G-SEM-PAIR pins it saying so.
 
-The LLM judge is measured OUT in every role: after fixing the parse (the greedy 12B was
+The LLM judge is measured OUT in every role: after fixing the parse (the retired greedy reference model was
 *continuing the few-shot pattern* instead of answering), it answers cleanly — and says NO on
 everything, true pairs included. Not miscalibrated; incapable of the judgment.
 

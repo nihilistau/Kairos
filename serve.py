@@ -3,12 +3,12 @@
 Usage:
     python serve.py companion      # the live profile. THE PROFILE IS POSITIONAL AND
                                    # REQUIRED — there is no default, on purpose: `agent`
-                                   # is the 12B near-twin and a defaulted launch serving
+                                   # is the retired reference model near-twin and a defaulted launch serving
                                    # the wrong model cost a session on 2026-08-03.
     python serve.py --stop         # stop the stack (takes no profile)
 
 (These two lines said `[profile] # default: agent` and `agent --stop` until 2026-08-19 —
-the 12B trap in the first five lines of the one door, outside G-PROFILE-DOOR's old
+the retired reference model trap in the first five lines of the one door, outside G-PROFILE-DOOR's old
 markdown-only glob. Bare invocation is refused at main(); --stop short-circuits.)
 
 Reads the profile, maps it to the engine/gateway env with an EXPLICIT table,
@@ -283,7 +283,7 @@ def build_env(c: dict) -> dict:
     #                          controls, so the store_verb fix did not reach them either
     #
     # Leave `set SP_FORGET=1` in a PowerShell window from a debugging session on Tuesday, and on
-    # Thursday `python serve.py agent` (the 12B) silently runs with autonomous forgetting armed. The profile
+    # Thursday a mistyped profile silently runs with autonomous forgetting armed. The profile
     # says nothing about it. The banner would have shown it, if you read the banner.
     #
     # AND IT MATCHES BY TOKEN OVERLAP ACROSS EVERY LIVE ROW, WHICH INCLUDES THE SELF LANE. The worst
@@ -511,7 +511,7 @@ def build_env(c: dict) -> dict:
         "SP_PROFILE": str(c.get("_profile_name") or ""),
         "SP_EOT_BIAS": str(dec["eot_bias"]),
         # ADR-013: the gemma4-MoE thought channel. OFF closes the channel in the
-        # generation prompt (the null floor, and what the 12B has always done); ON
+        # generation prompt (the null floor, and what the retired reference model has always done); ON
         # leaves it open and un-bans `<channel|>` so she can close it herself. The
         # tokenizer reads this ONCE for both the prompt shape and the suppression set —
         # they must agree, and a knob that reached only one of them would either reason
@@ -843,8 +843,8 @@ def build_env(c: dict) -> dict:
         # serves THE kairos console (its charter home) via the env override.
         # THE LABEL THAT LIED (2026-07-29): the model path reached the daemon only as
         # a CLI arg, so nothing else in the stack could name the model that was loaded
-        # — and the console filled that gap by hardcoding "gemma-4-12B", which is how a
-        # whole field session against the model got attributed to the 12B. The gateway's
+        # — and the console filled that gap by hardcoding "the retired reference model", which is how a
+        # whole field session against the model got attributed to the retired reference model. The gateway's
         # /v1/models reads this. Same value the daemon is launched with, one source.
         # ── PoUW (2026-07-31) ────────────────────────────────────────────────────────
         # MINING was an UNCONDITIONAL tokio::spawn with no flag at all: measured at
@@ -907,7 +907,7 @@ def build_env(c: dict) -> dict:
         # ── SENSES (2026-07-31) ────────────────────────────────────────────────
         # WHAT THE SERVED MODEL CAN RECEIVE, ruled from a committed table rather
         # than assumed. This is the fix for a live defect: var/voice/embed_audio.npz
-        # is the 12B's [3840,640] projection, and the served 26B has hidden size
+        # is the retired reference model's [3840,640] projection, and the served 26B has hidden size
         # 2816 with `audio_config: null` — no audio embedder at all. Nothing on
         # either side compared the widths, so the voice path was feeding a 2816-wide
         # model 3840-wide frames. harness/senses/capability.py now refuses.
@@ -1283,8 +1283,8 @@ def stop_gateway_only(port=None) -> None:
 def main() -> int:
     # ── THE ARGUMENT THAT WASN'T (2026-07-29) ────────────────────────────────
     # This took the FIRST non-dash arg and dropped the rest on the floor, so
-    #     python serve.py agent --profile companion      <- the 12B, NOT what he meant
-    # booted the 12B under profile `agent` and said "profile=agent" while the
+    #     python serve.py agent --profile companion      <- the retired reference model, NOT what he meant
+    # booted the retired reference model under profile `agent` and said "profile=agent" while the
     # operator read it as the model. That is this repo's own bug class wearing a
     # different hat: a knob that does not exist, silently accepted. serve.py is
     # THE ONE DOOR — it strips every unmapped SP_*, and it has no business being
@@ -1310,17 +1310,16 @@ def main() -> int:
         raise SystemExit(
             "serve.py: --gateway-only and --daemon-only are mutually exclusive.\n"
             "  a full launch (no flag) starts both halves.")
-    # ── A BARE `python serve.py` BOOTED THE 12B (2026-08-04) ────────────────────────
-    # The default was "agent", which is `profiles/agent.toml` — the retired 12B, with
-    # eot_bias 4.0, byteexact on and pmax 13000. It starts, warms, answers, and reports
-    # healthy while serving a different model: this file's own comment below records the
-    # outage it caused (eight --gateway-only bounces on `agent` against a running 26B,
-    # every turn coming back zero characters while /health said ok), and agent.toml's
-    # header records it costing a restart mid-measurement on a second occasion.
+    # ── NO DEFAULT PROFILE, BECAUSE THE PROFILE PICKS THE MODEL (2026-08-04) ────────
+    # This used to default to a profile name. A default that silently selects a MODEL is
+    # not a convenience: the wrong one starts, warms, answers and reports healthy while
+    # serving something else with different decode knobs, and the only symptom is that
+    # she stops speaking. It cost a live outage (eight --gateway-only bounces, every turn
+    # zero characters, /health green) and a restart mid-measurement.
     #
-    # A default that silently picks a MODEL is not a convenience. It is refused now, and
-    # the message names the two real choices rather than making the caller guess — the
-    # 12B is still runnable on purpose, just never by omission.
+    # The profiles that made that misfire possible were deleted on 2026-08-26 and the
+    # rule stays regardless, because it is right independently of how many profiles are
+    # on disk. G-PROFILE-GUARD asserts the absence structurally.
     # --stop FIRST: it kills processes and needs no profile, so it must not be gated by a
     # check about which model to start. (The first cut of this guard raised SystemExit
     # with an empty message on the --stop path — which still EXITS, so `serve.py --stop`
@@ -1340,7 +1339,6 @@ def main() -> int:
         raise SystemExit(
             "serve.py: name the profile — it selects the MODEL, so there is no safe default.\n"
             "  python serve.py companion     <- her. your model, the daily driver.\n"
-            "  python serve.py agent         <- the retired 12B, on purpose.\n"
             "  (profiles/*.toml for the rest; --stop needs no profile)")
     name = pos[0]
     c = load_profile(name)
@@ -1353,8 +1351,8 @@ def main() -> int:
         # THE PROFILE MUST AGREE WITH THE DAEMON THAT IS ALREADY RUNNING.
         #
         # 2026-08-01, and this cost a live outage. The daemon was serving the model;
-        # eight gateway bounces were done with `serve.py agent`, which is the 12B
-        # profile. It carries eot_bias = 4.0, tuned for the 12B — and companion.toml
+        # eight gateway bounces were done with `serve.py agent`, which is the retired reference model
+        # profile. It carries eot_bias = 4.0, tuned for the retired reference model — and companion.toml
         # sets 0.0 with a comment saying exactly why: on your model at 4.0 the FIRST
         # sampled token is a stop. So every turn came back with zero characters and she
         # went completely silent, while /health said ok, warm and daemon:true.

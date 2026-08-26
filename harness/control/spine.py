@@ -349,7 +349,7 @@ def recall_decider(min_overlap: float = 0.34) -> Decider:
 
 
 def toolset_decider() -> Decider:
-    """PRE-turn (ADR-008): pick WHICH tool tier the turn advertises. The banked rule is a 12B
+    """PRE-turn (ADR-008): pick WHICH tool tier the turn advertises. The banked rule is a small model
     picks reliably from ≤6 tools — this decider makes those six the RIGHT six for the turn:
     coding words → the coding set; memory words → the memory set (+extras); else → core.
     Deterministic keyword routing (no model call, no latency): the tiers are coarse on purpose —

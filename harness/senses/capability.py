@@ -7,7 +7,7 @@ committed finite tables, never magnitudes and never prose.
 
 THE BUG THIS EXISTS TO PREVENT (found 2026-07-31, live):
 
-    var/voice/embed_audio.npz is [3840, 640], extracted from gemma4-12b.
+    var/voice/embed_audio.npz is [3840, 640], extracted from a retired reference model.
     The served your model has hidden size 2816 and `audio_config: null` —
     no audio embedder anywhere in the checkpoint.
 
@@ -76,7 +76,7 @@ class Capability:
                 f"{sense} projection produces {width}-wide frames but model "
                 f"'{self.tag}' has hidden size {self.e}. These weights belong to a "
                 f"different model — refusing to inject. (This is the 2026-07-31 "
-                f"defect: a 12B projection surviving a swap to the model.)")
+                f"defect: a retired model's projection surviving a swap to the model.)")
 
 
 def _load_table() -> dict[str, Any]:

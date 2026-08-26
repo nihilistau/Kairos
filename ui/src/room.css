@@ -1072,6 +1072,17 @@ body.resizing, body.resizing * { user-select: none !important; cursor: inherit; 
 .wr-want.wr-refused .wr-half { color: var(--off); text-decoration: line-through; }
 .wr-want.wr-making .wr-half { color: var(--cyan); }
 .wr-want .wr-thumb { width: 34px; height: 34px; object-fit: cover; border-radius: 3px; }
+/* ── A SUGGESTION IS AN OFFER, NOT AN ORDER (2026-08-27) ──────────────────────────
+   She reached for a verb the control surface does not have; the prose was kept and
+   nothing is queued until he accepts. It reads as an offer — dimmer than live work,
+   with a left edge so it is separable at a glance from the rows actually being made. */
+.wr-want.wr-suggested { opacity: .82; border-left: 2px solid var(--gold, #c9a); padding-left: 6px; }
+.wr-want.wr-suggested .wr-half { color: var(--gold, #c9a); }
+/* HER EXACT WORDS, not a paraphrase of them: the offer is judged on what she wrote. */
+.wr-want.wr-suggested .wr-mark { font-family: var(--mono, ui-monospace, monospace);
+  font-size: .92em; opacity: .85; word-break: break-all; }
+.wr-gen.wr-accept { border-color: var(--gold, #c9a); }
+
 
 /* NEW UNTIL SHE WEARS IT. Not "new until someone looked at a list" — his rule, and the
    difference is the whole point: a thing is new until it has been used. */

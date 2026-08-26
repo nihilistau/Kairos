@@ -435,7 +435,21 @@ export function extractTags(raw, opts) {
   const text4 = text3.replace(TAG_STUB_RE, (m, w) =>
     (tagWord(w) || _TAG_WORDS.some(t => t.startsWith(w.toLowerCase()))) ? '' : m)
   // collapse the whitespace the removal leaves behind, without eating paragraphs
-  const out = text4.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
+  // ── AND AT THE HEAD AND TAIL OF EACH LINE (2026-08-27, his report) ──────────────
+  // Collapsing RUNS leaves exactly ONE space where the mark used to be, and `.turn` is
+  // `white-space: pre-wrap`, so that single orphan renders as an indent on every
+  // paragraph she opens with a mark — which is most of them:
+  //     [MOOD:warm] [VOICE:soft] Honestly? I spent most of the night...
+  //       ->  " Honestly? I spent most of the night..."
+  // `.trim()` only ever touched the ends of the WHOLE reply, so every paragraph after
+  // the first kept its indent. Per LINE, not per string. Same three lines in
+  // stream_processor.strip_for_record — G-STRIP-EQUIVALENCE holds them equal.
+  const out = text4
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/[ \t]+$/gm, '')
+    .replace(/^[ \t]+/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
   // ...and give the room its own words back.
   return {
     text: out.replace(/\u0001ROOMSAYS(\d+)\u0001?/g, (_m, i) => held[Number(i)] || ''),

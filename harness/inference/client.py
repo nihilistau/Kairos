@@ -19,8 +19,8 @@ native.
 
 Launch reference (the daemon this client targets)::
 
-    sp-daemon start --model gemma4-12b-b1.sp-model \\
-        --tokenizer gemma4-12b-b1.sp-tokenizer --port 3000
+    sp-daemon start --model legacy-ref.sp-model \\
+        --tokenizer legacy-ref.sp-tokenizer --port 3000
     # env: SP_DAEMON_BACKEND=cuda SP_DAEMON_KVDECODE=1 SP_CUDA_DECODE_INT8=1
 """
 

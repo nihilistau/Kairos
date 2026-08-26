@@ -69,7 +69,7 @@ def check(name, cond, detail=""):
 
 # ── A BLACK-HOLE DAEMON ──────────────────────────────────────────────────────────────
 # NOT a closed port — a closed port refuses instantly and would prove nothing. This one ACCEPTS
-# the connection and then never answers, which is exactly what a GPU busy with a 12B generation
+# the connection and then never answers, which is exactly what a GPU busy with a small model generation
 # looks like from the harness. Under the old synchronous code every remember() here would block
 # for the full 120-second timeout.
 _srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

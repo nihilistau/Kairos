@@ -36,7 +36,7 @@ python serve.py companion        # boots daemon + gateway; ~2–5 min to a hot p
 ```
 Open http://127.0.0.1:8800/ — it lands on the room. Stop her from the room (the ⏻ in the dock:
 *her only* / *everything* / *kill*) or `python serve.py --stop`. The profile is **positional and
-not optional**: `agent` is the smaller 12B profile, still runnable, not her.
+not optional**: `agent` is the smaller the retired reference model profile, still runnable, not her.
 
 ## What is on, what is off
 
