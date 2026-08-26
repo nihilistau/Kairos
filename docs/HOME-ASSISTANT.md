@@ -247,6 +247,48 @@ in that entry.
 - **Automations referencing entities from failed integrations** disable themselves and come
   back when the integration does.
 
+### Two config faults a long version jump exposes
+
+Neither was caused by the migration. Both had been wrong for months and only became visible
+when a version jump put them in a log somebody finally read — which is the useful thing about
+a big upgrade: it makes silent breakage loud.
+
+**`sensor:` versus `template:`.** A `sensors.yaml` holding a `template:` block, included from
+`configuration.yaml` as `sensor: !include sensors.yaml`. `sensor:` wants a list of *platform*
+configs; handed a mapping whose only key is `template`, Home Assistant reports **"required key
+'platform' not provided"** and drops **every entity in the file**. Here that was three template
+entities missing while all 21 of their source sensors were live and reporting — a shape worth
+recognising, because the symptom points at the entities and the cause is the include key.
+
+Fixing it needs both ends: the include becomes `template: !include sensors.yaml`, **and** the
+file loses its own `template:` header, or the result is `template: template: [...]` and it
+fails differently.
+
+**`panel_iframe` was removed in 2024.6.** What replaced it is a *Webpage dashboard* — a normal
+dashboard whose stored config is `strategy: {type: iframe, url: ...}`. If one already exists,
+the YAML block is just a dead duplicate warning on every config check.
+
+### A 200 that is the wrong page
+
+The Webpage dashboard here pointed at `/radar-pro/index.html` and appeared to work: **HTTP 200,
+6 KB**. It was Home Assistant's own single-page shell — HA answers 200 for unknown paths because
+its frontend does client-side routing, so the iframe was loading Home Assistant inside Home
+Assistant.
+
+Files in `/config/www/` are served from **`/local/`**, so the real path was
+`/local/radar-pro/index.html`. **A 404 would have been easier to diagnose than a 200.** When a
+URL "works" but shows the wrong thing, compare the `<title>`, not the status code.
+
+### Edit line-structured config by walking lines, not with a regex
+
+Stripping the dead `panel_iframe:` block with a regex left an orphan: every alternative in the
+pattern required a trailing newline, the block's last line did not have one, and
+`url: /local/...` survived its own parent — turning `configuration.yaml` into invalid YAML.
+
+A regex over line-structured text has to reason about the end of the file. Walking lines does
+not. Take a backup, make the edit, and **parse the result before restarting** — the parse is
+what turns a mistake into a retry instead of an outage.
+
 ### And check the disk before you start
 
 This migration ran the system drive to **zero bytes free** mid-restore. WSL's ext4 went
