@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.6.3 — mmWave radar, and four silent faults (2026-08-26)
+
+Notes from getting two ESP32 radar nodes working after three abandoned dashboard attempts.
+`docs/HOME-ASSISTANT.md` has them in full. Every fault shared a shape: nothing errored where
+anyone would look.
+
+- **A state longer than 255 characters is discarded.** The firmware's JSON snapshot was 393,
+  so HA logged `falling back to unknown` four times a second and the radar card saw nothing.
+  Rebuild the object in a **template attribute** — attributes have no length limit — and
+  leave the state short.
+- **Units come from measurement, not declarations.** The same device declared speed as `m/s`
+  while reporting `mm/s`, and its distance genuinely was metres while X and Y beside it were
+  millimetres. Thresholds written against the labels never fired, and a threshold that never
+  fires looks exactly like an empty room.
+- **`unique_id` is the identity; `name` is cosmetic.** Reusing one keeps the old
+  `entity_id`, so a renamed sensor reports the right value at the wrong address. Changing
+  one orphans the old entity and the new one settles for `..._2`. Renaming via the registry
+  is the only thing that actually moves an entity.
+- **Give every template an `availability:`**, or an unplugged sensor reports a confident
+  "nobody is here" — the same failure as a stale reading, in a different costume.
+
 ## 0.6.2 — what a long version jump exposes (2026-08-26)
 
 Notes from finishing the migration. None of these were caused by moving to containers; they
