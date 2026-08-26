@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.6.2 — what a long version jump exposes (2026-08-26)
+
+Notes from finishing the migration. None of these were caused by moving to containers; they
+had been wrong for months and only became visible when a version jump put them in a log.
+`docs/HOME-ASSISTANT.md` has them in full.
+
+- **`sensor:` versus `template:`.** A `sensors.yaml` holding a `template:` block, included as
+  `sensor: !include sensors.yaml`. `sensor:` wants *platform* configs, so Home Assistant
+  reports "required key 'platform' not provided" and drops **every entity in the file** —
+  three template entities missing while all 21 of their source sensors were live. Fixing it
+  needs both ends: the include key changes **and** the file loses its own `template:` header.
+- **`panel_iframe` was removed in 2024.6**, replaced by a Webpage dashboard whose stored
+  config is `strategy: {type: iframe, url: ...}`.
+- **A 200 that is the wrong page.** That dashboard pointed at `/radar-pro/index.html` and
+  returned HTTP 200 — Home Assistant's own SPA shell, because HA answers 200 for unknown
+  paths. The iframe was loading HA inside HA. Files in `/config/www/` serve from `/local/`.
+  When a URL "works" but shows the wrong thing, compare the `<title>`, not the status code.
+- **Edit line-structured config by walking lines, not with a regex.** A regex strip left an
+  orphan because its alternatives all required a trailing newline and the last line had none.
+  Back up, edit, and **parse before restarting**.
+
 ## 0.6.1 — migrating an appliance backup into the container stack (2026-08-26)
 
 Done for real, and the notes are what came out of it. `docs/HOME-ASSISTANT.md` has the

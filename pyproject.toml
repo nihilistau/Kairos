@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kairos-companion"
-version = "0.6.1"   # keep in step with CHANGELOG.md — it read 0.1.0 through
+version = "0.6.2"   # keep in step with CHANGELOG.md — it read 0.1.0 through
                     # two releases (fixed 2026-08-25)
 description = "A local-first AI companion framework: durable, auditable memory that never deletes, unprompted speech with reasons, a room UI — against any OpenAI-compatible endpoint on one consumer GPU."
 readme = "README.md"
