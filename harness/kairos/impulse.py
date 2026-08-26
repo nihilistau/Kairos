@@ -96,8 +96,8 @@ class KairosConfig:
     # to be, but because the forward itself reports she had nothing left to say. Re-run
     # the calibration after ANY change to eot_bias, the sampler, or the model.
     #
-    # ── AND EVERY NUMBER ABOVE IS THE 12B's (2026-08-04) ─────────────────────────────
-    # THAT CALIBRATION IS NOT THIS MODEL'S. It was taken on gemma4-12b at eot_bias 4.0.
+    # ── AND EVERY NUMBER ABOVE IS A RETIRED MODEL'S (2026-08-04) ─────────────────────────────
+    # THAT CALIBRATION IS NOT THIS MODEL'S. It was taken on a different, smaller model at eot_bias 4.0.
     # On the model (eot_bias 0.0) the same signal sits at a completely different scale:
     # FINISHED median +13.10 (min +8.96), CUT OFF median -28.43, threshold -18.50 —
     # measured, receipt in harness/tuning/registry.py under kairos.continue_margin.
@@ -105,11 +105,11 @@ class KairosConfig:
     # The paragraph above is kept because the METHOD is the valuable part (search for the
     # operating point that resumes the most cut-offs at zero false positives), but its
     # numbers describe a model this repo no longer serves, and they were sitting here in
-    # the present tense above a dataclass default that carried the 12B value.
+    # the present tense above a dataclass default that carried that retired model's value.
     #
     # `live_config()` overrides this from the registry, so the served path was always
     # correct — but every direct `KairosConfig(...)` inherited -11.75, INCLUDING THE
-    # GATES. G-KAIROS-POLICY passed 12/12 against 12B fixtures precisely because this
+    # GATES. G-KAIROS-POLICY passed 12/12 against fixtures from a retired model precisely because this
     # default agreed with them: two stale things confirming each other, which is the
     # exact failure the gate existed to prevent.
     continue_margin: float = -18.50

@@ -293,11 +293,28 @@ try:
     # for the past to be rewritten. What is asserted is what the DOOR admits from here on:
     # the four refusals added no row, and the two real wants added exactly two.
     _new = [w for w in WD.wants() if w["id"] not in _before]
-    check("the four refusals wrote nothing to the store", len(_new) == 2,
-          [w.get("want", "")[:40] for w in _new])
-    check("...and neither new row is mark-shaped",
-          not [w for w in _new if (w.get("want") or "").strip().startswith("[")],
-          [w.get("want", "")[:40] for w in _new])
+    # ── AMENDED 2026-08-27: A REFUSAL NOW KEEPS THE INTENTION ───────────────────────
+    # This asserted the refusals wrote NOTHING, and it went red the day suggestions
+    # landed — correctly, because the contract changed. What matters was never "no row";
+    # it was "nothing the generator will act on". An improvised mark now files an inert
+    # SUGGESTION (state="suggested", no prompt) so that what she MEANT survives the
+    # refusal, and only `[gesture:"…"]`-style improvisations do — a DECLARED verb
+    # ([WEAR:], [MOOD:]) is machinery and still writes nothing at all. See G-SUGGEST.
+    _asked = [w for w in _new if w.get("state") == "asked"]
+    _sugg = [w for w in _new if w.get("state") == "suggested"]
+    check("the four refusals queued NOTHING generatable", len(_asked) == 2,
+          [w.get("want", "")[:40] for w in _asked])
+    check("...a DECLARED verb still writes nothing whatsoever",
+          not [w for w in _sugg
+               if (w.get("mark_verb") or "") in ("wear", "show", "mood", "voice", "trait")],
+          [w.get("from_mark", "")[:34] for w in _sugg])
+    check("...the improvised one is kept as an inert suggestion, prose not mark",
+          all(not (w.get("want") or "").strip().startswith("[") and not w.get("prompt")
+              for w in _sugg),
+          [(w.get("want", "")[:34], bool(w.get("prompt"))) for w in _sugg])
+    check("...and neither ASKED row is mark-shaped",
+          not [w for w in _asked if (w.get("want") or "").strip().startswith("[")],
+          [w.get("want", "")[:40] for w in _asked])
 
     print("\nG-WARDROBE-QUEUE: %d pass, %d fail" % (PASS, FAIL))
 finally:

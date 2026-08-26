@@ -1,6 +1,6 @@
 """THE NOTE TOOLS — the board, in her hands.
 
-These are written to be CALLED BY A 12B, which means three constraints shaped them, and all
+These are written to be CALLED BY A retired reference model, which means three constraints shaped them, and all
 three were paid for elsewhere in this system:
 
   1. A TOOL WITH NO DOCSTRING IS A TOOL SHE GUESSES AT. The personality tools shipped with
@@ -12,12 +12,12 @@ three were paid for elsewhere in this system:
      for weeks — correct, gated, wired into nothing — so she answered "what is my name?"
      from her persona instead of looking it up. These join default_tools().
 
-  3. FEW TOOLS, OR SHE PICKS BADLY. agent.py's own comment: "a 12B picks reliably and fast
+  3. FEW TOOLS, OR SHE PICKS BADLY. agent.py's own comment: "a small model picks reliably and fast
      from ~6 tools; 14 overwhelms it (it explores and stalls)". So this is FIVE verbs, not
      the eight the feature naturally wants. `add_note` absorbs "remind me" (a note with a
      due date IS a reminder); `find_notes` with no query absorbs "list them all".
 
-AND `due` TAKES ENGLISH. Asking a 12B to emit "2026-07-17T09:00:00Z" is asking for a
+AND `due` TAKES ENGLISH. Asking a small model to emit "2026-07-17T09:00:00Z" is asking for a
 malformed timestamp and a silent no-op reminder. It says "friday", "tomorrow 9am", "in 2
 hours" — the words he used — and the PARSER does the arithmetic, where arithmetic belongs.
 """

@@ -113,6 +113,13 @@ FACTS: Dict[str, ToolFacts] = {
     "skip_track":   ToolFacts("music", "write"),
     "queue_track":  ToolFacts("music", "write", note="adds without interrupting"),
     "read_journal": ToolFacts("memory", "read", note="HER journal — she could not read her own past until now"),
+    # A PLACE OF HER OWN (2026-08-27). NOT the `private-secret` class, which is withheld
+    # at five doors for the operator's credentials — this is the opposite: she reads it,
+    # he can read it, and the nightly journal may draw on one. "Secret" here means SET
+    # ASIDE ON PURPOSE. She was already doing it with nowhere to put it, filing "I just
+    # [redacted]..." as `narration`.
+    "keep_secret":  ToolFacts("memory", "write", note="a thought she means to keep and has not found the moment to say; never fades"),
+    "read_secrets": ToolFacts("memory", "read", note="what she has set aside, newest first"),
     # the shelf (presence modes, 2026-08-22): var/library/, a bookmark per book, never the text
     "enter_mode":          ToolFacts("presence", "write", note="narration / company / lucid, when he asks — her first turn comes right after the reply"),
     "leave_mode":          ToolFacts("presence", "write"),

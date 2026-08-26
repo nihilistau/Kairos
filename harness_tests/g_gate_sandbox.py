@@ -79,6 +79,9 @@ NOT_A_STORE = {
     "SP_PERSONA_DIR": "the persona FRAGMENT directory, read-only (persona.md is covered)",
     "SP_TASK_ROOT": "the task tree; the pk2 gates sandbox it themselves",
     "SP_PROFILE": "a name, not a path",
+    # CACHE is in the suffix list because SP_TTS_CACHE is a real store; this is the
+    # int beside it. The cost of widening a name-based rule is exactly this kind of row.
+    "SP_TTS_CACHE_MAX": "a number of entries, not a path",
 }
 # `SP_DECISIONS` is deliberately absent: it does not match the grep's name shape and it
 # derives from SP_RECALL_REGISTRY when unset, so it is covered by the sandbox already.
@@ -107,10 +110,28 @@ for base, dirs, files in os.walk(os.path.join(ROOT, "harness")):
         if not f.endswith(".py"):
             continue
         src = io.open(os.path.join(base, f), encoding="utf-8", errors="replace").read()
+        # ── THE SUFFIX LIST WAS THE BUG, AND IT IS ONLY HALF FIXED (2026-08-26) ─────
+        # It enumerated ROOT|DIR|TIER|FILE|REGISTRY. `SP_RESEARCH_RECEIPTS` ends in
+        # RECEIPTS, matched nothing, and so the one gate whose job is "no store is left
+        # unsandboxed" could not see that store AT ALL -- while 138 fixture rows piled up
+        # in his live research ledger over a week of green sweeps.
+        #
+        # The suffixes below are widened, and _gate._STORE_ENV now carries the four stores
+        # that were found by hand. THAT IS THE INSTANCE FIXED, NOT THE CLASS: discovery is
+        # still by NAME, and the next store called something nobody guessed will be just as
+        # invisible as this one was.
+        #
+        # Detecting by USE instead -- "the value becomes a path" -- was tried and is the
+        # right idea, but it needs real triage rather than a late-night regex: matching any
+        # SP_* gave 130 hits, a 360-character window gave 42, the read line alone gave 7
+        # good ones plus false positives from wrapped reads. That work is on the ledger
+        # rather than half-landed here, because a guard nobody trusts is worse than one
+        # with a known and written-down blind spot.
+        _SUF = r"ROOT|DIR|TIER|FILE|REGISTRY|RECEIPTS|PINS|CACHE|WORKTREES|LEDGER|STORE"
         found |= set(re.findall(
-            r'environ\.get\(\s*"(SP_[A-Z0-9_]*(?:ROOT|DIR|TIER|FILE|REGISTRY)[A-Z0-9_]*)"', src))
+            r'environ\.get\(\s*"(SP_[A-Z0-9_]*(?:%s)[A-Z0-9_]*)"' % _SUF, src))
         found |= set(re.findall(
-            r'environ\[\s*"(SP_[A-Z0-9_]*(?:ROOT|DIR|TIER|FILE|REGISTRY)[A-Z0-9_]*)"\s*\]', src))
+            r'environ\[\s*"(SP_[A-Z0-9_]*(?:%s)[A-Z0-9_]*)"\s*\]' % _SUF, src))
 covered = set(_gate._STORE_ENV)
 missing = sorted(found - covered - set(NOT_A_STORE))
 check("every store root is either sandboxed or written down as not-a-store",

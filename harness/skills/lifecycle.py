@@ -225,7 +225,7 @@ _PREF_NOUN = re.compile(r"\b(favou?rite|lucky number|preference)\b", re.I)
 #
 #     "I write code"            -> private-secret
 #     "I like the token economy"-> private-secret
-#     "my GPU is a gemma4-12b"  -> private-secret   (hyphenated alnum, >=5 chars)
+#     "my GPU is a legacy-ref-v1"  -> private-secret   (hyphenated alnum, >=5 chars)
 #
 # She would go cagey about her own model name and refuse to discuss his job. Porting a sloppy rule
 # across a seam does not give you one system — it gives you two wrong ones. So this list keys on
@@ -374,6 +374,11 @@ _HALF_LIFE_BY_KIND = {
     "thought":          _NEVER,
     "dream":            _NEVER,
     "chapter":          _NEVER,
+    # A KEEPSAKE DOES NOT FADE (2026-08-27). She sets a `secret_thought` aside ON PURPOSE
+    # — the whole act is "[redacted]" — so decaying it
+    # at the 120-day moment rate would be the system disagreeing with her about what she
+    # meant to keep. Same durability as what she concluded, for the same reason.
+    "secret_thought":   _NEVER,
     "narration":         120.0,
     "spoke_up":          120.0,
     "company":            60.0,

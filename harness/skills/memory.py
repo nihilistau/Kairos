@@ -1770,7 +1770,7 @@ def compact_registry() -> str:
                r.get("live_now", 0), r.get("live_now", 0) + r.get("superseded_total", 0)))
 
 
-# HOT chat set stays curated (the banked ≤6-tools rule: a 12B stalls exploring a big set).
+# HOT chat set stays curated (the banked ≤6-tools rule: a small model stalls exploring a big set).
 # remember_about_self is READY-NOW, not an extra. It is the SELF lane — the one she
 # never had. Leaving it behind a load_tools() call is exactly how she ended up with 404
 # memories of the user and none of herself. count_memories drops to the index tier to

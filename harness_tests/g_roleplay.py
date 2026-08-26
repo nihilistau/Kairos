@@ -1,7 +1,7 @@
 """G-ROLEPLAY — the structure holds, or it is just a prompt.
 
 Anyone can put "you are a character" in a system prompt. That is a sentence, not a
-feature, and a 12B drifts out of it in four turns. What makes this S-tier is that the
+feature, and a small model drifts out of it in four turns. What makes this S-tier is that the
 STRUCTURE is enforced in code, so it cannot be talked out of:
 
   1. she enters ONLY on an explicit ask (not because he said the word "story")

@@ -4,7 +4,7 @@ THE CLASS. Ceilings and tiers died on 2026-08-21 and docs/AVATAR-PIPELINE.md kep
 on `roleplay.max_heat` under a front matter that said they were gone; the Grok CLI was
 replaced by the REST API and two lines kept "shelling out" to it in the present tense;
 three README stubs pointed at a `staging/` that never existed in this repo; AGENTS.md
-said "~54 gates" over 149; and `python serve.py agent` (the 12B) survived in a gate
+said "~54 gates" over 149; and a mistyped profile survived in a gate
 write-up. Each was true once. A doc that describes a retired thing in the present tense
 is the 3am trap AGENTS.md §6 warns about, wearing a different coat.
 
@@ -44,7 +44,7 @@ RETIRED = [
     (re.compile(r"~54"), "2026-08-21", "the gate count is ~150 g_*.py; see GATE-INDEX"),
     (re.compile(r"speechSynthesis"), "2026-08-21", "her voice is the xAI API + the room's speech.js"),
     (re.compile(r"python serve\.py agent(?!-26b)\b"), "2026-08-03",
-     "`agent` is the 12B profile — the live one is companion"),
+     "`agent` is the retired reference model profile — the live one is companion"),
     (re.compile(r"Migration target \(see MIGRATION-MAP\.md\)"), "2026-08-21",
      "the 1-line README stubs were replaced with real orientation files"),
 ]

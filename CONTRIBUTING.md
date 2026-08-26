@@ -1,8 +1,8 @@
 # Contributing to Kairos
 
 Kairos is a **periodically re-exported snapshot** of the engine-agnostic half of
-[shannon-prime-kairos](https://github.com/nihilistau/shannon-prime-kairos) — the living system
-where the operator's own companion runs on the custom engine. `KAIROS-SOURCE.txt` names the
+a private working repository — the living
+system where the author's own companion runs on a custom engine. `KAIROS-SOURCE.txt` names the
 commit each export came from.
 
 - **Issues and PRs are welcome here.** Fixes made in Kairos are cherry-picked back into the

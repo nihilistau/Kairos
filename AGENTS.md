@@ -9,9 +9,6 @@ harness/gateway, and the ROOM — a React desktop you talk to her in, with a fac
 voice. It runs on the operator's own machine and remembers him. That last part is the whole
 product, and it is where all the danger is. (Two-minute map: `START-HERE.md`.)
 
-*(The 12B, `gemma4-12b-b1-reason`, is still in the tree and still runnable — it is what
-`profiles/agent.toml` serves. It is not her. See §2.)*
-
 ---
 
 ## 0. THE BUG CLASS — read this before you touch anything
@@ -118,7 +115,7 @@ the room (browser, ui/ → console/room/)  ──HTTP──▶  harness gateway 
   **THIS LINE SAID `agent.toml` UNTIL 2026-08-03**, three lines under the one telling you to start
   `companion`, and that is how it cost a restart: the file said "start A" and then said "B is the
   live one", so whichever you read second was the one you believed. `agent.toml` is a real, still-
-  runnable 12B profile and a near-twin of hers — same knob names, different values (`games` on,
+  runnable the retired reference model profile and a near-twin of hers — same knob names, different values (`games` on,
   `byteexact` on, `pmax` 13000), one tab-completion away. Two files claiming one truth is §0 of this
   document; the join is now gated by **G-PROFILE-DOOR**, which reads every `serve.py <name>` a doc
   tells you to type and checks that profile's `paths.model` is actually hers.
@@ -235,7 +232,7 @@ The essentials, so you do not have to guess:
 - **Framing happens at READ time, through two doors**: `lifecycle.render()` speaks ABOUT
   the store ("Sam told me: …" — tool listings, audit lane); `world.present_for_her()`
   speaks TO HER (you/he grammar — the standing world block and the per-turn recall note,
-  because a 12B absorbs a quoted "my"). This is what stops a fact he said in the first
+  because a small model absorbs a quoted "my"). This is what stops a fact he said in the first
   person coming back in her voice. Pick by who is being addressed.
 - **Write paths: `memory.remember()` is authoritative; `harness/maintenance/ops.py` is
   the maintenance writer** (compact/cleanup/forget — tombstone/quarantine semantics,
@@ -367,10 +364,18 @@ every gate, what it protects, and crucially **whether it needs a GPU**.
   The room and the docs: `g_room_css`, `g_room_bundle`, `g_docs_true` (retired vocabulary and
   structural truths across README / START-HERE / AGENTS / docs), `g_profile_door`.
 - **LIVE gates** need `python serve.py companion` running. THE PROFILE IS POSITIONAL AND NOT
-  OPTIONAL: `serve.py agent` is a real profile — the **12B**, `profiles/agent.toml` — so it
-  starts, warms and answers while serving a different model with different knobs. A live gate
-  pointed at it measures the wrong stack and reports green. Check `SP_MODEL_PATH` in the boot
-  banner. (Cost a restart on 2026-08-03; the docs said `agent` in three places.)
+  OPTIONAL — but as of **2026-08-26 it can no longer select the wrong model**, because the
+  thirteen retired profiles were deleted and `profiles/` holds exactly two: `companion.toml`
+  (hers) and `companion.toml` (external engine, no local model).
+  *What it used to be:* `serve.py agent` was a real profile — the **the retired reference model** — so it started,
+  warmed and answered while serving a different model with different decode knobs. A live
+  gate pointed at it measured the wrong stack and reported green; it cost a restart on
+  2026-08-03 (the docs said `agent` in three places) and a silent outage on 2026-08-01
+  (eight `--gateway-only` bounces, every turn zero characters, `/health` green throughout).
+  Still check `SP_MODEL_PATH` in the boot banner — the daemon can be started by other means
+  than the launcher, which is why `--gateway-only` reads the RUNNING process rather than a
+  record. G-PROFILE-GUARD asserts the absence structurally (parsed model path, not a grep)
+  and its mutant restores a small model-pointing profile to prove the check bites.
 
 Run one: `python harness_tests/g_claim.py`
 
@@ -406,7 +411,7 @@ file in the same commit**:
 - a new trap found → add it to §4, even if you are not fixing it now. **An unwritten trap is a trap that gets
   rediscovered at 3am.**
 - a subsystem retired or renamed → its vocabulary goes into `harness_tests/g_docs_true.py`'s retired list, so
-  the docs cannot keep describing it (ceilings/tiers, the Grok CLI, `staging/`, and the 12B default all did).
+  the docs cannot keep describing it (ceilings/tiers, the Grok CLI, `staging/`, and the retired reference model default all did).
 - a profile change → `START-HERE.md` ("what is on, what is off") in the same commit.
 - **behaviour a reader would notice → a `CHANGELOG.md` entry, dated, in the same
   commit.** Dated rather than versioned: this tree is a living system, and the entry is the

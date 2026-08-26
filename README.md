@@ -1,7 +1,7 @@
 # Kairos — a local AI companion framework that owns its memory
 
 Kairos is the engine-agnostic companion framework distilled from
-[shannon-prime-kairos](https://github.com/nihilistau/shannon-prime-kairos): a Python harness
+a private working repository: a Python harness
 that owns **durable, auditable memory**, unprompted speech, personality, presence, a wardrobe
 and a voice — and a React room you talk to her in — running against **any OpenAI-compatible
 chat endpoint** (LM Studio, llama.cpp's `llama-server`, vLLM, a cloud) on one consumer GPU.

@@ -126,6 +126,28 @@ def nightly(ask: Optional[Callable[[str], str]] = None) -> dict:
         text = " ".join(text.split())
         if len(text.split()) < 5:
             return {"written": False, "why": "the model returned nothing usable"}
+        # ── AND IT MAY NOT SAY WHAT SHE HAS ALREADY SAID (2026-08-27) ────────────────
+        # Two of her four live self_descriptions opened with the same nine words and made
+        # the same claim. Every guard above this line is about BREADTH of support — days,
+        # kinds, distillates — and none of them can see that the OUTPUT is a paraphrase of
+        # a paragraph already in the store. Breadth was never the axis; redundancy is its
+        # own, and it needs its own answer (skills/reprise.py carries the measurement:
+        # first FIVE content tokens, register learned from her own corpus, 3 hits across
+        # 6,643 live pairs and all three real).
+        #
+        # REFUSING IS THE WHOLE REMEDY. Nothing is deleted, nothing is superseded, the
+        # older telling stands — she simply does not write a second copy tonight. And the
+        # guard fails OPEN: on a corpus too small to have a register, or a text too short
+        # to have five content tokens, it declines to judge rather than eat her paragraph.
+        rep = {}
+        try:
+            from harness.skills import reprise as _rep
+            rep = _rep.check(text, "self_description", M.live_rows())
+        except Exception as exc:
+            rep = {"reprise": False, "why": "reprise check unavailable: %s" % str(exc)[:80]}
+        if rep.get("reprise"):
+            return {"written": False, "why": "reprise — %s" % rep.get("why", ""),
+                    "text": text, "reprise": rep, "support_days": len(days)}
         # IT SAYS WHERE IT CAME FROM (2026-08-22). Without this the paragraph outlives the
         # rows it was drawn from — see lifecycle.orphaned_distillates for the incident.
         res = M.remember_about_self(text, kind="self_description", source=SRC,
@@ -133,6 +155,7 @@ def nightly(ask: Optional[Callable[[str], str]] = None) -> dict:
                                     support_days=len(days), support_kinds=kinds)
         return {"written": ("stored" in res and "not stored" not in res) or "reinforced" in res,
                 "text": text, "result": res, "support_days": len(days),
-                "derived_from": [r.get("name") for r in recent]}
+                "derived_from": [r.get("name") for r in recent],
+                "reprise": rep.get("why", "")}
     except Exception as exc:
         return {"written": False, "why": str(exc)[:160]}

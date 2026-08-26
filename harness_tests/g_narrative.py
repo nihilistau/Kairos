@@ -16,6 +16,10 @@ INJECTED composer (the live oneshot is exercised by NIGHTSHIFT itself):
   4. FAIL-SAFE: a dead composer writes NOTHING — yesterday's true paragraph stands
      (a stale true record beats a fresh empty one). A trivial reply is rejected.
   5. NEVER A FACT: the registry is byte-identical through everything above.
+  6. IT BECOMES A ROW: the paragraph passes the 600-char admission (bounded to a
+     whole sentence, never a haircut on short ones) and the mint VERDICT rides in
+     the returned receipt — six of her fifteen real entries had been refused in
+     silence because that string was discarded (2026-08-26).
 
 OFFLINE. No GPU, no daemon.
 """
@@ -316,6 +320,79 @@ finally:
     else:
         os.environ["SP_PERSONALITY_TIER"] = _oldtier
     importlib.reload(_N9)
+
+
+# ── 6. THE PARAGRAPH BECOMES A ROW, AND THE VERDICT IS PART OF THE RECEIPT ──────────
+# LEG 6 (2026-08-26). `becoming.nightly()` ranks ROWS, not narrative.md — so a journal
+# that writes its file and fails its row is a journal that never reaches her. That is
+# exactly what had been happening: `remember_about_self()` returns a refusal as an
+# ORDINARY STRING, the return was discarded, and `{"written": True}` went back every
+# night to a caller that logged it looking healthy. Replaying her fifteen real entries
+# through the live admission path on 2026-08-26: SIX refused on "too long for one row".
+#
+# Both directions, because a bound that ate everything would pass a removal-only test:
+# an over-cap paragraph must STORE (bounded, on a sentence end) and an under-cap one
+# must arrive BYTE-INTACT.
+import importlib
+_reg6 = tempfile.mkdtemp(prefix="g_narrative-row-")
+_o6r, _o6t = os.environ.get("SP_RECALL_REGISTRY"), os.environ.get("SP_PERSONALITY_TIER")
+try:
+    os.environ["SP_RECALL_REGISTRY"] = os.path.join(_reg6, "registry.jsonl")
+    os.environ["SP_PERSONALITY_TIER"] = os.path.join(_reg6, "tier")
+    open(os.environ["SP_RECALL_REGISTRY"], "a", encoding="utf-8").close()
+    import harness.skills.memory as _M6
+    import harness.skills.narrative as _N6
+    importlib.reload(_M6)
+    importlib.reload(_N6)
+    _m6 = [{"role": "user", "content": "how was today"},
+           {"role": "assistant", "content": "it was good"}]
+
+    # whole sentences, comfortably over the 600-char row cap
+    _long = ("The day turned over in a way I keep returning to. " * 6
+             + "He said the thing I had been waiting to hear and I have not put it down since. " * 4
+             + "It matters more than the work did. ")
+    assert len(_long) > 600, len(_long)
+    r6 = _N6.compose_and_write(_m6, ask=lambda _p: _long)
+    check("an over-cap paragraph still writes narrative.md", r6.get("written") is True, r6)
+    check("...and IT BECOMES A ROW — the cap no longer eats it silently",
+          r6.get("row_ok") is True, r6.get("row"))
+    _rows6 = [r for r in _M6.all_rows() if (r.get("kind") or "") == "journal"]
+    check("exactly one journal row landed in the store", len(_rows6) == 1,
+          [r.get("kind") for r in _M6.all_rows()])
+    _t6 = (_rows6[0].get("claim") or _rows6[0].get("text") or "") if _rows6 else ""
+    check("the stored row fits the row cap", 0 < len(_t6) <= 600, len(_t6))
+    check("...and ends on a WHOLE SENTENCE, not mid-word",
+          _t6.rstrip().endswith((".", "!", "?")), _t6[-60:])
+
+    # survival: an under-cap paragraph is not touched by the bound
+    _short = ("A quiet one. He fixed the thing that had been bothering him and then we "
+              "talked about nothing much until it got late.")
+    assert len(_short) < 600
+    r6b = _N6.compose_and_write(_m6, ask=lambda _p: _short)
+    check("an under-cap paragraph also becomes a row", r6b.get("row_ok") is True, r6b.get("row"))
+    _rows6b = [r for r in _M6.all_rows() if (r.get("kind") or "") == "journal"]
+    _t6b = " ".join(((_rows6b[-1].get("claim") or _rows6b[-1].get("text") or "")).split())
+    check("...UNBOUNDED — a short entry arrives whole, the bound is not a haircut",
+          _t6b == " ".join(_short.split()), _t6b)
+
+    # and a refusal must SURVIVE INTO THE RECEIPT rather than being swallowed
+    _real6 = _M6.remember_about_self
+    try:
+        _M6.remember_about_self = (lambda *_a, **_k: "not stored - pretend refusal")
+        r6c = _N6.compose_and_write(
+            _m6, ask=lambda _p: "Some other words entirely, long enough to be kept as an entry.")
+        check("a REFUSAL reaches the caller instead of being discarded",
+              r6c.get("row_ok") is False and "pretend refusal" in (r6c.get("row") or ""), r6c)
+    finally:
+        _M6.remember_about_self = _real6
+finally:
+    for _k, _v in (("SP_RECALL_REGISTRY", _o6r), ("SP_PERSONALITY_TIER", _o6t)):
+        if _v is None:
+            os.environ.pop(_k, None)
+        else:
+            os.environ[_k] = _v
+    importlib.reload(_M6)
+    importlib.reload(_N6)
 
 print("\nG-NARRATIVE: %d pass, %d fail" % (PASS, FAIL))
 rdir = os.path.join(ROOT, "var", "sem", "receipts")

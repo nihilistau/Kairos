@@ -1,4 +1,4 @@
-"""native.py — Gemma-4-12B-Unified's NATIVE encoder-free audio path (ADR-KAI4).
+"""native.py — the retired reference model-Unified's NATIVE encoder-free audio path (ADR-KAI4).
 
 The model is ENCODER-FREE: 640 raw audio samples (40ms @16k) ARE the audio
 feature; model.embed_audio.embedding_projection [3840,640] maps each frame into
@@ -67,7 +67,7 @@ def encode(pcm: np.ndarray, scale: float | None = None) -> np.ndarray:
     SP_AUDIO_SCALE (default 1.0 = raw projection output).
 
     ── THE GUARD, ADDED 2026-07-31 ────────────────────────────────────────────
-    This projection is [3840, 640] and was extracted from gemma4-12b. When the
+    This projection is [3840, 640] and was extracted from a retired reference model. When the
     stack moved to your model (hidden size 2816, `audio_config: null` — no
     audio embedder in the checkpoint at all) this function carried on emitting
     3840-wide frames, and NOTHING caught it: there was no check here, and the

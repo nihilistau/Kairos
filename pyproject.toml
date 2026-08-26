@@ -29,7 +29,7 @@ harness = "harness.cli.main:main"
 
 [project.urls]
 Homepage = "https://github.com/nihilistau/Kairos"
-Source = "https://github.com/nihilistau/shannon-prime-kairos"
+Source = "https://github.com/nihilistau/Kairos"
 
 [tool.setuptools.packages.find]
 include = ["harness*"]

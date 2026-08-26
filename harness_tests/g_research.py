@@ -29,6 +29,18 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+# ── SANDBOX FIRST (2026-08-26) ────────────────────────────────────────────────────────
+# This gate had no sandbox at all, so `research()` and `discover()` wrote their fixtures
+# into HIS research ledger -- "what is 2+2" and "q", once per sweep run since 2026-08-19,
+# 138 rows sitting next to the things she had actually gone and read. His research panel
+# showed almost nothing but "what is RMSNorm".
+#
+# G-GATE-SANDBOX did not catch it twice over: SP_RESEARCH_RECEIPTS ends in RECEIPTS and
+# its discovery regex enumerated ROOT|DIR|TIER|FILE|REGISTRY, and its "which gates must
+# sandbox" list is eleven files a past audit named by hand -- this was not one of them.
+from _gate import sandbox  # noqa: E402
+sandbox("g_research")      # FIRST, before any harness import can resolve a path
+
 os.environ["SP_RESEARCH"] = "1"
 
 from harness.skills import research as R  # noqa: E402

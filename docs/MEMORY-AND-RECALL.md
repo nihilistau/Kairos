@@ -367,7 +367,7 @@ decline unreachable; the guard must fire, not evaporate.
 `lifecycle.render()` (below) speaks ABOUT the store — the tool listings and the audit
 lane ("Sam told me: …"). `world.present_for_her()` speaks TO HER — the standing world
 block and the per-turn recall note, in you/he grammar ("You've come to think: …"),
-because a 12B skims a quoted "my" and absorbs it (the field bug in `world.py`'s own
+because a small model skims a quoted "my" and absorbs it (the field bug in `world.py`'s own
 comments). `recall()` and `spine.recall_decider` use `present_for_her`;
 `list_memories`/`provenance`/audit use `render()`. Same row, two grammars, chosen by WHO
 is being addressed — a surface that picks the wrong one recreates the identity blur.
@@ -481,7 +481,7 @@ the tree.** The engine's `recall.rs::classify_mem_class` (`recall.rs:164`) is a 
 implementation from the harness's `lifecycle.classify()` (`lifecycle.py:245-265`), and they do
 not agree — porting the engine's rule (bare `code`/`token`/`secret`/`override`, plus any token
 with >=2 letters and >=2 digits) into the harness verbatim would flag "I write code" and the
-model name "gemma4-12b" as secrets, so the harness deliberately keeps its own, narrower,
+a hyphenated model name as a secret, so the harness deliberately keeps its own, narrower,
 credential-noun-in-attribute-position rule instead. `self_model.py`'s delivery map
 (`_CLASS_DELIVERY`, `self_model.py:47`, default `mem_class="self-fact"` at `self_model.py:54`)
 and `curator.py`'s hardcoded `"mem_class: persona"` (`curator.py:70`) are two more independent

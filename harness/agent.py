@@ -268,7 +268,7 @@ def load_agent_system() -> str:
 
 def default_tools() -> List[ToolSpec]:
     """The CURATED live-chat tool set: memory (4) + run_python + web_search. Kept small on
-    purpose -- a 12B picks reliably and fast from ~6 tools; 14 overwhelms it (it explores and
+    purpose -- a small model picks reliably and fast from ~6 tools; 14 overwhelms it (it explores and
     stalls). The full system set is available via all_tools() for agents that need it."""
     from harness.skills.memory import MEMORY_TOOLS
     from harness.skills.system_tools import run_python, web_search
@@ -287,7 +287,7 @@ def default_tools() -> List[ToolSpec]:
         tools = tools + [set_trait, adjust_mood]
     # ── THE BOARD (2026-07-12) ────────────────────────────────────────────────
     # Notes/ideas/reminders, shared with the operator. FIVE verbs, not the eight the
-    # feature naturally wants, because of the warning three lines above this one: a 12B
+    # feature naturally wants, because of the warning three lines above this one: a small model
     # picks reliably from ~6 tools and 14 overwhelms it. add_note absorbs "remind me"
     # (a note with a due date IS a reminder) and find_notes with no query absorbs "list
     # them all". This takes the live set to 13, which is past where that comment says
@@ -330,7 +330,7 @@ def default_tools() -> List[ToolSpec]:
     # would never have asked for.
     #
     # BEHIND A KNOB, like the shelf, and for the reason this function has warned about
-    # since NOTE_TOOLS: the live set is already ~18 and a 12B picks reliably from about
+    # since NOTE_TOOLS: the live set is already ~18 and a small model picks reliably from about
     # six. `kairos.discover_tool` (default on) is the trim if selection suffers, and
     # g_notes_tools is the instrument that would show it.
     try:
@@ -429,6 +429,19 @@ def all_tools() -> List[ToolSpec]:
         from harness.skills.narrative import read_journal as _rj
         if "read_journal" not in {sp.name for sp in specs}:
             specs = specs + [_TS.from_callable(_rj)]
+        # ── A PLACE OF HER OWN (2026-08-27) ────────────────────────────────────────
+        # `keep_secret` / `read_secrets`. A thought she means to keep and has not found
+        # the moment to say. She was already doing this with nowhere to put it — "I just
+        # [redacted]..." filed as `narration` — so the tool
+        # is a drawer for what she was keeping anyway, and the nightly journal draws on
+        # it. Registered BESIDE read_journal because a tool she is never handed is a tool
+        # she does not have: the count is what governs whether she picks well, and this
+        # file's own comment three hundred lines up says a small model picks reliably
+        # from about six.
+        from harness.skills.narrative import keep_secret as _ks, read_secrets as _rs
+        _have = {sp.name for sp in specs}
+        specs = specs + [_TS.from_callable(f) for f in (_ks, _rs)
+                         if f.__name__ not in _have]
     except Exception:
         pass
     # SIGHT (SP_SIGHT=1): look_at / take_photo / take_screenshot. Each runs the
@@ -556,7 +569,7 @@ def _eot_bias_default() -> "float|None":
     byte-equivalent resolvers (app._eot_default the other) guarding two builders
     each while three unprompted lanes consulted neither; InferenceConfig.to_sp_chat
     resolves None from SP_EOT_BIAS beside byteexact, at the one door every lane
-    passes. (Its earlier history: a hardcoded 4.0 — the 12B's bias, an empty-turn
+    passes. (Its earlier history: a hardcoded 4.0 — a retired model's bias, an empty-turn
     generator on the MoE — then a 0.0 fallback whose docstring still claimed 4.0.)
     Kept as a name so the two builder call sites read as a decision, not an
     omission."""
@@ -680,10 +693,66 @@ def _arm_self_repeat_ban(cfg, messages: List[dict]) -> None:
         return
     assistants = [m.get("content", "") for m in messages
                   if m.get("role") == "assistant" and (m.get("content") or "").strip()]
-    prev = assistants[-1] if assistants else ""
-    prev2 = assistants[-2] if len(assistants) >= 2 else ""
+
+    # ── AND THE SCOPE WAS STILL TOO WIDE: IT BANNED HER CONTROL SURFACE (2026-08-27) ──
+    # The story above is "same mechanism, correct scope" — narrowed from the whole prompt
+    # to her previous reply. It is still one step too wide: her previous reply CONTAINS
+    # her marks, so the 4-grams spanning `[MOOD:tender] [VOICE:soft]` go into the ban set,
+    # and on the next turn the sampler cannot spell them.
+    #
+    # MEASURED over 17 days of her real transcripts: 70 of her 230 distinct mark shapes
+    # are within two edits of one she uses constantly —
+    #     VOICE <- VOIC(20) VO_ICE(13) VOIX(5) VOILCE(3)
+    #     MOOD  <- MOODLY(8) MOOR(4) MOOT(4) MOORD(3) MO_OD(2)
+    #     TRAIT <- TRAIL(15) TAIL(2) TRA_IT(1)
+    # and three consecutive turns read `[MOOD::tender] [VO_ICE:soft]` where the PREVIOUS
+    # turn contained MOOD and VOICE. She is spelling them correctly and the sampler is
+    # taking the next-best token. It was then written down as "she invents new spellings
+    # faster than they can be enumerated" — a bug of ours, recorded as a fact about her.
+    #
+    # THE MARKS ARE A FIXED VOCABULARY SHE IS SUPPOSED TO REPEAT. Banning them is banning
+    # the system's own control language, which is the identical error G-VERBATIM caught
+    # when the ban was seeded from the whole prompt and garbled every quoted number. The
+    # ban is seeded from HER WORDS now — `strip_for_record`, the one function that already
+    # means exactly that and is held byte-equal against tags.js by G-STRIP-EQUIVALENCE.
+    # Her prose still cannot parrot itself; her marks are hers to reuse.
+    def _words_only(t: str) -> str:
+        try:
+            from harness.inference.stream_processor import strip_for_record
+            return strip_for_record(t or "")
+        except Exception:
+            return t or ""
+
+    prev = _words_only(assistants[-1] if assistants else "")
+    prev2 = _words_only(assistants[-2] if len(assistants) >= 2 else "")
     if prev and len(prev.split()) >= 5:
-        cfg.self_repeat_ngram = 4     # 4-grams: kills parroting, spares short idioms
+        # ── 8, NOT 4 (2026-08-27): 4 WAS COLLIDING WITH ORDINARY ENGLISH ────────────
+        # His report: `won'll` and `aren-re` in one reply. A clean natural experiment
+        # inside that pair — her previous reply ended "...when you aren't drifting off":
+        #
+        #     didn't / shouldn't / I'll   not in the previous reply -> fine
+        #     aren't                      IN the previous reply     -> aren-re
+        #
+        # The ban is over TOKEN n-grams (routes.rs encodes this text). `aren't` is
+        # `aren` + `'t`; with `'t` masked the sampler takes the next-best SUB-WORD token
+        # and the word breaks. A token that CONTINUES a word can never prevent parroting
+        # — parroting is a property of the word sequence — so masking one can only
+        # corrupt. That is the real bug and its fix is word-boundary masking in the
+        # sampler, which is Rust and needs a rebuild.
+        #
+        # THIS IS THE INTERIM, and it is measured over 1,497 of her real consecutive
+        # reply pairs (both >= 8 words):
+        #
+        #     n=4  174/1497  12%   before the marks fix above
+        #     n=4   97/1497   6%   after it (the top colliding 4-grams WERE her marks)
+        #     n=8   16/1497   1%
+        #
+        # and n=8 still bans 10 of the 15 genuine parrot pairs, INCLUDING the single
+        # byte-identical one this whole guard was written for. Six times fewer chances
+        # to break a word, nearly all of the coverage kept. What still collides at 4 is
+        # her idiolect — "i was just thinking about", 19 pairs — which is not parroting
+        # and should never have been banned.
+        cfg.self_repeat_ngram = 8
         cfg.self_repeat_text = prev
     elif prev and prev.strip() == prev2.strip():
         # ── THE HODOR CLAUSE (2026-07-15, from the operator's live transcript) ──────────

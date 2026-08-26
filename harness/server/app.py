@@ -847,6 +847,16 @@ def _gen_now_start(body: Dict[str, Any]) -> Dict[str, Any]:
                 w = next((x for x in WD.wants() if x["id"] == want_id), None)
                 if w is None:
                     _GEN_JOB["last"] = "no want with id %s" % want_id
+                elif (w.get("state") or "") == "suggested":
+                    # ── A SUGGESTION IS NOT A QUEUE ITEM (2026-08-27) ───────────────
+                    # run_wants() is protected by `wants(state="asked")`, but this path
+                    # fetches BY ID and never looked at state — so a suggestion id sent
+                    # here would have spent an image on something he had not accepted,
+                    # walking straight past the guard. That is the §0 shape: an invariant
+                    # enforced on the sweep path and not on the by-id path is enforced on
+                    # neither. Accepting is a decision and it has its own door.
+                    _GEN_JOB["last"] = ("%s is a suggestion, not an accepted want — "
+                                        "accept it first" % want_id)
                 else:
                     ok = gen.gen_want(w)
                     _GEN_JOB["done"] = int(bool(ok))
@@ -3045,7 +3055,7 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
     # The first cut of this block injected top_p=0.95 and top_k=40 as DEFAULTS. Those two
     # had never been sent on this path at all: InferenceConfig leaves them None, None is
     # omitted from the daemon payload, and the daemon used its own. The numbers came off
-    # console/index.html's input boxes, which are the 12B's tuning.
+    # console/index.html's input boxes, which are a retired model's tuning.
     #
     # This is the eot_bias bug, exactly, five days later: a decode default that belongs
     # to another model, injected into a path that had been letting the daemon decide. The
@@ -3971,9 +3981,9 @@ def _prewarm() -> None:
             # The preamble KV is the thing whose DETAIL matters (persona, hardware,
             # tool names). It is ALWAYS prefilled byte-exact, whatever the serving
             # regime — float-prefilling it is what produced "Kairos-15 / RTX 3067".
-            # ── AND THESE WERE THE 12B's (2026-08-04) ────────────────────────
+            # ── AND THESE WERE A RETIRED MODEL'S (2026-08-04) ────────────────────────
             # `eot_bias=4.0` and `byteexact=True` were hardcoded here, bypassing both
-            # `_eot_default()` and the profile. 4.0 is the 12B's bias — on this MoE it
+            # `_eot_default()` and the profile. 4.0 is a retired model's bias — on this MoE it
             # makes the first sampled token a stop — and byteexact is `false` in the live
             # profile because the MoE FFN seam refuses it outright. This runs on EVERY
             # boot (76 s, and it mints the prefix every warm turn then restores from), so
@@ -4576,6 +4586,25 @@ def _run_stdlib(host: str, port: int) -> None:
                 self.send_response(200 if res.get("ok") else 400); _cors(self)
                 self.send_header("Content-Type", "application/json"); self.end_headers()
                 self.wfile.write(payload)
+            elif self.path == "/v1/wardrobe/want/accept":
+                # ── THE ONLY DOOR FROM SUGGESTION TO QUEUE (2026-08-27) ──────────────
+                # An improvised mark she wrote — `[gesture:"kneeling/leaning forward"]` —
+                # is refused as a garment and kept as an inert suggestion. This is where
+                # it becomes a want, and it is HIS click: the prompt is composed here, so
+                # nothing generatable exists until he says so. Dismiss needs no new route;
+                # `/v1/wardrobe/want/dismiss` is already his broom for the whole queue.
+                body = self._body()
+                try:
+                    from harness.control import wardrobe as _WDa
+                    wid = (body.get("id") or "").strip()
+                    res = (_WDa.accept_suggestion(wid, by=str(body.get("by") or "him"))
+                           if wid else {"ok": False, "error": "no id"})
+                except Exception as exc:
+                    res = {"ok": False, "error": str(exc)[:200]}
+                payload = json.dumps(res).encode()
+                self.send_response(200 if res.get("ok") else 400); _cors(self)
+                self.send_header("Content-Type", "application/json"); self.end_headers()
+                self.wfile.write(payload)
             elif self.path == "/v1/wardrobe/want/dismiss":
                 # take a want off the list (row kept, state=dismissed) — his broom
                 body = self._body()
@@ -4971,12 +5000,12 @@ def _run_stdlib(host: str, port: int) -> None:
                                         "harness.inference.backends", fromlist=["x"]).supports("warm"),
                                     "engine": _engine_info(),
                                     "daemon": get_client().health()},
-                # THE LABEL THAT LIED (2026-07-29): the console hardcoded "gemma-4-12B"
+                # THE LABEL THAT LIED (2026-07-29): the console hardcoded "the retired reference model"
                 # in its reply header, so a whole field session against the model was
-                # attributed to the 12B — and read back as 12B behaviour. The name comes
+                # attributed to the wrong model — and read back as that model's behaviour. The name comes
                 # from the ONE authority that cannot be stale: the container serve.py
                 # actually loaded. Not a config default, which is what the Flask
-                # fallback's /v1/models uses and why it still says gemma4-12b-b1.
+                # fallback's /v1/models uses and why it still names a retired model.
                 "/v1/models": _models_json,
                 "/v1/voice/status": _voice_status,   # ADR-KAI4: ear device/artifacts state
                 "/v1/voice/corpus": _voice_corpus,   # ADR-KAI4 P1.6: sentences to read for training

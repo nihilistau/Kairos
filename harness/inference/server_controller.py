@@ -37,7 +37,7 @@ class DaemonSpec:
     host: str = "127.0.0.1"
     binary: str = "sp-daemon"
     backend: str = "cuda"           # cuda | cpu | hex | vulkan
-    kvdecode: bool = True           # required for the 12B resident decode
+    kvdecode: bool = True           # required for the resident-cache decode path
     decode_int8: bool = True        # tied full-vocab head materialization
     recall_registry: str = ""       # SP_RECALL_REGISTRY (autonomous recall)
     wc_head: str = ""               # SP_B3_WC deploy blob

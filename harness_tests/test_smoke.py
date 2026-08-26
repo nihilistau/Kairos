@@ -90,7 +90,7 @@ def test_ephemeral_tool_call_parsing():
 
 def test_sse_gateway_chunk_format():
     from harness.server.app import _chunk
-    chunk = _chunk("hello", "gemma4-12b-b1")
+    chunk = _chunk("hello", "legacy-ref-b1")
     assert chunk.startswith("data: ")
     assert "chat.completion.chunk" in chunk
 

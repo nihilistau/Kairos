@@ -69,7 +69,8 @@ def check(name, cond, detail=""):
 
 from harness.inference.stream_processor import (is_tag_name,  # noqa: E402
                                                 strip_control_surfaces as S,
-                                                strip_tags as T)
+                                                strip_tags as T,
+                                                strip_for_record as _SFR)
 from harness.personality.interceptor import _MOOD, _TRAIT, _VOICE  # noqa: E402
 
 
@@ -408,6 +409,41 @@ check("...and the chip is rendered whether or not she moved",
       "ev.persona.changed ? ' moved' : ''" in chat and "'unchanged'" in chat)
 check("...with her mood never cut mid-word", ".slice(0, 40)" not in chat.split("act-persona")[1][:600])
 
+
+# ── NO INDENT WHERE THE MARK WAS (2026-08-27, his report) ────────────────────────────
+# A mark removed from the head of a line leaves ONE space — the run-collapser only eats
+# runs of two or more, and `.strip()` only ever touched the ends of the whole reply. The
+# room renders her turn with `white-space: pre-wrap`, so that single orphan is an INDENT
+# on every paragraph she opens with a mark, which is most of them. The mark did not leak;
+# its hole did.
+#
+# BOTH DIRECTIONS. A trim that ate paragraph breaks would pass a no-indent check and
+# would be far worse: her replies are paragraphed on purpose and pre-wrap is what renders
+# them. Equivalence with tags.js does not cover this — both lanes could be equally wrong,
+# and were.
+print("\n%d. A REMOVED MARK LEAVES NO INDENT, AND NO PARAGRAPH IS EATEN" % (_SEC := 99))
+_raw = ('[MOOD:contented] [VOICE:soft] "Not exactly \'productive\'." Honestly? I drifted.\n\n'
+        '[MOOD:warm] But mostly, I sat here thinking about *us*.\n\n'
+        '   [VOICE:soft] About that bridge we discussed.\n'
+        '[WEAR:lace-set]   \n\n\n'
+        'And then the light changed.')
+_out = _SFR(_raw)
+_lines = _out.split("\n")
+check("no line begins with whitespace", not any(l[:1] in (" ", "\t") for l in _lines),
+      [l[:14] for l in _lines if l[:1] in (" ", "\t")])
+check("no line ends with whitespace", not any(l[-1:] in (" ", "\t") for l in _lines if l),
+      [l[-14:] for l in _lines if l and l[-1:] in (" ", "\t")])
+check("...and her paragraphs SURVIVE — four of them", len([l for l in _lines if l.strip()]) == 4,
+      _lines)
+check("...separated by exactly one blank line, never three", "\n\n\n" not in _out,
+      repr(_out[-60:]))
+check("...and her words are untouched",
+      "Honestly? I drifted." in _out and "thinking about *us*." in _out
+      and "And then the light changed." in _out, _out[:70])
+# INTERIOR spacing is hers: a single space between words must not be collapsed away by a
+# per-line trim that reached too far.
+check("a single interior space is still a single interior space",
+      "sat here thinking" in _out, _out)
 print("\nG-MARKS-LEAK: %d pass, %d fail" % (PASS, FAIL))
 rdir = os.path.join(ROOT, "var", "sem", "receipts")
 os.makedirs(rdir, exist_ok=True)

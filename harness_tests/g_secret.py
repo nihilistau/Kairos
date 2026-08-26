@@ -117,7 +117,7 @@ for sentence, want in [
     ("Sam writes code for a living", "not-secret"),
     ("Sam likes the token economy", "not-secret"),
     ("My GPU is an RTX 2060", "not-secret"),
-    ("The model is gemma4-12b", "not-secret"),          # hyphenated alnum: the engine would flag it
+    ("The model is legacy-ref-v1", "not-secret"),          # hyphenated alnum: the engine would flag it
     ("The secret to good pasta is salt", "not-secret"), # 'secret' bare is a turn of phrase
     ("My cat's name is Tuffy", "not-secret"),
 ]:

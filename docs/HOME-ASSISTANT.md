@@ -351,6 +351,42 @@ As `input_number` helpers on the dashboard it can be calibrated the only honest 
 in the doorway and watch the live coordinates while nudging the bounds. All three targets
 are tested, because the radar renumbers them as people move.
 
+### Ask the database which entities are filling it
+
+A 964 MB recorder database, and **one entity was 88.5% of it**: 3,449,284 rows for the
+LD2450's `target_snapshot`. That is the sensor whose state is 393 characters against Home
+Assistant's 255-character limit — so it had **never once held a value**. Inspected before
+anything was deleted: 3,449,271 rows of the literal string `'unknown'`, twelve
+`'unavailable'`, and **zero rows holding a reading**, four times a second since April.
+
+The entity that prompted the clean-up was a different one — `still_energy`, reporting a 3–6%
+noise floor at 7,655 rows a day. Real, worth excluding, and **450 times smaller**. Filtering
+what you happened to notice is not the same as filtering what is there:
+
+```sql
+SELECT m.entity_id, COUNT(*) n FROM states s
+JOIN states_meta m ON m.metadata_id = s.metadata_id
+GROUP BY m.entity_id ORDER BY n DESC LIMIT 20;
+```
+
+Result: `recorder.exclude` for both, `recorder.purge_entities` with `keep_days: 0`, then a
+**VACUUM**. Rows 3,897,939 → 441,630; file **964 MB → 311 MB**, reclaimed in three seconds.
+
+**A purge does not shrink the file.** SQLite keeps the freed pages, so the 964 MB stayed 964
+MB until the vacuum — the same shape as a WSL disk that grows and never shrinks. Do it with
+Home Assistant stopped; VACUUM wants the file to itself.
+
+**And exclude the sensor, not just the rows.** The entity was already disabled, but a
+disabled entity can be re-enabled by anyone poking at the UI, and then it starts again at
+four rows a second. The `recorder:` block is what makes that harmless.
+
+### `purge_keep_days` defaults to ten
+
+Worth knowing the moment anything depends on history. The default nightly purge keeps **ten
+days** and nothing else, so a history browser looking back further will find the window
+quietly closing behind it. Five months of data survived here only because the instance had
+been switched off and the nightly purge never ran.
+
 ### And check the disk before you start
 
 This migration ran the system drive to **zero bytes free** mid-restore. WSL's ext4 went

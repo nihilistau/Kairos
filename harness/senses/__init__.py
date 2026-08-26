@@ -7,7 +7,7 @@ One rule organises this package, and it is the lesson of 2026-07-31:
 `capability.py` rules from a committed table on what the live checkpoint can
 receive, and every encoder asks it before producing a single frame. An encoder
 whose projection is the wrong width for the served model REFUSES. That is not
-defensive coding; it is the fix for a real defect in which a 12B audio
+defensive coding; it is the fix for a real defect in which a retired model's audio
 projection survived a swap to a 26B that has no audio path at all, and neither
 the harness nor the daemon noticed, because each checked only that the frames
 agreed with THEMSELVES.

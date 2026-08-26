@@ -50,7 +50,7 @@ def check(name, ok, detail=""):
 
 def main() -> int:
     print("G-KAIROS-POLICY - silence is the default; speech is earned.\n")
-    # THE MARGINS BELOW ARE THIS MODEL'S. They were the 12B's (+2.01 finished, -14.8
+    # THE MARGINS BELOW ARE THIS MODEL'S. They were the retired reference model's (+2.01 finished, -14.8
     # cut off) and this gate passed 12/12 with them — because KairosConfig's dataclass
     # default was ALSO still -11.75, so the fixtures and the code under test were stale
     # together and agreed. Correcting the default alone took it to 8/12. Two wrong things

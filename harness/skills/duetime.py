@@ -5,7 +5,7 @@ Friday", the store holds due_at="", nothing ever comes due, and he finds out by 
 thing. So this parser has exactly one rule — IF IT CANNOT READ THE TIME, IT SAYS SO, and
 the tool refuses the note rather than pinning a promise it cannot keep.
 
-Why not make the model emit ISO8601? Because asking a 12B for "2026-07-17T09:00:00Z" is
+Why not make the model emit ISO8601? Because asking a small model for "2026-07-17T09:00:00Z" is
 asking for an off-by-one year, a dropped timezone, or a plausible-looking string that is
 silently wrong — and there is no way to tell the difference downstream. The model is good
 at hearing "friday"; a computer is good at knowing what date Friday is. Let each do its

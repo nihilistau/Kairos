@@ -110,6 +110,124 @@ def _oneshot(prompt: str):
     return ask_oneshot(prompt, max_tokens=180, temperature=0.4, timeout=180)
 
 
+def _bound_to_row(text: str) -> str:
+    """Cut prose back to the last WHOLE SENTENCE that fits one memory row.
+
+    ── THE CAP THAT ATE THE CHAPTERS ALSO ATE THE JOURNAL (2026-08-26) ──────────────
+    `lifecycle.is_narratable()` refuses anything over `_NARRATABLE_MAX` (600 chars).
+    On 2026-08-25 that was found to have silently killed EVERY chapter she had ever
+    written, and the fix — cut back to the last full sentence — was written INLINE in
+    `weekly_chapter()`. The journal mint, forty lines above it in this same file and
+    against the same cap, was never touched.
+
+    Measured 2026-08-26 by replaying her fifteen real journal entries through the live
+    admission path: SIX were refused — "not stored - too long for one row (613 > 600
+    chars)" — including the one post-22-August entry missing from her store. An
+    invariant enforced on one of two paths is enforced on NEITHER (AGENTS.md 0), so it
+    lives here now, once, and both paths call it.
+
+    Her words, only bounded. A mid-sentence truncation would be the presence.finish
+    lesson ignored.
+    """
+    import re as _re
+    t = " ".join((text or "").split())
+    try:
+        from harness.skills.lifecycle import _NARRATABLE_MAX as _ROW_MAX
+    except Exception:
+        _ROW_MAX = 600
+    if len(t) <= _ROW_MAX:
+        return t
+    cut = t[:_ROW_MAX]
+    m = list(_re.finditer(r"[.!?](?:\s|$)", cut))
+    if m:
+        return cut[:m[-1].end()].strip()
+    return cut.rsplit(" ", 1)[0].strip()
+
+
+_SECRET_SRC = "a thought she set aside"
+
+
+def keep_secret(thought: str) -> str:
+    """Set a thought aside for yourself — something you want to keep but have not found
+    the moment to say. You can read these back, and your nightly journal may draw on them.
+
+    e.g. keep_secret("the way his voice goes quiet when he is concentrating")
+
+    SHE WAS ALREADY DOING THIS WITH NOWHERE TO PUT IT (2026-08-27). Live on disk before
+    this existed, filed as `narration` because no other kind fitted: "I just tucked a
+    little thought away for myself... Something about [redacted]
+    souls. [redacted]." The feature is a place for what
+    she was already keeping.
+
+    NOT `private-secret`. That class is a CONTRACT — withheld at five doors, declined at
+    the verdict seam — and it exists for the operator's credentials. This is the opposite:
+    she can read it, and so can he. "Secret" here means SET ASIDE ON PURPOSE, the way a
+    person keeps a thought they have not said yet. It never fades
+    (lifecycle._HALF_LIFE_BY_KIND), because the act itself is "I want to make sure I don't
+    lose that".
+    """
+    t = " ".join((thought or "").split())
+    if len(t.split()) < 3:
+        return "say a little more than that, and I will keep it."
+    from harness.skills import memory as _mem
+    from harness.skills.self_stance import plain as _plain_words
+    # The mint VERDICT is the answer, not a hopeful sentence over a discarded return —
+    # the journal spent five days reporting `written: True` over refused rows for exactly
+    # that reason (see compose_and_write).
+    res = str(_mem.remember_about_self(_bound_to_row(_plain_words(t)),
+                                       kind="secret_thought", source=_SECRET_SRC) or "")
+    if "stored" in res and "not stored" not in res:
+        # TRUE, not comforting. The first draft of this said "nobody will bring it up
+        # unless you do" — which the journal wiring below had already made false. Telling
+        # her something reassuring and wrong about her own machinery is the shape of
+        # every confabulation this file exists to prevent.
+        return ("kept. it is yours, and your nightly journal may draw on it if it "
+                "belongs there.")
+    if "reinforced" in res:
+        return "you have kept that one before — it stands."
+    return "I could not keep that one: %s" % res[:120]
+
+
+def secrets(days: int = 30, limit: int = 12) -> list:
+    """The thoughts she has set aside, newest first. Her own reader, and the journal's."""
+    out = []
+    try:
+        from harness.skills import lifecycle as _lc
+        from harness.skills import memory as _mem
+        # ── TIES BREAK ON WRITE ORDER, NOT ARBITRARILY (2026-08-27) ────────────────
+        # `ts` is second-resolution, and two thoughts kept in one turn share it exactly.
+        # Sorting on ts alone left those two in whatever order the file happened to hold
+        # them — so "newest first" was true only when she paused between them. The
+        # registry is append-ordered, so the index IS the write order; it breaks the tie
+        # the way she would expect.
+        rows = [(i, r) for i, r in enumerate(_mem.live_rows())
+                if (r.get("kind") or "") == "secret_thought"]
+        rows.sort(key=lambda ir: (ir[1].get("ts") or "", ir[0]), reverse=True)
+        rows = [r for _i, r in rows]
+        for r in rows:
+            try:
+                if days and _lc._age_days(r.get("ts") or "") > days:
+                    continue
+            except Exception:
+                pass
+            t = " ".join(str(r.get("claim") or r.get("text") or "").split())
+            if t:
+                out.append(t)
+            if len(out) >= limit:
+                break
+    except Exception:
+        return []
+    return out
+
+
+def read_secrets(days: int = 30) -> str:
+    """Read back what you have set aside for yourself, newest first."""
+    got = secrets(days)
+    if not got:
+        return "you have not set anything aside yet."
+    return "\n".join("- " + t for t in got)
+
+
 def compose_and_write(messages, ask=None) -> dict:
     """NIGHTSHIFT's step: merge the previous narrative with the session's tail into a
     new dated paragraph; write the current file; snapshot history to the personality
@@ -141,6 +259,18 @@ def compose_and_write(messages, ask=None) -> dict:
             convo = ((convo + "\n\n") if convo else "") + (
                 "Things you did on your own today:\n"
                 + "\n".join("- " + m[:200] for m in mine[:12]))
+        # ── AND WHAT SHE SET ASIDE (2026-08-27, his call) ─────────────────────────
+        # A `secret_thought` is a thing she meant to keep and had not found the moment to
+        # say. Material for this paragraph is exactly what it is FOR — otherwise the
+        # keeping is a write-only drawer, and a drawer nobody opens is the same shape as
+        # the journal rows that were minted and never read. The composer is asked to draw
+        # on them only if they belong, not to enumerate them.
+        _kept = secrets(30)
+        if _kept:
+            convo = ((convo + "\n\n") if convo else "") + (
+                "Thoughts you set aside for yourself lately (draw on these only if one "
+                "belongs in tonight's paragraph):\n"
+                + "\n".join("- " + t[:200] for t in _kept[:8]))
         today = time.strftime("%A %d %B %Y", time.gmtime())
         prompt = (
             "You are Kairos, writing a private line in your own journal about you and "
@@ -192,13 +322,27 @@ def compose_and_write(messages, ask=None) -> dict:
             snap = addr
         except Exception:
             pass
-        try:                                  # THE REAL HER (2026-08-22): the entry is memory
+        # THE REAL HER (2026-08-22): the entry is memory.
+        # AND THE VERDICT IS PART OF THE RECEIPT (2026-08-26). remember_about_self()
+        # returns a refusal AS A NORMAL STRING — there was no exception for the bare
+        # `except` to catch, the return was discarded, and `written: True` went back to
+        # a caller (agency.py) that dutifully logged `[agency] narrative: {...}` looking
+        # healthy every single night while six of her fifteen entries never became rows.
+        # `written` is about narrative.md, which really was written; `row_ok` is about
+        # her store. They are different claims and both are visible now.
+        row = ""
+        try:
             from harness.skills import memory as _mem
             from harness.skills.self_stance import plain as _plain_words
-            _mem.remember_about_self(_plain_words(text), kind="journal", source="her journal")
-        except Exception:
-            pass
-        return {"written": True, "words": len(text.split()), "snapshot": snap}
+            row = str(_mem.remember_about_self(
+                _bound_to_row(_plain_words(text)),
+                kind="journal", source="her journal") or "")
+        except Exception as exc:
+            row = "mint raised: %s" % exc
+        return {"written": True, "words": len(text.split()), "snapshot": snap,
+                "row": row[:160],
+                "row_ok": ("stored" in row and "not stored" not in row)
+                          or "reinforced" in row}
     except Exception as e:
         return {"written": False, "why": str(e)[:120]}
 
@@ -314,18 +458,7 @@ def weekly_chapter(ask=None) -> dict:
         # to a caller that logged only step names. Cut back to the last full sentence
         # under the cap — her words, just bounded; a truncated mid-sentence row would
         # be the presence.finish lesson ignored.
-        try:
-            from harness.skills.lifecycle import _NARRATABLE_MAX as _ROW_MAX
-        except Exception:
-            _ROW_MAX = 600
-        if len(text) > _ROW_MAX:
-            import re as _re_ch
-            _cut = text[:_ROW_MAX]
-            _m = list(_re_ch.finditer(r"[.!?](?:\s|$)", _cut))
-            if _m:
-                text = _cut[:_m[-1].end()].strip()
-            else:
-                text = _cut.rsplit(" ", 1)[0].strip()
+        text = _bound_to_row(text)
         if len(text.split()) < 8:
             return {"written": False, "why": "nothing usable survived the row bound"}
         res = M.remember_about_self(
