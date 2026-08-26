@@ -102,6 +102,23 @@ FACTS = [
 ]
 
 # ── 1. SHE ANSWERS HIM. SHE DOES NOT WAIT FOR THE CACHE. ─────────────────────────────
+# ── SKIP WHERE THE SUBJECT DOES NOT EXIST (2026-08-27) ───────────────────────────────
+# What this gate proves is that the KV mint is DEFERRED rather than dropped — the queue
+# fills, and she answers without waiting on it. A backend with no `capture` never queues
+# anything at all: the mint returns immediately and `mint_backlog()` is 0 forever, so "the
+# mint is QUEUED, not dropped" is asking about a queue that does not exist.
+#
+# It went RED that way in the Kairos export, which ships no engine, on every run since the
+# first. Keyed on the CAPABILITY rather than on the tree: the same holds against LM Studio.
+try:
+    from harness.inference.backends import supports as _sup2
+    if not _sup2("capture"):
+        from _gate import skip as _skip2
+        _skip2("this backend does not capture — nothing is ever queued, so the deferred "
+               "mint has no subject here", "G-CAPTURE-ASYNC")
+except ImportError:
+    pass
+
 print("\n1. a turn's worth of facts, against a daemon that never answers")
 t0 = time.perf_counter()
 for f in FACTS:
