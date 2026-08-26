@@ -66,6 +66,27 @@ def reset(alive=True):
     W._daemon_alive = lambda: alive          # type: ignore[assignment]
 
 
+# ── SKIP WHERE THE SUBJECT DOES NOT EXIST (2026-08-27) ───────────────────────────────
+# `_should_restart()` opens with a documented refusal: "AN EXTERNAL ENGINE IS NOT OURS TO
+# RESTART — under the openai backend the watchdog may observe and say, never relaunch."
+# So under `SP_ENGINE_KIND=openai` it returns "" for every input, and three of this gate's
+# assertions are asking a function that was told to say nothing to say something.
+#
+# It went RED that way in the Kairos export, which ships no engine, on every run since the
+# first. A gate that reds for a missing daemon IN A TREE THAT SHIPS NO DAEMON teaches an
+# adopter to ignore reds — and ignored reds are how the four-week-old ones found on
+# 2026-08-26 survived for four weeks. Keyed on the CAPABILITY, not on "am I in the
+# export": the same reasoning holds for anyone running the harness against LM Studio.
+try:
+    from harness.inference.backends import supports as _sup
+    if not _sup("restart"):
+        from _gate import skip as _skip
+        _skip("this backend is not ours to restart — _should_restart() returns \"\" by "
+              "design under an external engine, so the restart ladder has no subject here "
+              "(harness/control/watchdog.py, 2026-08-21)", "G-WATCHDOG")
+except ImportError:
+    pass
+
 print("1. A DEAD DAEMON IS NOTICED")
 reset(alive=False)
 os.environ["SP_WATCHDOG_S"] = "10"
