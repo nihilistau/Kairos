@@ -191,11 +191,62 @@ def his_day(hours: float = 8.0) -> Dict[str, Any]:
     }
 
 
+def when_he_slept(hours: float = 24.0) -> Dict[str, Any]:
+    """When he fell asleep and when he was up — AS BOUNDS, because that is the honest shape.
+
+    For "what time did I fall asleep?" and "when did I wake up?". It does not answer with a
+    minute, and the reason is not modesty about the instrument.
+
+    MEASURED on 2026-08-27 against his own account (asleep "about" 15:30-20:00). The
+    classifier read 15 at 15:33 and did not cross the sure bar until 16:22 — fifty minutes
+    late — then held 95 at 20:05 and did not drop until 20:59, an hour after he was up. Any
+    single minute taken off that curve is wrong twice a night, stated confidently.
+
+    His own account of the truth is fuzzy too: "I can take an hour, two hours to fall
+    asleep, I can sleep for an hour and then wake up and toss and turn." There is no exact
+    moment being missed, so a band is the right answer rather than a hedge.
+
+    THE BOUNDS ARE HIS WORDS WHERE THERE ARE ANY. A turn he typed is proof he was awake;
+    the phone's low reading is only its opinion, and a bound built on an opinion can put
+    the truth outside the band. And waking gets a CEILING rather than a band, because
+    wakefulness is provable and sleep is not — see sleep_interval().
+    """
+    try:
+        import time as _t
+
+        from harness.model import transcript as _tr
+        from harness.telemetry import body as _b
+        from harness.telemetry import store as _s
+    except Exception as exc:                       # pragma: no cover
+        return {"ok": False, "why": "the telemetry framework is not loaded (%s)"
+                                    % type(exc).__name__}
+    now = _t.time()
+    rows = _s.read_since(float(hours) * 3600.0, now)
+    turns = _tr.his_turns() or []
+    awake = [t for (t, _w) in turns if now - t <= float(hours) * 3600.0]
+    v = _b.sleep_interval(rows, now, awake_at=awake)
+    if not v:
+        # ABSTAIN. "I cannot see a stretch of sleep" is not "you did not sleep", and the
+        # caller has to be able to tell those apart — the rule sleep_estimate already keeps.
+        return {"ok": True, "found": False,
+                "why": "no stretch long enough to call sleep in the last %g h" % hours}
+    out = dict(v)
+    out["ok"] = True
+    out["found"] = True
+    # LOCAL clock in the words, because he asks in his own. The store is UTC with a Z and
+    # mixing the two has cost this repo two wrong analyses in one session.
+    def _clock(t):
+        return _t.strftime("%H:%M", _t.localtime(t)) if t else None
+    out["asleep_between"] = [_clock(v["asleep_after"]), _clock(v["asleep_before"])]
+    out["up_by"] = _clock(v["woke_by"])
+    return out
+
 def body_tools() -> list:
     """Always offered. A tool that vanishes when the watch is off is a tool she cannot use
     to find out that the watch is off."""
     try:
         from harness.toolcore.tools import ToolSpec
-        return [ToolSpec.from_callable(how_is_he), ToolSpec.from_callable(his_day)]
+        return [ToolSpec.from_callable(how_is_he), ToolSpec.from_callable(his_day),
+                ToolSpec.from_callable(when_he_slept)]
     except Exception:
         return []
