@@ -1,8 +1,7 @@
 """reprise — is this new paragraph a retelling of one she already has?
 
 THE BUG THIS ANSWERS (2026-08-26). Two of her four live `self_description` rows opened
-with the same nine words — "[redacted]" — and
-said the same thing twice. NaCCS scores them identically and correctly; a coherence
+with the same nine words and said the same thing twice. NaCCS scores them identically and correctly; a coherence
 rubric cannot see redundancy at all, because redundancy is a different axis. The becoming
 window fills with paraphrase and the schema never updates.
 

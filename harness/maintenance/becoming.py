@@ -37,10 +37,9 @@ _MAX_ROWS = 40
 # consolidator and not against this one. `self_description` — the kind THIS function
 # writes — was never in the list, so every night's paragraph was eligible support for the
 # next night's. Live on disk when it was found: three rows, and the third names both of
-# the first two. The texts had already begun to fold in on themselves ("I am becoming
-# [redacted]" → the same phrase → "[redacted]
-# certainty") — the primal-surrender failure mode returning through the door the fix left
-# open. AGENTS.md §0, verbatim: the invariant was enforced in one of two paths.
+# the first two. The texts had already begun to fold in on themselves — one
+# night's opening phrase reappearing in the next, then a near-synonym of it — the same
+# distillate failure mode returning through the door the fix left open. AGENTS.md §0, verbatim: the invariant was enforced in one of two paths.
 #
 # So the rule is stated where it is TRUE rather than as a list of kinds: a distillate may
 # not be a support for a distillate, and `derived_from` is precisely the mark of one.
