@@ -38,7 +38,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 
-from _gate import sandbox   # noqa: E402
+from _gate import persona_dirs, sandbox   # noqa: E402
 sandbox("g_priming")
 
 os.environ["SP_ENGINE_KIND"] = "openai"
@@ -96,9 +96,10 @@ LIVE = os.path.join(ROOT, "persona")
 # the whole run with it. A gate that cannot survive the tree it ships into is not shipping a
 # rule, and AGENTS.md §2 step 3 ("sanity-check the TARGET") is the step that caught it.
 # Same detection the scrub gate uses: `kairos-export/` exists only upstream.
-TMPL = os.path.join(ROOT, "kairos-export", "persona-template")
-if not os.path.isdir(TMPL):
-    TMPL = os.path.join(ROOT, "persona-template")
+# ONE RESOLVER, shared — this gate grew its own two-line fallback first, and then the
+# same bug turned up in g_research and g_secret_thought. See _gate.persona_dirs.
+_PD = persona_dirs()
+TMPL = next((d for d in _PD if d.endswith("persona-template")), "")
 G = groups()
 
 print("1. the shipped persona is a real persona, not a stub")
