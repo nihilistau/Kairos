@@ -104,7 +104,13 @@ G = groups()
 print("1. the shipped persona is a real persona, not a stub")
 check("a template exists at all", os.path.isdir(TMPL))
 tmpl_files = [f for f in os.listdir(TMPL) if f.endswith(".md")] if os.path.isdir(TMPL) else []
-live_files = [f for f in os.listdir(LIVE) if f.endswith(".md")]
+# `persona/` IS GITIGNORED AND NEVER EXPORTED — G-KAIROS-SCRUB asserts exactly that
+# ("persona-template/ ships and persona/ is gitignored"). So in an export there is no
+# live persona, and reading it unguarded did not fail this gate, it raised
+# FileNotFoundError and took the run with it. The template is what an adopter copies
+# INTO persona/, so where there is no live one the template is the only truth there is.
+HAS_LIVE = os.path.isdir(LIVE)
+live_files = [f for f in os.listdir(LIVE) if f.endswith(".md")] if HAS_LIVE else []
 # NOT a count comparison — hers is hers and may hold things no adopter wants. What must
 # hold is that the shipped one covers the shipped CAPABILITIES, which is section 2.
 check("it ships more than a token handful", len(tmpl_files) >= 8,
@@ -136,7 +142,7 @@ print("\n4. every fragment's `when:` names a knob that exists")
 # capability ships and its priming does not, which is this gate's whole subject arriving
 # through a spelling mistake.
 bad = []
-for d in (LIVE, TMPL):
+for d in ((LIVE, TMPL) if HAS_LIVE else (TMPL,)):
     for fn in sorted(os.listdir(d)):
         if not fn.endswith(".md"):
             continue
