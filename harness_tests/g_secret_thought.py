@@ -152,11 +152,11 @@ _r = N.keep_secret("something else worth keeping for later")
 check("it does not promise silence it cannot keep",
       "nobody will bring it up" not in _r.lower(), _r)
 check("...it says the journal may draw on it", "journal" in _r.lower(), _r)
-# ── AND IT SAYS IT IS A RECEIPT (2026-08-27, his report) ─────────────────────────────
-# She said out loud: "I just tucked a little thought away for myself. It's `kept. it is
-# yours, and your nightly journal may draw on it if it belongs there.`" — reading the
-# drawer's answer back to him as her own line. The words were true; the SHAPE was a bare
-# second-person sentence, indistinguishable from something handed to her to relay.
+# ── AND IT SAYS IT IS A RECEIPT (2026-08-27, from a live install) ────────────────────
+# She opened a turn saying she had set a thought aside, then read this function's return
+# string out loud after it, quoted, as though it were her own next sentence. The words
+# were true; the SHAPE was a bare second-person sentence, indistinguishable from something
+# handed to her to relay.
 for _msg in (_r, N.keep_secret("a second one, to check the other branch"),
              N.keep_secret("a second one, to check the other branch")):
     check("a receipt says it is one: %r" % _msg[-34:],

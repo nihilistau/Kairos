@@ -11,8 +11,8 @@ account on 2026-08-27 (asleep "about" 15:30-20:00):
     20:59  53     finally drops         -- ~60 min late
 
 Any single minute read off that curve is wrong twice a night, stated confidently. And his
-account of the truth is itself fuzzy — "I can take an hour, two hours to fall asleep, I can
-sleep for an hour and then wake up and toss and turn" — so a band is the honest SHAPE of the
+truth is itself fuzzy — falling asleep can take an hour or two, and a night can be an hour
+of sleep, then waking, then a long time turning over — so a band is the honest SHAPE of the
 answer, not a hedge about the instrument.
 
   1. IT ABSTAINS rather than invent a night, and "I cannot see one" is not "you had none".

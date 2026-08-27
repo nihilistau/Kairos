@@ -2201,8 +2201,7 @@ def _read_day_transcript(day: str = "", include_synthetic: bool = False) -> list
 def _recent_transcript(min_rows: int = 12) -> list:
     """The recent CONVERSATION, which is not the same thing as today's rows.
 
-    THE BUG (2026-08-28, his report: "i just refreshed and it cleared the rendered chat
-    history"). `_day_transcript_path` names its file from `time.localtime`, so at local
+    THE BUG (2026-08-28, from a live install: a refresh cleared the rendered chat history). `_day_transcript_path` names its file from `time.localtime`, so at local
     midnight "today" becomes an empty file. Their evenings routinely run past one in the
     morning, so at 00:00 three things went blank at once, all reading the same function:
 
