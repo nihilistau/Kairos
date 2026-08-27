@@ -115,6 +115,21 @@ responsible for exactly one thing, which is whether she describes the outcome tr
 *(Section numbers 2, 3 and 4 are absent on purpose — those three graduated to the ARMED table
 above on 2026-07-30. The gaps are the record, and renumbering would erase it.)*
 
+### 0. `SP_HOUSE_HANDS` — she can turn his lights on and off *(recorded 2026-08-27)*
+
+| | |
+|---|---|
+| **Code** | `harness/homeassistant/hands.py`, verbs in `harness/skills/house.py`, registered in `agent.py` only when armed |
+| **Gate** | `harness_tests/g_house_hands.py` — 30/30, four mutants red by name |
+| **Why off** | **CAPABILITY** — not a measurement that went against it, but a capability whose owner has to choose it. `house.py` said so before it existed: *"giving a companion the light switches is a genuinely different product with genuinely different failure modes, and it is not something to arrive at by accident while wiring up a sleep sensor."* Off is the default it was promised, not a hesitation. |
+| **What "off" means here** | The verbs are **absent**, not present-and-refusing. That is the opposite of `body_tools`, deliberately: a body tool she cannot use is how she finds out the watch is off, while a house verb she cannot use is an invitation to promise him a light and then fail. |
+| **The boundary is NOT Home Assistant's** | The first design leaned on Assist exposure — it lives where the house lives and the owner edits it in a UI. Reading it against his real machine killed that: **`expose_new` defaults ON, so 44 entities were already exposed that nobody chose**, including `switch.kettle_start`. A boundary that admits new things by default is not a boundary. |
+| **The floor is a closed domain set** | `ACTABLE_DOMAINS = ("light", "fan")`, in code, not configurable. His `switch.*` includes a **kettle, a 3D-printer plug and a fingerbot**. The mutant that removes this guard records real POSTs to all three — while they are *listed*, which is the point: the floor catches a row that should not have been in the list. |
+| **The allowlist lives in `var/`** | `SP_HOUSE_ALLOW` → `var/house-allow.json`, `{spoken name: entity_id}`, empty by default. Not the profile and not the module, because everything committed is exported and his entity ids are his house's floor plan. Empty, missing or malformed all deny. |
+| **On request only** | His call: *"on-request only with autonomous action as a separate, later, off-by-default arming."* Enforced on the same `_seconds_since_he_spoke` clock the room veto reads — not a second copy of it, which this gate refuses. |
+| **What would arm the AUTONOMOUS half** | Nothing yet, and it is a separate row when it comes. It needs its own design: a reason to act, a bound on what may be acted on unprompted, and an answer to "what does she do when she is wrong at 3am". None of those exist, and the on-request path does not imply any of them. |
+| **What would arm it** | Nothing measurable — this one is his to decide, which is what a CAPABILITY row means. Concretely: `hands = true` under `[homeassistant]` in the profile, **and** rows in `var/house-allow.json`. Both, or nothing moves; either alone is inert by construction. |
+
 ### 1. `SP_SEM_DOMINATE` — Dickson subsumption as a supersede proposer *(recorded 2026-07-30; measured again 2026-08-23 — lost worse)*
 
 | | |

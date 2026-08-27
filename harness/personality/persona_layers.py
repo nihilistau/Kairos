@@ -72,6 +72,10 @@ KNOBS: Dict[str, str] = {
     # actually has a vision path AND it is armed. Teaching her about a sense she
     # does not have is how "I looked and saw" becomes a confabulation.
     "sight": "SP_SIGHT",
+    # HER HANDS ON THE HOUSE (2026-08-27). Gated on the same knob that arms the verbs,
+    # so the priming cannot ship without the capability or the capability without the
+    # priming — PRIMING.md rule 2, and the reason the loader fails closed on a typo.
+    "house_hands": "SP_HOUSE_HANDS",
     # the research tier — the honesty rule ships WITH the capability, never after it
     "research": "SP_RESEARCH",
 }

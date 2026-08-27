@@ -899,6 +899,14 @@ def build_env(c: dict) -> dict:
         "SP_HA_URL": str(c.get("homeassistant", {}).get("url", "") or ""),
         "SP_HA_POLL_S": str(c.get("homeassistant", {}).get("poll_s", 60)),
         "SP_HA_TOKEN_FILE": os.path.join(VAR, "ha_token"),
+        # ── HER HANDS ON THE HOUSE (2026-08-27). DEFAULT OFF: house.py promised
+        # that acting would get "its own design, its own gate and its own row in
+        # OFF-BY-DEFAULT", and this is the arming half of that. The ALLOWLIST is a
+        # path into var/ for the same reason the token is: everything in profiles/
+        # is committed and everything committed is exported, and his entity ids are
+        # his house's floor plan.
+        "SP_HOUSE_HANDS": ("1" if c.get("homeassistant", {}).get("hands") else "0"),
+        "SP_HOUSE_ALLOW": os.path.join(VAR, "house-allow.json"),
         "SP_TELEMETRY_DIR": os.path.join(VAR, "telemetry"),
         "SP_TELEMETRY_KEEP_DAYS": str(c.get("telemetry", {}).get("keep_days", 0)),
 
