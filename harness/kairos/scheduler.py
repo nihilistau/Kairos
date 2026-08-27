@@ -554,7 +554,17 @@ def _reflect_insight(res: dict) -> Optional[dict]:
 
     Split out only so that step 1 (`ambient_silence`) has an offline seam; the body below
     is unchanged and still reads `res` from the caller's `ops.insight()`.
+
+    ── AND THE IMPORT HAD TO COME WITH IT (2026-08-28) ──────────────────────────────
+    The split left `PersonModel` imported in reflect_tick and USED down here, so every
+    tick raised NameError, was caught by reflect_tick's own `except Exception` and logged
+    as one warning line — `[kairos] reflect_tick: name 'PersonModel' is not defined`. The
+    whole conclusion lane was dead for five hours and the only symptom was that she went
+    quiet, which is exactly the shape of failure a broad `except` around a whole function
+    produces: the thing stops working and nothing stops.
     """
+    from harness.model.person import PersonModel
+    from harness.tuning import registry as tune
     # ops.insight() returns structured receipts ({"claim", "result"}) as of 2026-08-19.
     # The old receipt was the display string `f"{line[:60]} -> {res[:38]}"`, and this
     # function recovered the claim with split(" -> ")[0] — i.e. THE FIRST 60 CHARACTERS.

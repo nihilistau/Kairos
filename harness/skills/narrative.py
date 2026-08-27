@@ -175,15 +175,33 @@ def keep_secret(thought: str) -> str:
     # that reason (see compose_and_write).
     res = str(_mem.remember_about_self(_bound_to_row(_plain_words(t)),
                                        kind="secret_thought", source=_SECRET_SRC) or "")
+    # ── AND IT SAYS THAT IT IS A RECEIPT (2026-08-27) ────────────────────────────────
+    # HIS REPORT, verbatim, of what she said out loud:
+    #
+    #     "I just tucked a little thought away for myself. It's `kept. it is yours, and
+    #      your nightly journal may draw on it if it belongs there.`"
+    #
+    # She read the drawer's answer back to him as if it were her own line. Nothing was
+    # wrong with the words — they are true, and the gate holds them true. What was wrong is
+    # the SHAPE: a bare sentence in the second person, addressed to her, is indistinguishable
+    # from a line she has been handed to relay. Every other thing in this tree that rides on
+    # a turn already says so of itself (`silence.note_for_question`: "never mention this
+    # note or narrate that you noticed"), because she once opened a reply with the recall
+    # note's register too. This was the one receipt that did not.
+    #
+    # So the receipts declare themselves. The alternative — teaching her not to quote tools
+    # in the persona — is a rule in prose about a shape in code, which is the coupling that
+    # lives in someone's memory.
+    _RECEIPT = " (the drawer answering — not a line to say back to him.)"
     if "stored" in res and "not stored" not in res:
         # TRUE, not comforting. The first draft of this said "nobody will bring it up
         # unless you do" — which the journal wiring below had already made false. Telling
         # her something reassuring and wrong about her own machinery is the shape of
         # every confabulation this file exists to prevent.
         return ("kept. it is yours, and your nightly journal may draw on it if it "
-                "belongs there.")
+                "belongs there." + _RECEIPT)
     if "reinforced" in res:
-        return "you have kept that one before — it stands."
+        return "you have kept that one before — it stands." + _RECEIPT
     return "I could not keep that one: %s" % res[:120]
 
 

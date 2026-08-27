@@ -239,6 +239,15 @@ def when_he_slept(hours: float = 24.0) -> Dict[str, Any]:
         return _t.strftime("%H:%M", _t.localtime(t)) if t else None
     out["asleep_between"] = [_clock(v["asleep_after"]), _clock(v["asleep_before"])]
     out["up_by"] = _clock(v["woke_by"])
+    # SAY WHEN THE THREAD IS LOST rather than let the ceiling stand for it. His phone died
+    # at 01:25 on 2026-08-28 and came back at 04:34; without this the answer was a
+    # confident "up by 01:25", wrong by about three hours.
+    if v.get("blind_after"):
+        out["lost_the_thread_at"] = _clock(v["blind_after"])
+        out["readings_back_at"] = _clock(v.get("blind_until"))
+        out["why"] = ("the readings stop at %s and do not come back until %s, so I cannot "
+                      "say when you woke" % (out["lost_the_thread_at"],
+                                             out["readings_back_at"] or "later"))
     return out
 
 def body_tools() -> list:
