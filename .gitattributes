@@ -1,0 +1,36 @@
+# THE BUNDLE IS COMMITTED, SO THE SOURCE BYTES ARE PART OF THE BUILD (2026-08-27)
+#
+# console/room/ is a Vite build of ui/src, committed so the gateway serves it with no Node
+# at runtime, and G-ROOM-BUNDLE rebuilds ui/src and compares the emitted bytes with what is
+# committed. That check is only meaningful if everyone building it starts from the same
+# bytes.
+#
+# They did not. The exporter writes ui/src with LF; a clone on Windows checked it out as
+# CRLF (`core.autocrlf=true`, and there was no .gitattributes anywhere to say otherwise).
+# Multi-line template literals and JSX text keep their newlines verbatim through the
+# bundler, so the two builds differed by 10 bytes and G-ROOM-BUNDLE was RED for anyone who
+# cloned this repo — while passing in the tree it was built in. The toolchain was never the
+# problem: vite, esbuild and the plugin all resolve to identical versions from the lock.
+#
+# `eol=lf` makes the checkout byte-identical on every platform, so the committed bundle is
+# reproducible by whoever clones it. That is the whole point of committing it.
+* text=auto eol=lf
+
+# ...except the things that must not be touched.
+*.bat  text eol=crlf
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.mp4  binary
+*.webm binary
+*.mp3  binary
+*.wav  binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.ico  binary
+*.pdf  binary
+*.safetensors binary
+*.gguf binary
