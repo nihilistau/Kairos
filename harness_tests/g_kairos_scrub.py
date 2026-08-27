@@ -45,7 +45,60 @@ _SRC_ROOT = os.path.dirname(HERE)
 _MANIFEST = os.path.join(_SRC_ROOT, "kairos-export", "kairos-export.toml")
 _EXPORTER = os.path.join(_SRC_ROOT, "tools", "kairos_export.py")
 
-_FALLBACK_FORBIDDEN = ["Sam", "sam112358", "D:/F/", "D:\\F\\", "agent-26b", "gemma4-26b"]
+# ── THE GATE MAY NOT PUBLISH WHAT IT FORBIDS (2026-08-27) ────────────────────────────
+# This was a list of LITERALS, and this file is copied RAW into the export
+# (`kairos_export.py`: `shutil.copy2` after the scrub, so the rewrite rules never touch
+# it). So the one artefact whose job is to keep the operator's handle out of a public repo
+# was the artefact publishing it — his handle AND the local-part of his email, on line 48
+# of a file anyone can read. Found by cloning the pushed repo and grepping it, which is the
+# only check that answers "what is actually public" rather than "what did we intend".
+#
+# The needles are SHA-256 now. The gate still finds them because it hashes WINDOWS of the
+# text rather than searching for a string: for each needle length, hash every window of
+# that length beginning at a token boundary and compare digests. That is the same
+# detection as `tok in txt` for anything that starts at a word/path boundary — which every
+# one of these does — and it names nothing.
+#
+# A hit reports the needle's INDEX, never its value. If the token really is in a shipped
+# file the operator can see which file and line; he does not need this gate to spell it out
+# for the reader who got there first.
+#
+# WHAT THIS DOES NOT CLAIM: a 5-character handle does not survive a determined offline
+# attack on its digest, and it is not meant to. The threat is a public file that GitHub
+# search, a crawler, or a casual reader indexes in cleartext. That is now closed.
+_FALLBACK_H = (
+    (5,  "4e38adb6f60ebe297c84fb0b37db558f9639a0f220a55211bcb98583de0d3328"),
+    (11, "b094ba63b14c26c1d8063ce290ca9790d221b5bd309dd7d9c615cb6a4f422632"),
+    (5,  "3a2edd19fc19ace507806c80db4c02a510e8244e3097f478cb3b99f2aad3e180"),
+    (5,  "faf8bc67a416cfe6fa0f297eca4449cb0514ba1afb1d8e9978761cd930c4af41"),
+    (9,  "efda066af97a14bd74920d4162c3f6a8dd7d9a6a79a5d06d07aeebd453435201"),
+    (10, "3522e4ecde35c9bb08a9814f0bb158ef24e70bb45ed0324e942c913001f87571"),
+)
+_FALLBACK_FORBIDDEN = []          # kept as a name; the literals are gone on purpose
+
+
+def _hashed_hits(txt: str) -> list:
+    """[(needle_index, line_no)] for every hashed needle present in `txt`.
+
+    Anchored at token starts — a window counts only where the preceding character is not
+    alphanumeric — so this is one hash per boundary per distinct needle length rather than
+    one per character. Every needle here begins at such a boundary.
+    """
+    import hashlib
+    by_len = {}
+    for i, (ln, h) in enumerate(_FALLBACK_H):
+        by_len.setdefault(ln, {})[h] = i
+    starts = [0] + [i + 1 for i, c in enumerate(txt) if not (c.isalnum() or c == "_")]
+    out = []
+    for ln, wanted in by_len.items():
+        for s in starts:
+            if s + ln > len(txt):
+                continue
+            h = hashlib.sha256(txt[s:s + ln].encode("utf-8")).hexdigest()
+            idx = wanted.get(h)
+            if idx is not None:
+                out.append((idx, txt.count("\n", 0, s) + 1))
+    return out
 # MIRRORS the exporter's TEXT_EXT, and must: this is what the gate uses when it runs
 # INSIDE the export, where neither the manifest nor the exporter ships. A fallback
 # that lags is a check that is strictest exactly where nobody can fix it.
@@ -98,6 +151,11 @@ for dp, dns, fns in os.walk(ROOT):
             if tok in txt:
                 ln = next((i for i, l in enumerate(txt.splitlines(), 1) if tok in l), 0)
                 hits.append("%s:%d  %s" % (rel, ln, tok))
+        # ...and the hashed needles, which are the only ones available inside the export.
+        # Reported by INDEX: a gate that prints the token it caught re-publishes it in CI
+        # logs, which is the same leak one layer out.
+        for idx, ln in _hashed_hits(txt):
+            hits.append("%s:%d  <identity needle #%d>" % (rel, ln, idx))
 check("%d text files scanned, zero forbidden tokens" % n_files, not hits, hits[:12])
 
 print("\n2. NOTHING OF HERS OR HIS IS IN THE TREE")
