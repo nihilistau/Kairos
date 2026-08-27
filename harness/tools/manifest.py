@@ -199,6 +199,12 @@ FACTS: Dict[str, ToolFacts] = {
     "his_day": ToolFacts("body", "private",
                          note="the shape of the last few hours — counts and freshness, "
                               "never the feed; answers 'has he been wearing it at all'"),
+    "when_he_slept": ToolFacts("body", "private",
+                               note="when he fell asleep and when he was up, AS BOUNDS — a "
+                                    "band for going under and a ceiling for waking, because "
+                                    "the classifier lags both ways and he describes the "
+                                    "truth itself as fuzzy; bounded by his own words where "
+                                    "there are any, and abstains rather than invent a night"),
 
     "my_research": ToolFacts("web", "read",
                              note="the ledger of what she actually looked up — not her memory of looking"),

@@ -247,6 +247,119 @@ def _seconds_since_he_spoke():
         return max(0.0, _t.monotonic() - last)
     except Exception:
         return None
+# ── WHEN HE FELL ASLEEP IS A BAND, NOT A MINUTE (2026-08-27) ─────────────────────────
+# A run has to last this long before it is sleep rather than a still half-hour on the
+# sofa. Twenty minutes because the sampler runs about every six, so a run needs three or
+# four samples to exist at all, and because his own account of it — "I can take an hour,
+# two hours to fall asleep, I can sleep for an hour and then wake up and toss and turn" —
+# is a description of something that does not have edges to find.
+_SLEEP_RUN_S = 20 * 60
+
+
+def sleep_interval(rows: List[dict], now: float,
+                   awake_at: Optional[List[float]] = None,
+                   min_run_s: float = _SLEEP_RUN_S) -> Optional[Dict[str, Any]]:
+    """The band he fell asleep in and the band he woke in, or None. NEVER a single minute.
+
+    WHY A BAND. Measured against his own label on 2026-08-27 (asleep "about" 15:30-20:00):
+    the classifier reads 15 at 15:33, 5 at 15:48, and does not cross SLEEP_SURE until
+    16:22 — fifty minutes later. Coming back it reads 95 at 20:05 and does not fall under
+    the bar until 20:59, an hour after he was up and typing. Reporting either crossing as
+    the moment would be a wrong minute stated confidently, twice a night.
+
+    And the lag is not the whole of it. He describes the truth itself as fuzzy, so there is
+    no exact minute being missed — a band is the honest shape of the answer, not a hedge
+    about the instrument.
+
+    TESTIMONY TIGHTENS IT, and outranks the classifier wherever the two disagree — this
+    store's oldest rule, arriving at one more seam. `awake_at` is epoch seconds at which he
+    PROVABLY was awake (he typed something). On the same night that turns "between 15:33
+    and 16:22" into "between 15:41 and 16:22", and the waking band from an hour wide down
+    to twelve minutes: last high 20:05, his first message 20:17.
+
+    A turn INSIDE a run also ends it. That is what makes "slept an hour, woke, tossed and
+    turned" representable rather than smoothed into one long sleep he did not have.
+
+    Returns None when no run qualifies — "I cannot say" is a different answer from a guess,
+    and the caller must be able to tell them apart.
+    """
+    awake_at = sorted(awake_at or [])
+    xs = []
+    for r in rows:
+        if r.get("kind") != "sleep_confidence":
+            continue
+        v = r.get("value")
+        t = store.parse_iso(r.get("at") or "")
+        if isinstance(v, (int, float)) and t:
+            xs.append((t, float(v)))
+    xs.sort()
+    if not xs:
+        return None
+
+    # runs of "sure" samples, broken by a sample at or under SLEEP_AWAKE or by his own turn
+    runs, cur = [], []
+    for i, (t, v) in enumerate(xs):
+        broken = any(cur and cur[-1][0] < a <= t for a in awake_at)
+        if v >= SLEEP_SURE and not broken:
+            cur.append((t, v))
+            continue
+        if cur:
+            runs.append(cur)
+        cur = [(t, v)] if (v >= SLEEP_SURE and broken) else []
+    if cur:
+        runs.append(cur)
+    runs = [r for r in runs if r[-1][0] - r[0][0] >= min_run_s]
+    if not runs:
+        return None
+    run = runs[-1]                                   # the most recent sleep we can see
+    first, last = run[0][0], run[-1][0]
+
+    # ── THE BOUNDS COME FROM PROOF, NOT FROM THE CLASSIFIER ─────────────────────────
+    # The first cut of this used a low reading as the "he was still up" end, and that is
+    # the category error this store has a rule against: a low number is the phone's
+    # OPINION that he is awake, and a bound built on an opinion can exclude the truth.
+    # On 2026-08-27 the phone read 16 at 16:04 while he says he was already going under;
+    # a band of 16:04-16:22 would have been narrow, confident, and possibly wrong.
+    #
+    # A turn is proof. So the awake ends are HIS WORDS, and the phone's own opinion rides
+    # alongside as a separate, weaker field the caller may mention but must not present as
+    # the boundary. Wide and correct beats narrow and wrong: the point of a band is that
+    # the answer is inside it.
+    said = [a for a in awake_at if a < first]
+    asleep_after = said[-1] if said else None
+    said_after = [a for a in awake_at if a > last]
+
+    # ── AND WAKING IS ONE-SIDED, WHICH IS NOT THE SAME SHAPE AS FALLING ASLEEP ───────
+    # The classifier lags in BOTH directions, so both of its edges are UPPER bounds:
+    #   onset  — it fires late, so the first sure reading is after he actually went under
+    #   waking — it stays high after he is up, so the last sure reading is after he woke
+    # Falling asleep therefore has a real band (his last word ... first sure reading) and
+    # waking has only a ceiling. Reporting waking as "between last-sure and next-message"
+    # is the trap I walked into first: on 2026-08-27 that reads 20:52-22:09, and he was up
+    # at 20:00 — a confident band that does not contain the answer.
+    #
+    # WAKEFULNESS IS PROVABLE AND SLEEP IS NOT, and the asymmetry is real rather than a
+    # gap in the instrument. A message proves he is up; nothing proves he is under. So the
+    # honest waking answer is a ceiling: he was up no later than this.
+    woke_by = min([last] + said_after[:1])
+
+    lows = [t for (t, v) in xs if v <= SLEEP_AWAKE and t < first]
+    lows_after = [t for (t, v) in xs if v <= SLEEP_AWAKE and t > last]
+
+    return {
+        "asleep_after": asleep_after, "asleep_before": first,
+        "woke_by": woke_by,                 # a CEILING, not the lower half of a band
+        "woke_at_latest_said": said_after[0] if said_after else None,
+        # what the PHONE thought, kept apart from what he proved
+        "phone_awake_until": lows[-1] if lows else None,
+        "phone_awake_from": lows_after[0] if lows_after else None,
+        "still_asleep": not said_after and (now - last) < 3600,
+        "hours": round((last - first) / 3600.0, 1),
+        "bounded_by": ("his own words" if (said or said_after) else "the phone alone"),
+        "samples": len(run),
+    }
+
+
 _SLEEP_MIN_SIGNALS = 2     # below this the answer is None — see why in the docstring
 
 
