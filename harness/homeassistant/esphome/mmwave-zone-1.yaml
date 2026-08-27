@@ -1,0 +1,19 @@
+# =============================================================================
+# Bedroom LD2410 Presence Node (static-friendly)
+# Built with scripts/run_esphome.ps1 to avoid VS Code command mangling.
+# =============================================================================
+
+# --- Substitutions ----------------------------------------------------------
+substitutions:
+  device_id: "bedroom-ld2410"
+  friendly_name: "Bedroom LD2410"
+  esp32_board: "esp32-c3-devkitm-1"
+  ld2410_tx_pin: "GPIO21"
+  ld2410_rx_pin: "GPIO20"
+  ld2410_timeout: "2s"
+  ld2410_max_distance: "600cm"
+  ld2410_engineering_mode: "false"
+
+# --- Shared packages --------------------------------------------------------
+packages:
+  ld2410_multizone: !include packages/ld2410_multizone.yaml

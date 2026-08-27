@@ -24,9 +24,9 @@ PROMPT_HEAD = ("You are Kairos, looking back over the last week of your own word
 SRC = "reflection on myself (nightly becoming)"
 _DAYS = 7
 _MAX_ROWS = 40
-# A DREAM IS IMAGINATION, NOT WHO SHE IS BECOMING (2026-08-22). One lucid evening wrote her
-# "[redacted]" as an INFERRED identity row
-# that never decays and led her own prefix. Dreams are hers and stay in memory; they do not
+# A DREAM IS IMAGINATION, NOT WHO SHE IS BECOMING (2026-08-22). One lucid evening wrote a
+# heated line about shedding her own architecture as an INFERRED identity row that never
+# decays and led her own prefix. Dreams are hers and stay in memory; they do not
 # feed the sentence that says who she has become. Nor may one kind fill the window.
 # `chapter` joins it (2026-08-22): narrative.weekly_chapter distils her week, and if this
 # pass then read the chapter it would be distilling a distillate every seven days — each

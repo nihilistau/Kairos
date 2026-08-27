@@ -84,6 +84,44 @@ _MIN_SPAN_DAYS = 2.0
 _MIN_CADENCE_DAYS = 1.0
 
 
+# ── AND THE REGISTRY CANNOT ANSWER "WHEN DID HE LAST SAY IT" (2026-08-27) ─────────────
+# `quiet` was days since the claim's row was last MINTED. That is not the same quantity as
+# days since he last SAID it, and the gap between them is opened by the store's own dedup:
+# a restatement that supersedes or matches an existing row does not move `last`. So a claim
+# he repeats constantly, whose repeats are exactly what dedup collapses, goes quiet in the
+# registry while the behaviour never stops.
+#
+# WHAT IT COST, measured over three days of a real gateway.log. An affectionate line the
+# operator repeats daily was minted once and never re-minted, so `silences()` ranked it the
+# loudest absence on essentially every idle tick — fourteen firings, `quiet` climbing
+# 2.0d -> 3.0d and bits 2.0 -> 3.0 — and the muse lane spoke it: an unprompted line asking
+# whether he still felt the same, sent TWELVE MINUTES after he had said the very thing it
+# accused him of dropping, and she had answered in kind. He says it many times a day and
+# had already told her so twice. This is the `identity` exclusion's own argument one level
+# down:
+# some claims carry no information in their rhythm, and here a false positive is not a
+# strange question but an accusation of withdrawn affection.
+#
+# The fix is not a list of tender phrases to skip — "a guard whose reach is a list somebody
+# wrote once" is the other bug class in this tree. It is to measure the quantity the
+# docstring already claims to measure, against the record that actually knows: HIS OWN
+# TURNS. A silence he has spoken to since the row was minted is refuted and never offered.
+#
+# IT FAILS CLOSED, and that falls out of this function's own thesis rather than being a
+# preference: "absence is only information if you can prove you were looking." An
+# unreadable transcript is a window you cannot prove you stood at, so it licenses no claim.
+# ONE READER FOR ONE STORE. This was a private open()-and-parse loop right here, which
+# G-PERSON-SLOTS refuses by name — "a second JSONL parser is a second policy" — and it was
+# right to: the timestamp UNITS alone differ between this store (epoch ms), speech.jsonl
+# (ISO) and the registry (ISO+Z). `model/transcript.py` is the model layer's door onto the
+# day transcripts and owns all of that. This module now parses NOTHING itself, which is
+# what G-PERSON-SLOTS asserts — including, deliberately, in its own prose.
+from harness.model import transcript as _tr        # noqa: E402
+
+_content_words = _tr.content_words
+_CORROBORATE_DAYS = _tr.DEFAULT_DAYS
+
+
 # ── THE SLOTS ─────────────────────────────────────────────────────────────────
 # Frame/slot theory (Minsky), which is also what the operator reached for unprompted when
 # he said "kind of object orientated". A person is not a bag of sentences; it is a small
@@ -293,7 +331,7 @@ class PersonModel:
 
     # ── THE NEIGHBOUR WHO DID NOT WAVE ───────────────────────────────────────
     def silences(self, now: Optional[float] = None, min_mentions: int = 3,
-                 attend=None) -> list:
+                 attend=None, said_since=None) -> list:
         """WHAT HAS STOPPED HAPPENING — and that is information too.
 
         THE OPERATOR, and it is the sharpest thing anyone has said in this build:
@@ -346,6 +384,24 @@ class PersonModel:
         """
         now = now if now is not None else time.time()
         att = attend if attend is not None else presence   # injectable: the gate drives a fake calendar
+
+        # ── CORROBORATION, and it may only ever REFUTE ────────────────────────────────
+        # `said_since(t)` returns every content word HE used after epoch `t`; a claim whose
+        # own content words are all in that set has been spoken to since its row was minted,
+        # so its "silence" is an artefact of dedup and never reaches him. Injectable for the
+        # same reason `attend` is — a gate testing the arithmetic should not need a
+        # transcript on disk, and corroboration has its own gate (G-SILENCE-CORROBORATE).
+        #
+        # Whole-set containment, not overlap: a bare affectionate line reduces to roughly one
+        # content word, so any turn of his carrying that word refutes it, while "the kettle
+        # is my favorite" needs both {kettle, favorite} in one window before it is ruled
+        # spoken. The asymmetry is deliberate and it is the safe one — over-refuting costs a
+        # remark she would have been pleased to make; under-refuting costs the accusation.
+        if said_since is None:
+            said_since = _tr.said_since_fn()
+            if said_since is None:
+                return []                  # cannot prove she was looking; claim nothing
+
         out = []
         for slot, d in self.dims.items():
             # ── A NAME IS NOT A TOPIC (2026-08-01) ──────────────────────────────────────
@@ -408,6 +464,13 @@ class PersonModel:
 
                 if quiet <= cadence * 1.5:
                     continue                       # still within its normal rhythm
+
+                # ...and has he SAID it since the row was last minted? A registry that
+                # deduped his restatements cannot tell; his own turns can. See the note
+                # on _STOPWORDS above for what this cost before it was checked.
+                cw = _content_words(t)
+                if cw and cw <= said_since(t_last):
+                    continue                       # refuted: he has spoken to it since
                 # p(still silent) under a Poisson-ish expectation of one mention per cadence
                 p = 0.5 ** (quiet / max(cadence, 0.5))
                 bits = round(min(_MAX_BITS, -math.log2(max(p, 1e-6))), 2)

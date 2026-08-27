@@ -1203,8 +1203,8 @@ def stamp(row: dict, fact: str, speaker: str, src: str,
     # A row that was DISTILLED from other rows — the nightly becoming, the journal, an
     # insight, a consolidation — has never carried a link back to what it was distilled
     # FROM. That is how one lucid evening outlived its own retirement: 24 of her rows
-    # were tombstoned and the "[redacted]" self_description they had produced went
-    # on leading her prefix, because nothing on disk connected the two.
+    # were tombstoned and the self_description they had produced went on leading her
+    # prefix, because nothing on disk connected the two.
     #
     #   derived_from   the row NAMES it read. ABSENT means "unknown provenance" and is
     #                  inert; an explicit list is a CLAIM, and orphaned_distillates()

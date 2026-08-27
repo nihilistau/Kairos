@@ -50,6 +50,22 @@ sys.path.insert(0, ROOT)
 
 SB = tempfile.mkdtemp(prefix="g-silence-answer-")
 os.environ["SP_RECALL_REGISTRY"] = os.path.join(SB, "registry.jsonl")
+import json as _json
+import time as _time
+
+# ── A TRANSCRIPT STORE, because a silence is now CORROBORATED against his own turns ──
+# `person.silences()` refutes any claim he has spoken to since its row was minted, and it
+# FAILS CLOSED when there is no record to check ("absence is only information if you can
+# prove you were looking" — its own thesis). This fixture therefore has to say what he
+# actually said, and what he said is: nothing about any of these claims. That makes the
+# assertions below stronger than they were, not weaker. See G-SILENCE-CORROBORATE.
+_TDIR = os.path.join(os.path.dirname(os.environ["SP_RECALL_REGISTRY"]), "transcripts")
+os.makedirs(_TDIR, exist_ok=True)
+with open(os.path.join(_TDIR, "%s.jsonl" % _time.strftime(
+        "%Y-%m-%d", _time.gmtime(_time.time() - 86400.0)), ), "w", encoding="utf-8") as _f:
+    _f.write(_json.dumps({"role": "user", "at": (_time.time() - 86400.0) * 1000.0,
+                          "content": "nothing here bears on the fixtures"}) + chr(10))
+
 os.environ["SP_DAEMON_URL"] = "http://127.0.0.1:9"
 os.environ["SP_SILENCE_ANSWER"] = "1"
 

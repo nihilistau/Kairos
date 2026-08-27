@@ -492,9 +492,43 @@ def reflect_tick(now: Optional[float] = None) -> Optional[dict]:
 
     # 1. HAS SOMETHING GONE QUIET? The neighbour who did not wave carries more information
     #    than the one who did, and noticing it is not retrieval — nobody asked a question.
+    hit = ambient_silence()
+    if hit:
+        return hit
+
+    # 2. Otherwise: did she CONCLUDE anything, and was it surprising enough to interrupt for?
+    return _reflect_insight(res)
+
+
+def ambient_silence() -> Optional[dict]:
+    """The loudest absence worth interrupting him for, or None. ITS OWN SEAM, on purpose.
+
+    This lived inline in reflect_tick, which cannot run without a daemon (`ops.insight()`),
+    so the one rule that decides whether she may accuse him of going quiet had no offline
+    door to test through — and a gate that cannot drive the real path ends up asserting on
+    a copy of it. G-SILENCE-CORROBORATE §5 drives THIS.
+    """
     try:
-        pm = PersonModel.from_registry()
-        sil = pm.silences()
+        # ── THE EVIDENCE FLOOR BELONGS TO BOTH DOORS (2026-08-27) ────────────────────
+        # `skills/silence.py` is the answer-time door onto this same signal and it refuses
+        # to speak until the attention ledger is MIN_LEDGER_DAYS deep — "you must have been
+        # looking LONG ENOUGH" — and it is DEFAULT OFF today precisely because the ledger is
+        # not yet that deep. This door asked for none of that. So the careful door was
+        # disarmed for want of evidence while the ambient one, reading the same model,
+        # interrupted him with it every half hour: AGENTS.md §0, an invariant enforced on
+        # one of two paths and therefore on neither.
+        #
+        # ONE AUTHORITY, IMPORTED rather than restated — a second copy of the number is the
+        # bug underneath the bug. Ambient speech is the stricter case (he did not ask), so
+        # it can never be admitted on thinner evidence than an answer-time note.
+        from harness.model.person import PersonModel
+        from harness.skills import silence as _sil
+        _days = _sil.ledger_days()
+        if _days < _sil.MIN_LEDGER_DAYS:
+            logger.info("[kairos] silence: ledger %dd < %dd — not deep enough to notice "
+                        "an absence", _days, _sil.MIN_LEDGER_DAYS)
+            return None
+        sil = PersonModel.from_registry().silences()
         # STRUCTURAL HERE TOO. This was `bits >= reflect.speak_bits`, an invented constant
         # deciding whether an absence was worth a question. The structural admission was
         # already sitting in silences() and doing the real work — at least three mentions,
@@ -512,8 +546,15 @@ def reflect_tick(now: Optional[float] = None) -> Optional[dict]:
             return {"text": sil[0]["claim"], "bits": sil[0]["bits"], "silence": sil[0]}
     except Exception:
         pass
+    return None
 
-    # 2. Otherwise: did she CONCLUDE anything, and was it surprising enough to interrupt for?
+
+def _reflect_insight(res: dict) -> Optional[dict]:
+    """Step 2 of reflect_tick: did she CONCLUDE anything worth interrupting for?
+
+    Split out only so that step 1 (`ambient_silence`) has an offline seam; the body below
+    is unchanged and still reads `res` from the caller's `ops.insight()`.
+    """
     # ops.insight() returns structured receipts ({"claim", "result"}) as of 2026-08-19.
     # The old receipt was the display string `f"{line[:60]} -> {res[:38]}"`, and this
     # function recovered the claim with split(" -> ")[0] — i.e. THE FIRST 60 CHARACTERS.

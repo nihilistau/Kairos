@@ -155,3 +155,24 @@ def sandbox(name: str = "gate", persona: str = "") -> str:
     with open(os.environ["SP_PERSONA_FILE"], "w", encoding="utf-8") as f:
         f.write(persona or "She is dry and warm.\n\n## Personality state\nmood: neutral\n")
     return sb
+
+
+# ── A TURN A GATE DROVE IS NOT THEIR CONVERSATION (2026-08-27) ───────────────────────
+# The gateway already quarantines any chat request that DECLARES itself synthetic
+# (app.py: `body.get("synthetic")` -> `_append_day_turn(synthetic=...)`), and
+# `_read_day_transcript` then excludes it from the 04:00 consolidation. Nothing is
+# deleted; `include_synthetic=True` reads it back.
+#
+# TEN LIVE GATES POST TO HER REAL GATEWAY AND NOT ONE OF THEM DECLARED. Measured on
+# 2026-08-27: `g_self_repeat` ran four times at 01:00-01:03 and left 32 unmarked rows in
+# her day transcript — "The code is 4471. Repeat it exactly." / "4471", and replies in a
+# register that is not hers ("Since I don't have feelings..."). Left alone the nightly
+# pass would have read them as their conversation, written a journal paragraph about it
+# and distilled facts from it, which is precisely the harm `synthetic` exists to prevent.
+#
+# So the declaration is a HELPER rather than a habit, and G-PROBE-DECLARED fails the suite
+# for any harness_tests file that posts to the gateway without it. A rule each author has
+# to remember is a rule that gets forgotten — this one was, ten times out of ten.
+def probe(name: str) -> str:
+    """The `synthetic` reason for a turn a gate drove. Put it in the request body."""
+    return "live gate %s — driven, not their conversation" % name

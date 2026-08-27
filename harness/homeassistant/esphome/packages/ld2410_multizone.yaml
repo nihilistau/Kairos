@@ -1,0 +1,108 @@
+# =============================================================================
+# LD2410 Presence/Radar Package (multi-sensor)
+# Shared by LD2410-based ESPHome nodes.
+# =============================================================================
+
+substitutions:
+  ld2410_timeout: "2s"
+  ld2410_max_distance: "600cm"   # 6 m
+  ld2410_engineering_mode: "false"
+
+# --- Core firmware metadata -------------------------------------------------
+esphome:
+  name: ${device_id}
+  platformio_options:
+    extra_scripts:
+      - pre:../../../scripts/platformio/git_ceiling.py
+
+# --- ESP32 target -----------------------------------------------------------
+esp32:
+  variant: ESP32C3
+  board: ${esp32_board}
+  framework:
+    type: esp-idf
+
+# --- Diagnostics ------------------------------------------------------------
+logger:
+  baud_rate: 0
+  hardware_uart: USB_SERIAL_JTAG
+
+# --- Connectivity -----------------------------------------------------------
+api:
+
+ota:
+  platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+# --- UART bus (LD2410) ------------------------------------------------------
+uart:
+  id: uart_bus
+  tx_pin: ${ld2410_tx_pin}
+  rx_pin: ${ld2410_rx_pin}
+  baud_rate: 256000
+  parity: NONE
+  stop_bits: 1
+
+# --- LD2410 component -------------------------------------------------------
+ld2410:
+  id: ld2410_radar
+  uart_id: uart_bus
+
+# --- Runtime tunables (moved to number components) -------------------------
+number:
+  - platform: ld2410
+    ld2410_id: ld2410_radar
+    timeout:
+      name: "${friendly_name} Timeout"
+    light_threshold:
+      name: "${friendly_name} Light Threshold"
+    max_move_distance_gate:
+      name: "${friendly_name} Max Move Distance Gate"
+    max_still_distance_gate:
+      name: "${friendly_name} Max Still Distance Gate"
+
+# --- Binary sensors ---------------------------------------------------------
+binary_sensor:
+  - platform: ld2410
+    ld2410_id: ld2410_radar
+    has_target:
+      name: "${friendly_name} Occupancy"
+      device_class: occupancy
+    has_moving_target:
+      name: "${friendly_name} Motion"
+      device_class: motion
+    has_still_target:
+      name: "${friendly_name} Still Presence"
+      device_class: occupancy
+
+# --- Sensors ---------------------------------------------------------------
+sensor:
+  - platform: ld2410
+    ld2410_id: ld2410_radar
+    moving_distance:
+      name: "${friendly_name} Moving Distance"
+      icon: mdi:map-marker-distance
+    still_distance:
+      name: "${friendly_name} Still Distance"
+      icon: mdi:map-marker-distance
+    moving_energy:
+      name: "${friendly_name} Moving Energy"
+      icon: mdi:flash
+    still_energy:
+      name: "${friendly_name} Still Energy"
+      icon: mdi:flash
+    detection_distance:
+      name: "${friendly_name} Detection Distance"
+      icon: mdi:map-marker-distance
+
+# --- Web server (optional quick view) --------------------------------------
+web_server:
+  port: 80
+
+# --- Maintenance buttons ----------------------------------------------------
+button:
+  - platform: restart
+    name: "${friendly_name} Restart"

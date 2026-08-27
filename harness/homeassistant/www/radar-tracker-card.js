@@ -65,8 +65,36 @@ class RadarTrackerCard extends HTMLElement {
       room_depth_mm: Number(config.room_depth_mm) || 4200,
       prefix: config.prefix || "sensor.bedroom_ld2450_bedroom_ld2450_target_",
       count: Number(config.count) || 3,
+      // ── LIVE GEOMETRY (2026-08-27) ────────────────────────────────────────────
+      // Optional. Point these at input_number helpers and the room and the sensor's
+      // position in it become knobs you can drag while watching the plot. Leave them
+      // out and every number above is used exactly as before.
+      room_width_entity: config.room_width_entity || "",
+      room_depth_entity: config.room_depth_entity || "",
+      origin_x_entity: config.origin_x_entity || "",
+      origin_y_entity: config.origin_y_entity || "",
+      // Where the sensor sits IN the room, mm from the left wall and from the back
+      // wall. Defaults put it mid-wall, which is what the card used to assume with no
+      // way to say otherwise.
+      origin_x_mm: config.origin_x_mm === undefined ? null : Number(config.origin_x_mm),
+      origin_y_mm: Number(config.origin_y_mm) || 0,
     };
     this._render();
+  }
+
+  /** A number from a live entity when one is configured, else the literal.
+   *  NEVER a silent zero: an entity that is missing, unavailable or non-numeric falls
+   *  back to the configured value, because a room 0 mm wide divides by zero and a
+   *  sensor at origin 0 looks like a real answer. */
+  _num(entityId, fallback) {
+    if (entityId && this._hass) {
+      const st = this._hass.states[entityId];
+      if (st && st.state !== "unavailable" && st.state !== "unknown") {
+        const v = Number(st.state);
+        if (Number.isFinite(v)) return v;
+      }
+    }
+    return fallback;
   }
 
   set hass(hass) {
@@ -297,11 +325,23 @@ class RadarTrackerCard extends HTMLElement {
     if (cv.height !== Math.round(cssH * dpr)) { cv.height = Math.round(cssH * dpr); }
     const g = cv.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const RW = this._cfg.room_width_mm, RD = this._cfg.room_depth_mm, pad = 34;
+    const RW = this._num(this._cfg.room_width_entity, this._cfg.room_width_mm);
+    const RD = this._num(this._cfg.room_depth_entity, this._cfg.room_depth_mm);
+    const pad = 34;
     const s = Math.min((cssW - pad * 2) / RW, (cssH - pad * 2) / RD);
-    return { g, W: cssW, H: cssH, RW, RD, pad, s,
-             ox: cssW / 2, oy: cssH - pad,
-             px: mm => cssW / 2 + mm * s, py: mm => (cssH - pad) - mm * s };
+    // ── THE SENSOR IS WHERE IT IS, NOT WHERE THE CARD ASSUMED ──────────────────────
+    // Targets arrive in the SENSOR's frame (x=0 straight ahead), so moving the sensor
+    // moves everything it reports with it — which is the whole point of the knob and
+    // the reason two radars in one room stop drawing the same person twice.
+    // origin_x defaults to mid-wall so an unconfigured card is unchanged.
+    const oxMM = this._num(this._cfg.origin_x_entity,
+                           this._cfg.origin_x_mm === null ? RW / 2 : this._cfg.origin_x_mm);
+    const oyMM = this._num(this._cfg.origin_y_entity, this._cfg.origin_y_mm);
+    const left = (cssW - RW * s) / 2, bottom = (cssH - pad);
+    const ox = left + oxMM * s;          // sensor, across the room
+    const oy = bottom - oyMM * s;        // sensor, up from the back wall
+    return { g, W: cssW, H: cssH, RW, RD, pad, s, ox, oy, left, bottom,
+             px: mm => ox + mm * s, py: mm => oy - mm * s };
   }
 
   _drawRoom(q) {
@@ -309,7 +349,9 @@ class RadarTrackerCard extends HTMLElement {
     g.clearRect(0, 0, W, H);
     g.fillStyle = "#05070d"; g.fillRect(0, 0, W, H);
     g.strokeStyle = "rgba(190,205,225,.55)"; g.lineWidth = 1.5;
-    g.strokeRect(px(-RW / 2), py(RD), RW * q.s, RD * q.s);
+    // THE ROOM IS FIXED, THE SENSOR MOVES INSIDE IT. Drawn from the room's own left
+    // edge rather than from the sensor, or sliding the origin would drag the walls.
+    g.strokeRect(q.left, q.bottom - RD * q.s, RW * q.s, RD * q.s);
     g.strokeStyle = "rgba(125,240,255,.22)";
     g.fillStyle = "rgba(160,225,245,.75)";
     g.font = "11px ui-monospace, monospace"; g.lineWidth = 1;

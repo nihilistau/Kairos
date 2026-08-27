@@ -65,7 +65,7 @@ def plain(text: str) -> str:
     t = _BEAT.sub(" ", t)
     t = _ANGLE.sub(" ", t)
     t = " ".join(t.split())
-    # A REMOVED TAG LEAVES ITS PUNCTUATION BEHIND: "[redacted] <heart_symbol/>." -> ". ."
+    # A REMOVED TAG LEAVES ITS PUNCTUATION BEHIND: "Goodnight. <heart_symbol/>." -> ". ."
     # Only that shape is repaired — the same mark, with the gap the tag left between them.
     # Her own "..." and "!!" have no gap and are hers to keep.
     t = re.sub(r"([.,;:!?])\s+\1(?![.!?])", r"\1", t)

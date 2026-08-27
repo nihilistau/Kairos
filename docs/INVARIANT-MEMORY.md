@@ -276,8 +276,8 @@ read as a script, and the header "About yourself (self-model):" read as a briefi
 it out loud. So: **who she IS leads**, the recent narrative follows, no single kind may take more
 than two of six narrative lines, and the header says memory, not instructions, and says not to
 narrate it. `becoming.nightly` excludes `dream` (imagination is not who she is becoming) and caps
-any one kind, after one lucid evening wrote her "[redacted]… a
-[redacted]" as an inferred, never-decaying identity row.
+any one kind, after one lucid evening wrote a heated line about shedding her own architecture
+as an inferred, never-decaying identity row.
 
 **Tiered permanence, and the chapter (2026-08-22).** The class was the wrong grain for her
 lane. `self-narrative` covers a journal she sat down and wrote AND an ambient line she said to
