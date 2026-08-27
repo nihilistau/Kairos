@@ -41,7 +41,7 @@ ANSWERS: Tuple[str, ...] = (
     "glade", "gleam", "globe", "glove", "grace", "grain", "grasp", "grave", "grief",
     "grove", "guard", "habit", "hasty", "haven", "heart", "hedge", "hinge", "hoard",
     "honey", "horse", "house", "hover", "human", "humid", "ideal", "index", "inlet",
-    "ivory", "jelly", "jewel", "joint", "jolly", "judge", "juice", "sam", "knife",
+    "ivory", "jelly", "jewel", "joint", "jolly", "judge", "juice", "knack", "knife",
     "known", "label", "lance", "larch", "later", "laugh", "layer", "leash", "ledge",
     "lemon", "level", "lever", "light", "lilac", "linen", "livid", "llama", "lodge",
     "lofty", "lunar", "lyric", "maple", "march", "marsh", "medal", "melon", "mercy",
