@@ -32,7 +32,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 
-from _gate import sandbox   # noqa: E402  — FIRST, before any harness import
+from _gate import persona_file, sandbox   # noqa: E402  — FIRST, before any harness import
 sandbox("g_secret_thought")
 
 os.environ["SP_DAEMON_URL"] = "http://127.0.0.1:9"
@@ -131,9 +131,11 @@ print("\n6. SHE IS TOLD IT EXISTS — a tool she is never handed is a tool she d
 # template that seeds a new stack there. Both must document the verb, because a tool the
 # persona never names is a tool she never reaches for; if neither is present there is
 # nothing to assert and the section says so rather than passing quietly.
-_pp = [os.path.join(ROOT, "persona", "20-memory.md"),
-       os.path.join(ROOT, "kairos-export", "persona-template", "20-memory.md")]
-_pp = [p for p in _pp if os.path.exists(p)]
+# RESOLVED BY _gate.persona_file, not by hand: the template sits under
+# `kairos-export/` upstream and AT THE ROOT in the export, and `persona/` ships
+# nowhere. Three gates hardcoded this and all three raised FileNotFoundError inside
+# a clone of the export rather than failing.
+_pp = [q for q in [persona_file("20-memory.md")] if q]
 check("a persona source exists to check", bool(_pp),
       "no persona/ and no persona-template/ — nothing documents her tools")
 _persona = "\n".join(io.open(p, encoding="utf-8").read() for p in _pp)

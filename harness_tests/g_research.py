@@ -38,7 +38,7 @@ sys.path.insert(0, ROOT)
 # G-GATE-SANDBOX did not catch it twice over: SP_RESEARCH_RECEIPTS ends in RECEIPTS and
 # its discovery regex enumerated ROOT|DIR|TIER|FILE|REGISTRY, and its "which gates must
 # sandbox" list is eleven files a past audit named by hand -- this was not one of them.
-from _gate import sandbox  # noqa: E402
+from _gate import persona_file, sandbox  # noqa: E402
 sandbox("g_research")      # FIRST, before any harness import can resolve a path
 
 os.environ["SP_RESEARCH"] = "1"
@@ -117,8 +117,11 @@ ok("argv" in rsrc and "json.dump" in rsrc,
    "the receipt records the question, the answer AND the exact command line")
 
 print("\n8. the honesty rule ships WITH the capability, not after it")
-frag = os.path.join(ROOT, "persona", "37-thinking-tiers.md")
-ok(os.path.isfile(frag), "persona/37-thinking-tiers.md exists")
+# RESOLVED BY _gate.persona_file — `persona/` is gitignored and never exported, so
+# reading it directly raised FileNotFoundError inside a clone of the export instead
+# of failing. The template carries the same fragment and is what an adopter copies in.
+frag = persona_file("37-thinking-tiers.md")
+ok(bool(frag), "37-thinking-tiers.md exists in a persona source")
 body = open(frag, encoding="utf-8").read()
 # Normalise whitespace before matching: the persona is prose and wraps at 88
 # columns, so a substring check that spans a line break fails on formatting rather

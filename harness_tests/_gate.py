@@ -176,3 +176,40 @@ def sandbox(name: str = "gate", persona: str = "") -> str:
 def probe(name: str) -> str:
     """The `synthetic` reason for a turn a gate drove. Put it in the request body."""
     return "live gate %s — driven, not their conversation" % name
+
+
+# ── WHERE THE PERSONA LIVES DEPENDS ON WHICH TREE YOU ARE IN (2026-08-27) ────────────
+# Three gates resolved it by hand and all three broke inside a fresh clone of the export,
+# each in the same way: not a FAIL but a FileNotFoundError that took the whole run with
+# it. `g_priming` wanted `kairos-export/persona-template` (upstream only), `g_research`
+# and `g_secret_thought` wanted `persona/` — which is GITIGNORED AND NEVER EXPORTED, as
+# G-KAIROS-SCRUB itself asserts ("persona-template/ ships and persona/ is gitignored").
+#
+# Patching them one at a time is the bug this repo is named for: a rule that each author
+# has to remember. So the resolution lives here, once.
+#
+#   persona/                        the live one. Upstream only.
+#   kairos-export/persona-template  the shipped default, staged. Upstream only.
+#   persona-template/               the same default, AT THE ROOT. In the export.
+#
+# Order is priority: a gate asking "what does the persona say" wants the live one where
+# there is one, and the template otherwise — which is exactly right, because the template
+# is what an adopter copies INTO persona/.
+def persona_dirs(root: str = "") -> list:
+    """Every persona source that exists in this tree, most-specific first."""
+    import os as _os
+    r = root or _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+    cand = [_os.path.join(r, "persona"),
+            _os.path.join(r, "kairos-export", "persona-template"),
+            _os.path.join(r, "persona-template")]
+    return [d for d in cand if _os.path.isdir(d)]
+
+
+def persona_file(name: str, root: str = "") -> str:
+    """The first existing `name` across the persona sources, or "" if it ships nowhere."""
+    import os as _os
+    for d in persona_dirs(root):
+        p = _os.path.join(d, name)
+        if _os.path.exists(p):
+            return p
+    return ""
