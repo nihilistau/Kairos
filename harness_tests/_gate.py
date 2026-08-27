@@ -213,3 +213,22 @@ def persona_file(name: str, root: str = "") -> str:
         if _os.path.exists(p):
             return p
     return ""
+
+
+# ── A FIXTURE OF HIS, AND A DEFAULT THAT SHIPS (2026-08-27) ──────────────────────────
+# Same shape as `persona/` vs `persona-template/`, and for the same reason. A gate whose
+# fixture is 207 rows out of her live store cannot ship — but dropping the GATE is worse,
+# because then the FEATURE ships with no proof it works for the person who cloned it.
+#
+# So: the private fixture stays upstream and the export carries a synthetic default with
+# the same measured properties, staged in `kairos-export/fixtures/` and overlaid into
+# place. The gate asks for both names and takes whichever exists, live first.
+def fixture(subdir: str, *names: str) -> str:
+    """The first of `names` that exists under harness_tests/fixtures/<subdir>, or ""."""
+    import os as _os
+    here = _os.path.dirname(_os.path.abspath(__file__))
+    for n in names:
+        p = _os.path.join(here, "fixtures", subdir, n)
+        if _os.path.exists(p):
+            return p
+    return ""
