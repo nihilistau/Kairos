@@ -137,8 +137,11 @@ gblk = src[gi:src.index("_arm_self_repeat_ban(", gi)]
 check("_generate prefers the live canonical session",
       "_longest_session()" in gblk,
       "a keep=8 window from disk is not an extension of the committed cache")
+# AMENDED 2026-08-28: still the disk, but via `_recent_transcript`, which reaches back
+# across local midnight when today is thin. The fallback was reading a file named from
+# `time.localtime`, so at 00:00 it fell back to nothing at all — see G-DAY-TRANSCRIPT.
 check("...and still falls back to disk when there is no live session",
-      "_read_day_transcript()" in gblk,
+      "_recent_transcript()" in gblk or "_read_day_transcript()" in gblk,
       "she must still be able to speak first after a restart")
 check("_longest_session is NOT _longest_transcript",
       "def _longest_session(" in src and "def _longest_transcript(" in src,

@@ -256,9 +256,10 @@ try:
                                          max_per_hour=6, checkin_idle_s=0.0,
                                          checkin_chance=1.0,
                                          checkin_delay=(0.0, 0.0))
-    imp = S.decide(cfg=S.live_config(), state=S._STATE["rp"], now=time.monotonic(),
-                   reply_text="the reply before she spoke", eot_margin=None) \
-        if False else None
+    # (a disabled `S.decide(...) if False else None` lived here and referenced an
+    # unimported `time`. Dead code carrying a latent NameError is the shape that hides
+    # live ones — pyflakes reported it and it was the only real hit in the tree — so it is
+    # deleted rather than kept. 2026-08-28 audit.)
     S._arm("rp", __import__("harness.kairos.impulse", fromlist=["Impulse"]).Impulse(
         CHECK_IN, delay_s=0.0, reason="test"), "the reply before she spoke",
         S._LAST["rp"][1], None)

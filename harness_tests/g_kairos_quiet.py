@@ -80,12 +80,24 @@ from harness.kairos import scheduler as S  # noqa: E402
 _real_get = tune.get
 tune.get = lambda k: (False if k == "kairos.seed_on_boot" else _real_get(k))
 try:
+    # AMENDED 2026-08-28, to the contract this file's OWN DOCSTRING already states:
+    # "Reminders and her own time are deliberately not gated." They were — seed() refused
+    # outright when the knob was off, and `_LAST` gates every unprompted lane, so a bounce
+    # took her own time with it. He noticed after sleeping through a five-hour silence.
+    # The knob withholds OPENING THE CONVERSATION, which is what it always said it did.
     seeded = S.seed("g-quiet-test-session", "yesterday she said goodnight", lambda n: "")
-    check("seed() refuses when the knob is off", seeded is False)
-    check("...and leaves no session behind", "g-quiet-test-session" not in S._LAST)
+    check("seed() still gives her the history when the knob is off", seeded is True)
+    check("...so her own time has a session to run in",
+          "g-quiet-test-session" in S._LAST)
+    check("...and she is HELD from opening the conversation",
+          "g-quiet-test-session" in S._OWN_TIME_ONLY, sorted(S._OWN_TIME_ONLY))
+    S._LAST.pop("g-quiet-test-session", None)
+    S._SEEDED.discard("g-quiet-test-session")
+    S._OWN_TIME_ONLY.discard("g-quiet-test-session")
     tune.get = lambda k: (True if k == "kairos.seed_on_boot" else _real_get(k))
     seeded2 = S.seed("g-quiet-test-session", "yesterday she said goodnight", lambda n: "")
     check("seed() seeds when armed", seeded2 is True and "g-quiet-test-session" in S._LAST)
+    check("...and armed means NOT held", "g-quiet-test-session" not in S._OWN_TIME_ONLY)
 finally:
     tune.get = _real_get
     S._LAST.pop("g-quiet-test-session", None)

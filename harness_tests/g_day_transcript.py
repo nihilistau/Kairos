@@ -267,6 +267,38 @@ check("an empty turn never becomes a blank message",
               A._chat_from_rows(_rows + [{"role": "user", "content": "   "}], keep=8)))
 
 shutil.rmtree(SB, ignore_errors=True)
+# ── THE CONVERSATION DOES NOT END AT MIDNIGHT (2026-08-28) ───────────────────────────
+# HIS REPORT: "i just refreshed and it cleared the rendered chat history." `_day_key` names
+# the file from `time.localtime`, so at 00:00 today's file is empty — and their evenings run
+# past one in the morning. Three things read it and went blank together: the room's log
+# (reloaded from /v1/day on mount), `_seed_kairos_from_day`, and the continuation window.
+#
+# `_read_day_transcript` keeps its meaning, because the CONSOLIDATOR consolidates a day and
+# that is the right unit for it. `_recent_transcript` is the other question — "what were we
+# just saying" — and reaches back across the boundary only when today is thin.
+import datetime as _dt   # noqa: E402
+_today = A._day_key()
+_yest = (_dt.date.today() - _dt.timedelta(days=1)).isoformat()
+os.makedirs(os.path.dirname(A._day_transcript_path(_yest)), exist_ok=True)
+with io.open(A._day_transcript_path(_yest), "w", encoding="utf-8") as f:
+    for i in range(6):
+        f.write(json.dumps({"role": "user", "content": "last night %d" % i}) + "\n")
+        f.write(json.dumps({"role": "assistant", "content": "and hers %d" % i}) + "\n")
+with io.open(A._day_transcript_path(_today), "w", encoding="utf-8") as f:
+    pass                                   # midnight: today is empty
+check("the day reader still means TODAY", A._read_day_transcript() == [])
+_recent = A._recent_transcript()
+check("...but the recent conversation crosses midnight", len(_recent) == 12, len(_recent))
+check("...so a continuation has something to continue FROM",
+      len(A._chat_from_rows(_recent, keep=8)) > 0)
+with io.open(A._day_transcript_path(_today), "w", encoding="utf-8") as f:
+    for i in range(20):
+        f.write(json.dumps({"role": "user", "content": "today %d" % i}) + "\n")
+_full = A._recent_transcript()
+check("...and a normal day does NOT reach back, so nothing is shown twice",
+      len(_full) == 20 and all("last night" not in (r.get("content") or "") for r in _full),
+      len(_full))
+
 print("\nG-DAY-TRANSCRIPT: %d pass, %d fail" % (PASS, FAIL))
 rdir = os.path.join(ROOT, "var", "sem", "receipts")
 os.makedirs(rdir, exist_ok=True)
