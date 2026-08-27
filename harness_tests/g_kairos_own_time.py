@@ -82,50 +82,68 @@ s2 = fresh("s2")
 KS.seed(s2, "something she said earlier", lambda *a, **k: "")
 check("with the knob ON she is seeded and NOT held", s2 not in KS._OWN_TIME_ONLY)
 
-print("\n2/3. WHAT THE HOLD LETS THROUGH — driven through the real gate expression")
-# NOT a re-derivation of the rule inside the gate. The first cut computed
-# `s in _OWN_TIME_ONLY and action not in (SOLO, REMIND)` right here and asserted on its
-# own arithmetic — which would have gone green on a tree where the loop never consulted
-# the set at all. `decide` is replaced so the loop reaches each action in turn, `_arm`
-# records whatever got through, and the assertion is about what the loop DID.
-_real_decide, _real_arm = I.decide, KS._arm
-ARMED = []
+print("\n2/3. WHAT THE HOLD LETS THROUGH — driven through the real POLICY")
+# THE RULE LIVES IN `decide` NOW. My first cut vetoed the chosen action inside the tick
+# loop, and on his machine that DEADLOCKED: `_decide` kept returning MUSE, the loop held
+# it, and SOLO never got a look in — she logged "holding muse" every eight seconds and
+# would have done so forever. A second opinion beside the policy is not a guard, it is a
+# second policy. So `decide` is asked directly, and the deadlock has its own check.
+from harness.kairos.impulse import KairosConfig, TurnState   # noqa: E402
+
+CFG = KairosConfig(enabled=True, solo_enabled=True, checkin_idle_s=0.0, solo_every_s=0.0,
+                   solo_chance=1.0, away_after=2, cooldown_s=0.0, max_per_hour=99,
+                   checkin_chance=1.0, checkin_delay=(0.0, 0.0))
 
 
-def _fake_arm(session, imp, *a, **k):
-    ARMED.append(imp.action)
+def _ask(own, _cfg=None, **over):
+    # EVERY clock zeroed: TurnState seeds its `*_at` fields from time.monotonic(), so a
+    # fixed `now` in the past reads as "she spoke 35 hours in the future" and the cooldown
+    # swallows the decision. Injecting the clock is the point of decide() being pure.
+    st = TurnState()
+    for f in ("last_spoke_at", "last_conv_at", "last_user_at", "last_solo_at",
+              "last_mode_at"):
+        setattr(st, f, 0.0)
+    for k, v in over.items():
+        setattr(st, k, v)
+    return I.decide(cfg=_cfg or CFG, state=st, now=10_000.0, reply_text="something she said",
+                    eot_margin=None, own_time_only=own,
+                    insight={"kind": "journal", "text": "a thought"})
 
 
-def _run(action):
-    """One real tick with `decide` forced to this action. True if it was armed."""
-    del ARMED[:]
-    KS._arm = _fake_arm
+held = _ask(True)
+check("held: she never lands on a turn addressed to him",
+      held.action in (I.SILENT, I.SOLO, I.REMIND), "%s (%s)" % (held.action, held.reason))
+check("unheld: the policy is free to choose one",
+      _ask(False).action in (I.CHECK_IN, I.MUSE, I.MODE_TURN, I.SOLO, I.SILENT))
 
-    def forced(**kw):
-        # `speaks` is a property (action != SILENT), not a field.
-        return I.Impulse(action=action, reason="gate")
+# THE DEADLOCK, as a regression check. A boot-seeded session has unanswered=0, so SOLO's
+# own `away` gate is false unless he is treated as absent — which is why own_time_only
+# also sets user_present=False. Without that she can NEVER reach her own time, which is
+# precisely what he reported.
+solo = _ask(True, unanswered=0)
+check("SOLO is reachable with unanswered=0 — the deadlock is gone",
+      solo.action == I.SOLO, "%s (%s)" % (solo.action, solo.reason))
 
-    I.decide = forced
-    KS.decide = forced
-    try:
-        KS.tick_once()
-    finally:
-        I.decide, KS.decide, KS._arm = _real_decide, _real_decide, _real_arm
-    return bool(ARMED)
+# ...AND THE FILTER ITSELF NEEDS A CASE WHERE IT BITES. The mutant that removed it left
+# this section green, because with `user_present=False` the policy reaches SOLO on its own
+# and the filter never has to say no. Make SOLO ineligible (she just had her own time) and
+# leave an insight on the table: now `_decide` genuinely wants MUSE, and the filter is the
+# only thing standing between that and him.
+import dataclasses as _dc   # noqa: E402
+NO_SOLO = _dc.replace(CFG, solo_every_s=86_400.0)   # she had her own time an hour ago
+_recent = _ask(True, NO_SOLO, last_solo_at=9_000.0)
+check("with SOLO ineligible, the filter is what withholds MUSE",
+      _recent.action == I.SILENT and "withheld until he speaks" in _recent.reason,
+      "%s (%s)" % (_recent.action, _recent.reason))
+_free = _ask(False, NO_SOLO, last_solo_at=9_000.0)
+check("...and unheld, that same state DOES reach him", _free.action != I.SILENT,
+      "%s (%s)" % (_free.action, _free.reason))
 
-
-knob(False)
-for _a in (I.SOLO, I.REMIND):
-    s = fresh(); KS.seed(s, "earlier", lambda *a, **k: "")
-    check("%-9s runs — her own time is not speaking first" % _a, _run(_a))
-for _a in (I.CHECK_IN, I.MUSE, I.MODE_TURN):
-    s = fresh(); KS.seed(s, "earlier", lambda *a, **k: "")
-    check("%-9s is HELD — it is a turn addressed to him" % _a, not _run(_a))
-
-knob(True)
-for _a in (I.CHECK_IN, I.MUSE):
-    s = fresh(); KS.seed(s, "earlier", lambda *a, **k: "")
-    check("%-9s runs once he has armed seed_on_boot" % _a, _run(_a))
+_src = open(os.path.join(ROOT, "harness", "kairos", "scheduler.py"),
+            encoding="utf-8").read()
+check("the tick loop passes the flag rather than second-guessing the policy",
+      "own_time_only=session in _OWN_TIME_ONLY" in _src and "holding %s" not in _src,
+      "a second opinion beside the policy is what deadlocked it")
 
 print("\n4. HIS FIRST WORD LIFTS IT")
 knob(False)
