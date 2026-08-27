@@ -517,6 +517,20 @@ def all_tools() -> List[ToolSpec]:
         import logging
         logging.getLogger(__name__).warning("body tools unavailable: %s", exc)
 
+    # ── HER HANDS ON THE HOUSE, AND ONLY WHEN ARMED (2026-08-27) ─────────────────────
+    # The opposite rule to body_tools above, deliberately. A body tool she cannot use is a
+    # diagnostic — it is how she finds out the watch is off. A house verb she cannot use is
+    # an invitation to promise him the light is on and then fail, which is the
+    # confabulation most of the rules in this file exist to prevent. So: off means ABSENT,
+    # and `house_tools()` returns [] unless SP_HOUSE_HANDS is armed.
+    try:
+        from harness.skills.house import house_tools
+        names = {s.name for s in specs}
+        specs = specs + [s for s in house_tools() if s.name not in names]
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("house tools unavailable: %s", exc)
+
     # ── THE BRIDGE GOES LAST, AND THAT IS THE WHOLE RULE (2026-08-25) ─────────────
     # Tools from mcp_servers.json join when SP_MCP_TOOLS=1. Three documents say
     # "native always keeps the bare name on a collision" — mcp_servers.json, docs/MCP.md

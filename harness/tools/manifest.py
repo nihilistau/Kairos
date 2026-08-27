@@ -199,6 +199,18 @@ FACTS: Dict[str, ToolFacts] = {
     "his_day": ToolFacts("body", "private",
                          note="the shape of the last few hours — counts and freshness, "
                               "never the feed; answers 'has he been wearing it at all'"),
+    # ── HER HANDS ON THE HOUSE (2026-08-27). "act" because these MOVE something in his
+    # home, which no other tool here does; the group is gated so the verbs are absent
+    # unless SP_HOUSE_HANDS is armed. docs/OFF-BY-DEFAULT.md carries the arming condition.
+    "set_light": ToolFacts("house", "act", arms="SP_HOUSE_HANDS",
+                           note="turn one of HIS listed lights on or off, or set its "
+                                "colour or brightness; on request only, and only what he "
+                                "put in the allowlist"),
+    "set_fan": ToolFacts("house", "act", arms="SP_HOUSE_HANDS",
+                         note="turn one of his listed fans on or off; on request only"),
+    "what_i_can_reach": ToolFacts("house", "read", arms="SP_HOUSE_HANDS",
+                                  note="the handful of things he allowed, by the names he "
+                                       "uses; never an enumeration of the house"),
     "when_he_slept": ToolFacts("body", "private",
                                note="when he fell asleep and when he was up, AS BOUNDS — a "
                                     "band for going under and a ceiling for waking, because "
