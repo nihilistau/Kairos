@@ -222,6 +222,31 @@ WOKE_WINDOW_S = 90 * 60
 
 SLEEP_SURE = 70.0          # at or above: she may say he seems asleep
 SLEEP_AWAKE = 30.0         # at or below: he is awake
+# How recently a turn in the room counts as proof he is up. Fifteen minutes because that
+# is the window the measurement used, and because a person who typed a sentence a quarter
+# of an hour ago is not asleep. See the veto near the end of read().
+ROOM_VETO_S = 15 * 60
+
+
+def _seconds_since_he_spoke():
+    """Seconds since his last turn in the room, or None if nothing can say.
+
+    `last_user_at` is monotonic and lives in the kairos scheduler's per-session state —
+    the same expression app.py's `_quiet_for` already uses to decide whether the room is
+    still enough to take the GPU. Read rather than copied: a second clock for "when did
+    he last speak" is two truths about one fact, which is what this tree keeps getting
+    caught by. Fails to None on any error, and None never vetoes anything."""
+    try:
+        import time as _t
+
+        from harness.kairos import scheduler as _ks
+        with _ks._LOCK:
+            last = max((st.last_user_at for st in _ks._STATE.values()), default=0.0)
+        if last <= 0.0:
+            return None
+        return max(0.0, _t.monotonic() - last)
+    except Exception:
+        return None
 _SLEEP_MIN_SIGNALS = 2     # below this the answer is None — see why in the docstring
 
 
@@ -459,6 +484,36 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
                 facts["asleep"] = True
             elif c <= SLEEP_AWAKE:
                 facts["asleep"] = False
+
+    # ── HE IS TALKING TO HER. THAT IS NOT AN INFERENCE (2026-08-27) ──────────────────
+    # Every signal above is about a PHONE — screen, charger, wrist, a classifier reading
+    # a handset. None of them is about him, and once he is at the desktop the phone lies
+    # on a charger looking exactly like a phone whose owner is asleep.
+    #
+    # MEASURED, against the only ground truth that costs nothing: a message from him is
+    # proof he was awake that minute. Over 46 samples taken within fifteen minutes of one
+    # of his messages, the classifier's MEDIAN was 61% — and between 01:00 and 03:50 on
+    # 2026-08-27, while he typed continuously, it ran 76-95%. At the SLEEP_SURE line of 70
+    # it would have called him asleep for 30% of the minutes he was demonstrably awake.
+    #
+    # So the room outranks the phone, and it is not a tie-break: a turn in the room is
+    # OBSERVED and a classifier is INFERRED, which is this store's oldest rule arriving
+    # at the one seam that had not heard it. His words for the same thing: "50/50 would
+    # lean towards awake."
+    #
+    # NOT A GUESS WHEN IT DOES NOT KNOW. No session, no scheduler, a fresh boot — the
+    # veto simply does not fire and every reading above stands unchanged. The one soft
+    # edge is deliberate: a session that exists but has never had a turn carries BOOT_AT,
+    # so for a few minutes after a restart this reads as "he just spoke". That errs
+    # toward AWAKE, which is the direction the measurement says to err in.
+    _spoke = _seconds_since_he_spoke()
+    if _spoke is not None and _spoke <= ROOM_VETO_S:
+        if facts.get("asleep") is True or facts.get("sleep_confidence") is not None:
+            facts["sleep_vetoed_by_room"] = int(_spoke)
+        facts["asleep"] = False
+        facts["awake_by_room"] = True
+        why.append("he spoke to me %d minutes ago, which outranks any reading of his phone"
+                   % max(1, int(_spoke // 60)))
 
     # ── MOVING / STILL, and HOW LONG. "How long" is the half that makes it presence
     # rather than a status line: "still" is a state, "still for two hours" is a person.

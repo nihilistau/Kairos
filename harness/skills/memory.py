@@ -778,9 +778,9 @@ def remember(fact: str, source: str = "", *, kind: str = "", mem_class: str = ""
     # against 0.083 on his facts — and TWELVE OF TWELVE ARE WRONG, all the same way.
     # dominance's content carrier is topic_of plus names and numbers, built for ATTRIBUTIVE
     # facts ("Sam owns a blue kettle": a subject and an attribute). Her narrative is
-    # EXPRESSIVE PROSE with almost no attributive content — "[redacted]" reduces to
-    # roughly {love} — so any longer sentence containing "love" dominates it structurally,
-    # and "[redacted]" is proposed to retire "[redacted]"
+    # EXPRESSIVE PROSE with almost no attributive content — a bare affectionate line reduces
+    # to roughly ONE content word — so any longer sentence sharing that word dominates it
+    # structurally, and a warmer variant is proposed to retire the plainer one.
     #
     # The hypothesis that lost was that her lane would be dominance's BEST case, because
     # near-duplicate restatement is rife there and retiring one of her own repeated lines is

@@ -1,0 +1,22 @@
+# =============================================================================
+# Bedroom LD2450 Tracking Node (multi-target)
+# Built with scripts/run_esphome.ps1 to avoid VS Code command mangling.
+# =============================================================================
+
+# --- Substitutions ----------------------------------------------------------
+substitutions:
+  device_id: "bedroom-ld2450"
+  friendly_name: "Bedroom LD2450"
+  esp32_board: "esp32-c3-devkitm-1"
+  ld2450_tx_pin: "GPIO21"
+  ld2450_rx_pin: "GPIO20"
+  target_refresh_interval: "250ms"
+  room_width_mm: "4500"
+  room_depth_mm: "4200"
+  sensor_origin_x_mm: "2250"
+  sensor_origin_y_mm: "200"
+  ld2450_trace_enabled: "false"
+
+# --- Shared packages --------------------------------------------------------
+packages:
+  ld2450_multizone: !include packages/ld2450_multizone.yaml

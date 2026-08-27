@@ -1,0 +1,58 @@
+# =============================================================================
+# Bedroom LD2450 Tracking Node #2 (multi-target)
+#
+# THE SAME ESP32-C3 THAT USED TO CARRY THE LD2410 (2026-08-27). The LD2410 was
+# unplugged and an LD2450 wired to the same pins, so this node REPLACES the
+# hardware behind `mmwave-zone-1.yaml` — that file is kept, but nothing answers
+# to it any more.
+#
+# ── THE FIRST UPLOAD NEEDS AN ADDRESS, THE REST DO NOT ──────────────────────
+# OTA finds a node by its mDNS name, and the name comes from `device_id`. On the
+# first flash this device is still announcing itself as `bedroom-ld2410`, so
+# `bedroom-ld2450-2.local` does not exist yet and the upload has nowhere to go.
+# `use_address` points the first upload at the IP it currently holds
+# (its then-current DHCP lease, confirmed serving its web UI first). AFTER the
+# first successful OTA the node announces the new name and this line should be
+# deleted — leaving it pins the device to an address DHCP is free to change,
+# which is a silent breakage the next time the router hands out a new lease.
+# =============================================================================
+
+# --- Substitutions ----------------------------------------------------------
+substitutions:
+  device_id: "bedroom-ld2450-2"
+  friendly_name: "Bedroom LD2450 2"
+  esp32_board: "esp32-c3-devkitm-1"
+  # SAME PINS AS THE WORKING LD2450 (mmwave-zone-2). The first flash saw no UART
+  # bytes at all — every target valid:false, `active_targets` never published
+  # once — so the pins were swapped as a two-minute test of "crossed wires vs
+  # dead module". That was the wrong question: the wires were crossed at the
+  # HEADER, he rewired them to match the original, and these are the pins that
+  # pairing needs. Kept as the note rather than the swap, because the next
+  # person to see silence here should check the plug before the config.
+  ld2450_tx_pin: "GPIO21"
+  ld2450_rx_pin: "GPIO20"
+  # ── BAUD IS NOT THE PROBLEM; THE MODULE IS NOT ANSWERING (2026-08-27) ──────
+  # Tested at 256000 (factory) and 115200: the parser reports "Max command
+  # length exceeded; ignoring" at BOTH, and the module reports
+  #     Firmware version: 0.00.00000000    MAC address: unknown
+  # A powered, silent module produces NO bytes — an idle UART line sits high.
+  # Garbage at every rate is a FLOATING RX: the module TX is not reaching
+  # GPIO20. Both pin orders were tried in firmware, so it is not the config.
+  # Left at the factory rate, which is the right default once the wire is on.
+  target_refresh_interval: "250ms"
+  # Room geometry, copied from mmwave-zone-2 because BOTH SENSORS ARE IN THE
+  # SAME ROOM. The origin is where THIS sensor sits, and it is the one thing
+  # here that is genuinely per-device: two radars at the same origin would place
+  # every target twice in the same spot. Measure it and set it — the value below
+  # is a placeholder equal to zone-2's and is almost certainly wrong for this
+  # unit. See the note in the dashboard commit.
+  room_width_mm: "4500"
+  room_depth_mm: "4200"
+  sensor_origin_x_mm: "2250"
+  sensor_origin_y_mm: "200"
+  ld2450_trace_enabled: "false"
+
+# --- Shared packages --------------------------------------------------------
+packages:
+  ld2450_multizone: !include packages/ld2450_multizone.yaml
+

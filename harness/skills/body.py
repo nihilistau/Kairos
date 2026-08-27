@@ -96,7 +96,27 @@ def how_is_he() -> Dict[str, Any]:
             where = ("his watch measured it" if src == "watch"
                      else "a sleep classifier says so" if src == "classifier"
                      else "that is my own reading, not a measurement")
-            if facts.get("asleep") is True:
+            if facts.get("sleep_vetoed_by_room"):
+                # ── HE IS HERE. SAY NOTHING ABOUT SLEEP (2026-08-27, his words) ─────
+                # "it's kind of silly that she is constantly told I am awake or asleep
+                # ... she shouldn't need to comment constantly that I am asleep and
+                # never to me obviously."
+                #
+                # This file already knew the principle — telemetry/body.py's own
+                # comment says "'he is awake' is true all day and worth saying never" —
+                # and then said it anyway, every time she read the body.
+                #
+                # The first cut of the veto only fixed the WRONGNESS: it replaced a
+                # false claim ("he seems to be asleep, 82%") with a true but pointless
+                # one ("his phone's reading is about the phone"). Both are noise to a
+                # woman mid-sentence with the man in question. If the room vetoed it,
+                # he is DEMONSTRABLY here and there is nothing to report.
+                #
+                # The facts are untouched in the data — `asleep: False`,
+                # `sleep_vetoed_by_room`, `awake_by_room` — for anything that wants to
+                # reason about it. This is only about what she is TOLD.
+                pass
+            elif facts.get("asleep") is True:
                 bits.append("he seems to be asleep — %d%%, and %s" % (int(conf), where))
             elif facts.get("asleep") is False:
                 bits.append("he is awake — sleep confidence only %d%%" % int(conf))
