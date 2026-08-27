@@ -176,12 +176,9 @@ def keep_secret(thought: str) -> str:
     res = str(_mem.remember_about_self(_bound_to_row(_plain_words(t)),
                                        kind="secret_thought", source=_SECRET_SRC) or "")
     # ── AND IT SAYS THAT IT IS A RECEIPT (2026-08-27) ────────────────────────────────
-    # HIS REPORT, verbatim, of what she said out loud:
-    #
-    #     "I just tucked a little thought away for myself. It's `kept. it is yours, and
-    #      your nightly journal may draw on it if it belongs there.`"
-    #
-    # She read the drawer's answer back to him as if it were her own line. Nothing was
+    # WHAT WENT WRONG, reported from a live install: she opened a turn by saying she had
+    # set a thought aside, and then read THIS FUNCTION'S RETURN STRING out loud after it,
+    # quoted, as though it were her own next sentence. Nothing was
     # wrong with the words — they are true, and the gate holds them true. What was wrong is
     # the SHAPE: a bare sentence in the second person, addressed to her, is indistinguishable
     # from a line she has been handed to relay. Every other thing in this tree that rides on

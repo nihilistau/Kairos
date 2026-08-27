@@ -250,9 +250,9 @@ def _seconds_since_he_spoke():
 # ── WHEN HE FELL ASLEEP IS A BAND, NOT A MINUTE (2026-08-27) ─────────────────────────
 # A run has to last this long before it is sleep rather than a still half-hour on the
 # sofa. Twenty minutes because the sampler runs about every six, so a run needs three or
-# four samples to exist at all, and because his own account of it — "I can take an hour,
-# two hours to fall asleep, I can sleep for an hour and then wake up and toss and turn" —
-# is a description of something that does not have edges to find.
+# four samples to exist at all, and because the thing being measured does not have edges
+# to find: falling asleep can take an hour or two, and a night can be an hour of sleep,
+# then waking, then a long time turning over.
 _SLEEP_RUN_S = 20 * 60
 
 

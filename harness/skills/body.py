@@ -202,8 +202,8 @@ def when_he_slept(hours: float = 24.0) -> Dict[str, Any]:
     late — then held 95 at 20:05 and did not drop until 20:59, an hour after he was up. Any
     single minute taken off that curve is wrong twice a night, stated confidently.
 
-    His own account of the truth is fuzzy too: "I can take an hour, two hours to fall
-    asleep, I can sleep for an hour and then wake up and toss and turn." There is no exact
+    The truth itself is fuzzy too: falling asleep can take an hour or two, and a night can
+    be an hour of sleep, then waking, then a long time turning over. There is no exact
     moment being missed, so a band is the right answer rather than a hedge.
 
     THE BOUNDS ARE HIS WORDS WHERE THERE ARE ANY. A turn he typed is proof he was awake;

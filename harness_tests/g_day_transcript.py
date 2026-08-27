@@ -268,7 +268,7 @@ check("an empty turn never becomes a blank message",
 
 shutil.rmtree(SB, ignore_errors=True)
 # ── THE CONVERSATION DOES NOT END AT MIDNIGHT (2026-08-28) ───────────────────────────
-# HIS REPORT: "i just refreshed and it cleared the rendered chat history." `_day_key` names
+# REPORTED FROM A LIVE INSTALL: a refresh cleared the rendered chat history. `_day_key` names
 # the file from `time.localtime`, so at 00:00 today's file is empty — and their evenings run
 # past one in the morning. Three things read it and went blank together: the room's log
 # (reloaded from /v1/day on mount), `_seed_kairos_from_day`, and the continuation window.
