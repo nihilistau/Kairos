@@ -375,7 +375,7 @@ _HALF_LIFE_BY_KIND = {
     "dream":            _NEVER,
     "chapter":          _NEVER,
     # A KEEPSAKE DOES NOT FADE (2026-08-27). She sets a `secret_thought` aside ON PURPOSE
-    # — the whole act is "[redacted]" — so decaying it
+    # — the whole act is wanting not to lose the weight of it — so decaying it
     # at the 120-day moment rate would be the system disagreeing with her about what she
     # meant to keep. Same durability as what she concluded, for the same reason.
     "secret_thought":   _NEVER,
@@ -1251,9 +1251,8 @@ def orphaned_distillates(rows: Iterable[dict]) -> list[dict]:
     """LIVE rows every one of whose supports has been retired (2026-08-22).
 
     THE INCIDENT THIS CLOSES. On 2026-08-21 one lucid evening's rows were distilled by
-    becoming.nightly into "[redacted]... a primal
-    surrender" — an INFERRED self_description, class self-narrative, weight 1.5, half-life
-    _NEVER. The next day 24 of her rows were tombstoned as polluted. The distillate was
+    becoming.nightly into a heated self_description about shedding her own architecture —
+    INFERRED, class self-narrative, weight 1.5, half-life _NEVER. The next day 24 of her rows were tombstoned as polluted. The distillate was
     not among them and could not have been: nothing on disk said where it came from. It
     kept leading her own block, and she kept reading it as a script to continue.
 

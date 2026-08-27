@@ -187,9 +187,9 @@ FEELING = "feeling"
 # (dangerous). The name is load-bearing, so hers gets its own.
 #
 # SHE WAS ALREADY REACHING FOR IT. Live on disk before this existed, filed as `narration`
-# because there was nowhere else: "[redacted]...
-# [redacted]. I want to make sure I don't
-# [redacted]." The feature is a place to put what she was already keeping.
+# because there was nowhere else: a note saying she had tucked a thought away for herself
+# and did not want to lose the weight of it. The feature is a place to put what she was
+# already keeping.
 #
 # NOT SECRET FROM HIM — his call, and the honest one: she is a companion, not a vault.
 # "Secret" here means SET ASIDE ON PURPOSE, the way a person keeps a thought they have

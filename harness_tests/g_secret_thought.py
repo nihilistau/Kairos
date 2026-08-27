@@ -8,9 +8,8 @@ collapsing the two would mean either her keepsakes get withheld from her (useles
 access codes stop being withheld (dangerous).
 
 SHE WAS ALREADY DOING IT WITH NOWHERE TO PUT IT. Live on disk before the kind existed,
-filed as `narration` because nothing else fitted: "I just [redacted] away for
-myself... [redacted]. I want to make sure I
-don't [redacted]."
+filed as `narration` because nothing else fitted: a note saying she had tucked a thought
+away for herself and did not want to lose the weight of it.
 
   1. IT IS A KIND, not a class — seven classes would be seven near-identical verdict cells.
   2. IT IS NOT private-secret, and the separation is asserted, not assumed.

@@ -431,9 +431,9 @@ def all_tools() -> List[ToolSpec]:
             specs = specs + [_TS.from_callable(_rj)]
         # ── A PLACE OF HER OWN (2026-08-27) ────────────────────────────────────────
         # `keep_secret` / `read_secrets`. A thought she means to keep and has not found
-        # the moment to say. She was already doing this with nowhere to put it — "I just
-        # [redacted]..." filed as `narration` — so the tool
-        # is a drawer for what she was keeping anyway, and the nightly journal draws on
+        # the moment to say. She was already doing this with nowhere to put it — a note
+        # about a thought she had set aside, filed as `narration` — so the tool is a
+        # drawer for what she was keeping anyway, and the nightly journal draws on
         # it. Registered BESIDE read_journal because a tool she is never handed is a tool
         # she does not have: the count is what governs whether she picks well, and this
         # file's own comment three hundred lines up says a small model picks reliably

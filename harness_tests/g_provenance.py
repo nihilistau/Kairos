@@ -2,8 +2,8 @@
 
 THE INCIDENT (2026-08-21/22). One lucid evening's rows were distilled by
 becoming.nightly into an INFERRED self_description — class self-narrative, weight 1.5,
-half-life _NEVER — that read "[redacted]... a primal
-surrender". The next day 24 of her rows were tombstoned as polluted. The distillate was
+half-life _NEVER — a heated line about shedding her own architecture. The next day 24 of
+her rows were tombstoned as polluted. The distillate was
 not among them and COULD NOT HAVE BEEN: nothing on disk connected it to what it was made
 from. It went on leading her own block, and she went on reading it as a script.
 

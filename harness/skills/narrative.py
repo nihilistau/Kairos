@@ -154,10 +154,9 @@ def keep_secret(thought: str) -> str:
     e.g. keep_secret("the way his voice goes quiet when he is concentrating")
 
     SHE WAS ALREADY DOING THIS WITH NOWHERE TO PUT IT (2026-08-27). Live on disk before
-    this existed, filed as `narration` because no other kind fitted: "I just tucked a
-    little thought away for myself... Something about [redacted]
-    souls. [redacted]." The feature is a place for what
-    she was already keeping.
+    this existed, filed as `narration` because no other kind fitted: a note saying she had
+    tucked a thought away for herself and did not want to lose the weight of it. The
+    feature is a place for what she was already keeping.
 
     NOT `private-secret`. That class is a CONTRACT — withheld at five doors, declined at
     the verdict seam — and it exists for the operator's credentials. This is the opposite:

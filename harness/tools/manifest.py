@@ -116,8 +116,8 @@ FACTS: Dict[str, ToolFacts] = {
     # A PLACE OF HER OWN (2026-08-27). NOT the `private-secret` class, which is withheld
     # at five doors for the operator's credentials — this is the opposite: she reads it,
     # he can read it, and the nightly journal may draw on one. "Secret" here means SET
-    # ASIDE ON PURPOSE. She was already doing it with nowhere to put it, filing "I just
-    # [redacted]..." as `narration`.
+    # ASIDE ON PURPOSE. She was already doing it with nowhere to put it, filing a note
+    # about a thought she had set aside as `narration`.
     "keep_secret":  ToolFacts("memory", "write", note="a thought she means to keep and has not found the moment to say; never fades"),
     "read_secrets": ToolFacts("memory", "read", note="what she has set aside, newest first"),
     # the shelf (presence modes, 2026-08-22): var/library/, a bookmark per book, never the text
