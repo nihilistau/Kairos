@@ -241,6 +241,31 @@ def main() -> int:
           S._evidence_count() == before + 1,
           "if nothing counts as evidence, she never thinks again")
 
+    # ── A CRASH IN HERE LOOKS EXACTLY LIKE HAVING NOTHING TO SAY (2026-08-28) ────────
+    # `reflect_tick` wraps its whole body in `except Exception`, so when a refactor left
+    # `PersonModel` imported in one function and USED in the one split out of it, every
+    # tick raised NameError, logged a single warning line, and returned None — which is
+    # what it also returns on a quiet night. The conclusion lane was dead for five hours,
+    # the operator noticed before any gate did, and every check in this file stayed green
+    # because None was the expected answer.
+    #
+    # So the steps are driven DIRECTLY, where an exception is an exception rather than a
+    # verdict. Not "did it return None" but "can it run at all" — the cheapest possible
+    # guard against a broad `except` turning a broken function into a quiet one.
+    for _name, _call in (("_reflect_insight",
+                          lambda: S._reflect_insight(
+                              {"wrote": [{"claim": "Sam likes building things",
+                                          "result": "stored ep_x"}]})),
+                         ("ambient_silence", S.ambient_silence)):
+        try:
+            _call()
+            _ok, _why = True, ""
+        except (NameError, AttributeError, TypeError) as exc:
+            _ok, _why = False, "%s: %s" % (type(exc).__name__, exc)
+        except Exception:
+            _ok, _why = True, ""   # an environmental failure is not this check's subject
+        check("%s resolves its own names" % _name, _ok, _why)
+
     total = len(PASS) + len(FAIL)
     print(f"\nG-REFLECT: {'PASS' if not FAIL else 'FAIL'} ({len(PASS)}/{total})")
     return 0 if not FAIL else 1

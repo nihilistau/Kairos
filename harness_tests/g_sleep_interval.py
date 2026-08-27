@@ -123,6 +123,27 @@ check("the ceiling is the tighter of last-sure and his next word",
 check("...and a real waking BEFORE the ceiling is admitted",
       (NOW - 150 * M) <= v["woke_by"])
 
+print("\n3b. A RUN THAT ENDS BECAUSE THE DATA ENDED IS NOT A WAKING")
+# HIS NIGHT, 2026-08-28: high from 23:04 to 01:25, then a 188-MINUTE HOLE, then 48 at 04:34
+# with the battery back at 100%. The phone had died. The ceiling read "up by 01:25" —
+# confident, and false by about three hours. Absence of data is not evidence of waking,
+# which is the same rule this whole area runs on one level up.
+DEAD = ([conf(m, 20) for m in (400, 395, 390)]
+        + [conf(m, 90) for m in range(380, 200, -10)]   # sure sleep...
+        + [conf(m, 40) for m in (12,)])                 # ...then nothing for three hours
+d = B.sleep_interval(DEAD, NOW)
+check("a night is still found", bool(d))
+check("it does NOT assert a ceiling it never observed", d["woke_by"] is None, d["woke_by"])
+check("...and says where it lost the thread", d["blind_after"] is not None, d)
+check("...and when the readings came back", d["blind_until"] is not None, d)
+check("...and does NOT call him still asleep, which is a different claim",
+      not d["still_asleep"], d)
+d2 = B.sleep_interval(DEAD, NOW, awake_at=[NOW - 5 * M])
+check("his own word after the hole DOES bound it",
+      d2["woke_by"] is not None and abs(d2["woke_by"] - (NOW - 5 * M)) <= 1.5, d2["woke_by"])
+check("an unbroken stream still yields a ceiling",
+      B.sleep_interval(NIGHT, NOW)["woke_by"] is not None)
+
 print("\n4. A TURN INSIDE A RUN BREAKS IT")
 # he woke mid-way and said something; that is two sleeps, not one long one
 mid = NOW - 260 * M

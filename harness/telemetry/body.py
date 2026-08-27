@@ -341,7 +341,26 @@ def sleep_interval(rows: List[dict], now: float,
     # WAKEFULNESS IS PROVABLE AND SLEEP IS NOT, and the asymmetry is real rather than a
     # gap in the instrument. A message proves he is up; nothing proves he is under. So the
     # honest waking answer is a ceiling: he was up no later than this.
-    woke_by = min([last] + said_after[:1])
+    # ── A RUN THAT ENDS BECAUSE THE DATA ENDED IS NOT A WAKING (2026-08-28) ─────────
+    # HIS NIGHT: high from 23:04 to 01:25, then a 188-MINUTE HOLE, then 48 at 04:34 with
+    # the battery back at 100%. The phone died. The ceiling read "up by 01:25" — confident,
+    # and false by about three hours.
+    #
+    # Absence of data is not evidence of waking, which is the same rule this whole area
+    # already runs on one level up ("absence is only information if you can prove you were
+    # looking"). So when the stream stops right after the run, the classifier's edge is not
+    # an observation of anything and only his own words can bound it. If he has not spoken
+    # either, the answer is that there is no answer — which is a THIRD state, distinct from
+    # "still asleep", and the caller has to be able to tell them apart.
+    nxt = next((t for (t, _v) in xs if t > last), None)
+    gaps = [b - a for a, b in zip([t for t, _ in xs], [t for t, _ in xs][1:])]
+    gaps = sorted(g for g in gaps if g > 0)
+    cadence = gaps[len(gaps) // 2] if gaps else 0.0
+    blind = nxt is None or (nxt - last) > max(4.0 * cadence, 20 * 60)
+    if blind:
+        woke_by = said_after[0] if said_after else None
+    else:
+        woke_by = min([last] + said_after[:1])
 
     lows = [t for (t, v) in xs if v <= SLEEP_AWAKE and t < first]
     lows_after = [t for (t, v) in xs if v <= SLEEP_AWAKE and t > last]
@@ -350,10 +369,14 @@ def sleep_interval(rows: List[dict], now: float,
         "asleep_after": asleep_after, "asleep_before": first,
         "woke_by": woke_by,                 # a CEILING, not the lower half of a band
         "woke_at_latest_said": said_after[0] if said_after else None,
+        # THE THIRD STATE. blind = the readings stop at the end of the run, so nothing here
+        # observed him waking; `woke_by` is then his word or nothing at all.
+        "blind_after": last if blind else None,
+        "blind_until": nxt if (blind and nxt) else None,
         # what the PHONE thought, kept apart from what he proved
         "phone_awake_until": lows[-1] if lows else None,
         "phone_awake_from": lows_after[0] if lows_after else None,
-        "still_asleep": not said_after and (now - last) < 3600,
+        "still_asleep": (not blind) and (not said_after) and (now - last) < 3600,
         "hours": round((last - first) / 3600.0, 1),
         "bounded_by": ("his own words" if (said or said_after) else "the phone alone"),
         "samples": len(run),
