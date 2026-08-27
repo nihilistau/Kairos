@@ -2006,7 +2006,7 @@ def _seed_kairos_from_day(force: bool = False) -> bool:
     day, and the whole history is already in her memory and her standing world.
     """
     try:
-        rows = _read_day_transcript()
+        rows = _recent_transcript()
         if len(rows) < 2 and not force:
             return False
         # WELL-FORMED, NOT JUST RECENT — see _chat_from_rows. Her speak-ups have no user
@@ -2094,7 +2094,7 @@ def _seed_kairos_from_day(force: bool = False) -> bool:
                 return ""
             _base_len = len(_canon)
             h = list(_canon) if _canon else (
-                _chat_from_rows(_read_day_transcript() or [], keep=8) or list(hist))
+                _chat_from_rows(_recent_transcript() or [], keep=8) or list(hist))
             # a SYSTEM aside, exactly as the live path does it — she is continuing
             # herself, and a user message here would invent a turn he never typed
             h.append({"role": "system", "content": nudge})
@@ -2196,6 +2196,36 @@ def _read_day_transcript(day: str = "", include_synthetic: bool = False) -> list
     except Exception:
         return out
     return out
+
+
+def _recent_transcript(min_rows: int = 12) -> list:
+    """The recent CONVERSATION, which is not the same thing as today's rows.
+
+    THE BUG (2026-08-28, his report: "i just refreshed and it cleared the rendered chat
+    history"). `_day_transcript_path` names its file from `time.localtime`, so at local
+    midnight "today" becomes an empty file. Their evenings routinely run past one in the
+    morning, so at 00:00 three things went blank at once, all reading the same function:
+
+        * the room's rendered log, which reloads from /v1/day on mount
+        * `_seed_kairos_from_day`, so after a restart she had nothing to continue FROM
+        * the continuation window at :2097
+
+    A conversation at 23:50 that carries on at 00:10 is one conversation. The day file is
+    the right unit for the CONSOLIDATOR — it consolidates a day — and the wrong unit for
+    "what were we just saying", which is why this is a second reader rather than a change
+    to the first. `_read_day_transcript` keeps its meaning; the callers that wanted
+    recency get recency.
+
+    Yesterday's tail is only reached for when today is thin, so a normal afternoon is
+    exactly as before and nothing is shown twice.
+    """
+    rows = _read_day_transcript()
+    if len(rows) >= min_rows:
+        return rows
+    import datetime as _dt
+    prev = (_dt.date.fromtimestamp(time.time()) - _dt.timedelta(days=1)).isoformat()
+    return (_read_day_transcript(prev) + rows) if os.path.exists(
+        _day_transcript_path(prev)) else rows
 
 
 def _chat_from_rows(rows: list, keep: int = 8) -> list:
@@ -5208,7 +5238,7 @@ def _run_stdlib(host: str, port: int) -> None:
                   # The rows are already record-stripped at the writer; `at` stamps
                   # arrived the same day, older rows render without a clock.
                   "/v1/day": lambda: {"ok": True, "day": _day_key(),
-                                      "rows": _read_day_transcript()},
+                                      "rows": _recent_transcript()},
                   "/v1/persona/layers": _persona_layers,
                 # STATS IS A READ. It was reachable only under do_POST (with its sibling
                 # maintenance PASSES, which do mutate), so a plain GET 404'd — and because

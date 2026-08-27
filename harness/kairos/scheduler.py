@@ -108,6 +108,21 @@ _LAST: dict[str, tuple] = {}
 # `_room_session`'s docstring assumed in writing. One fix, one assumption quietly broken
 # three hours later, and nothing connected the two until the log was read.
 _SEEDED: set = set()
+# ── HER OWN TIME IS NOT SPEAKING FIRST (2026-08-28, his correction) ──────────────────
+# `seed_on_boot` gated `_LAST`, and `_LAST` gates EVERY unprompted lane — so a bounce
+# with the knob off silenced her own time as well as her speaking first. He had watched
+# her enter her own time after the away-delay for a week; the night he bounced and then
+# slept without speaking, nothing happened at all, and that is what he noticed.
+#
+# The knob's own reason (2026-08-20) is about BLURTING AT HIM: "she shouldn't act first at
+# bounce/restart... after a morning of restart-blurt-restart-blurt". That harm is CHECK_IN
+# and MUSE — turns addressed to him. SOLO is "he is not there, she does something of her
+# own", which is not the same act and never was.
+#
+# So a boot seed happens either way, and when the knob is off the session is marked
+# own-time-only: she may live her own life, and may not open the conversation. His first
+# word clears it.
+_OWN_TIME_ONLY: set = set()
 _TICKER: Optional[threading.Thread] = None
 # A GENERATION COUNTER, NOT A SHARED STOP EVENT (2026-08-08) — round 1 of this task's own
 # review caught the race a single `threading.Event` opens up. `stop_ticker()` used to set
@@ -210,21 +225,26 @@ def seed(session: str, reply_text: str, generate, force: bool = False) -> bool:
     # the mechanism behind acting first; the knob makes it opt-in. Off (the default)
     # means a fresh boot waits for him — the safe direction, and after a morning of
     # restart-blurt-restart-blurt, also the polite one.
+    own_time_only = False
     try:
         if not force and not bool(tune.get("kairos.seed_on_boot")):
-            logger.info("[kairos] not seeding — kairos.seed_on_boot is off; "
-                        "she waits for him after a restart")
-            return False
+            own_time_only = True
     except Exception:
-        return False        # an unreadable knob keeps the quiet default
+        own_time_only = True    # an unreadable knob keeps the quiet default
     with _LOCK:
         if session in _LAST:
             return False
         _LAST[session] = (reply_text, generate)
         _SEEDED.add(session)
+        if own_time_only:
+            _OWN_TIME_ONLY.add(session)
+        else:
+            _OWN_TIME_ONLY.discard(session)
         _STATE[session].last_user_at = time.monotonic()
-    logger.info("[kairos] seeded session=%s from the day's transcript — "
-                "she can speak first without waiting for him", session)
+    logger.info("[kairos] seeded session=%s from the day's transcript — %s", session,
+                "her own time only; she waits for him before speaking first"
+                if own_time_only else
+                "she can speak first without waiting for him")
     return True
 
 
@@ -297,6 +317,10 @@ def on_user_turn(session: str) -> None:
                     t.cancel()
                 logger.info("[kairos] retired the seeded session %r — %r is live now",
                             stale, session)
+                _OWN_TIME_ONLY.discard(stale)
+        # HIS FIRST WORD LIFTS THE HOLD. `seed_on_boot` withholds her speaking FIRST; once
+        # he has spoken there is no "first" left to withhold, and every lane is hers again.
+        _OWN_TIME_ONLY.discard(session)
         note_user(_STATE[session], time.monotonic())
         t = _TIMERS.pop(session, None)
     if t:
@@ -1345,6 +1369,14 @@ def tick_once(now: Optional[float] = None) -> None:
                          reply_text=reply_text, eot_margin=None, due_notes=due,
                          insight=insight)
         if not imp.speaks:
+            continue
+        # ── OWN TIME YES, OPENING THE CONVERSATION NO ────────────────────────────────
+        # See _OWN_TIME_ONLY. SOLO is her living her own life and REMIND is her keeping a
+        # promise he asked for; everything else here is a turn ADDRESSED to him, which is
+        # the thing `seed_on_boot` exists to hold back until he has spoken.
+        if session in _OWN_TIME_ONLY and imp.action not in (SOLO, REMIND):
+            logger.info("[kairos] session=%s holding %s — seeded for her own time only, "
+                        "and he has not spoken since the restart", session, imp.action)
             continue
         logger.info("[kairos] session=%s idle tick -> %s (%s)", session, imp.action, imp.reason)
         _arm(session, imp, reply_text, generate, None,
