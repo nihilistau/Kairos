@@ -351,6 +351,11 @@ def why_quiet() -> str:
         r = from_rhythm(days, today, raised_keys())
         return ("rhythm would say: %r" % r) if r else "rhythm has nothing to say today"
     except Exception as exc:
+        # It already surfaces to HER, in the returned string. That is not the same as
+        # surfacing to the LOG: a NameError here would read as a mysterious sentence in
+        # her context and be greppable nowhere. Both, now.
+        from harness.kairos import swallowed as _sw
+        _sw(logger, "reasons.why_quiet", exc)
         return "rhythm unavailable: %s" % exc
 
 

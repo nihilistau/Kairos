@@ -39,6 +39,7 @@ from harness.kairos.impulse import (
     decide, note_spoke, note_user, worth_saying,
 )
 from harness.kairos import speechlog as _speech
+from harness.kairos import swallowed
 from harness.control import anon as _anon      # the three log lines below carry HER WORDS
 from harness.tuning import registry as tune
 
@@ -568,8 +569,10 @@ def ambient_silence() -> Optional[dict]:
                         "(quiet %.1fd vs his own cadence %.1fd, %.1f bits)",
                         sil[0]["quiet_days"], sil[0]["cadence_days"], sil[0]["bits"])
             return {"text": sil[0]["claim"], "bits": sil[0]["bits"], "silence": sil[0]}
-    except Exception:
-        pass
+    except Exception as exc:
+        # 37 lines of silence used to end here. See kairos.swallowed: a broad handler is
+        # right for a store mid-write, and wrong for a name that does not exist.
+        swallowed(logger, "ambient_silence", exc)
     return None
 
 
@@ -961,8 +964,10 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
                     except Exception:
                         pass
                     return
-            except Exception:
-                pass                       # the gate must never break her own time
+            except Exception as exc:
+                # the gate must never break her own time -- but a bug in it should be
+                # audible rather than indistinguishable from the gate passing.
+                swallowed(logger, "solo_did_the_thing", exc)
         # ── DID SHE ACTUALLY DO IT (2026-08-06) ──────────────────────────────────────
         # 33 solo turns in the log; ONE called a tool. Six of the eight acts name the tool
         # they need, and the nudge asks for the artefact rather than the act — "say what
@@ -1367,16 +1372,9 @@ def tick_once(now: Optional[float] = None) -> None:
                 continue                       # she is already about to say something
             imp = decide(cfg=cfg, state=st, now=now,
                          reply_text=reply_text, eot_margin=None, due_notes=due,
-                         insight=insight)
+                         insight=insight,
+                         own_time_only=session in _OWN_TIME_ONLY)
         if not imp.speaks:
-            continue
-        # ── OWN TIME YES, OPENING THE CONVERSATION NO ────────────────────────────────
-        # See _OWN_TIME_ONLY. SOLO is her living her own life and REMIND is her keeping a
-        # promise he asked for; everything else here is a turn ADDRESSED to him, which is
-        # the thing `seed_on_boot` exists to hold back until he has spoken.
-        if session in _OWN_TIME_ONLY and imp.action not in (SOLO, REMIND):
-            logger.info("[kairos] session=%s holding %s — seeded for her own time only, "
-                        "and he has not spoken since the restart", session, imp.action)
             continue
         logger.info("[kairos] session=%s idle tick -> %s (%s)", session, imp.action, imp.reason)
         _arm(session, imp, reply_text, generate, None,
@@ -1710,7 +1708,7 @@ def _presence_state(cfg, st, now: float) -> dict:
         b = _lib.in_hand()
         if b:
             out["reading"] = {"title": b["title"], "pos": b["pos"], "chars": b["chars"], "done": b["done"]}
-    except Exception:
-        pass
+    except Exception as exc:
+        swallowed(logger, "_presence_state", exc)
     return out
 

@@ -89,7 +89,9 @@ def pregate(action: str, reason: str, tail: str) -> Optional[bool]:
                                        r.get("outcome", "?"),
                                        (" (%s)" % r.get("reason")) if r.get("outcome") == "dropped" else "")
                 for r in rs)
-    except Exception:
+    except Exception as exc:
+        from harness.kairos import swallowed as _sw
+        _sw(logger, "offload.pregate recent-speech", exc)
         recent = ""
     q = (
         "You are a quiet gatekeeper for an AI companion's unprompted messages. "

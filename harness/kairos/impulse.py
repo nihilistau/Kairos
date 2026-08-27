@@ -263,7 +263,7 @@ def mode_wait_s(cfg: KairosConfig, state: TurnState, now: float, every: float) -
     return max(0.0, wait)
 
 
-def decide(
+def _decide(
     *,
     cfg: KairosConfig,
     state: TurnState,
@@ -274,6 +274,7 @@ def decide(
     rng: Optional[random.Random] = None,
     due_notes: Optional[list] = None,
     insight: Optional[dict] = None,
+    own_time_only: bool = False,
 ) -> Impulse:
     """The whole policy. Pure — inject `now`, `rng` and `due_notes` and it is fully
     determinable. (The scheduler fetches the due reminders and passes them in; this module
@@ -282,6 +283,25 @@ def decide(
 
     if not cfg.enabled:
         return Impulse(SILENT, reason="kairos disabled")
+
+    # ── AFTER A RESTART: HER OWN LIFE YES, OPENING THE TALK NO (2026-08-28) ───────────
+    # `kairos.seed_on_boot` is about her BLURTING AT HIM after a bounce, and the actions
+    # that do that are CHECK_IN, MUSE, MODE_TURN and the continuations. SOLO is "he is not
+    # there, she does something of her own"; REMIND is a promise he asked for. Neither is
+    # speaking first.
+    #
+    # THE RULE LIVES HERE, in the policy, and not in the tick loop. My first cut put it in
+    # the loop as a veto on the chosen action, and that DEADLOCKED: `decide` kept returning
+    # MUSE, the loop held it, and SOLO never got a look in — she sat logging "holding muse"
+    # every eight seconds and would have done so forever. One function decides what she
+    # does; a second one second-guessing it is how you get a policy nobody can read.
+    #
+    # `user_present` goes False for the same reason: after a restart with no word from him
+    # there is no evidence he is there, and SOLO's own gate (`unanswered >= away_after`)
+    # counts turns he did not answer — which a fresh session has none of. Absent evidence
+    # of presence, he is away, which is also just true.
+    if own_time_only:
+        user_present = False
 
     # ── ASKED FOR (2026-08-22): "narrate for me" / the window's "now" button. ──────────
     # STRAIGHT AWAY, his words: ahead of the cooldown, the caps, the idle floor and
@@ -516,6 +536,26 @@ def decide(
         return Impulse(SILENT, reason=("he is not here (%d unanswered) — she is not "
                                        "going to keep asking" % state.unanswered))
     return Impulse(SILENT, reason="nothing to add")
+
+
+def decide(**kw) -> Impulse:
+    """The policy, plus the ONE filter that says what a boot-seeded session may do.
+
+    A THIN WRAPPER BECAUSE `_decide` HAS NINETEEN RETURNS. Enforcing "she may not open the
+    conversation" at each of them is a rule in nineteen places, which is a rule in none —
+    this tree's own §0. So the body decides what she WOULD do and this decides whether she
+    may; one seam, and adding a twentieth branch to the policy cannot escape it.
+
+    Withholding is SILENT rather than a raised error or a skipped tick: the caller loops
+    over sessions and a skipped tick was exactly the deadlock this replaces — `_decide`
+    kept choosing MUSE, the loop vetoed it, and SOLO never got a look in.
+    """
+    own = bool(kw.pop("own_time_only", False))
+    imp = _decide(own_time_only=own, **kw)
+    if own and imp.action not in (SOLO, REMIND, SILENT):
+        return Impulse(SILENT, reason=("seeded for her own time only — %s withheld until "
+                                       "he speaks" % imp.action))
+    return imp
 
 
 def worth_saying(continuation: str, previous_reply: str) -> tuple[bool, str]:
