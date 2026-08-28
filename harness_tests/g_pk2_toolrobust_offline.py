@@ -196,6 +196,72 @@ def main() -> int:
                              gram_ghost is None
                              or getattr(gram_ghost, "name", None) not in known)))
 
+    # 13) SHE WROTE THE CALL INSIDE A SENTENCE (2026-08-28). Live, verbatim, on his
+    #     screen while her wardrobe stayed unchanged:
+    #
+    #         `check_wardrobe()` shows that we have some options left from earlier!
+    #         ... I think I'll go with this: `wear("the sheer dark mesh top")`.
+    #
+    #     Held (line-initial backtick), parsed to zero calls (the whole-line rule, leg
+    #     10's law), and the fallthrough flushed the tool syntax as her reply. The
+    #     STREAM loop now re-asks ONCE, quoting her call in the fence it needs; the
+    #     discriminator is the hold itself, so a streamed mention is never taxed.
+    from harness import agent as A
+
+    class StreamFake(object):
+        """chat_stream fake: one scripted generation per call, streamed whole."""
+        def __init__(self, script): self.script = list(script); self.i = 0
+        def chat_stream(self, messages=None, config=None, **_kw):
+            self.last = (messages or [{}])[-1].get("content", "")
+            self.lasts = getattr(self, "lasts", []) + [self.last]
+            t = self.script[self.i] if self.i < len(self.script) else "done."
+            self.i += 1
+            return iter([t])
+
+    ran = []
+    def wear(outfit: str) -> str:
+        """Change into an outfit."""
+        ran.append(outfit)
+        return "Changed. You are wearing %s." % outfit
+    wtools = [ToolSpec.from_callable(wear)]
+
+    # (a) the live shape: held inline call in prose -> re-asked once; round one emits
+    #     the fence and the tool RUNS; the backticked syntax never reaches him.
+    sf = StreamFake([BT + "check_wardrobe()" + BT + " shows options! I'll go with this: "
+                     + BT + 'wear("the mesh top")' + BT + ". It feels light.",
+                     "```tool_code" + NL + 'wear("the mesh top")' + NL + "```",
+                     "Changed — the mesh top, just for you."])
+    out = "".join(A.agent_chat_stream([{"role": "user", "content": "change?"}],
+                                      tools=wtools, client=sf,
+                                      config=InferenceConfig()))
+    results.append(check("a held inline call in prose is re-asked and RUNS",
+                         ran == ["the mesh top"] and "mesh top" in out))
+    results.append(check("...and the re-ask quotes her own call in the fence",
+                         any('wear("the mesh top")' in t and "mention, not a call" in t
+                             for t in getattr(sf, "lasts", []))))
+    results.append(check("...and the raw backtick syntax never reaches him",
+                         BT not in out))
+
+    # (b) BOUNDED: if she does it again, the second buffer flushes as speech — one
+    #     extra round per turn, total, shared with the plan/claim legs.
+    ran[:] = []
+    sf2 = StreamFake([BT + 'wear("silk")' + BT + " maybe, I am thinking about it here.",
+                      "Still deciding: " + BT + 'wear("silk")' + BT + " perhaps."])
+    out2 = "".join(A.agent_chat_stream([{"role": "user", "content": "change?"}],
+                                       tools=wtools, client=sf2,
+                                       config=InferenceConfig()))
+    results.append(check("the inline re-ask is bounded to one round",
+                         sf2.i == 2 and ran == [] and "Still deciding" in out2))
+
+    # (c) a tool she does not have, backticked in a held buffer, is a string: no
+    #     re-ask burned, the buffer flushes as her words.
+    sf3 = StreamFake([BT + "frobnicate(1)" + BT + " is not a thing I can do, love."])
+    out3 = "".join(A.agent_chat_stream([{"role": "user", "content": "hi"}],
+                                       tools=wtools, client=sf3,
+                                       config=InferenceConfig()))
+    results.append(check("an unknown backticked name burns no re-ask round",
+                         sf3.i == 1 and "not a thing" in out3))
+
     ok = all(results)
     print(f"\nG-PK2-TOOLROBUST (offline): {'PASS' if ok else 'FAIL'} ({sum(results)}/{len(results)})")
     return 0 if ok else 1

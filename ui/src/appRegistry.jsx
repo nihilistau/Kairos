@@ -21,6 +21,7 @@ import Presence from './apps/Presence.jsx'
 import Librarians from './apps/Librarians.jsx'   // not Aux.jsx: 'aux' is a Windows reserved device name
 import Music from './apps/Music.jsx'
 import Journal from './apps/Journal.jsx'
+import Story from './apps/Story.jsx'
 import Files from './apps/Files.jsx'
 import Ledger from './apps/Ledger.jsx'
 import Stage from './apps/Stage.jsx'
@@ -95,6 +96,8 @@ export const APPS = [
     blurb: 'the paid tier, hers and yours — titles expand to the returned text' },
   { id: 'journal',title: 'journal', icon: '📔', w: 600, h: 500, Component: Journal, css: 'jr',
     blurb: 'what she writes at the end of a day — hers, you can only read it' },
+  { id: 'story',  title: 'story',   icon: '📖', w: 720, h: 580, Component: Story, css: 'sty',
+    blurb: 'her prefix line by line, the chapters and their folds, the lanes — and the backup receipt' },
   { id: 'files',  title: 'files',   icon: '📁', w: 620, h: 500, Component: Files, css: 'fl',
     blurb: 'the tree you share — drag something in and she can read it' },
   // THE LEDGER is the one app that is not purely a window onto the harness — it is

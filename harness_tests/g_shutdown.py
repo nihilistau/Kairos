@@ -324,9 +324,12 @@ print("\n11. THE COUNTER IS WIRED INTO BOTH CHAT PATHS, AND ALWAYS PAIRED")
 # BOTH, NOT ONE. app.py's own comments record five hooks — kairos, the repeat-guard,
 # roleplay, capture, on_user_turn — each wired into `/v1/chat` OR `/v1/chat/completions`
 # and therefore into neither. The ladder's wait is the sixth candidate.
-check("both chat paths open a turn", app.count("_sd_turn_start()") == 3,
+# FOUR, since 2026-08-28: the two chat mouths (each open+refuse-read), and the VOICE
+# door joined the shell — a third entry point that used to run happily through a
+# quiesce. The count is the census; when a new mouth opens a turn, it joins it HERE.
+check("every mouth opens a turn", app.count("_sd_turn_start()") == 4,
       app.count("_sd_turn_start()"))
-check("...and every one of them closes it", app.count("_sd_turn_end()") == 3,
+check("...and every one of them closes it", app.count("_sd_turn_end()") == 4,
       app.count("_sd_turn_end()"))
 # PAIRED IN A `finally`, NOT BESIDE A RETURN. An unbalanced counter breaks nothing
 # today and makes every shutdown months from now wait the full timeout and abandon.
@@ -354,10 +357,10 @@ print("\n12. THE FLAG HAS A READER AND A CLEARER — FOUND BY DRIVING IT, NOT BY
 # state it could never leave, and a turn arriving after the daemon died went at a dead
 # socket. A flag with no reader is not an invariant, it is a comment with state attached.
 SD._reset_for_test()
-check("a flag nobody reads is not a rule — both chat paths read it now",
-      app.count("if not _sd_turn_start():") == 2, app.count("if not _sd_turn_start():"))
+check("a flag nobody reads is not a rule — all three mouths read it now",
+      app.count("if not _sd_turn_start():") == 3, app.count("if not _sd_turn_start():"))
 check("...and refuse with one spelling, not two",
-      app.count("self._refuse_shutting_down()") == 2
+      app.count("self._refuse_shutting_down()") == 3
       and app.count("def _refuse_shutting_down(") == 1,
       app.count("self._refuse_shutting_down()"))
 check("...with 503, so the caller knows to retry rather than to file a bug",

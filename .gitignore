@@ -23,3 +23,8 @@ ui/node_modules/
 # guarantee: if it is ever missing, a transcript full of his name and absolute paths
 # lands in a repo. Ignored at the root as well, belt and braces (2026-08-23).
 .remember/
+
+# state, never source (2026-08-28, external review): a clone that
+# mints nexus.db must not commit it — the source repo tracked its own for
+# three days after the rule was written.
+data/

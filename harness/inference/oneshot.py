@@ -56,6 +56,26 @@ def ask_oneshot(
 
     from harness.inference.stream_processor import strip_control_surfaces
 
+    # ── A FOREIGN BACKEND HAS NO /v1/oneshot (2026-08-28, external review) ──────────
+    # On an openai-engine profile SP_DAEMON_URL is LM Studio (or any OpenAI-compat
+    # server), which does not serve this route — so the becoming pass, the weekly
+    # chapter and the slots oracle all failed-to-silence on exactly the profile the
+    # public framework ships. The zero-dependency stdlib path below stays, and stays
+    # the default, for the reason this file's header gives (a door nobody can be
+    # bothered to walk through is not a door); a NON-sp engine falls through to the
+    # backend seam, whose .oneshot knows how to be a plain completion there. The
+    # fail-toward-silence contract is identical: None, never a raise.
+    if os.environ.get("SP_ENGINE_KIND", "sp") != "sp":
+        try:
+            from harness.inference.client import get_client
+            out = get_client().oneshot(
+                [{"role": "user", "content": prompt}],
+                max_tokens=max_tokens, temperature=temperature) or ""
+            out = strip_control_surfaces(out).strip()
+            return out or None
+        except Exception:
+            return None
+
     url = (daemon or daemon_url()).rstrip("/") + "/v1/oneshot"
     body: Dict[str, Any] = {
         "messages": [{"role": "user", "content": prompt}],

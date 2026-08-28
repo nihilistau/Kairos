@@ -230,6 +230,46 @@ try:
 finally:
     M.secret_withheld = _orig_sw
 
+print("\n6. THE FIFTH DOOR: forget() DOES NOT READ A SECRET BACK AT ITS FUNERAL")
+# (2026-08-28, external review.) Four tool doors withheld a private-secret's text; the
+# forget receipt echoed it verbatim — "forget the code" answered WITH the code, at a 0.3
+# bag-of-words match. The forgetting is right (he asked); the echo was the leak.
+M.remember("My garage door code is 4471", source="user turn")
+_row_s6 = next(r for r in M._load() if "4471" in (r.get("text") or ""))
+check("the fixture secret was minted AS a secret (else this section proves nothing)",
+      _row_s6.get("mem_class") == "private-secret", _row_s6.get("mem_class"))
+_f_s6 = M.forget("garage door code 4471")
+check("forget still forgets it", _f_s6.startswith("forgotten"), _f_s6[:60])
+check("...but the receipt does NOT carry the secret", "4471" not in _f_s6, _f_s6)
+check("...and says why it is silent", "unspoken" in _f_s6, _f_s6)
+M.remember("My toaster is lime green", source="user turn")
+_f_ord = M.forget("lime green toaster")
+check("...while an ordinary row's receipt still names what died",
+      "toaster" in _f_ord, _f_ord)
+
+print("\n7. THE SIXTH DOOR: deep_recall MASKS SECRET-SHAPED SENTENCES")
+# (2026-08-28, external review.) secret_withheld guards the CLASSIFIED store; the day
+# transcripts were never classified, so a credential said out loud in chat came back
+# verbatim through the archive while every registry door declined it. Driven through the
+# REAL tool with the sidecar stubbed present and the archive returning a transcript
+# chunk that mixes an ordinary moment with a secret-bearing sentence.
+from harness.sidecar import tools as _ST
+from harness.sidecar import archive as _AR, client as _SC
+_old_av, _old_sr = _SC.available, _AR.search
+try:
+    _SC.available = lambda: True
+    _AR.search = lambda q, k=4: [{"day": "2026-08-01", "score": 0.55,
+                                  "text": ("We laughed about the storm that night. "
+                                           "My garage door code is 8812. "
+                                           "Then we made tea and talked till late.")}]
+    _out7 = _ST.deep_recall("the storm night")
+    check("the moment still returns", "laughed about the storm" in _out7, _out7[:120])
+    check("...but the secret-bearing SENTENCE is withheld, credential and all",
+          "8812" not in _out7 and "withheld" in _out7, _out7)
+    check("...and the sentences around it survive", "made tea" in _out7, _out7)
+finally:
+    _SC.available, _AR.search = _old_av, _old_sr
+
 os.unlink(_reg)
 print("\nG-SECRET  %d/%d" % (PASS, PASS + FAIL))
 sys.exit(1 if FAIL else 0)

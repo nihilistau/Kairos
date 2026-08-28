@@ -153,6 +153,14 @@ def add(title: str, body: str = "", category: str = "note",
     the CLOCK says so. A watch fires when THE WORLD does. Everything else — the store, the
     tick, the raise-it-like-a-reminder path — already existed; the only thing missing was a
     note whose trigger is a question rather than a time."""
+    # ── OFF THE RECORD HOLDS THE BOARD TOO (2026-08-28, external review). Facts via
+    # remember() were held; a NOTE written mid-anon-evening landed on the board and
+    # survived the mode — the evening's content, on disk, under a different door. Same
+    # guard, same receipt, fail-closed like every other anon door.
+    from harness.control import anon as _anon
+    if _anon.holds("notes.add"):
+        return {"ok": False, "held": True, "why": _anon.WHY}
+
     title = (title or "").strip()
     if not title:
         raise ValueError("a note needs a title")

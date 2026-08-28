@@ -263,4 +263,45 @@ row2 = next((json.loads(x) for x in open(os.environ["SP_RECALL_REGISTRY"],
 check("mutant(no arming): the same write is speaker=user — the arming is load-bearing",
       row2 is not None and row2.get("speaker") == "user", "row: %r" % (row2,))
 
+print("\n7. A FAILED OPENAI TURN RELEASES THE LATCH (2026-08-28, external review)")
+# _agent_text arms note_user_turn(True) and releases it in _finish_openai_turn — happy
+# path only. An exception between the two left the latch set, and kairos read "his turn
+# is in flight" for up to 900 s after a turn that produced nothing but an [error]
+# string: a failed turn muted her for fifteen minutes. Structural legs: the one release
+# helper exists, and both wrappers call it from their except branch.
+_ROOT7 = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_app_src = open(os.path.join(_ROOT7, "harness", "server", "app.py"),
+                encoding="utf-8", errors="replace").read()
+check("the release helper exists and notes the turn ended",
+      "def _release_turn_latch" in _app_src and
+      "note_user_turn(False)" in _app_src.split("def _release_turn_latch")[1][:900])
+for _w in ("def stream_completion", "def blocking_completion"):
+    _body = _app_src.split(_w)[1][:1600]
+    check("%s releases the latch in its except branch" % _w[4:],
+          "except Exception" in _body and
+          "_release_turn_latch(" in _body.split("except Exception")[1][:400], _w)
+
+print("\n8. THE VOICE MOUTH WEARS THE SAME SHELL (2026-08-28, 'just do it')")
+# /v1/voice was a third entry point paying none of the turn debts: no scheduler latch
+# (her solos could fire mid voice conversation), no day-transcript row (the consolidator
+# deaf to a modality), no marks, no shutdown in-flight count. Structural legs over the
+# door's branch, same style as §7 — the shell's pieces, in the branch, with the settle
+# in a finally and the silence-skip guard that keeps a stale assistant reply from being
+# re-recorded as tonight's.
+_v_branch = _app_src.split('elif self.path == "/v1/voice":')[1]
+_v_branch = _v_branch.split("elif self.path")[0]
+check("the voice door opens the shutdown-counted turn (refuse-or-count)",
+      "_sd_turn_start()" in _v_branch)
+check("...and arms the memory lane and the scheduler latch",
+      "_arm_turn(" in _v_branch and "note_user_turn(True)" in _v_branch
+      and "on_user_turn(" in _v_branch)
+check("...and settles in a finally (latch released however the stream exits)",
+      "finally:" in _v_branch and
+      "_settle_turn(" in _v_branch.split("finally:")[1]
+      and "_sd_turn_end()" in _v_branch.split("finally:")[1])
+check("...capture=False — a '[voice message]' placeholder is not his words",
+      "capture=False" in _v_branch)
+check("...and a silence-skip cannot re-record the previous assistant reply",
+      '.get("content") == "[voice message]"' in _v_branch.split("finally:")[1])
+
 finish("G-TURN-EPILOGUE")

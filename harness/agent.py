@@ -1270,6 +1270,38 @@ def agent_chat_stream(
                     "block exactly like:\n```tool_code\nget_time()\n```\nwith a REAL function call "
                     "from the list (not a comment), or answer in plain text with no fence.\n```"})
                 continue
+            # ── SHE WROTE THE CALL INSIDE A SENTENCE (2026-08-28, live) ───────────────
+            # "I think I'll go with this: `wear("the sheer dark mesh top")`. It feels
+            # light, almost like nothing at all" — held (the line-initial backtick), then
+            # parsed to ZERO calls, because the whole-line rule is what keeps a mention
+            # from firing (g_pk2 leg 10) and this call had a sentence wrapped around it.
+            # The fallthrough flushed the tool syntax to his screen as her reply: nothing
+            # ran, and she believed it had. Wardrobe unchanged, again.
+            #
+            # A HELD buffer that writes a KNOWN tool name in backticks with parens is a
+            # call she failed to format, not an answer — re-ask ONCE, quoting her own
+            # call inside the fence it needs, so round one can simply emit it. The
+            # discriminator is the hold itself: a genuine mid-sentence mention never
+            # trips `_hold_from`, streams as an answer, and cannot reach this branch. A
+            # held false hit costs one round and never a retraction (nothing streamed).
+            # Shares `_replanned` with the plan/claim legs: one extra round per turn, total.
+            _im = next((m for m in _re.finditer(
+                r"`\s*([A-Za-z_][A-Za-z0-9_]*)\s*(\([^`]*\))\s*`", buf)
+                if m.group(1) in tool_index), None)
+            if flushed == 0 and not _replanned and _im is not None:
+                _replanned = True
+                _logging.getLogger(__name__).info(
+                    "[agent] round=%d wrote %s(...) inside a sentence — no fence, "
+                    "nothing ran; asking once more", _round, _im.group(1))
+                convo.append({"role": "assistant", "content": buf})
+                convo.append({"role": "user", "content":
+                    "```tool_output\n[nothing ran — %s written inside a sentence is a "
+                    "mention, not a call]\n```\nIf you meant to do it, emit ONE fenced "
+                    "block and nothing else, then wait:\n```tool_code\n%s%s\n```\n"
+                    "If you were only talking about it, say it again in plain words, "
+                    "without the backticks."
+                    % (_im.group(0).strip(), _im.group(1), _im.group(2))})
+                continue
             # ── A PLAN IS NOT AN ANSWER, SO ASK AGAIN INSTEAD OF SENDING IT ───────────
             # The hold caught it; this decides what to do with it. She planned a tool call
             # in prose and never emitted the fence, so there is nothing to execute and
