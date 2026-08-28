@@ -1108,6 +1108,13 @@ def forget(fact: str) -> str:
         hit["superseded_by"] = "forget"
         hit["forgotten_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         _save_all(rows)
+    # ── A SECRET IS NOT REPEATED, EVEN AT ITS FUNERAL (2026-08-28, external review) ──
+    # This echoed the retired row's full text. Every other speaking door withholds a
+    # private-secret's content; the forget receipt read it back verbatim — "forget the
+    # code" answered WITH the code. The forgetting still happens (he asked; retiring is
+    # right); only the echo is withheld, and the audit lane keeps the row as always.
+    if (hit.get("mem_class") or "") == "private-secret":
+        return "forgotten (retired, not erased): a private thing — its text stays unspoken"
     return f"forgotten (retired, not erased): {_text(hit)}"
 
 

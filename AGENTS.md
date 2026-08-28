@@ -114,9 +114,10 @@ the room (browser, ui/ → console/room/)  ──HTTP──▶  harness gateway 
 
   **THIS LINE SAID `agent.toml` UNTIL 2026-08-03**, three lines under the one telling you to start
   `companion`, and that is how it cost a restart: the file said "start A" and then said "B is the
-  live one", so whichever you read second was the one you believed. `agent.toml` is a real, still-
-  runnable the retired reference model profile and a near-twin of hers — same knob names, different values (`games` on,
-  `byteexact` on, `pmax` 13000), one tab-completion away. Two files claiming one truth is §0 of this
+  live one", so whichever you read second was the one you believed. `agent.toml` was deleted with the
+  other reference profiles on 2026-08-26 (§5) — while it lived it was a near-twin of hers
+  with different values (`games` on, `byteexact` on, `pmax` 13000), one tab-completion away,
+  which is exactly why it could not stay. Two files claiming one truth is §0 of this
   document; the join is now gated by **G-PROFILE-DOOR**, which reads every `serve.py <name>` a doc
   tells you to type and checks that profile's `paths.model` is actually hers.
 
@@ -238,7 +239,7 @@ The essentials, so you do not have to guess:
   the maintenance writer** (compact/cleanup/forget — tombstone/quarantine semantics,
   holding `memory.registry_lock()` since 2026-08-19; before that it held nothing while
   the scheduler ran it during live turns). The daemon's two write flags are off in all
-  14 profiles and refused at boot — see TRAPS. `memory.compact_registry()` is a
+  every profile then on disk (14 at the time; two remain after the 2026-08-26 retirement) and refused at boot — see TRAPS. `memory.compact_registry()` is a
   projection of `ops.compact()` now; until 2026-08-19 it was a raw unlocked rewrite
   that hard-deleted rows and resolved a forgotten-then-restated fact in favour of the
   corpse, wired to the automatic hygiene tick (G-COMPACT).
@@ -334,7 +335,7 @@ Renumbered 2026-08-21 (1..n, live first; the closed ones keep their receipts bel
    daemon, with `speaker` hardcoded, no `status`, and none of admission / firewall / dedupe / supersede /
    secret-classification — **and zero model inference, so she never saw the turn.**
    The remedy for *an invariant enforced in one of two paths* was enforced in one of two paths.
-   Both flags are now false on all 14 profiles, and **`serve.py` refuses to boot** any profile that arms
+   Both flags are false on every profile on disk (14 when this was written; two remain), and **`serve.py` refuses to boot** any profile that arms
    either while `agent.authority = 'spine'`. A rule in a comment gets applied to the file the comment is
    in; this one lives in the door.
 

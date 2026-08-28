@@ -164,6 +164,15 @@ def store_conversation(messages: List[dict], summary: Optional[str] = None, clie
     t = _transcript(messages)
     if not t:
         return None
+    # OFF THE RECORD HOLDS THE LONG STORE TOO (2026-08-28, external review): this writes
+    # the COMPLETE transcript under memory-okf-conv — the largest single leak an anon
+    # evening could have, and the only conversation-shaped one. Same guard as every door.
+    try:
+        from harness.control import anon as _anon
+        if _anon.holds("conversation.store"):
+            return None
+    except Exception:
+        pass
     if summary is None:
         summary = summarize_conversation(messages, client=client) or t[:160]
     addr = ok.addr_of(t)

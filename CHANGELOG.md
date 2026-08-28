@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.8.5 — the story panel, and a mouth that failed politely (2026-08-29)
+
+- **The Story panel** (📖 in the dock): what stands in her prefix line by line, each
+  line attributed to the registry row it came from — `/v1/story` serves the SAME
+  assembly the prefix renders, byte-checked by the gate, so the panel can never show a
+  prefix she does not carry — plus the chapters with the rows the fold archived into
+  them as footnotes, the narrative lanes by kind, and the backup receipt on the same
+  screen as the thing it protects. Edits go through the two existing doors (relabel,
+  forget); the panel owns no verbs.
+- **A call written inside a sentence gets one re-ask.** Live: "I'll go with this:
+  `wear(…)`" — held by the stream, parsed to zero calls (the whole-line rule is what
+  keeps a mention from firing), then flushed to the screen as prose with nothing run.
+  A held buffer naming a KNOWN tool in backticks is now re-asked ONCE, her own call
+  quoted inside the fence it needs. A streamed mention is never taxed — the hold
+  itself is the discriminator — and the re-ask shares the plan/claim one-round bound.
+- **The voice mouth wears the same turn shell.** `/v1/voice` was a third entry point
+  paying none of the turn debts: no scheduler latch (her unprompted turns could fire
+  mid conversation), no day-transcript row, no mark application, and it ran happily
+  through a shutdown quiesce. It now refuses-or-counts, arms the lane, and settles in
+  a `finally` — with a guard so a silence-skip cannot re-record the previous reply.
+- The shutdown gate's census counts every mouth now (4 opens, 4 closes, one refusal
+  spelling), and the backup receipt reads the fields `backup.status()` actually serves.
+
 ## 0.8.4 — the story cycle, and the four-minute turn (2026-08-28)
 
 An evening-long deep dive on the memory system, prompted by an unresponsive page and a

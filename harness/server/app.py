@@ -1399,6 +1399,23 @@ def _kairos_after_turn(body: Dict[str, Any], reply: str) -> None:
         logger.warning("[gateway] kairos skipped: %s", exc)
 
 
+def _release_turn_latch(where: str) -> None:
+    """A FAILED TURN MAY NOT MUTE HER FOR FIFTEEN MINUTES (2026-08-28, external review).
+
+    _agent_text arms note_user_turn(True) near its top and releases it inside
+    _finish_openai_turn — on the happy path. An exception between the two left the
+    latch set, and the latch is what kairos reads as "his turn is in flight": every
+    unprompted lane then waited out _USER_TURN_MAX_S (900 s) after a turn that
+    produced nothing but an [error] string. The native mouth pays this in a finally;
+    the OpenAI mouth's two wrappers now do the same, through this one helper.
+    """
+    try:
+        from harness.kairos import scheduler as _ks_rel
+        _ks_rel.note_user_turn(False)
+    except Exception as exc:
+        logger.warning("[gateway] %s: latch release failed: %s", where, exc)
+
+
 def stream_completion(body: Dict[str, Any]) -> Iterator[str]:
     """Yield OpenAI-style SSE chunks. Runs the agent (tool calling) then streams the final answer."""
     model = body.get("model") or _models_json()["data"][0]["id"]
@@ -1407,6 +1424,7 @@ def stream_completion(body: Dict[str, Any]) -> Iterator[str]:
     except Exception as exc:
         logger.error("[gateway] stream failed (operation=completions): %s", exc)
         text = f"[error: {exc}]"
+        _release_turn_latch("stream_completion")
     for i in range(0, len(text), 24):  # chunked after the agent loop completes
         yield _chunk(text[i:i + 24], model)
     yield _chunk("", model, finish="stop")
@@ -1420,6 +1438,7 @@ def blocking_completion(body: Dict[str, Any]) -> Dict[str, Any]:
         text = _agent_text(body)
     except Exception as exc:
         text = f"[error: {exc}]"
+        _release_turn_latch("blocking_completion")
     return {
         "id": f"chatcmpl-{int(time.time()*1000)}",
         "object": "chat.completion",
@@ -1586,6 +1605,40 @@ def _memory_why_json(name: str) -> Dict[str, Any]:
         }
     except Exception as exc:
         return {"ok": False, "error": str(exc)[:200]}
+
+
+def _story_json() -> Dict[str, Any]:
+    """THE STORY PANEL'S DATA (2026-08-28, his ask): what stands in her prefix, line by
+    line, each line naming the registry row it came from — plus the backup receipt, so
+    "is all of this backed up" is answered on the same screen that shows it.
+
+    The block comes from self_block_lines(), THE SAME assembly render_self_model() joins
+    for the prefix — one truth, verified byte-identical at the refactor. The rows
+    themselves come from /v1/memory (the panel joins on name), so this endpoint carries
+    structure, not a second copy of the store."""
+    out: Dict[str, Any] = {"ok": True, "block": [], "backup": {}}
+    try:
+        from harness.personality.self_model import self_block_lines
+        from harness.tuning import registry as _tr_s
+        _b = int(_tr_s.get("memory.self_budget", 2400) or 2400)
+        out["block"] = [{"section": s_, "name": n_, "label": l_}
+                        for s_, n_, l_ in self_block_lines(budget_chars=_b)]
+    except Exception as exc:
+        out["block_error"] = str(exc)[:120]
+    try:
+        from harness.control import backup as _bk
+        st = _bk.status() or {}
+        # the fields status() actually serves (checked live 2026-08-29: the first cut
+        # filtered for at/iso/files, keys status() has never had, and the panel said
+        # "no backup receipt" over 65 archives and an 00:15 newest)
+        out["backup"] = {"ok": bool(st.get("enabled")) and bool(st.get("newest")),
+                         "enabled": bool(st.get("enabled")),
+                         "newest": st.get("newest") or "",
+                         "count": st.get("count", 0),
+                         "bytes": st.get("total_bytes", 0)}
+    except Exception as exc:
+        out["backup"] = {"error": str(exc)[:120]}
+    return out
 
 
 def _memory_json() -> Dict[str, Any]:
@@ -4807,19 +4860,66 @@ def _run_stdlib(host: str, port: int) -> None:
                 self.send_header("Content-Type", "application/json"); self.end_headers()
                 self.wfile.write(payload)
             elif self.path == "/v1/voice":  # ADR-KAI4 P0: one VAD-segmented utterance
+                # ── THE THIRD MOUTH GETS THE SAME TURN SHELL (2026-08-28) ────────────
+                # /v1/chat and /v1/chat/completions both pay the turn debts (_arm_turn,
+                # the scheduler latch, _settle_turn, the shutdown in-flight count). This
+                # door paid NONE of them: a voice turn never told kairos he was speaking
+                # (so her solos could fire mid-conversation), never landed in the day
+                # transcript (the consolidator was deaf to an entire modality), never
+                # applied her [MOOD:]/[WEAR:] marks, and ran happily through a quiesce.
+                # "A hook wired into one of two entry points is wired into neither" —
+                # and a third entry point makes that arithmetic worse, not better.
+                #
+                # His words this turn are AUDIO; "[voice message]" is the honest text
+                # stand-in (the same one the session transcript already records), so
+                # capture=False — there is nothing of his to mine from a placeholder.
+                # Her reply is text like any other: record/marks/stances all apply.
                 body = self._body()
+                if not _sd_turn_start():
+                    self._refuse_shutting_down()   # ONE spelling, all three mouths
+                    return
                 self.send_response(200); _cors(self)
                 self.send_header("Content-Type", "text/event-stream"); self.end_headers()
+                _v_latch: Dict[str, Any] = {"done": False}
+                transcript: list = []
                 try:
                     from harness.voice.service import voice_turn
                     transcript = _session_transcript({"session_id": body.get("session_id"),
                                                       "messages": body.get("messages", [])})
+                    _arm_turn([{"role": "user", "content": "[voice message]"}])
+                    try:
+                        from harness.kairos import scheduler as _ks_v
+                        _ks_v.on_user_turn(_session_of(body))
+                        _ks_v.note_user_turn(True)   # released by _settle_turn below
+                    except Exception:
+                        pass
                     for chunk in voice_turn(body, transcript):
                         self.wfile.write(chunk); self.wfile.flush()
                 except Exception as exc:
-                    self.wfile.write(("data: " + json.dumps(
-                        {"error": f"voice: {exc}"}) + "\n\ndata: [DONE]\n\n").encode())
-                    self.wfile.flush()
+                    try:
+                        self.wfile.write(("data: " + json.dumps(
+                            {"error": f"voice: {exc}"}) + "\n\ndata: [DONE]\n\n").encode())
+                        self.wfile.flush()
+                    except Exception:
+                        pass                     # the settle below matters more than the goodbye
+                finally:
+                    # voice_turn appends her final reply to the session transcript
+                    # itself; read it back from there rather than re-parsing SSE bytes.
+                    # ...and only when THIS turn actually spoke: the service appends
+                    # (user "[voice message]", assistant reply) as a pair, so a
+                    # silence-skip — transcript untouched — must not re-record the
+                    # PREVIOUS assistant reply as if it were tonight's.
+                    _v_fin = ""
+                    try:
+                        if (len(transcript) >= 2
+                                and transcript[-1].get("role") == "assistant"
+                                and transcript[-2].get("content") == "[voice message]"):
+                            _v_fin = transcript[-1].get("content", "")
+                    except Exception:
+                        pass
+                    _settle_turn("[voice message]", _v_fin, capture=False,
+                                 latch=_v_latch)
+                    _sd_turn_end()
             elif self.path == "/v1/speak":  # SPEECH OUT — one utterance -> audio/wav
                 # Deliberately ONE utterance per call, not one reply. Long input on
                 # this build does not degrade, it blows up (a 20 s paragraph ran 47
@@ -5268,6 +5368,7 @@ def _run_stdlib(host: str, port: int) -> None:
                 "/v1/telemetry/health": lambda: __import__(
                     "harness.telemetry.store", fromlist=["x"]).verify(),
                 "/v1/memory": _memory_json,      # PK2 §U1 memory-browser data
+                "/v1/story": _story_json,        # the Story panel: her prefix, attributed
                 "/v1/decisions": _decisions_json,
                 "/v1/tasks": _tasks_json,        # PK2 §U1 task-queue data
                 "/v1/persona": _persona_get,     # PK2 §P1 persona editor (load)

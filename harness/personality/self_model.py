@@ -122,7 +122,16 @@ _MAX_PER_KIND = 2       # ...and no kind may take more than this many of them
 _MAX_CHAPTERS = 2       # ...ahead of which stand up to this many weeks (kind="chapter")
 
 
-def render_self_model(root=None, max_facts: int = 20, budget_chars: Optional[int] = None) -> str:
+def self_block_lines(root=None, max_facts: int = 20,
+                     budget_chars: Optional[int] = None) -> list:
+    """THE STRUCTURED FORM of the self block: [(section, row_name, label), ...].
+
+    ONE ASSEMBLY, TWO READERS (2026-08-28, the Story panel). render_self_model() is now a
+    join over exactly this list, so the panel that shows him "what stands in her prefix"
+    and the prefix itself cannot disagree — the two-copies bug pre-empted at the seam.
+    `section` is "fact" | "chapter" | "narrative"; `row_name` is the registry row the line
+    came from, so the panel can offer edit/retire/pin on the very line she reads.
+    """
     """The self-model block for the persona system prefix — ONLY self rows, from the registry.
 
     IT READS THE REGISTRY, WHICH IS WHERE HER SELF-FACTS ACTUALLY GO. (History: this block was
@@ -230,14 +239,18 @@ def render_self_model(root=None, max_facts: int = 20, budget_chars: Optional[int
         return t
 
     seen, out = set(), []
-    # who she IS, then the WEEKS, then the recent lines
+    # who she IS, then the WEEKS, then the recent lines — each label beside its row
+    _sect_of = {}
+    for _grp, _nm in ((rest, "fact"), (chap, "chapter"), (narr, "narrative")):
+        for r in _grp:
+            _sect_of.setdefault(id(r), _nm)
     for r in rest + chap + narr:
         t = (r.get("text") or "").strip()
         key = t.rstrip(".").lower()
         if not t or key in seen:          # "I genuinely enjoy thunderstorms" twice, once
             continue                      # with a full stop — the same fact, said twice
         seen.add(key)
-        out.append(_label(r))
+        out.append((_sect_of.get(id(r), "fact"), r.get("name", ""), _label(r)))
     if budget_chars is None:
         if not narr and not chap:
             out = out[-max_facts:]        # legacy shape: the last N plain self-facts
@@ -261,31 +274,41 @@ def render_self_model(root=None, max_facts: int = 20, budget_chars: Optional[int
         # CORE-marked rows lead the facts section: rows he or she pinned as load-bearing
         # identity claim their place before any unpinned fact, which is what keeps her
         # core from drifting off the end of the list as the store grows.
-        sects = [([_label(r) for r in
+        sects = [([("fact", r.get("name", ""), _label(r)) for r in
                    sorted(rest, key=lambda r: (0 if r.get("core") else 1, _ts(r)))],
                   0.45),
-                 ([_label(r) for r in chap], 0.30),
-                 ([_label(r) for r in narr], 0.25)]
+                 ([("chapter", r.get("name", ""), _label(r)) for r in chap], 0.30),
+                 ([("narrative", r.get("name", ""), _label(r)) for r in narr], 0.25)]
         kept, spill = [], 0
         seen2: set = set()
         for lines_s, share in sects:
             allow = int(budget_chars * share) + spill
             used = 0
-            for line in lines_s:
+            for _sect, _nm, line in lines_s:
                 if line in seen2:
                     continue
                 # a section's FIRST line renders even oversize — a chapter a little over
                 # its share is worth more present than absent
                 if used + len(line) + 3 > allow and used:
                     break
-                kept.append(line)
+                kept.append((_sect, _nm, line))
                 seen2.add(line)
                 used += len(line) + 3
             spill = max(0, allow - used)
-        out = [l for l in out if l in seen2] or kept   # keep the original ordering
+        out = [t for t in out if t[2] in seen2] or kept   # keep the original ordering
+    return out
+
+
+def render_self_model(root=None, max_facts: int = 20,
+                      budget_chars: Optional[int] = None) -> str:
+    """The self-model block for the persona system prefix — a JOIN over
+    self_block_lines(), and nothing else. The Story panel reads the same list, so what he
+    is shown and what she reads are ONE assembly (2026-08-28); byte-identity with the
+    pre-refactor renderer was verified against the live store before this landed."""
+    out = self_block_lines(root=root, max_facts=max_facts, budget_chars=budget_chars)
     if not out:
         return ""
-    lines = "\n".join(f"- {t}" for t in out)
+    lines = "\n".join(f"- {t}" for _sect, _nm, t in out)
     # THE HEADER IS LOAD-BEARING (2026-08-22). Under "About yourself (self-model):" alone she
     # read the block as a briefing and narrated it out loud — "the prompt also provides a
     # 'feeling' context…". It is MEMORY: things she knows about herself, never a script and

@@ -205,4 +205,37 @@ check("...and maps the engine block: kind=openai, a base_url, a key FILE path",
 check("...and the gateway port the profile names (8810 — beside hers, never ON hers)",
       _env.get("SP_GATEWAY_PORT") == "8810", _env.get("SP_GATEWAY_PORT"))
 
+print("\n9. ask_oneshot WALKS THE SEAM ON A FOREIGN ENGINE (2026-08-28, external review)")
+# oneshot.py POSTs SP_DAEMON_URL + /v1/oneshot — deliberately stdlib-only, and right for
+# the sp daemon. On an openai-engine profile that URL is LM Studio, which has no such
+# route, so the becoming pass, the weekly chapter and the slots oracle all failed-to-
+# silence on exactly the profile the public framework ships. A non-sp engine now falls
+# through to get_client().oneshot; the sp fast path is untouched.
+import harness.inference.oneshot as _osh
+import harness.inference.client as _cl
+_old_kind = os.environ.get("SP_ENGINE_KIND")
+_old_get = _cl.get_client
+
+
+class _StubC:
+    def oneshot(self, msgs, **kw):
+        return "STUB-ANSWER from the seam"
+
+
+try:
+    os.environ["SP_ENGINE_KIND"] = "openai"
+    _cl.get_client = lambda: _StubC()
+    check("a foreign engine gets its answer through the backend client",
+          _osh.ask_oneshot("one question") == "STUB-ANSWER from the seam",
+          _osh.ask_oneshot("one question"))
+    _cl.get_client = lambda: (_ for _ in ()).throw(RuntimeError("down"))
+    check("...and a dead client is still fail-toward-silence, never a raise",
+          _osh.ask_oneshot("q") is None)
+finally:
+    _cl.get_client = _old_get
+    if _old_kind is None:
+        os.environ.pop("SP_ENGINE_KIND", None)
+    else:
+        os.environ["SP_ENGINE_KIND"] = _old_kind
+
 finish("G-BACKEND-SEAM")

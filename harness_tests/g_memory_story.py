@@ -258,6 +258,29 @@ check("the folded rows are gone from recall's candidates (one death field)",
       not any("walked the pier" in (M._text(e) or "")
               for e in M.live_rows()), "a folded row is still live to recall")
 
+print("\n5. THE STORY DOOR CARRIES THE SAME ASSEMBLY THE PREFIX RENDERS")
+# (2026-08-28, his ask: a panel that "renders exactly her memories that are used").
+# /v1/story is structure over self_block_lines() — the SAME assembly render_self_model()
+# joins into her standing prompt. If the door ever grows its own selection logic, the
+# byte check below is the tripwire: the panel would be showing him a prefix she does
+# not actually carry, which is the two-copies bug wearing a UI.
+from harness.server.app import _story_json  # noqa: E402
+_sj = _story_json()
+check("the door answers ok with a non-empty block",
+      _sj.get("ok") and isinstance(_sj.get("block"), list) and len(_sj["block"]) > 0,
+      _sj.get("block_error", ""))
+check("every line is attributed to a section and a registry row name",
+      all(b.get("section") in ("fact", "chapter", "narrative") and b.get("name")
+          for b in _sj["block"]),
+      [b for b in _sj["block"] if not b.get("name")][:3])
+_joined = "\n".join("- " + b["label"] for b in _sj["block"])
+# The render is header + join; the header is prose law (never narrate this list), the
+# join is the assembly. The door carries the assembly; the byte check is on that.
+check("joining the door's labels is BYTE-IDENTICAL to the rendered prefix body",
+      len(_joined) > 0 and render_self_model(budget_chars=2400).endswith("\n" + _joined),
+      "the door and the prefix have diverged")
+check("the backup receipt rides along", isinstance(_sj.get("backup"), dict))
+
 print("\nG-MEMORY-STORY: %d pass, %d fail" % (PASS, FAIL))
 rdir = os.path.join(ROOT, "var", "sem", "receipts")
 os.makedirs(rdir, exist_ok=True)

@@ -69,6 +69,8 @@ export const day = () => get('/v1/day')
 export const wardrobe = () => get('/v1/wardrobe')
 export const music     = () => get('/v1/music')
 export const narrative = () => get('/v1/narrative')
+/* the story panel: her prefix line-by-line with row attribution, + backup receipt */
+export const story = () => get('/v1/story')
 /* HER OWN TIME — one merged feed of what she did while he was away. Read-only by
  * construction: it composes stores she already writes, and there is no POST. */
 export const agency    = () => get('/v1/agency')

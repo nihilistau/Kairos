@@ -382,4 +382,34 @@ check("...and the private turns did NOT come back with them",
       "a held write must stay held after the mode ends")
 check("the disk grew, which is what recording looks like", tree() != before)
 
+print("\n10. THE BOARD AND THE LONG STORE HOLD TOO (2026-08-28, external review)")
+# Facts via remember() were held; a NOTE written mid-anon-evening landed on the board,
+# and store_conversation wrote the COMPLETE transcript under memory-okf-conv — the
+# largest single leak an off-the-record evening could have. Same guard, same receipt.
+AN.enter("him")
+try:
+    from harness.skills import notes as _NT
+    _n10 = _NT.add("a thing from the private evening", body="do not keep this")
+    check("notes.add is HELD under anon", _n10.get("held") is True, _n10)
+    from harness.skills import conversation_memory as _CM
+    _addr = _CM.store_conversation(
+        [{"role": "user", "content": "off the record: the biscuit confession"}],
+        summary="private")
+    check("store_conversation is HELD under anon (returns no address)", _addr is None,
+          _addr)
+    import glob as _gl
+    _conv = os.environ.get("SP_CONV_OKF_ROOT", "")
+    # scoped to the sandboxed store — an empty root would glob the cwd and find THIS
+    # GATE'S OWN SOURCE, which is exactly what happened on the first run
+    _leak = [f for f in _gl.glob(os.path.join(_conv, "**", "*"), recursive=True)
+             if os.path.isfile(f) and not f.endswith(".py")
+             and "biscuit confession" in io.open(f, encoding="utf-8",
+                                                 errors="replace").read()] if _conv else []
+    check("...and the transcript truly never touched disk", not _leak, _leak[:2])
+finally:
+    AN.exit_mode() if hasattr(AN, "exit_mode") else AN.leave() if hasattr(AN, "leave") else None
+_n10b = _NT.add("a thing from after the evening", body="keep this one")
+check("...and the board works again once the mode ends", _n10b.get("held") is not True,
+      _n10b)
+
 finish("G-ANON")

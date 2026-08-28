@@ -1205,6 +1205,31 @@ body.resizing, body.resizing * { user-select: none !important; cursor: inherit; 
 .ap-ti { font-weight: 500; }
 .ap-blurb { font-size: 11px; opacity: .55; line-height: 1.3; }
 
+/* story (sty-) — her prefix attributed, the chapters and their folds, the lanes */
+.sty { overflow-y: auto; height: 100%; font-size: 12.5px; }
+.sty-sect { margin-bottom: 14px; }
+.sty-h { text-transform: uppercase; font-size: 10px; letter-spacing: .12em;
+  opacity: .65; margin: 10px 0 6px; }
+.sty-n { margin-left: 8px; opacity: .6; letter-spacing: 0; }
+.sty-row { border-bottom: 1px solid rgba(128,128,128,.10); }
+.sty-row.gone { opacity: .45; }
+.sty-line { display: flex; gap: 8px; align-items: baseline; padding: 5px 2px;
+  cursor: pointer; line-height: 1.35; }
+.sty-line:hover { background: rgba(128,128,128,.07); }
+.sty-core { color: var(--gold); flex: none; }
+.sty-text { flex: 1 1 auto; min-width: 0; }
+.sty-act { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding: 4px 2px 8px; font-size: 11px; }
+.sty-act button { font-size: 11px; }
+.sty-act input { flex: 1 1 220px; min-width: 160px; font-size: 11px; }
+.sty-fold { margin: 2px 0 8px 14px; }
+.sty-fold summary { cursor: pointer; font-size: 11px; opacity: .6; }
+.sty-k { border-color: #3d4a5c; color: #8fb3d9; }
+.sty-lane { font-size: 11px; }
+.sty-lane.on { outline: 1px solid rgba(128,128,128,.5); }
+.sty-bk { margin-top: 12px; font-size: 11px; border-top: 1px solid rgba(128,128,128,.15);
+  padding-top: 8px; }
+
 /* journal (jr-) — the dedupe's furniture */
 .jr-recent { color: var(--cyan); text-transform: uppercase; font-size: 9.5px;
   letter-spacing: .1em; }
