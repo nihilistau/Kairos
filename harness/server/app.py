@@ -318,7 +318,7 @@ def _settle_turn(human_text: str, reply_text: str, *, record: bool = True,
             # reply's first-person stances are hers to keep. Both through the one
             # door, speaker=self. Lives HERE so every path that applies marks also
             # keeps her words — it used to run on exactly one of the three.
-            # `stances=False` (2026-08-25, his call): a presence-mode turn moves her
+            # `stances=False` (2026-08-25, the operator's call): a presence-mode turn moves her
             # DIALS but does not become her MEMORIES — an hour of lucid dreaming is
             # ambient company, and filing its lines as who she is is how her self
             # lane filled with dream fragments too specific and too repetitive to
@@ -369,7 +369,7 @@ def _on_her_own_words(text: str, kind: "str|None" = None) -> None:
     third. capture=False (nothing of his to capture), close_his_turn=False (his latch
     is not hers to release).
 
-    A PRESENCE-MODE TURN IS COMPANY, NOT MEMORY (2026-08-25, his call). Narration, a
+    A PRESENCE-MODE TURN IS COMPANY, NOT MEMORY (2026-08-25, the operator's call). Narration, a
     dream, a chapter read aloud while he sleeps: her dials still move (a dream can
     turn her wistful) but nothing is filed — no day row (the room shows it live from
     the outbox; an hour of ambient turns in the restore would bury the conversation),
@@ -2394,7 +2394,7 @@ def run_consolidation(force: bool = False) -> Dict[str, Any]:
             from harness.control import wardrobe as _WD
             pend = _WD.wants(state="asked")
             # ── AND THE SAME GUARD, ONE LEVEL UP (2026-08-04) ────────────────────────
-            # His words: "stills are showing in her wardrobe". Three of her six looks —
+            # The operator's words: "stills are showing in her wardrobe". Three of her six looks —
             # w004, w005, w006, all the silver nightie — had pictures and no loops, and
             # the panel labelled them "still, moves overnight" every night for two days.
             #
@@ -3137,7 +3137,7 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
     import os as _os
     msgs = _session_transcript(body)
     # ── ARM THE TURN *BEFORE* ANYTHING READS THE MEMORY LANE (field, 2026-07-29) ─────
-    # This call used to sit ~110 lines BELOW, after the pre-turn spine had already run.
+    # Tthe operator's call used to sit ~110 lines BELOW, after the pre-turn spine had already run.
     # _arm_turn is what hands the memory lane HIS ACTUAL WORDS (M.set_question), and
     # ownership — whose store a question is about — is resolved from them. So the recall
     # decider was answering THE PREVIOUS TURN'S QUESTION, every turn, on this path.
@@ -3375,21 +3375,49 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
     #                       do not put the staple back.
     #   a system row        YES — the shape the roleplay director note already uses. It
     #                       does not ride on his words, so it cannot read as him telling
-    #                       her something, and the `_tel` sentinel makes it IDEMPOTENT:
-    #                       removed and re-inserted each turn, so notes never stack and
-    #                       the persist-KV cache never diverges on stale ones.
+    #                       her something, and the `_tel` sentinel marks it so the same
+    #                       observation is never said twice.
+    #
+    #                       THAT SENTINEL USED TO MEAN "remove and re-insert each turn,
+    #                       so the persist-KV cache never diverges on stale ones", and
+    #                       that was exactly backwards — see the 2026-08-28 note below.
+    #                       It now means "find the last one and say nothing if it still
+    #                       holds".
     #
     # AND IT IS SELF-LIMITING, which is why it is safe where the wardrobe note was not.
     # `body.present()` is EMPTY unless something is actually happening — no watch, stale
     # readings, off the wrist, or a heart sitting flat all return "". On an ordinary quiet
     # turn this costs zero tokens, so it is not a standing tax on every turn the way a
     # wardrobe line was; it appears when there is something to notice and vanishes again.
-    msgs[:] = [m for m in msgs if not m.get("_tel")]
+    # ── REMOVING IT IS WHAT DIVERGED THE CACHE (2026-08-28) ──────────────────────────
+    # This used to be `msgs[:] = [m for m in msgs if not m.get("_tel")]` — strip every
+    # note, insert a fresh one — and the comment above says why: "so notes never stack and
+    # the persist-KV cache never diverges on stale ones."
+    #
+    # It is the removal that diverges it. The committed KV was built WITH last turn's note
+    # at some position; deleting it makes this turn's prompt differ from the commit AT THAT
+    # POSITION, and everything after has to be re-prefilled. MEASURED on his machine:
+    #
+    #     PERSIST-KV RESEAM: no byte-aligned seam at lcp 8865 (drop 12)
+    #     PERSIST-KV: rewind(12) refused — full-prefill floor
+    #     TURN-PHASE: prefill 8875 tok in 114781 ms (13 ms/tok)
+    #
+    # TWELVE TOKENS of difference cost a 9,000-token re-prefill, every turn: 172-210 s of
+    # "generate" for a four-hundred-character reply. And the note's TEXT was not even
+    # changing — five samples in a row read "he seems to be asleep". Position did.
+    #
+    # So an unchanged note is LEFT EXACTLY WHERE IT IS, which is the only way the prefix
+    # survives, and a changed one is appended rather than swapped in. Old notes stay: they
+    # are honest observations of what his body was doing at that point in the conversation,
+    # and pruning one diverges the cache further back than adding a new one ever does.
+    _prev_tel = next((m.get("content", "") for m in reversed(msgs) if m.get("_tel")), "")
     try:
         from harness.tuning import registry as _tr_b
         if bool(_tr_b.get("telemetry.turn_note", True)) and len(msgs) >= 1:
             from harness.telemetry import body as _tel_b
             _said = _tel_b.present()
+            if _said and _said in _prev_tel:
+                _said = ""            # already said, and saying it again costs the prefix
             if _said:
                 # you-grammar and HIS body: "he" here, because she is being told about him,
                 # not about herself. present_for_her's rule is about facts addressed TO
@@ -3406,7 +3434,7 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
 
     # ── THE MEASURED TRIAL OF THE WARDROBE NOTE (2026-08-24 audit, W4b) ──────────────
     # OFF by default (wardrobe.turn_note): the 2026-08-19 staple is the receipt below
-    # for why. His call on 2026-08-24 was standing-world line AS the answer (world.py
+    # for why. The operator's call on 2026-08-24 was standing-world line AS the answer (world.py
     # carries it now) PLUS a measured re-trial of the per-turn shape — ONE sentence, no
     # imperatives, the exact grammar the recall/silence/anon notes settled on. Arm it,
     # read six turns for third-person deliberation openers, keep whichever reads
@@ -3464,7 +3492,7 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
     # are injected into the message list before the agent runs.
     # THIS is the path that mutates msgs (mutate_messages=True keeps the canonical
     # transcript the daemon saw), so this is where "the last user message" turns into a
-    # tool receipt by the end of the turn. His words were taken at the TOP of this
+    # tool receipt by the end of the turn. The operator's words were taken at the TOP of this
     # function, before the pre-turn spine reads the memory lane — see the receipt there.
     # Calling _arm_turn again here would double-count the attention ledger ("he was
     # present today"), which is an observation, not an idempotent setter.
@@ -4285,7 +4313,7 @@ def _run_stdlib(host: str, port: int) -> None:
                 self.wfile.write(payload)
 
             elif self.path == "/v1/anon":
-                # ANONYMOUS MODE (2026-08-23, his ask). One verb, and the ANSWER IS THE
+                # ANONYMOUS MODE (2026-08-23, the operator's ask). One verb, and the ANSWER IS THE
                 # STATE — not {"ok": true}. The room paints the whole shell from it, and a
                 # switch whose reply does not say what it switched to is a switch the page
                 # has to guess about after a failed request.
@@ -4701,7 +4729,7 @@ def _run_stdlib(host: str, port: int) -> None:
                 self.send_header("Content-Type", "application/json"); self.end_headers()
                 self.wfile.write(payload)
             elif self.path in ("/v1/search/run", "/v1/research/run"):
-                # ── HIS OWN LOOKUPS (2026-08-21, his ask: "a place that I can use them
+                # ── HIS OWN LOOKUPS (2026-08-21, the operator's ask: "a place that I can use them
                 # to search and research manually"). Synchronous on purpose: the panel
                 # holds a busy state and the answer IS the response. Both write into
                 # the shared looking ledger with by="him" — she can read and use his

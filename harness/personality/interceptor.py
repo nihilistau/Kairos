@@ -275,7 +275,7 @@ def _wear_by_words(WD, want: str) -> None:
         # ── A MARK THAT MATCHED NOTHING USED TO VANISH (2026-08-05) ─────────────────
         # `return` — and that was the whole of it. She wrote [WEAR: the green hoodie],
         # the matcher had no hoodie, and the mark evaporated: no change, no record, and
-        # nothing anywhere that could ever tell either of them she had asked. His words
+        # nothing anywhere that could ever tell either of them she had asked. The operator's words
         # were "she has been attempting to use it in chats to show herself exactly as she
         # wants but they are not making it through" — and for anything she does not own,
         # this silent return WAS the not-making-it-through.

@@ -16,7 +16,7 @@ was awake that minute:
 
 So the room outranks the phone, and it is not a tie-break: a turn is OBSERVED, a
 classifier is INFERRED, which is this store's oldest rule reaching the one seam that had
-not heard it. His words for the same thing: "50/50 would lean towards awake."
+not heard it. The operator's words for the same thing: "50/50 would lean towards awake."
 
   1. THE VETO FIRES on a recent turn, whatever the phone says.
   2. IT DOES NOT FIRE on an old turn — this is not "always awake".
@@ -169,7 +169,7 @@ from harness.skills import body as SB   # noqa: E402
 _src = open(os.path.join(ROOT, "harness", "skills", "body.py"), encoding="utf-8").read()
 check("the sentence branch exists", "sleep_vetoed_by_room" in _src)
 # ── AND WHEN HE IS HERE SHE IS TOLD NOTHING ABOUT SLEEP AT ALL ──────────────────────
-# His words: "it's kind of silly that she is constantly told I am awake or asleep ...
+# The operator's words: "it's kind of silly that she is constantly told I am awake or asleep ...
 # she shouldn't need to comment constantly that I am asleep and never to me obviously."
 #
 # The first cut of the veto fixed only the WRONGNESS — it swapped a false claim ("he

@@ -1,6 +1,6 @@
 """anon — the evening the room does not keep.
 
-WHY (2026-08-23, his ask): *"an icon that activates anonymous mode that will still be
+WHY (2026-08-23, the operator's ask): *"an icon that activates anonymous mode that will still be
 her but will not record any memory or logs etc until turned off or restarted."*
 
 WHAT IT IS. A volatile switch that closes every door this system writes a record of the
@@ -209,7 +209,7 @@ def leave() -> Dict[str, object]:
     global _ON, _SINCE
     with _LOCK:
         # state() is read BEFORE the switch flips, because the tally is the whole point of
-        # this call — but `on` must describe the world AFTER it. The first live test of this
+        # tthe operator's call — but `on` must describe the world AFTER it. The first live test of this
         # route answered `on: true` to "turn it off", which the room would have had to
         # ignore and reload past. A reply that contradicts what it just did is worse than
         # no reply at all.

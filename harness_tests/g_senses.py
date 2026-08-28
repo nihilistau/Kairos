@@ -303,7 +303,7 @@ else:
 importlib.reload(amb)
 
 print("\n§ HER ROOM NOTE IS PERSONAL — the door's prompt, not a surveyor's")
-# 2026-08-21, his ask: the eye is her window into HIS world. The door default
+# 2026-08-21, the operator's ask: the eye is her window into HIS world. The door default
 # names Sam (never "a man"), makes the room's things his, and keeps the
 # stranger clause — which is also the seed of "notice if others are here".
 _serve8 = open(os.path.join(ROOT, "serve.py"), encoding="utf-8").read()

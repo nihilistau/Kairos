@@ -247,7 +247,7 @@ try:
     check("...and no longer promises the day boundary as the schedule",
           "end of the day" not in reply and "until it MOVES, which happens" not in reply,
           reply[:220])
-    # His words: "wardrobe contains Her clothes section and Her wardrobe. this makes no
+    # The operator's words: "wardrobe contains Her clothes section and Her wardrobe. this makes no
     # sense and is redundant... and they contain separate items."
     panel = io.open(os.path.join(ROOT, "ui", "src", "apps", "Wardrobe.jsx"),
                     encoding="utf-8", errors="replace").read()

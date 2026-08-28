@@ -250,7 +250,7 @@ Narrative rows never supersede; a repeat reinforces. Presence-mode turns (C, 202
 > longer fires on those turns.** A presence-mode turn now settles with `record=False,
 > stances=False` (`harness/server/app.py`, the scheduler passes the impulse KIND to
 > `on_spoke`): it writes **no** day-transcript row and **no** `self_stance` rows. Her dials
-> still move — a dream can leave her wistful — but nothing is filed. His call, in his words:
+> still move — a dream can leave her wistful — but nothing is filed. The operator's call, in his words:
 > the lucid/reading lines are *too specific and too repetitive to be stored as her memories*,
 > and the `kind=dream` pile in the registry was the receipt. So read the mapping as: the
 > presence lane writes ITS OWN narrative row by kind, and the ordinary epilogue that follows
@@ -306,7 +306,7 @@ grew its breadcrumb). They are properly DEAD to every reader (`lifecycle` is the
 death field, ONE spelling since 2026-08-25 — `find_superseded`/`find_subsumed` dropped
 their wider `or superseded_by` clause, G-MEMORY-LIFECYCLE / G-SEM-DOMINATE), but they
 cannot answer WHY they died. The helper only RETURNS them, for the curate panel to show
-him one day; rewriting history onto 25 old rows is his call row by row, never a
+him one day; rewriting history onto 25 old rows is the operator's call row by row, never a
 maintenance pass's.
 
 **The secret is withheld at ALL the tool doors, by one rule** (2026-08-24, audit A3;

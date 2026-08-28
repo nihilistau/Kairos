@@ -162,7 +162,7 @@ check("nothing before it -> nothing is dropped",
 check("nothing after it -> nothing is dropped",
       "the whole reply" in clean("the whole reply\n***>"))
 # ── AND A LONE CLOSING TAG IS THE SAME MARKER (2026-08-06) ────────────────────────
-# His words when it appeared: "you don't find it strange when we close one she just
+# The operator's words when it appeared: "you don't find it strange when we close one she just
 # starts using another, even making them up?" The mechanism answer is no — the strip
 # runs after generation, outside the model, and the canon stores the STRIPPED reply, so
 # she can neither see the block nor be reinforced by her own markers. What she has is
@@ -410,7 +410,7 @@ check("...and the chip is rendered whether or not she moved",
 check("...with her mood never cut mid-word", ".slice(0, 40)" not in chat.split("act-persona")[1][:600])
 
 
-# ── NO INDENT WHERE THE MARK WAS (2026-08-27, his report) ────────────────────────────
+# ── NO INDENT WHERE THE MARK WAS (2026-08-27, the operator's report) ────────────────────────────
 # A mark removed from the head of a line leaves ONE space — the run-collapser only eats
 # runs of two or more, and `.strip()` only ever touched the ends of the whole reply. The
 # room renders her turn with `white-space: pre-wrap`, so that single orphan is an INDENT

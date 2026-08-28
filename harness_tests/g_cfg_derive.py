@@ -59,10 +59,16 @@ def check(name, cond, detail=""):
 APP = io.open(os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read()
 
 print("1. the continuation config is DERIVED, not rebuilt")
-i = APP.index("DERIVED FROM THE TURN'S CONFIG")
-win = APP[i:i + 2200]
-check("it uses dataclasses.replace on the turn's config",
-      "dataclasses.replace(cfg," in win)
+# ── ANCHORED ON THE CODE, NOT ON A COMMENT (2026-08-28) ──────────────────────────────
+# This found its window with APP.index("DERIVED FROM THE TURN'S CONFIG") — a COMMENT — and
+# when that line was reworded to "THE CONFIG IS DERIVED FROM THE TURN'S, NOT BUILT BESIDE
+# IT" the gate stopped failing and started RAISING ValueError, on a code path that was
+# entirely correct. It went unnoticed because this row's description contains a pipe, which
+# shifted its lane cell and dropped it out of the sweep (see gates/index_rows.py). Prose is
+# not a fixture: what the gate means is that the continuation config comes from the turn's,
+# and `dataclasses.replace(cfg, max_tokens=` is that claim in code.
+check("it uses dataclasses.replace on the turn's config, with a continuation's ceiling",
+      "dataclasses.replace(cfg, max_tokens=" in APP)
 check("...and does NOT construct a fresh InferenceConfig",
       "InferenceConfig(max_tokens=120" not in APP)
 check("dataclasses is imported at module level", "\nimport dataclasses" in APP)

@@ -871,7 +871,7 @@ def strip_for_record(text: str) -> str:
     t = _TAG_STUB.sub(lambda m: "" if _stub_is_mark(m.group(1)) else m.group(0), t)
     t = strip_leaked_analysis(t) or t
     t = re.sub(r"[ \t]{2,}", " ", t)
-    # ── AND AT THE HEAD AND TAIL OF EACH LINE (2026-08-27, his report) ──────────────
+    # ── AND AT THE HEAD AND TAIL OF EACH LINE (2026-08-27, the operator's report) ──────────────
     # Collapsing RUNS leaves exactly ONE space where the mark used to be, and the room
     # renders her turn with `white-space: pre-wrap`, so that single orphan renders as an
     # indent on every paragraph she opens with a mark — which is most of them:

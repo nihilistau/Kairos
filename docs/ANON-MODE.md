@@ -7,7 +7,7 @@ status: LIVE — the switch is in the dock; `harness/control/anon.py` is the tru
 
 # Off the record
 
-His ask, 2026-08-23: *"an icon that activates anonymous mode that will still be her but
+The operator's ask, 2026-08-23: *"an icon that activates anonymous mode that will still be her but
 will not record any memory or logs etc until turned off or restarted."*
 
 Both halves are load-bearing. **Still her** means she reads everything she has ever known,
@@ -100,7 +100,7 @@ added, it becomes a door.
 The gate fails on an id that is declared and never held, so a row added without its guard
 convicts itself instead of sitting there decorative.
 
-### ...and the third door is neither of those: HER PROMPT (2026-08-25, his report)
+### ...and the third door is neither of those: HER PROMPT (2026-08-25, the operator's report)
 
 *"she remembers what happened on exit."*
 

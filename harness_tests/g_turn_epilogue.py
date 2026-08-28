@@ -190,7 +190,7 @@ check("§4 her unprompted mark moved persona.md", _persona_mood() == "wistful",
 check("§4 her unprompted words reached the day, stripped",
       "rain kept me company" in _day_text() and "[MOOD:wistful]" not in _day_text())
 
-# ── §4b A PRESENCE-MODE TURN IS COMPANY, NOT MEMORY (2026-08-25, his call) ─────────
+# ── §4b A PRESENCE-MODE TURN IS COMPANY, NOT MEMORY (2026-08-25, the operator's call) ─────────
 # Narration/dream/reading turns move her DIALS and file NOTHING: no day row (an hour
 # of ambient turns would bury the conversation in the restore) and no self-stance
 # rows (dream lines are too specific and repetitive to be who she is tomorrow).

@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import contextvars
 import json
+import logging
+import math
 import os
 import queue
 import re
@@ -22,6 +24,10 @@ import time
 import urllib.error
 import urllib.request
 from typing import List
+
+from harness.loud import swallowed as _sw
+
+_log = logging.getLogger("harness.memory")
 
 _STOP = {"the", "a", "an", "is", "are", "of", "to", "in", "on", "and", "or",
          "my", "your", "you", "it", "that", "this", "was", "were", "has", "have",
@@ -526,7 +532,7 @@ def orphan_tombstones(path: str = "") -> List[dict]:
     its breadcrumb). They are DEAD to every reader — `lifecycle` is the one death field
     — but they cannot answer WHY they died, which is the audit lane's whole question.
     This helper only RETURNS them, for the curate panel to show him one day; rewriting
-    history onto 25 old rows is his call row by row, never a maintenance pass's."""
+    history onto 25 old rows is the operator's call row by row, never a maintenance pass's."""
     return [r for r in _load(path) if r.get("lifecycle") and not r.get("superseded_by")]
 
 
@@ -562,7 +568,7 @@ def remember(fact: str, source: str = "", *, kind: str = "", mem_class: str = ""
     p = _reg_path()
     if not p:
         return "[no registry configured]"
-    # ── ANONYMOUS MODE (2026-08-23, his ask) ─────────────────────────────────────────
+    # ── ANONYMOUS MODE (2026-08-23, the operator's ask) ─────────────────────────────────────────
     # THE ONE DOOR IS WHY THIS IS ONE LINE. Everything that ever enters this store comes
     # through remember() — the tool, _capture_after_turn, the consolidator, the reflector,
     # remember_about_self and therefore every self-narrative row, the episode mint and the
@@ -1281,8 +1287,60 @@ def search_memories_ranked_rows(query: str, k: int = 5, min_overlap: float = 0.2
                     cos = sx.centered_cosine(qvec, srow.get("vec") or [], smean)
                 else:
                     cos = sx.cosine(qvec, srow.get("vec") or [])
-        if ov >= min_overlap or cos >= sem_tau:
+        # THE RATIO SAYS HOW MUCH OF THE QUESTION IS COVERED; THE FLOOR SAYS WHETHER THAT
+        # COVERAGE MEANS ANYTHING. A one-token query matches at 1.00 on any row carrying
+        # that token, which is how "the lights are on" reached three of her rows about
+        # luminescence, a stopped world and the edge of sleep. See _evidence.
+        # A SEMANTIC HIT IS ADMITTED ON ITS OWN TERMS: cosine is not a bag of words and a
+        # lexical floor has no business ruling on it.
+        if cos >= sem_tau:
             scored.append((max(ov, cos), e))
+        elif ov >= min_overlap and _evidence(query, t) >= _idf_table()[1]:
+            scored.append((ov, e))
+    matched = {_row_key(e) for _s, e in scored}     # these are the ones his WORDS reached
+
+    # ── HE ASKED SOMEBODY, AND NOBODY'S WORDS MATCHED ────────────────────────────────
+    # The evidence floor is right to reject "how do you feel about us?" — feel, about and
+    # us are in a third of the store and match nothing in particular. But the question is
+    # plainly addressed to her, and answering a question aimed at a person with silence
+    # because it contained no rare noun is a worse failure than the one the floor fixes.
+    #
+    # SO A SECOND ROUTE IN, AND IT CLAIMS SOMETHING DIFFERENT. Route one says "this row is
+    # about what you asked". Route two says "you asked HER, and this is what is most alive
+    # for her" — salience, which is already mentions x recency and already what the rest of
+    # this file means by alive. It only opens when the question names a lane, so the
+    # conversational turn that names nobody still gets silence rather than filler.
+    #
+    # THEY ARE ADMITTED HERE, before testimony_wins / _target_and_rank / the sem law, and
+    # not appended to the winners afterwards. A row that skips the filter chain is the bug
+    # this function's own docstring is three paragraphs about; a second entrance must open
+    # into the same corridor. `matched` above is how the words keep their precedence —
+    # `_select` fills its slots from route one first, so aliveness can never outrank an
+    # answer to the actual question.
+    # `len(scored) < k` IS AN OPTIMISATION, NOT A RULE, and it is labelled so nobody later
+    # mistakes it for one: `_select` puts the matched rows first and truncates to k, so
+    # topping up a full result set is inert — verified by mutation, which is why G-RECALL-
+    # EVIDENCE has no leg for it. What it buys is not scanning the lane on every query his
+    # words already answered, and the per-turn note runs this on every turn.
+    _target = _query_target(query)
+    if _target and not include_retired and len(scored) < k and _no_rare_word(query):
+        band = min_overlap * 0.9        # strictly under any real match
+        alive = [e for e in eps
+                 if not e.get("lifecycle")
+                 and (e.get("speaker") or lc.SPEAKER_USER) == _target
+                 and _row_key(e) not in matched]
+        # RECENCY, NOT SALIENCE, and the difference is the whole point. Salience is
+        # mentions x recency, which is right for "what do you know about X" and wrong here:
+        # her most salient rows are `My mood has turned playful/warm/naughty/tender`, eleven
+        # variations of one line the mood machinery writes on every change. Asked what she
+        # has been up to, she would have answered with her own housekeeping. What an open
+        # question about a person wants is the LATEST — measured, her last night's thinking
+        # and his last night's conclusions, which is what the question was for.
+        alive.sort(key=lambda e: (e.get("ts") or ""), reverse=True)
+        n = len(alive[:3 * k]) + 1.0
+        for i, e in enumerate(alive[:3 * k]):
+            scored.append((band * (1.0 - i / n), e))
+
     scored.sort(key=lambda x: -x[0])
     if not include_retired:
         scored = lc.testimony_wins(scored)
@@ -1326,6 +1384,11 @@ def search_memories_ranked_rows(query: str, k: int = 5, min_overlap: float = 0.2
         if os.environ.get("SP_SEM_LAW", "0") == "1":
             from harness.skills import verdict as _law
             _law.shadow(query, [e for _s, e in scored[:k]], eps)
+        # THE TRUNCATION IS A DECISION, so it is made in one named place rather than by a
+        # slice: dedupe first, then reserve a slot for the lane the question did not name.
+        # See _select. The audit lane (include_retired) is untouched — it wants the raw
+        # ranking and nothing chosen for it.
+        return _select(query, scored, k, _query_target(query), matched)
     return scored[:k]
 
 
@@ -1565,6 +1628,308 @@ def _query_target(query: str):
     return None
 
 
+# ── WHAT GETS SURFACED, AFTER THE MATCH HAS RANKED (2026-08-28) ──────────────────────
+# MEASURED on his live store, before any of this existed. Recall was correct where the
+# question named a person and skewed where it did not:
+#
+#     questions about HIM  ("what gpu do I have?")     14 rows, 0% hers   correct
+#     questions about HER  ("how are you?")             9 rows, 100% hers  correct
+#     NEUTRAL, conversational                          15 rows, 73% hers  <- the defect
+#
+# And the mechanism was in `_overlap`, which is |q&t| / |q| — divided by the QUERY only, so
+# a longer row can only ever score higher. His facts have a median length of 53 characters
+# and her narrative 140; on a neutral turn the rows it surfaced had a median of 340. It was
+# picking her longest prose because it was long.
+#
+# THE FIX IS NOT A BETTER SIMILARITY NUMBER. Dice (2|q&t|/(|q|+|t|)) was measured and
+# over-corrects to 33% hers with a median row length of 45 — the same imbalance mirrored,
+# and choosing an exponent between the two is inventing a constant to sit under a
+# measurement, which this tree has a rule about. So MATCH stays what it is, and the two
+# things that were actually wrong are fixed as what they are: a MISSING PRIOR and a
+# MISSING SELECTION RULE.
+# ── ONE SHARED COMMON WORD IS NOT A TOPIC (2026-08-28) ───────────────────────────────
+# `_overlap` is |q&t| / |q|, so a query with ONE content token matches at 1.00 on any row
+# containing that token. Measured on his store, this is what the per-turn note was doing:
+#
+#     "the lights are on"        -> shared={light}      three of her rows about
+#                                                       luminescence, a stopped world,
+#                                                       and the edge of sleep
+#     "it is beautiful isn't it" -> shared={beautiful}
+#     "long day"                 -> shared={day}
+#
+# Nothing there is about his lamps. The ratio was 1.00 every time because the query had one
+# word to divide by. A weighting cannot fix a one-token intersection; what is missing is a
+# floor on HOW MUCH EVIDENCE a match carries, and information theory already names it: a
+# shared token is worth -log2 p(token), so a word in fifty rows is worth little and a word
+# in two is worth a lot.
+#
+# THE FLOOR IS DERIVED, NOT CHOSEN. It is the median IDF over token OCCURRENCES in his own
+# store — "more evidence than an average word carries". On 684 live rows that is 3.89,
+# which is a word appearing in about thirteen of them, and it lands where it should:
+#
+#     rejected: light (50 rows)  beautiful (24)  day (17)  nightie (16)
+#     admitted: morning (12)  sine (10)  long (9)  good (8)  tuffy (6)  gpu (2)  radar (0)
+#
+# It moves with the store rather than sitting under one measurement of it, and the failure
+# direction is silence — which this file already treats as an answer.
+def _no_rare_word(query: str) -> bool:
+    """True when nothing he said is rarer than an average word — i.e. there is no lexical
+    question here to answer, only a person being addressed.
+
+    THIS IS WHAT KEEPS THE LANE TOP-UP FROM BECOMING FILLER. "tell me about my radar setup"
+    names a lane too, and when the store holds nothing about radar the honest answer is
+    that it holds nothing about radar — not his name and his cat, which is what aliveness
+    alone offered. He used a rare word; that word IS the question; silence is the answer.
+    "how do you feel about us?" is made entirely of words in a third of the store, so there
+    is no such word to be silent about, and what is alive in her lane is the best answer
+    available. Same table and same floor as the admission test, read the other way round.
+    """
+    idf, floor = _idf_table()
+    if not idf:
+        return False                      # no table: never invent a reason to speak
+    ts = _toks(query)
+    if not ts:
+        return False
+    unknown = math.log(len(idf) + 1)      # a word the store has never seen is rare, and
+    return max(idf.get(t, unknown) for t in ts) < floor    # that is a question too
+
+
+def _row_key(e: dict) -> tuple:
+    """Identity of a row ACROSS the filter chain. Not id(), which the first step that
+    rebuilds a dict would silently break, and not text alone, which two tellings share."""
+    return (e.get("ts") or "", (e.get("text") or "")[:120])
+
+
+def _alive(e: dict) -> float:
+    """How live this row is, independent of the question. Mentions x recency, which
+    `lifecycle.salience` already owns — a second decay curve here would be the two-copies
+    bug again, and this file has paid for that three times."""
+    try:
+        from harness.skills import lifecycle as lc
+        return float(lc.salience(e))
+    except Exception as exc:
+        _sw(_log, "_alive", exc, lane="recall")
+        return 0.0
+
+
+_IDF_CACHE: list = []
+
+
+def _idf_table():
+    """({token: idf}, floor). Rebuilt when the row count changes. Never raises."""
+    try:
+        rows = [r for r in _load() if not r.get("lifecycle")]
+        if _IDF_CACHE and _IDF_CACHE[0] == len(rows):
+            return _IDF_CACHE[1], _IDF_CACHE[2]
+        import collections
+        import statistics
+        n = max(1, len(rows))
+        df = collections.Counter()
+        per_row = []
+        for r in rows:
+            ts = _toks(_text(r))
+            per_row.append(ts)
+            for t in ts:
+                df[t] += 1
+        idf = {t: math.log((n + 1) / (c + 1)) for t, c in df.items()}
+        occ = [idf[t] for ts in per_row for t in ts]
+        floor = statistics.median(occ) if occ else 0.0
+        _IDF_CACHE[:] = [len(rows), idf, floor]
+        return idf, floor
+    except Exception as exc:
+        # AN EMPTY TABLE IS ALSO WHAT AN EMPTY STORE LOOKS LIKE, so this handler could hide
+        # a broken floor behind "he has no memories yet" forever — and it did, for the
+        # length of one measurement: `math` was unimported, every call raised NameError,
+        # the floor read 0.0 and admitted everything. See harness/loud.py.
+        _sw(_log, "_idf_table", exc, lane="recall")
+        return {}, 0.0
+
+
+def _evidence(query: str, target: str) -> float:
+    """How much information the shared tokens carry, in bits. 0 when nothing is shared."""
+    idf, _floor = _idf_table()
+    if not idf:
+        return 1e9                    # no table yet: admit as before, never block on this
+    shared = _toks(query) & _toks(target)
+    unknown = math.log(len(idf) + 1)  # a token the store has never seen is maximally rare
+    return sum(idf.get(t, unknown) for t in shared)
+
+
+_SURP_CACHE: dict = {}
+
+
+def _surprisal_of(row: dict) -> float:
+    """Information content of one of HIS facts, 0..1. Her lane scores 0, on purpose.
+
+    I(x) = -log2 p(x | model of him), which `person.PersonModel` already computes and which
+    nothing in recall was reading. On his store it separates substance from pleasantry
+    exactly as it should:
+    
+        8.00  My GPU is an RTX 2060
+        4.12  Sam is a deeply devoted partner who finds comfort in ...
+        0.01  a warm two-word pleasantry, of the kind said most days
+        0.01  a second one, different words, same shape
+
+    (The two low rows are real rows and those are their real scores; they are DESCRIBED
+    rather than quoted because this file ships in the export, and what ships should be a
+    neutral template rather than a transcript of the two of them. Same rule as the
+    fixtures.)
+    
+    IT IS A RANK AND NOT A VERDICT, which is the use this repo has already sanctioned for it
+    in kairos/scheduler.py: "the metric measures lexical novelty, which is a perfectly good
+    RANK and an unsound VERDICT". A one-off odd phrase scores 8.00 too. Nothing is admitted
+    or refused by it — it moves things within an already-admitted set.
+    
+    HER LANE SCORES ZERO because there is no model of her to be surprised by, and the one
+    time this tree tried to score her prose with machinery built for attributive facts the
+    receipt was twelve proposals and twelve wrong (docs/OFF-BY-DEFAULT.md #1). Zero is the
+    honest number, not a penalty: it says we cannot measure this, so it does not lift.
+    """
+    key = (row.get("name") or "", row.get("ts") or "")
+    if key in _SURP_CACHE:
+        return _SURP_CACHE[key]
+    val = 0.0
+    try:
+        from harness.skills import lifecycle as lc
+        if (row.get("speaker") or lc.SPEAKER_USER) == lc.SPEAKER_USER:
+            pm = _person_model()
+            if pm is not None:
+                val = min(1.0, max(0.0, pm.surprisal(_text(row),
+                                                     row.get("mem_class") or "") / 8.0))
+    except Exception:
+        val = 0.0
+    _SURP_CACHE[key] = val
+    return val
+
+
+_PM_CACHE: list = []
+
+
+def _person_model():
+    """The model of him, rebuilt when the store changes. NEVER raises."""
+    try:
+        n = len(_load())
+        if _PM_CACHE and _PM_CACHE[0] == n:
+            return _PM_CACHE[1]
+        from harness.model.person import PersonModel
+        pm = PersonModel.from_registry()
+        _PM_CACHE[:] = [n, pm]
+        _SURP_CACHE.clear()
+        return pm
+    except Exception:
+        return None
+
+
+def _select(query: str, scored: list, k: int, target, matched=None) -> list:
+    """Choose WHICH of the ranked rows he actually sees. Deduped, balanced, mostly stable.
+
+    Three rules, and none of them is a tuned number:
+
+    1. NO TWO PICKS THAT SAY THE SAME THING. Measured on his store: one question returned
+       the silver nightie three times in three slots. `reprise` already owns "are these two
+       the same telling" for the WRITING path, so reading uses the same rule rather than a
+       second one — a near-duplicate costs a slot that had something else to say in it.
+
+    2. BOTH LANES GET A VOICE WHEN THE QUESTION NAMES NEITHER. If he asks about himself or
+       about her, `_target_and_rank` has already narrowed and this does nothing — that
+       behaviour measured correct in both directions and is left alone. It is the
+       conversational turn, where the question names no one, that was 73% hers. There, one
+       slot is reserved for the other lane IF that lane has an admitted candidate. A
+       reservation, not a quota: if only one lane matched, it keeps every slot.
+
+    3. THE ORDER IS OTHERWISE THE RANKING'S. No shuffling by default.
+
+    `recall.explore` (default 0) adds the bit of variety he asked for: with that
+    probability the LAST slot is drawn from the admitted-but-unpicked remainder instead of
+    taken in order. It is off by default so every gate is deterministic, and it can only
+    ever swap the weakest pick — exploration must not cost the best answer.
+    """
+    from harness.skills import lifecycle as lc
+    if k <= 0 or not scored:
+        return scored[:k]
+
+    # ── 0. HIS WORDS FIRST, ALWAYS ───────────────────────────────────────────────────
+    # `matched` is the set of rows admitted because they answer what he asked, as opposed
+    # to the lane top-up admitted because it is alive. Both went through the same filters,
+    # and the ranking mixes them — salience and surprisal are added to every row alike, so
+    # a vivid unrelated row can float over a plain answer. Order is restored here rather
+    # than by shrinking the bonuses, because the bonuses are doing the right thing for the
+    # rows that DID match and only the wrong thing across this boundary.
+    # ...AND THE TOP-UP IS ORDERED EVEN WHEN NOTHING MATCHED, which is the case route two
+    # exists for. The first cut guarded this whole block on a non-empty `matched`, so on a
+    # question his words reached nothing — "what have you been up to?" — the reordering was
+    # skipped entirely and the ranker's salience order stood: her three mood marks, which
+    # is precisely the answer this was written to prevent. An empty set is a real answer
+    # here, not a reason to do nothing.
+    if matched is not None:
+        strong = [x for x in scored if _row_key(x[1]) in matched]
+        # AND ROUTE TWO'S ORDER IS RECENCY, RESTATED HERE rather than left to survive the
+        # ranker. Its rows enter under a score band below any real match, but
+        # `_target_and_rank` then adds salience and surprisal to every row alike — bonuses
+        # whose range is several times the width of that band, so the mood-mark family
+        # would sort itself straight back to the top. The band keeps route two BELOW route
+        # one, which the bonuses cannot undo; the order WITHIN it is set here.
+        rest = sorted((x for x in scored if _row_key(x[1]) not in matched),
+                      key=lambda x: (x[1].get("ts") or ""), reverse=True)
+        scored = strong + rest
+
+    # ── 1. dedupe, through reprise's own rule ────────────────────────────────────────
+    try:
+        from harness.skills import reprise as _rp
+        reg = _rp.register_tokens([{"text": _text(e)} for _s, e in scored])
+    except Exception:
+        _rp, reg = None, set()
+    picked, seen_prefix, rest = [], set(), []
+    for s, e in scored:
+        pref = ""
+        if _rp is not None:
+            try:
+                pref = " ".join(_rp.content_prefix(_text(e), reg, 5))
+            except Exception:
+                pref = ""
+        if pref and pref in seen_prefix:
+            continue                      # she already says this in a slot above
+        if pref:
+            seen_prefix.add(pref)
+        (picked if len(picked) < k else rest).append((s, e))
+
+    # ── 2. reserve a slot for the other lane, only when the question named nobody ────
+    if target is None and len(picked) >= 2:
+        lanes = {(e.get("speaker") or lc.SPEAKER_USER) for _s, e in picked}
+        if len(lanes) == 1:
+            here = next(iter(lanes))
+            other = next(((s, e) for s, e in rest
+                          if (e.get("speaker") or lc.SPEAKER_USER) != here), None)
+            if other is not None:
+                picked[-1] = other        # the weakest pick yields, never the best one
+
+    # ── 3. a little variety, off by default ─────────────────────────────────────────
+    try:
+        from harness.tuning import registry as _tune
+        p = float(_tune.get("recall.explore", 0.0) or 0.0)
+    except Exception:
+        p = 0.0
+    if p > 0.0 and rest and len(picked) >= 2:
+        # VARIETY, NOT NONDETERMINISM, and the difference is not pedantry. `random.random()`
+        # here means the recall seam answers the same question differently on two calls in
+        # one turn, and G-SEM-CONSERVE's determinism leg exists because a ranker with hidden
+        # state cannot be audited — it passed only because that corpus never populated
+        # `rest`. The roll is drawn instead from the SITUATION: this question, over these
+        # candidates. Same question and same store, same third memory; and since his store
+        # takes new rows through most turns, the wildcard still moves — which is the variety
+        # he asked for, without a coin flip inside a path everything else is graded against.
+        #
+        # hashlib, not hash(): str hashing is salted per process, so hash() would be
+        # reproducible within a run and different in the next one — the worst of both.
+        import hashlib
+        situation = "|".join([query] + ["%s%s" % _row_key(e) for _s, e in picked + rest])
+        seed = int(hashlib.blake2b(situation.encode("utf-8"),
+                                   digest_size=8).hexdigest(), 16)
+        if (seed % 1000003) / 1000003.0 < p:
+            picked[-1] = rest[(seed >> 20) % len(rest)]
+    return picked[:k]
+
+
 def _target_and_rank(query: str, hits):
     from harness.skills import lifecycle as lc
     target = _query_target(query)
@@ -1610,7 +1975,15 @@ def _target_and_rank(query: str, hits):
         # you write when you have no prior and two rows both score 1.00. This is the
         # principled version of the same instinct, and it is derived from what he actually
         # did rather than from what I guessed he meant.
-        return s + 0.22 * lc.salience(e)
+        # ── AND WHAT IT TOLD US, not only how often and how recently ───────────────
+        # salience is frequency x recency x class half-life: it knows he SAID it a lot,
+        # lately. It cannot tell "My GPU is an RTX 2060" from a two-word endearment -- both
+        # said often, both said lately, one a fact about him and the other a pleasantry.
+        # surprisal is I(x) = -log2 p(x | model of him) and measures exactly that
+        # difference; recall was not reading it. 0.18 sits just under salience's 0.22 on
+        # purpose: what he repeats still outranks what was merely novel once, because this
+        # term is a RANK and not a verdict.
+        return s + 0.22 * lc.salience(e) + 0.18 * _surprisal_of(e)
 
     return sorted(((adjust(s, e), e) for s, e in hits), key=lambda x: -x[0])
 

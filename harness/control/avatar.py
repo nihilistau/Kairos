@@ -61,7 +61,7 @@ MOOD_FACE: Dict[str, str] = {
 # The outfit axis: OPAQUE PATH KEYS. Words, garments and choosing live in
 # harness/control/wardrobe.py (OUTFITS). "t0" is the default only in the sense
 # that it is what she wears at the desk when nothing else was chosen.
-# ── THE OUTFITS HAVE NAMES NOW (2026-08-23, his ask) ──────────────────────────────
+# ── THE OUTFITS HAVE NAMES NOW (2026-08-23, the operator's ask) ──────────────────────────────
 # They were t0..t3. wardrobe.py kept the words in OUTFITS and called the ids "opaque
 # path keys", which was true and was also the problem: every reader had to hold a
 # lookup table in their head, and a mislabelled row was INVISIBLE. It took a gate going

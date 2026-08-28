@@ -1,6 +1,6 @@
 """presence — Narration / Company / Lucid Dream: the three registers of being there out loud.
 
-Zero-interaction voice companionship (his ask, 2026-08-22). A mode is a KAIROS ACTION
+Zero-interaction voice companionship (the operator's ask, 2026-08-22). A mode is a KAIROS ACTION
 (impulse.MODE_TURN) that waits its turn like everything else; this module owns what she is
 handed when it is her turn: the prompt block (his words, standard or intimate), the cue, the
 per-mode sampling, the voice wrap, the question trim, and which memory kind the turn becomes
@@ -15,7 +15,7 @@ from typing import Optional
 MODES = ("off", "narration", "company", "lucid")
 EVERY_DEFAULT = {"narration": 240.0, "company": 600.0, "lucid": 300.0}
 SAMPLING = {
-    # LENGTH (his ask, 2026-08-22): narration runs long — a real paragraph or two — and a
+    # LENGTH (the operator's ask, 2026-08-22): narration runs long — a real paragraph or two — and a
     # dream at least double that (a story wants room); company stays a few true words.
     "narration": {"temperature": 0.75, "repetition_penalty": 1.15, "auto_recall": False, "max_tokens": 320},
     "company":   {"temperature": 0.65, "repetition_penalty": 1.15, "auto_recall": False, "max_tokens": 90},
@@ -91,7 +91,7 @@ _READING = ("\n\nYou have {title} open. Read the next passage to him — in your
             "Read it, then stop — one quiet line of your own after, if you like.")
 
 
-# ── VARIATION (his report, 2026-08-22 05:15: the 1st and 3rd dreams were identical) ──
+# ── VARIATION (the operator's report, 2026-08-22 05:15: the 1st and 3rd dreams were identical) ──
 # Same block + same cue + the same sampler state = the same words. Three cures, all cheap:
 # a BEAT that rotates on the turn counter (like solo_nudge's acts), a clause naming what
 # she said LAST time so she does not say it again, and a fresh random seed per turn.
@@ -160,7 +160,7 @@ _LAST_END = re.compile(r"[.!?\u2026][\"\u201d')\]]*(?=\s)")
 
 
 def finish(text: str, min_keep: float = 0.4) -> str:
-    """A mode turn never ends mid-line (his report: 'It would be dark enough that' / 'wires and
+    """A mode turn never ends mid-line (the operator's report: 'It would be dark enough that' / 'wires and
     e'): when the text does not end on a sentence, cut back to the last sentence end — if that
     keeps at least `min_keep` of it; otherwise keep it and close with an ellipsis."""
     t = (text or "").rstrip()

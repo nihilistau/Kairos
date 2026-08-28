@@ -178,7 +178,7 @@ check("...and the epilogue's day write passes them through verbatim",
 for marker, what in (("Things you happen to know", "the recall note"),
                      ("note_for_question(user_text)", "the silence note")):
     at = src.index(marker)
-    check("%s is stapled onto msgs AFTER his words were taken" % what, at > bind)
+    check("%s is stapled onto msgs AFTER the operator's words were taken" % what, at > bind)
 check("the helper takes a string, so a mutated msgs cannot reach it",
       "def _append_day_turn(user_text: str, final: str," in src)
 

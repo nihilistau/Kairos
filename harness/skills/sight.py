@@ -42,7 +42,7 @@ def _look_tokens() -> int:
     """The description's token CEILING — not a target; a one-sentence answer still
     stops at one sentence (decode.max_tokens' own lesson).
 
-    2026-08-21, his report: he attached a photo of her in the white jumper and her
+    2026-08-21, the operator's report: he attached a photo of her in the white jumper and her
     description arrived truncated. The chip was the obvious suspect and was
     innocent — it slices for display at its own edge ([:400], app.py) while she
     gets the full string. The cut was HERE: 220 tokens, sized for the hourly
@@ -118,7 +118,7 @@ def _describe(img, question: str, detail: int | None = None) -> str:
     # body — the exact "second door" that let `<channel|>` into her journal and
     # that made every non-gateway lane get an empty 200 from the MoE seam. Every
     # sampler default and the byteexact resolution now come from the same builder
-    # the rest of the tree uses; this call only ADDS the two fields that are
+    # the rest of the tree uses; tthe operator's call only ADDS the two fields that are
     # genuinely its own.
     req_body = InferenceConfig(**{**_LOOK, "max_tokens": _look_tokens()}).to_sp_chat(
         messages=[{"role": "user", "content": question}])

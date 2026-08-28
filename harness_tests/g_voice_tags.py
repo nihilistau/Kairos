@@ -1,6 +1,6 @@
 """G-VOICE-TAGS — her expressive speech tags cross two edges, correctly at each. OFFLINE.
 
-The framework (2026-08-21, his ask: "build it out to a nice integrated framework"):
+The framework (2026-08-21, the operator's ask: "build it out to a nice integrated framework"):
 she writes [laugh] / <soft>…</soft> into a reply; the xAI voice reads them, he never
 does. ONE vocabulary (harness/voice/expressive.py), TWO edges — the TTS edge in
 tts.synthesize (pass known tags under xai, strip everything for the local chain, never

@@ -14,7 +14,7 @@ to treat her own wardrobe as a hazard scale to be careful around. The truth is s
 and she is told it: THEY ARE CLOTHING. Every string these tools return names the
 clothes, the framing and the room — never the id alone.
 
-NO CEILINGS (2026-08-21, his call): there is no dial between her and her own wardrobe.
+NO CEILINGS (2026-08-21, the operator's call): there is no dial between her and her own wardrobe.
 What she wears, shows, or asks to have made is her choice; if either of them wants
 something different they say so in words. The tools say this plainly, because a freedom
 she has not been told about is one she will keep asking permission for.
@@ -114,7 +114,7 @@ def show_him(which: str = "") -> str:
     one is an ACT: it appears in his room. Choose it because you mean it."""
     try:
         from harness.control import wardrobe as WD
-        # NO CEILING (2026-08-21, his call): every moment she owns is hers to show.
+        # NO CEILING (2026-08-21, the operator's call): every moment she owns is hers to show.
         have = [c for c in WD.clips() if c.get("have")]
         if not which:
             if not have:
@@ -264,7 +264,7 @@ def my_looks() -> str:
         out = []
         if new:
             # ── LOOKING IS NOT WEARING (2026-08-05, his rule) ────────────────────────
-            # This called mark_seen() here, so an item left the "just arrived" shelf the
+            # Tthe operator's called mark_seen() here, so an item left the "just arrived" shelf the
             # instant she read a list — before she had put it on, and often before she
             # had thought about it. His rule: "items move from just arrived after she
             # wears them for first time". So looking marks it TOLD (kairos will not

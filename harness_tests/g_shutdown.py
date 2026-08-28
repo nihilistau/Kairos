@@ -195,7 +195,7 @@ SD.shutdown("all", _steps=_fake_steps())
 check("`all` is the same ladder plus the gateway, LAST",
       CALLS == ["quiesce", "finish", "flush", "voice", "daemon", "gateway"], CALLS)
 
-# THE ESCAPE HATCH. His words: "This is my machine and a lot happens on it. A simple kill
+# THE ESCAPE HATCH. The operator's words: "This is my machine and a lot happens on it. A simple kill
 # will sometimes be required." It must not quiesce, wait, or flush — if it did any of
 # those it would not be a kill, and the one thing it promises is that it returns now.
 SD._reset_for_test(); CALLS.clear()

@@ -249,7 +249,7 @@ check("...leaving no one-argument generate closure behind",
       and "def _generate(nudge: str) -> str:" not in app)
 
 # ── LOOKING IS NOT DOING, AND THE MARK IS DOING (2026-08-25) ────────────────────────
-# HIS REPORT: "she just said she'd go with the silver nightie... but did not change. I
+# REPORTED: "she just said she'd go with the silver nightie... but did not change. I
 # don't know if she attempted it or not." The receipt, from gateway.log:
 #
 #   10:21:08  tool check_wardrobe() -> You are wearing: black lace...

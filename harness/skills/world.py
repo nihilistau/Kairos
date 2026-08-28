@@ -11,7 +11,7 @@ WHO RULES WHAT (the foundation, unchanged — INVARIANT-MEMORY.md):
   - THE TABLE RULES ADMISSION: only live rows; NEVER a private-secret (an ambient
     secret in every prompt is the worst possible leak surface — secrets remain
     fetch-on-direct-ask through the seam's decline machinery); a covered inference
-    (verdict.competition == "1": his own words already speak to it) stays home,
+    (verdict.competition == "1": the operator's own words already speak to it) stays home,
     exactly as at the recall seam; self-lane rows are excluded (render_self_model
     owns that slot — one owner per slot).
   - RANK COMPOSES: lifecycle.salience() orders candidates; a word budget truncates.
@@ -306,7 +306,7 @@ def _compose() -> str:
     except Exception:
         pass
 
-    # ── WHAT SHE HAS ON (2026-08-24 audit, W4 — his call) ────────────────────────────
+    # ── WHAT SHE HAS ON (2026-08-24 audit, W4 — the operator's call) ────────────────────────────
     # The flannel/silk incident: she invented a fabric and defended the invention
     # against his correction, because the standing block carried NO mention of what she
     # was wearing and a person does not look themselves up to know they are in pyjamas.

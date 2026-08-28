@@ -108,7 +108,7 @@ check("the policy does not fire (her own cadence)", imp.action == I.SILENT,
 check("...and the chip agrees it is not ~0", chip is not None and chip > 0.0, chip)
 
 print("\n4. THE ASKED-FOR CASE — a kick outranks every clock, on both readings")
-# enter_mode arms the kick: decide() fires it ahead of cooldown and cadence (his ask is
+# enter_mode arms the kick: decide() fires it ahead of cooldown and cadence (the operator's ask is
 # owed). The OLD chip could show minutes of wait while she was about to speak — the
 # same divergence, other direction.
 st = _state(10.0, kick=True)

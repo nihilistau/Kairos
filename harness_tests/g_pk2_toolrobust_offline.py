@@ -137,7 +137,7 @@ def main() -> int:
     #
     #    Single backticks, not a fence. Nothing parsed, nothing ran, and all three appeared
     #    on his screen as text — she had written her journal, made a note and asked for a
-    #    picture, and none of it happened. His words: "her actions are not having an effect,
+    #    picture, and none of it happened. The operator's words: "her actions are not having an effect,
     #    she is not able to call anything". This is drift of the same kind the parser already
     #    absorbs for ```python fences, so it is absorbed the same way and under the same rule:
     #    only when the name is a tool she HAS.

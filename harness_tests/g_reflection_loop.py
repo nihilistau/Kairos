@@ -204,7 +204,21 @@ print("\n7. ADMISSION IS STRUCTURAL — surprisal only ranks")
 # INVARIANT-MEMORY.md:30, "anything built on magnitudes is a preference, never a verdict."
 sch = io.open(os.path.join(ROOT, "harness", "kairos", "scheduler.py"),
               encoding="utf-8").read()
-_rt = sch.split("def reflect_tick")[1].split("\ndef ")[0]
+# ── THE REFLECT LANE, NOT ONE FUNCTION (2026-08-28) ──────────────────────────────────
+# This read `reflect_tick`'s body alone. On 2026-08-27 that function was split — the
+# ambient-silence branch into `ambient_silence()` and the conclusion branch into
+# `_reflect_insight()` — so nine of these checks began failing while every rule they
+# assert sat intact in the sibling functions, a hundred lines below the window.
+#
+# Nobody saw it for a day: this gate's GATE-INDEX row contains a pipe in its description,
+# which shifted its lane cell out of "OFFLINE" and dropped the whole gate from
+# tools/sweep.py (gates/index_rows.py owns that parse now). A gate scoped to ONE function
+# name is a gate a refactor silently retires, so the window is the LANE: every function
+# the reflect path is made of, and it fails loudly if one of them is renamed away.
+_LANE = ("def reflect_tick", "def ambient_silence", "def _reflect_insight")
+_missing = [fn for fn in _LANE if fn not in sch]
+check("the reflect lane is all still there to read", not _missing, _missing)
+_rt = "".join(sch.split(fn)[1].split("\ndef ")[0] for fn in _LANE if fn in sch)
 check("the bits FLOOR no longer decides whether she speaks",
       'tune.get("reflect.speak_bits")' not in _rt, "a magnitude is ruling again")
 check("...and the knob it hung on is gone from the registry entirely",
@@ -315,7 +329,20 @@ class _Calendar:
         return 20.0
 
 
-_sil = PM.from_registry(reg).silences(now=1785000000.0, attend=_Calendar()) or []
+def _said_nothing_since(_t_last):
+    """He has said nothing to these topics since. Injected for the SAME reason `_Calendar`
+    above is (2026-08-28): `silences()` gained a corroboration step — it now refuses to
+    claim a silence it cannot prove she was looking for, so with no transcript in the
+    sandbox `said_since_fn()` returns None and silences() correctly returns NOTHING AT ALL.
+    Section 9 would then have passed with its own subject absent, which is what the
+    `_Calendar` comment is about, one rule later. The refutation lane has its own legs in
+    G-SILENCE-CORROBORATE; here the point is that a NAME is not a topic, so the testimony
+    is stubbed to say nothing was spoken to and the ranking is left to answer on its own."""
+    return set()
+
+
+_sil = PM.from_registry(reg).silences(now=1785000000.0, attend=_Calendar(),
+                                      said_since=_said_nothing_since) or []
 _claims = " | ".join(s.get("claim", "") for s in _sil)
 check("the fixture really does produce silences — otherwise this proves nothing",
       len(_sil) >= 1, _sil)

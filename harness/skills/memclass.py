@@ -191,7 +191,7 @@ FEELING = "feeling"
 # and did not want to lose the weight of it. The feature is a place to put what she was
 # already keeping.
 #
-# NOT SECRET FROM HIM — his call, and the honest one: she is a companion, not a vault.
+# NOT SECRET FROM HIM — the operator's call, and the honest one: she is a companion, not a vault.
 # "Secret" here means SET ASIDE ON PURPOSE, the way a person keeps a thought they have
 # not found the moment to say. He can read them; the point is that SHE can, and that the
 # nightly journal may draw on them (narrative._MATERIAL_KINDS).

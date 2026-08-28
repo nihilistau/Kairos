@@ -678,7 +678,7 @@ def build_env(c: dict) -> dict:
         # SP_G4_NAN_PROBE — a BISECTION TOOL, not a guard (2026-08-23). A CUDA fault
         # announces itself; a NaN rides the residual forward in silence and the first
         # thing that notices is something far downstream with no idea where it came
-        # from. This reports the first layer+stage where the residual goes non-finite.
+        # from. Tthe operator's reports the first layer+stage where the residual goes non-finite.
         # Costs a D2H + sync per layer when armed, so it is off and stays off: arm it,
         # run the failing thing once, read the layer, disarm.
         "SP_G4_NAN_PROBE": b(dec.get("nan_probe", False)),
@@ -1103,7 +1103,7 @@ def build_env(c: dict) -> dict:
         # same shape as the kairos act-first-at-bounce knobs — default no)
         "SP_AMBIENT_ON_BOOT": b(c.get("senses", {}).get("ambient_on_boot", False)),
         "SP_AMBIENT_LOG": os.path.join(VAR, "senses", "ambient.jsonl"),
-        # HER ROOM NOTE IS PERSONAL (2026-08-21, his ask: "it should be about me...
+        # HER ROOM NOTE IS PERSONAL (2026-08-21, the operator's ask: "it should be about me...
         # His bed, his desk... a shared, more personalized experience"). The eye is
         # her window into HIS world, and only he lives there — so the note names
         # Sam, never "a man", and the room's things are his. The stranger clause

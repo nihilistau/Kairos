@@ -42,17 +42,24 @@ WATCH = ["memory-okf-personality", "memory-okf", "memory-okf-conv", "memory-okf-
 
 
 def offline_gates():
-    idx = io.open(os.path.join(ROOT, "gates", "GATE-INDEX.md"), encoding="utf-8").read()
+    """Every OFFLINE gate the index names.
+
+    THROUGH gates/index_rows, NOT a split() here (2026-08-28). This read the lane out of
+    `line.split("|")[4]`, which is the right cell only while no DESCRIPTION contains a
+    pipe — and ten of them did. Those rows shifted their own cells along, the lane came
+    out as a fragment of the sentence before it, and NINE OFFLINE GATES WERE SILENTLY
+    DROPPED from "the whole offline suite in one command" for as long as their prose had
+    a pipe in it. The parser lives in one place now and G-DOCS-TRUE grades the shape.
+    """
+    sys.path.insert(0, ROOT)
+    from gates import index_rows as _ix
     out = []
-    for line in idx.splitlines():
-        if not line.startswith("|"):
+    for cs, _line in _ix.rows():
+        if len(cs) != _ix.CELLS or "OFFLINE" not in cs[_ix.LANE]:
             continue
-        cells = [c.strip() for c in line.split("|")]
-        if len(cells) < 6 or "OFFLINE" not in cells[4]:
-            continue
-        m = re.search(r"`(harness_tests/[a-z0-9_]+\.py)`", cells[2])
-        if m and os.path.exists(os.path.join(ROOT, m.group(1))):
-            out.append(m.group(1))
+        rel = _ix.gate_path(cs)
+        if rel and os.path.exists(os.path.join(ROOT, rel)):
+            out.append(rel)
     return sorted(set(out))
 
 
