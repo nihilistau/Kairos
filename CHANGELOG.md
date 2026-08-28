@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.8.2 — a refusal that can show its working (2026-08-28)
+
+The bridge refuses an external tool whose fingerprint changed and tells you to accept it
+"if the change is legitimate". Until now a pin stored only the digest, so nothing could show
+you what the change *was* — the message named a judgement the software had thrown away the
+evidence for, and blind acceptance was the only remedy on offer. That is the failure a
+rug-pull guard exists to prevent.
+
+- **A pin is a record**: the digest, and the `name` / `description` / `schema` it was taken
+  of. `python tools/mcp_pin.py --diff <server> [tool]` prints what moved, per half, as a
+  unified diff.
+- **The digest still decides.** The body is evidence beside it and never authority — a
+  record whose stored body disagrees with its own digest is judged on the digest, and the
+  tool matching its body is refused. Reading the fingerprint out of the body would let a
+  pin file approve a tool by describing it.
+- **Old pins keep working**, and are upgraded in place only where a matching digest *proves*
+  the body — a mismatched pin is left exactly as it was, because that is the case you need
+  to see, and writing a body for it would file the change as approved. Diffing one of those
+  says it cannot show a diff rather than inventing one.
+
+`G-MCP-TRUST` 59/59, five new mutants.
+
 ## 0.8.1 — pin the version, or the fingerprint guard is a treadmill (2026-08-28)
 
 The bridge fingerprints every external tool's `name + description + schema` and refuses one

@@ -205,10 +205,49 @@ command that accepts it.
 
 ```
 python tools/mcp_pin.py                              # what is pinned vs. live now
+python tools/mcp_pin.py --diff browser               # WHAT CHANGED, and in which half
+python tools/mcp_pin.py --diff browser take_snapshot # one tool, even if unchanged
 python tools/mcp_pin.py --accept browser take_screenshot
 python tools/mcp_pin.py --accept-all browser
 python tools/mcp_pin.py --forget browser             # drop the pins, re-TOFU
 ```
+
+#### A pin is a digest *and* the text it was taken of (2026-08-28)
+
+It used to be the digest alone — `{"browser": {"click": "bf05027b40fda4e1"}}` — so a
+refusal could say `bf05027b40fda4e1 -> 4324b9a732f6e183` and then tell the operator to
+accept it *"if the change is legitimate"*: a judgement nothing in the system could inform,
+because the thing that changed had never been kept. The only offered remedy was to accept
+blindly, which is the failure the control exists to prevent. It was answerable once, for
+1.6.0 → 1.8.0, and only from outside — npm hoards every version it has ever fetched, so both
+builds could be listed through the real bridge and diffed by hand. A lucky cache, not a
+control.
+
+A pin is a record now: the digest, and the `name`/`description`/`schema` it was taken of.
+`--diff` prints what moved, in unified-diff form, per half:
+
+```
+browser/take_snapshot  description and schema changed
+    7cac33a27ae5d7f2 -> 1745d85d8b21331e
+    desc  -Take a text snapshot of the currently selected page ...
+    desc  +Take a text snapshot of the target page ...
+    schema + "pageId": { "description": "Targets a specific page by ID." ...
+```
+
+**The digest still decides.** The body is evidence beside it and never authority: a record
+whose stored body disagreed with its own digest is judged on the *digest*, and the tool
+matching its body is refused. Reading the fingerprint out of the body would let a pin file
+approve a tool by describing it — the rug-pull with an extra step. G-MCP-TRUST §11 holds
+that, along with the diff naming both halves and showing the injected sentence itself.
+
+**Old pins keep working, and are upgraded only where the digest proves the body.** A
+matching digest means the text in front of you *is* the text that was pinned, so recording
+it adds evidence and moves no trust — those are adopted in place on the next listing, which
+converted 28 of 29 browser pins the day this landed. A **mismatched** pin is left exactly
+as it was: that is the case the operator has to see, and writing a body for it would file
+the rug-pull as though it had been approved. Diffing one of those says it cannot show a
+diff rather than inventing one — the honest answer is that this pin predates bodies, accept
+it once you have decided, and the *next* change will be showable.
 
 `SP_MCP_PIN=0` disarms the whole mechanism — the escape hatch exists so that a refusal is
 never the reason the stack is down at 3am, and it is a knob rather than a code edit for the
