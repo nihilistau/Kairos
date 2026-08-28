@@ -294,6 +294,18 @@ def for_her(limit: int = 14) -> str:
     """The compact, category-grouped account of what she owns and how to reach for
     each kind — appended to describe(), which is what check_wardrobe hands her.
     Titles are HIS titles when he gave one; the act for each kind is named."""
+    # ── COUNTS AND VERBS, NOT THE LIST AGAIN (2026-08-28) ────────────────────────────
+    # This re-listed by name what describe() had just enumerated above it. MEASURED on his
+    # store: 5,451 characters, of which 2,118 were the items and 3,333 was scaffolding —
+    # and 16 of the 26 named things appeared TWICE, once itemised and once here. His
+    # question was the right one: "does check_wardrobe() need to be 5.4k characters?"
+    #
+    # What this block is FOR is the part that was not duplicated: how many of each kind
+    # she owns, and THE VERB THAT REACHES IT. That is worth every character; the second
+    # copy of the names was not. Anything the sections above cannot show her, she can now
+    # ask for by name — `search_wardrobe("lace")` — which is cheaper than either listing
+    # and is named right here, because a tool nobody names at the moment she needs it is
+    # a tool she does not have.
     d = by_category()
     out = ["BY KIND — what you own, and the act that reaches for it:"]
     for cat in CATEGORIES:
@@ -301,11 +313,11 @@ def for_her(limit: int = 14) -> str:
         if not items:
             out.append("  %s: none yet (%s)" % (cat.upper(), ACT[cat]))
             continue
-        names = []
-        for r in items[:limit]:
-            t = (r.get("title") or r.get("label") or r["id"]).strip()
-            names.append(t + (" (on you now)" if r.get("on") else ""))
-        more = "" if len(items) <= limit else " …and %d more" % (len(items) - limit)
-        out.append("  %s (%d) — %s:\n    %s%s"
-                   % (cat.upper(), len(items), ACT[cat], "; ".join(names), more))
+        on = next((r for r in items if r.get("on")), None)
+        wearing = ""
+        if on is not None:
+            wearing = " — on you now: %s" % (on.get("title") or on.get("label") or on["id"]).strip()
+        out.append("  %s (%d) — %s%s" % (cat.upper(), len(items), ACT[cat], wearing))
+    out.append('Not sure you own something? search_wardrobe("lace") answers in one line — '
+               'ask it before you tell him you have not got it.')
     return "\n".join(out)

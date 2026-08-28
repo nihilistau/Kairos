@@ -74,8 +74,13 @@ check("...and reaches wardrobe.looks(), the reader every consumer uses",
       any(l["id"] == LOOK and l["label"] == "the window nightie" for l in WD.looks()))
 check("...and the base label is kept beside it", row["base_label"].startswith("the silver"))
 check("category moved to moment", row["category"] == "moment")
-check("for_her lists it under MOMENT by his title",
-      "the window nightie" in C.for_her().split("MOMENT")[1])
+# ── THE PROPERTY IS "HIS TITLE REACHES HER", NOT "IN THE BY-KIND BLOCK" (2026-08-28).
+# for_her() slimmed to counts + verbs — measured, it was re-listing by name what
+# describe() had just enumerated above it (16 of 26 items appeared twice; 5,451 chars).
+# His title flows to her through looks()' labels now — the reader every consumer uses,
+# asserted two checks up — so the surface to hold is the WHOLE of what she reads.
+check("what she reads carries his title for it",
+      "the window nightie" in WD.describe())
 bad = C.edit(LOOK, category="costume")
 check("an unknown category is refused, not stored", not bad.get("ok"))
 check("an unknown id is refused", not C.edit("nope", title="x").get("ok"))
@@ -92,7 +97,7 @@ check("hiding what she has ON takes it off her", WD.current().get("look") != GES
 check("rows() hides it by default, rows(include_hidden) offers it back",
       not any(r["id"] == GEST for r in C.rows())
       and any(r["id"] == GEST for r in C.rows(include_hidden=True)))
-check("for_her no longer names it", "laughing properly" not in C.for_her())
+check("nothing she reads names it any more", "laughing properly" not in WD.describe())
 C.unhide(GEST)
 check("unhide brings it back", any(l["id"] == GEST for l in WD.looks()))
 rm = C.remove(CLIP)

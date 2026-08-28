@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.8.3 — the wardrobe answers questions (2026-08-28)
+
+The wardrobe's listing was complete and nearly unusable: one ~5.4k-character read, with 16
+of its 26 named items listed twice, and no way to ask "do I own something like X?" short of
+reading all of it. The assistant's cheap move was answering from memory — and memory said
+no to garments hanging right there.
+
+- **`search_wardrobe("lace")`** answers in one line. It takes sentences ("something
+  black", "do I have a nightie" — filler dropped), a near miss beats a confident no, and
+  its token test is whole-words from birth: "dress" does not rule from inside "undressed".
+  Taught at three doors — its docstring, the listing's BY-KIND tail, and `wear()`'s
+  refusal, which now shows near-misses beside the no and names the search at the moment
+  it is needed.
+- **Operator edits reach every door.** `wants()`/`arrivals()` never consulted the
+  hide/retire overlay while `looks()`/`clips()` did — an invariant on two producers of
+  four is an invariant on none — so a hidden garment was still offered, wearable. Hide now
+  removes a thing from the listing, the search, the matcher and the queue; unhide and
+  restore bring it back everywhere.
+- **Pre-rename outfit stamps are canonicalised where the field is read.** Rows carrying
+  old `t0..t3` ids resolved to an outfit that no longer exists, so every clip stamped
+  before the rename was silently unshowable and hidden from the panel. The alias table
+  now applies in `_made_in()`, the one reader — hand-written rows and restored backups
+  are covered forever.
+- **A table ruling beats a look coincidence in `match()`.** An outfit's own committed
+  name lost to a two-token overlap with a look's prose; the matcher's own comment stated
+  the law and the code did not enforce it. Every item now resolves to itself by its own
+  name.
+- **The listing is ~31% smaller with more in it** — items enumerated once, the BY-KIND
+  block reduced to counts and the verb for each kind, retitles still flowing through the
+  labels.
+- **`telemetry.keep_days`** (default 0 = keep everything): the telemetry store's
+  `prune()` — "the only remover" — was called by nothing, at ~10 MB/day forever. The
+  nightly reflection runs it now, gated on a declared knob.
+
+Also: the wardrobe panel's edit field no longer loses focus on every keystroke — a React
+component was defined inside another component, so the whole row subtree remounted per
+state change (G-ROOM-SHELL §5 holds the class).
+
+`G-WARDROBE-WORDS` 76/76, six mutants red by name. Suite: 132 offline gates from inside
+this tree.
+
 ## 0.8.2 — a refusal that can show its working (2026-08-28)
 
 The bridge refuses an external tool whose fingerprint changed and tells you to accept it

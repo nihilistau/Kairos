@@ -441,6 +441,27 @@ def reflect() -> dict[str, Any]:
             _lg_r.getLogger(__name__).info(
                 "[reflect] %s: %s", _st.get("step"),
                 {k: (str(v)[:120]) for k, v in _st.items() if k != "step"})
+    # ── HIS BODY IS 10 MB A DAY, AND NOTHING EVER REMOVED A SAMPLE (2026-08-28) ──────
+    # telemetry/store.py has had `prune(keep_days)` since it was written, its docstring
+    # calls it "THE ONLY REMOVER", and nothing in the tree called it. MEASURED: ~86 rows a
+    # minute, 12,446 heart-rate rows in one day, 23 MB and climbing at roughly 10 MB a day.
+    #
+    # DEFAULT OFF, and that is not timidity — the same docstring says retention is an
+    # operator decision taken once, in the open, and deleting a month of someone's heart
+    # rate because a default felt tidy is not a decision code gets to make. `keep_days`
+    # comes from the knob; 0 keeps everything, exactly as before this line existed.
+    try:
+        from harness.tuning import registry as _tune_r
+        _keep = int(_tune_r.get("telemetry.keep_days", 0) or 0)
+        if _keep > 0:
+            from harness.telemetry import store as _tel_s
+            _pr = _tel_s.prune(_keep)
+            out["steps"].append({"step": "telemetry_prune", "keep_days": _keep,
+                                 "removed": len(_pr.get("removed") or []),
+                                 "why": _pr.get("why", "")})
+    except Exception as _exc:
+        out["steps"].append({"step": "telemetry_prune", "error": str(_exc)[:120]})
+
     out["stats"] = stats()
     return out
 

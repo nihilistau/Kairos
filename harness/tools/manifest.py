@@ -154,6 +154,7 @@ FACTS: Dict[str, ToolFacts] = {
     # marked write for exactly that reason. Every one of them resolves through the
     # operator's roleplay.max_heat ceiling, so none can name an asset above it.
     "check_wardrobe": ToolFacts("wardrobe", "read",  note="what she is wearing and what else is there"),
+    "search_wardrobe": ToolFacts("wardrobe", "read", note="does she own something like this — one line, instead of the whole listing"),
     "wear":           ToolFacts("wardrobe", "write", note="changes how she presents; persists; clamped by his ceiling"),
     "show_him":       ToolFacts("wardrobe", "write", note="puts one of her moments on HIS screen"),
     "stop_showing":   ToolFacts("wardrobe", "write", note="takes it down again"),
