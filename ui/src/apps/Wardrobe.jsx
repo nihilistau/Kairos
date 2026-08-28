@@ -386,23 +386,23 @@ export default function Wardrobe() {
  * file stay; restore brings it back); hide is the soft version. The inbox is
  * var/room/avatar/inbox: drop a file there, name it, pick a kind, and it goes through the
  * same tooling a made look does (webm, seamless loop, poster frame). */
-function Closet() {
-  const c = usePoll(api.catalog, 6000)
-  const [busy, setBusy] = useState('')
-  const [edit, setEdit] = useState(null)        // {id,title,description,category,tags}
-  const [imp, setImp] = useState({})            // file -> {category,title,description,loop}
-  const d = c.data
-  if (!d || !d.ok) return null
-  const op = async (body) => {
-    setBusy(body.op + ':' + (body.id || body.file || ''))
-    try { const r = await api.catalogOp(body); c.refresh(); return r } finally { setBusy('') }
-  }
-  const rows = d.rows || []
-  const live = rows.filter(r => !r.hidden && !r.removed_at)
-  const hidden = rows.filter(r => r.hidden && !r.removed_at)
-  const removed = rows.filter(r => r.removed_at)
-  const cats = d.categories || ['clothing', 'gesture', 'moment']
-  const Row = ({ r, dim }) => (
+/* ── ROW IS DEFINED OUT HERE, AND THAT IS THE WHOLE FIX (2026-08-28) ──────────────────
+ * It used to live inside Closet(), so every render of Closet created a NEW component
+ * TYPE. React compares types by identity, so a new type is a different component: the
+ * entire 47-row subtree was unmounted and remounted on every state change — including the
+ * one `setEdit` fires on each keystroke.
+ *
+ * MEASURED in the room, typing one character into an edit field:
+ *     input_node_survived_the_keystroke: false
+ *     focus_still_in_the_field:          false
+ * You typed one letter and the field vanished from under the cursor, so the edit form was
+ * unusable and read as "the buttons do not work". The write path was fine the whole time —
+ * hide and unhide round-tripped 200/ok against the live gateway.
+ *
+ * Everything it needs now arrives as props. Nothing else about the row changed.
+ */
+function Row({ r, dim, edit, setEdit, op, busy, cats }) {
+  return (
     <>
       <div className={'wr-row' + (r.on ? ' wr-on' : '') + (dim ? ' wr-dim' : '')}>
         <span title={r.source || ''}>{r.source === 'imported' ? '⇩' : r.source === 'grid' ? '▦' : '✦'}</span>
@@ -457,6 +457,24 @@ function Closet() {
       ) : null}
     </>
   )
+}
+
+function Closet() {
+  const c = usePoll(api.catalog, 6000)
+  const [busy, setBusy] = useState('')
+  const [edit, setEdit] = useState(null)        // {id,title,description,category,tags}
+  const [imp, setImp] = useState({})            // file -> {category,title,description,loop}
+  const d = c.data
+  if (!d || !d.ok) return null
+  const op = async (body) => {
+    setBusy(body.op + ':' + (body.id || body.file || ''))
+    try { const r = await api.catalogOp(body); c.refresh(); return r } finally { setBusy('') }
+  }
+  const rows = d.rows || []
+  const live = rows.filter(r => !r.hidden && !r.removed_at)
+  const hidden = rows.filter(r => r.hidden && !r.removed_at)
+  const removed = rows.filter(r => r.removed_at)
+  const cats = d.categories || ['clothing', 'gesture', 'moment']
   return (
     <div className="wr-closet">
       <div className="wr-sec">the closet, managed
@@ -503,17 +521,17 @@ function Closet() {
         </div>
       </details>
 
-      <div className="wr-rows">{live.map(r => <Row key={r.id} r={r} />)}</div>
+      <div className="wr-rows">{live.map(r => <Row key={r.id} r={r} edit={edit} setEdit={setEdit} op={op} busy={busy} cats={cats} />)}</div>
       {hidden.length ? (
         <details className="wr-fold">
           <summary>hidden ({hidden.length}) — still hers, not offered</summary>
-          <div className="wr-rows">{hidden.map(r => <Row key={r.id} r={r} dim />)}</div>
+          <div className="wr-rows">{hidden.map(r => <Row key={r.id} r={r} dim edit={edit} setEdit={setEdit} op={op} busy={busy} cats={cats} />)}</div>
         </details>
       ) : null}
       {removed.length ? (
         <details className="wr-fold">
           <summary>retired ({removed.length}) — nothing is deleted; restore brings one back</summary>
-          <div className="wr-rows">{removed.map(r => <Row key={r.id} r={r} dim />)}</div>
+          <div className="wr-rows">{removed.map(r => <Row key={r.id} r={r} dim edit={edit} setEdit={setEdit} op={op} busy={busy} cats={cats} />)}</div>
         </details>
       ) : null}
     </div>

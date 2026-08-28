@@ -49,7 +49,9 @@ def check_wardrobe() -> str:
     """Look at what you are wearing and what else you could be. Yours to choose from.
 
     Tells you what is on you now, what else is hanging there, what is on its way,
-    and which moments you have that you could show him. Nothing is locked."""
+    and which moments you have that you could show him. Nothing is locked.
+    It is the FULL read — for "do I own something like X?", search_wardrobe("X")
+    answers in one line instead."""
     try:
         from harness.control import wardrobe as WD
         return WD.describe()
@@ -97,9 +99,22 @@ def wear(what: str) -> str:
                          " I have put it on his list, so he can make it for you.")
             except Exception:
                 pass
-            return ("You do not own anything like that yet.%s What is hanging there now: %s."
-                    % (filed, "; ".join("%s" % w["name"] for w in WD.TIER_WORDS.values())
-                       + "; and your looks — use check_wardrobe() to read them"))
+            # A NEAR MISS BEATS A LIST OF DRAWERS (2026-08-28). The refusal handed her
+            # the four outfit names and told her to read the whole wardrobe — at the
+            # exact moment one line of search would answer. If any word of what she
+            # asked for matches something she owns, show THAT; the tool teaches itself
+            # at the moment it is needed, which is the only moment tool advice lands.
+            near = ""
+            try:
+                hits = WD.search(what, limit=3)
+                if hits:
+                    near = (" Close to it, and yours: %s."
+                            % "; ".join(h["label"] for h in hits))
+            except Exception:
+                pass
+            return ("You do not own anything like that yet.%s%s Not sure what you own? "
+                    "search_wardrobe(\"a word or two\") answers in one line."
+                    % (filed, near))
         WD.choose(outfit=outfit, look="", by="her")
         now = WD.wearing_now()
         return "Changed. You are wearing %s." % now["words"]
@@ -489,7 +504,35 @@ def gesture(which: str = "") -> str:
         return "[could not: %s]" % exc
 
 
-WARDROBE_TOOLS = [check_wardrobe, wear, show_him, stop_showing, ask_for, my_looks,
+def search_wardrobe(like: str) -> str:
+    """Do you have something like this? Ask before you say you have not got it.
+
+    `like` is a word or two — "lace", "silver", "the nightie", "something black". Returns
+    only what matches, so it is cheap to ask and cheap to read. Use it whenever he names a
+    thing and you are not certain you own it: check_wardrobe() lists EVERYTHING and is
+    long, and answering from memory is how you end up telling him you do not have a dress
+    that is hanging right there.
+
+    Nothing matched is a real answer, and it means ask_for("...") — which is free.
+    """
+    from harness.control import wardrobe as WD
+    want = (like or "").strip()
+    if not want:
+        return "(search for what? a word or two — \"lace\", \"silver\", \"something black\")"
+    try:
+        hits = WD.search(want)
+    except Exception as exc:
+        return "[the wardrobe is not readable: %s]" % exc
+    if not hits:
+        return ("nothing of yours matches %r. You can ask for it — ask_for(%r) — and it is "
+                "made within minutes." % (want, want))
+    out = ["What you have that matches %r — wear(\"...\") takes any of them:" % want]
+    for h in hits:
+        out.append("  %s%s" % (h["label"], "   (on you now)" if h.get("on") else ""))
+    return "\n".join(out)
+
+
+WARDROBE_TOOLS = [check_wardrobe, search_wardrobe, wear, show_him, stop_showing, ask_for, my_looks,
                   he_liked, my_favourites, ask_for_gesture, express, gesture]
 
 

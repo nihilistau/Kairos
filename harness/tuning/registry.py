@@ -712,6 +712,21 @@ KNOBS: list[Knob] = [
     # other direction: not a control that changes nothing, but a behaviour with no control.
     #
     # It can only ever move the WEAKEST slot. The best answer is never the one traded away.
+    # ── HIS BODY'S HISTORY: HOW LONG IT IS KEPT (2026-08-28) ────────────────────────
+    # telemetry/store.py has had prune() since it was written — "THE ONLY REMOVER,
+    # retention is an operator decision, taken once, in the open" — and nothing called
+    # it: ~86 rows/min, ~10 MB/day, forever. ops.reflect() now runs it nightly, gated
+    # on this knob. Declared because an undeclared knob can only ever return its
+    # fallback (recall.explore sat unreachable for exactly this reason, found the same
+    # morning). DEFAULT 0 = keep everything: deleting a month of his heart rate is his
+    # decision, not a default's.
+    Knob("telemetry.keep_days", "Memory", "Body history kept (days)", "int", 0,
+         "How many days of watch data (heart rate, movement, sleep) are kept on disk. "
+         "0 keeps everything. Above 0, the nightly reflection removes whole days older "
+         "than this window.",
+         min=0, max=3650, step=1,
+         danger="Days beyond the window are DELETED at the next 04:00 pass — there is "
+                "no undo, and her sleep/waking answers cannot reach past what is kept."),
     Knob("recall.explore", "Memory", "Variety in what she recalls", "float", 0.15,
          "How often the last of her recalled memories is drawn at random from the other "
          "admitted candidates instead of taken in rank order. 0 = the same question always "

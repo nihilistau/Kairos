@@ -23,6 +23,7 @@ Run: python harness_tests/g_room_shell.py
 from __future__ import annotations
 
 import json
+import io
 import os
 import shutil
 import subprocess
@@ -159,6 +160,37 @@ for path, what in (("/room/", "the room"), ("/index.html", "the console redirect
         print(f"  --   {what} not checked (no gateway)")
     else:
         ok(code == 200, f"{what} serves ({path})", code)
+
+print("\n5. no component is DEFINED INSIDE another component")
+# ── WHY THIS IS A GATE AND NOT A STYLE NOTE (2026-08-28) ─────────────────────────────
+# `Row` lived inside `Closet()` in Wardrobe.jsx. A component defined in a render body is a
+# NEW FUNCTION on every render, and React compares component types by identity — so a new
+# type is a different component and the whole subtree is unmounted and remounted on every
+# state change, including the one each keystroke fires.
+#
+# MEASURED in the live room, typing one character into the closet's edit field:
+#     input_node_survived_the_keystroke: false
+#     focus_still_in_the_field:          false
+# The field vanished from under the cursor after one letter, so editing a garment was
+# impossible and it read as "the buttons do not work" — while the write path was perfect
+# the whole time (hide/unhide round-tripped 200/ok against the live gateway). After the
+# hoist: three keystrokes, node survived, focus held, all three landed.
+#
+# It is a CLASS, not one bug: any nested component does this silently, and the symptom
+# never points at the cause. Indentation is the tell — a capitalised definition at a
+# shallow indent is inside a render body rather than at module scope.
+import glob as _glob                                              # noqa: E402
+import re as _re                                                  # noqa: E402
+_DEF = _re.compile(r"^(\s+)(?:const|let|function)\s+([A-Z][A-Za-z0-9_]*)\s*"
+                   r"(?:=\s*(?:\([^)]*\)|[A-Za-z0-9_]+)\s*=>|\()")
+_nested = []
+for _f in sorted(_glob.glob(os.path.join(ROOT, "ui", "src", "**", "*.jsx"), recursive=True)):
+    for _i, _line in enumerate(io.open(_f, encoding="utf-8").read().splitlines(), 1):
+        _m = _DEF.match(_line)
+        if _m and len(_m.group(1)) <= 4:       # shallow indent = a render body
+            _nested.append("%s:%d %s" % (os.path.basename(_f), _i, _m.group(2)))
+ok(not _nested, "no React component is defined inside another (they remount every render)",
+   _nested[:5])
 
 print(f"\nG-ROOM-SHELL: {_P} pass, {_F} fail")
 sys.exit(1 if _F else 0)

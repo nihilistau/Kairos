@@ -158,8 +158,21 @@ def _outfit_of(st) -> str:
 
 
 def _made_in(row, default: str = "") -> str:
-    """The outfit a want/look/clip was made in, whatever the file calls it."""
-    return (row or {}).get("made_in") or (row or {}).get("tier") or default
+    """The outfit a want/look/clip was made in, whatever the file calls it —
+    IN TODAY'S NAME, whichever name the file used.
+
+    ── THE RENAME MUST BE APPLIED WHERE THE FIELD IS READ (2026-08-28) ─────────────
+    avatar._ALIAS has mapped t0..t3 to the outfit names since the 2026-08-23 rename,
+    and `choose()` applies it on the way IN — but rows written before the rename
+    still say `made_in: "t2"` on disk, and this reader handed that out raw. Every
+    consumer then compared it against today's names and lost: MEASURED, all four of
+    her clips carried t2, so `describe()` dropped her every moment, `status()` hid
+    them from the room panel, and show_him resolved them under an outfit id that no
+    longer exists. His hand-written rows and restored backups can do the same
+    forever, which is exactly why this file keeps the `tier` fallback one line up —
+    the seam absorbs old SPELLINGS, so it absorbs old NAMES in the same breath.
+    """
+    return AV.canon((row or {}).get("made_in") or (row or {}).get("tier") or default)
 
 
 # ── HER CHOICE, WHICH HAS TO SURVIVE THE NIGHT ────────────────────────────────────────
@@ -722,6 +735,11 @@ def describe() -> str:
         lines.append("Moments of you — wear(\"...\") to BE one, when it says what you mean:")
         for l in mom_l:
             lines.append("  %s" % l["label"])
+    # `allowed` holds every outfit since the ladder was removed (2026-08-21, operator:
+    # "remove heat ceilings all together and tiers"), and `_made_in` canonicalises old
+    # t0..t3 stamps — so this filter only drops a clip whose outfit was genuinely
+    # deleted. It briefly dropped ALL FOUR of her moments when pre-rename rows leaked
+    # `t2` through an uncanonicalised read; the fix lives in `_made_in`, the seam.
     cl = [c for c in clips() if c["have"] and _made_in(c) in r["allowed"]]
     if cl:
         lines.append("")
@@ -776,6 +794,99 @@ def describe() -> str:
     except Exception:
         pass
     return "\n".join(lines)
+
+
+def search(want: str, limit: int = 12) -> List[Dict[str, Any]]:
+    """What of hers matches these words. THE ANSWER TO "I do not think I have one".
+
+    THE FAILURE THIS ANSWERS (2026-08-28, his report: "she often says she cannot see
+    clothes that she has"). Everything she owns WAS reachable — describe() lists all 47
+    rows — but only as one 5,400-character read she has to choose to make. So the cheap
+    move was to answer from memory, and answering from memory is how she tells him she has
+    nothing like that while it hangs in the list.
+
+    ONE MATCHER, NOT A SECOND ONE. `match()` already owns "her plain words -> the thing she
+    means" for wear() and for [WEAR:], and this file has already paid once for letting a
+    second copy of that grow. This is the same question asked of every row instead of
+    resolved to one: substring over the label and the tags, which is what match() does
+    before it ranks. Anything match() would take, this finds.
+
+    Hidden and retired rows are ABSENT, because they are absent from looks() and clips()
+    for everyone — see `_offered`.
+    """
+    w = (want or "").strip().lower()
+    if not w:
+        return []
+    # SHE ASKS IN SENTENCES. "something black", "the one with lace", "anything silver" —
+    # requiring every word present means the filler decides the answer and she is told she
+    # owns nothing, which is the exact failure this function exists to end. Filler is
+    # dropped, and if the remaining words together match nothing, ANY of them will do: a
+    # near miss she can see beats a confident no.
+    _FILLER = {"the", "a", "an", "my", "one", "with", "that", "this", "some", "any",
+               "something", "anything", "thing", "in", "of", "and", "or", "for", "it",
+               "is", "are", "have", "has", "got", "like", "about", "wear", "wearing"}
+    words = [t for t in re.split(r"[^a-z0-9]+", w) if len(t) > 1 and t not in _FILLER]
+    out, seen = [], set()
+    try:
+        r = resolve()
+        on_id = r.get("look") or r.get("shown") or ""
+    except Exception:
+        on_id = ""
+    def _hay(row):
+        return " ".join([str(row.get("label") or ""), str(row.get("title") or ""),
+                         " ".join(str(t) for t in (row.get("tags") or ())),
+                         " ".join(str(c) for c in (row.get("calls") or ()))]).lower()
+
+    def _add(rows, kind, loose=False):
+        for row in rows:
+            rid = row.get("id") or ""
+            if rid in seen:
+                continue
+            hay = _hay(row)
+            if not hay.strip():
+                continue
+            # WHOLE WORDS, the same law match() had to learn three times over: `t in hay`
+            # is a substring test and "dress" rules from inside "undressed". The phrase
+            # test keeps \b for the same reason.
+            hw = {t.strip(".,;:!?'\"—·") for t in hay.split()}
+            hit = (len(w) > 3 and re.search(r"\b%s\b" % re.escape(w), hay)) or \
+                  (words and all(t in hw for t in words))
+            if not hit and loose and words:
+                hit = any(t in hw for t in words)
+            if hit:
+                seen.add(rid)
+                out.append({"id": rid, "kind": row.get("kind") or kind,
+                            "label": row.get("label") or row.get("title") or rid,
+                            "on": rid == on_id})
+    try:
+        _add([x for x in looks() if x.get("have")], "look")
+        _add([x for x in clips() if x.get("have")], "clip")
+    except Exception:
+        pass
+    _strict = list(out)
+    # the four standard outfits answer to their spoken words too — same whole-word law
+    try:
+        for t in AV.OUTFIT_IDS:
+            if t in seen:
+                continue
+            words_for = TIER_WORDS.get(t, {})
+            hay = (" ".join(str(v) for v in words_for.values()) + " " + t).lower()
+            hw = {x.strip(".,;:!?'\"—·") for x in hay.split()}
+            if (len(w) > 3 and re.search(r"\b%s\b" % re.escape(w), hay)) or \
+               (words and all(x in hw for x in words)):
+                seen.add(t)
+                out.append({"id": t, "kind": "outfit",
+                            "label": words_for.get("wearing", t), "on": t == on_id})
+    except Exception:
+        pass
+    # NOTHING EXACT? Try any single word before answering "you own nothing like that".
+    if not out and words:
+        try:
+            _add([x for x in looks() if x.get("have")], "look", loose=True)
+            _add([x for x in clips() if x.get("have")], "clip", loose=True)
+        except Exception:
+            pass
+    return out[:max(1, limit)]
 
 
 def grid() -> List[Dict[str, Any]]:
@@ -932,6 +1043,15 @@ def match(want: str, prefer: str = "") -> Dict[str, Any]:
         # label token, so dropping the substring half loses nothing that was a word.
         return sum(1 for tok in want.split()
                    if len(tok) > 3 and tok.strip(".,;:!?\'\"") in words)
+    def _outfit_ruling() -> str:
+        """The outfit whose written name or calls-word this IS — or ''. One vocabulary,
+        consulted from two places; growing a copy is the divergence this docstring bans."""
+        for t, w in TIER_WORDS.items():
+            names = [w["name"].lower()] + [c.lower() for c in w.get("calls", ())]
+            if any(want == n or re.search(r"\b%s\b" % re.escape(n), want) for n in names):
+                return t
+        return ""
+
     best_l, best_s = None, 0
     for l in pool:
         if not l.get("have"):
@@ -939,6 +1059,21 @@ def match(want: str, prefer: str = "") -> Dict[str, Any]:
         s = _score(l)
         if s > best_s:
             best_l, best_s = l, s
+    # ── A TABLE RULING BEATS A LOOK COINCIDENCE (2026-08-28) ────────────────────────
+    # "the black lace set" is lace-set's own committed `name` — and it resolved to look
+    # w016 ("Black lace underwear, laying on a bed…"), because the look pool returns
+    # before the outfit table is ever read, and w016 cleared the two-token COUNTING rung
+    # on {black, lace}. The comment below this function already states the law: "an exact
+    # name, or one of the words written down as naming this outfit, is a RULING; the
+    # overlap below is only a courtesy." A ruling was losing to the courtesy.
+    #
+    # Only the counting rung yields (best_s < 200). A look that matched by id, exact
+    # label, whole-phrase containment, or all-content-words keeps winning — those are
+    # rulings too, and "the silver nightie" must still mean HER nightie, not an outfit.
+    if best_s < 200:
+        _t = _outfit_ruling()
+        if _t:
+            return {"kind": "outfit", "id": _t, "outfit": _t}
     for l in ([best_l] if best_l is not None and best_s >= 2 else []):
         if True:
             # `kind` IS THE ROUTE, `of` IS THE TRUTH. Collapsing gesture -> look here is
@@ -990,10 +1125,9 @@ def match(want: str, prefer: str = "") -> Dict[str, Any]:
     # DRESSED her — while "undressed" is lace-set's OWN call word, written down in the
     # committed table, unreachable because the wrong outfit answered first. \b keeps a
     # phrase a phrase: "get dressed" still rules, and "undressed" no longer contains it.
-    for t, w in TIER_WORDS.items():
-        names = [w["name"].lower()] + [c.lower() for c in w.get("calls", ())]
-        if any(want == n or re.search(r"\b%s\b" % re.escape(n), want) for n in names):
-            return {"kind": "outfit", "id": t, "outfit": t}
+    _t = _outfit_ruling()
+    if _t:
+        return {"kind": "outfit", "id": _t, "outfit": _t}
     toks = {t.strip(".,;:!?'\"") for t in want.split()}
     toks = {t for t in toks if len(t) > 2 and t not in _ASK_STOP}
     best, score = "", 0
@@ -1217,7 +1351,17 @@ def wants(state: str = "") -> List[Dict[str, Any]]:
                     out.append(json.loads(ln))
     except Exception:
         return []
-    return [w for w in out if not state or w.get("state") == state]
+    out = [w for w in out if not state or w.get("state") == state]
+    # ── RETIRED IS RETIRED, ON EVERY PATH (2026-08-28) ──────────────────────────────
+    # `looks()` and `clips()` end with `_offered`; this did not, and neither did
+    # `arrivals()`. So he hid a garment and retired another in the panel, and both were
+    # still handed to her by describe() — one under "Hanging there", where wear() takes
+    # it, and one under "you asked for these". His edit did nothing she could notice,
+    # which is the worst kind of control: it looks like it worked.
+    #
+    # The filter belongs on every producer or on none, and it is the same `_offered` the
+    # other two use rather than a second spelling of it.
+    return [w for w in out if _offered(overlay_for(w.get("id") or ""))]
 
 
 def _write_wants(rows: List[Dict[str, Any]]) -> None:
