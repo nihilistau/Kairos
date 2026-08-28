@@ -163,6 +163,27 @@ def main() -> int:
           bool(coffee) and not coffee[0].get("lifecycle"),
           "his testimony was tombstoned by a paraphrase")
 
+    # ── AND AN INFERENCE DOES NOT UNDO A RETIREMENT (2026-08-28) ──────────────────
+    # A tombstone was never reinforced back to life — but the same TEXT re-admitted as a
+    # NEW row walked straight past it. Said by HIM again, that is right: fresh testimony
+    # outranks old curation. Re-minted by the consolidator re-reading an old transcript,
+    # it silently undid a decision a person made in the panel an hour earlier — his
+    # report, verbatim: "retired memories stay retired... it seems a little flaky".
+    M.remember("My reading chair is brown leather.", source="user turn")
+    M.forget("reading chair")
+    out = M.remember("My reading chair is brown leather.", source="consolidator")
+    check("a consolidator pass may NOT re-admit a retired text",
+          out.startswith("not stored") and "retired" in out, out[:90])
+    check("...and the refusal says why, naming the retirement", "re-admit" in out, out[:90])
+    out2 = M.remember("My reading chair is brown leather.", source="user turn")
+    chairs = [x for x in rows(reg) if "reading chair" in (x.get("text") or "")]
+    check("...but HIM saying it again re-admits — testimony outranks curation",
+          out2.startswith("stored")
+          and sum(1 for c in chairs if not c.get("lifecycle")) == 1, out2[:60])
+    check("...and the original tombstone stays a tombstone beside it",
+          sum(1 for c in chairs if c.get("lifecycle")) == 1,
+          [(c.get("lifecycle"), (c.get("text") or "")[:20]) for c in chairs])
+
     print(f"\nG-MEMORY-LIFECYCLE: {'PASS' if not FAIL else 'FAIL'} "
           f"({len(PASS)}/{len(PASS) + len(FAIL)})")
     if FAIL:

@@ -18,6 +18,7 @@ an init primer that points the system at what it can do.
 from __future__ import annotations
 
 import os
+import re
 import sys
 import tempfile
 import textwrap
@@ -197,15 +198,34 @@ def extract_facts(messages: List[dict], client=None) -> List[str]:
     t = _transcript(messages)
     if not t:
         return []
+    # ── BY HIS NAME, NOT "THE USER" (2026-08-28, his ask: "her memories are of Sam,
+    # not of the user"). The prompt said "the user", so the model wrote rows that begin
+    # "The user ..." — 24 of the 25 such rows in the live store carried src=consolidator,
+    # this pass. A memory of a person is written in that person's name; "the user" is a
+    # role, and a companion who files her person under a role is keeping records, not
+    # knowing someone. The name comes from PersonModel.who — the one authority the export
+    # already rewrites for the blank slate, so a fresh clone's companion writes its own
+    # operator's name and never his.
+    from harness.model.person import PersonModel as _PM
+    _who = _PM.who or "the user"
+    # "still be true next week" — the store had "Sam needs to pee", "Sam's eyes are
+    # wide" filed as durable FACTS (class fact, year-long half-life) by this pass. A
+    # moment is not a memory; the admission door catches some of these, but the cheapest
+    # place to not-store a thing is to not-extract it.
     prompt = ("Conversation:\n" + t + "\n\n"
-              "Write the facts the user stated about themselves above, each as one short sentence "
-              "on its own line. Output only the facts, nothing else.\n\nFacts the user stated:")
+              "Write the facts %s (the human) stated about themselves above, each as one "
+              "short sentence on its own line, naming them as %s — never as 'the user'. "
+              "Only facts that will still be true next week; never momentary states "
+              "(what they need, feel or look like right now). "
+              "Output only the facts, nothing else.\n\nFacts %s stated:"
+              % (_who, _who, _who))
     r = _chat(prompt, client=client, max_tokens=160)
     facts = []
     # Echo guard: a genuine user fact never contains these meta words (the model sometimes
     # parrots the instruction back instead of extracting).
     meta = ("conversation", "extract", "instruction", "do not", "durable",
-            "one per line", "own line", "the facts the user", "output only")
+            "one per line", "own line", "the facts the user", "output only",
+            "naming them as", "the human")
     for ln in r.splitlines():
         s = ln.strip().lstrip("-*0123456789.) ").strip()
         sl = s.lower()
@@ -213,6 +233,10 @@ def extract_facts(messages: List[dict], client=None) -> List[str]:
             continue
         if "none" in sl[:6] or any(b in sl for b in meta):
             continue
+        # BELT UNDER THE PROMPT: a model that writes "The user ..." anyway is corrected at
+        # the seam, so the instruction failing quietly cannot re-grow the pile of role-rows
+        # this change exists to end. Leading position only — a sentence ABOUT users stays.
+        s = re.sub(r"^[Tt]he user\b", _who, s)
         facts.append(s)
     return facts
 

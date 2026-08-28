@@ -135,6 +135,21 @@ def testimony_wins(scored: list, overlap: int = 2) -> list:
         if status_of(e) in _GROUND_TRUTH:
             out.append((s, e))
             continue
+        # ── A DISTILLATE IS NOT A CONTRADICTION OF ITS OWN SOURCES (2026-08-28) ────────
+        # A chapter or a nightly becoming is MADE FROM her observed words, so its topic
+        # always overlaps them — that is what a distillate IS. This rule therefore muted
+        # every chapter and every becoming, everywhere this filter runs: the self block
+        # never carried a week, and recall never served one. Measured live: the chapter
+        # written at 20:37 survived testimony=False and vanished under testimony=True.
+        # The floor rule stays exactly as written for a bare inference — a GUESS on a
+        # topic someone has spoken to yields the floor — but a row carrying derived_from
+        # is the system's own consolidation, with provenance, and silencing it because
+        # its sources are still alive makes the entire narrative architecture unreachable
+        # while anything it summarised survives. Contradiction protection is unmoved:
+        # verdict.may_supersede still refuses an inference RETIRING ground truth.
+        if e.get("derived_from"):
+            out.append((s, e))
+            continue
         mine = topic_of(strip_prefix(_row_text(e)))
         who = e.get("speaker", SPEAKER_USER)
         covered = any(sp == who and len(mine & t) >= overlap for sp, t in spoken)

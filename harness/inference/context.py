@@ -89,6 +89,15 @@ PER_MSG_TOKENS = 6
 # window has to move again. See point 3 above.
 TRIM_TO = 0.80
 
+# The sticky cut (see fit()): (role, content fingerprint) of the first kept message from
+# the last fresh cut. Process-wide like the client singleton it serves; a bounce clears it.
+_STICKY_CUT = None
+
+
+def _fp(m) -> str:
+    import hashlib
+    return hashlib.md5((m.get("content") or "").encode("utf-8", "replace")).hexdigest()[:12]
+
 # What the reply needs. The ceiling is on POSITIONS, not on the prompt: prompt + generated
 # must both fit under pmax. The last turn that worked that night went in at 11 864 and
 # came out at exactly 12 096 with `eot_margin=-17.855` — she was cut off mid-sentence by
@@ -168,6 +177,34 @@ def fit(msgs: List[Dict[str, Any]],
     tail = msgs[len(head):]
     target = max(1, int(b * TRIM_TO))
 
+    # ── THE CUT IS STICKY, OR EVERY TURN PAYS FOR IT (2026-08-28, live) ──────────────
+    # The evening his conversation first crossed pmax, this function re-cut newest-first
+    # on EVERY call — so each turn kept a slightly different window (23 dropped, then 23,
+    # then 26...), the front of the prompt shifted, and the daemon's committed KV found
+    # no seam: PERSIST-KV RESEAM refused (drop 437), the rewind fell to the full-prefill
+    # floor, and every turn re-prefilled ~10,300 tokens at 20 ms/tok. MEASURED: 235.4 s,
+    # 222.5 s, 207.4 s per ordinary turn — which he reported as the gateway itself frozen,
+    # because a four-minute reply and a hang are indistinguishable from the room.
+    #
+    # So once a cut exists, LATER CALLS CUT AT THE SAME MESSAGE for as long as the window
+    # still fits the full budget. The window's front is then byte-stable across turns, the
+    # seam holds, and the cost of a moving boundary is paid once per genuine overflow —
+    # TRIM_TO's slack (20% of budget, several thousand tokens) is what buys the dozen-odd
+    # quiet turns between cuts. The marker is the first kept message's identity, not an
+    # index: prepended or vanished history (a bounce, a different session) simply misses
+    # and falls through to a fresh cut.
+    global _STICKY_CUT
+    if _STICKY_CUT is not None:
+        idx = next((i for i, m in enumerate(tail)
+                    if (m.get("role"), _fp(m)) == _STICKY_CUT), None)
+        if idx is not None and idx > 0:
+            kept = head + tail[idx:]
+            after = est_tokens(kept)
+            if after <= b:
+                return kept, {"dropped": len(msgs) - len(kept), "kept": len(kept),
+                              "before": before, "after": after, "budget": b,
+                              "sticky": True}
+
     # Newest first, stopping before the target — but ALWAYS keeping the last message,
     # which is what he just said. If his own message alone does not fit, sending it and
     # letting the engine refuse is still better than us refusing on his behalf: the
@@ -189,6 +226,7 @@ def fit(msgs: List[Dict[str, Any]],
         keep.pop(0)
 
     out = head + keep
+    _STICKY_CUT = (keep[0].get("role"), _fp(keep[0])) if keep else None
     return out, {"dropped": len(msgs) - len(out), "kept": len(out),
                  "before": before, "after": est_tokens(out), "budget": b}
 

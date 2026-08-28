@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.8.4 — the story cycle, and the four-minute turn (2026-08-28)
+
+An evening-long deep dive on the memory system, prompted by an unresponsive page and a
+suspicion that the narrative machinery was not doing what its comments said. It was not.
+
+- **The trim cut is sticky.** The night a conversation first crosses pmax, the context
+  trim used to re-cut its window newest-first on every call — so every turn's prompt
+  front shifted, the committed KV found no seam, and every ordinary turn paid a full
+  re-prefill. Measured: 235/222/207 s per turn, indistinguishable from a hang. Later
+  calls now cut at the same first-kept message until the window genuinely overflows:
+  the boundary moves once per overflow, not per turn. Warm turns prefill only their new
+  tokens (~400 tok ≈ 12 s at 31 ms/tok).
+- **The chapters had never rendered.** The self block's design — stable facts, then the
+  weekly chapters, then recent narrative — was prose: the budget walk was first-come and
+  the facts alone overflowed it, so since the day chapters were designed they had never
+  once appeared in the prefix. The block has SHARES now (who she is 45%, the weeks 30%,
+  the recent lines 25%, spill forward), and `core`-pinned rows claim the facts seats
+  first.
+- **`testimony_wins` muted every distillate.** A chapter is made from observed words, so
+  its topic always overlaps them, and the inference-yields-the-floor rule silenced the
+  system's own consolidation everywhere it runs. A row carrying `derived_from` is exempt
+  now; a bare inference on a covered topic still yields, and an inference still cannot
+  retire ground truth.
+- **The story cycle.** Nightly, after the weekly chapter step, `fold_into_chapters`
+  retires her diary exhaust INTO its chapter — only rows older than every consumer
+  window (14 days), only under a written chapter, never core, never the operator's
+  testimony — with the chapter named on the tombstone, so the retired list reads as the
+  story's footnotes. Consolidation, not contradiction.
+- **Core** (★ in the Memory panel, read-only tag in ops.html): pinned identity that leads
+  the self block and outlives every fold. Set through the one relabel door, breadcrumbed.
+  The panel API serves the field (its serializer is a fixed list, and the first cut wrote
+  the mark while hiding it).
+- **Recall admission is two routes over an evidence floor** (see 0.8.0), extended: an
+  elder seat keeps the far past reachable on neutral turns, `recall.explore` rolls from a
+  digest of the situation (deterministic per question), and a paraphrase pass may not
+  re-admit a text the operator retired — only fresh testimony can.
+- **A serve-stall instrument**: if the gateway serves no HTTP for three minutes, every
+  thread's stack is dumped to `var/serve-stall.trace`, once per quiet spell — a stall
+  becomes a diagnosis instead of a mystery.
+
+`G-MEMORY-STORY` (26 legs, eight mutants red by name), `G-CONTEXT-FIT` §8,
+`G-MEMORY-LIFECYCLE` 22/22, `G-RECALL-EVIDENCE` 44/44. `docs/MEMORY-AND-RECALL.md`
+rewritten to match, including a plain-language story-cycle section.
+
 ## 0.8.3 — the wardrobe answers questions (2026-08-28)
 
 The wardrobe's listing was complete and nearly unusable: one ~5.4k-character read, with 16

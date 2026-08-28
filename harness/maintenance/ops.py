@@ -430,6 +430,14 @@ def reflect() -> dict[str, Any]:
         out["steps"].append({"step": "chapter", **_nar_ch.weekly_chapter()})
     except Exception as exc:
         out["steps"].append({"step": "chapter", "skipped": str(exc)[:120]})
+    # 6. fold — the story absorbs its own sources once they age out of every consumer
+    # window (his design, 2026-08-28: chapter written -> sources archived -> refill).
+    # After the chapter step on purpose: a chapter written tonight makes its week
+    # foldable fourteen days from now, never tonight.
+    try:
+        out["steps"].append({"step": "fold", **fold_into_chapters()})
+    except Exception as exc:
+        out["steps"].append({"step": "fold", "error": str(exc)[:120]})
     # THE RECEIPT (2026-08-24 audit, B2). Zero `chapter` rows existed after two nights
     # of this pass, the dry mechanism proved healthy through a stub ask, and the reason
     # could not be recovered because these step results were returned to callers that
@@ -588,7 +596,7 @@ RELABEL_FIELDS = ("speaker", "mem_class", "kind")
 
 
 def relabel(name: str, speaker: str = None, mem_class: str = None,
-            kind: str = None) -> dict[str, Any]:
+            kind: str = None, text: str = None, core: bool = None) -> dict[str, Any]:
     """THE OPERATOR RE-FILES A ROW (2026-08-23). His judgement, recorded, never silent.
 
     The classifier is a heuristic and the author lane is set by which door a producer
@@ -615,6 +623,24 @@ def relabel(name: str, speaker: str = None, mem_class: str = None,
     name = (name or "").strip()
     want = {"speaker": speaker, "mem_class": mem_class, "kind": kind}
     want = {k: v for k, v in want.items() if v is not None}
+    # ── AND THE TEXT ITSELF, FOR CORRECTIONS (2026-08-28, his ask: "her memories are
+    # of Sam, not of the user"). 25 live rows began "The user ..." — the consolidator's
+    # old prompt — and the only remedy was retire-and-re-add, which loses mentions,
+    # first_seen and provenance to fix a WORDING. Same four rules as the labels: the old
+    # text goes into the src breadcrumb, so what the row used to say is part of its
+    # history rather than gone. The sem-index row keyed on the old text orphans and
+    # re-mints on the next pass; dedupe keys likewise follow the new words.
+    if text is not None:
+        text = text.strip()
+        if not (6 <= len(text) <= 400):
+            return {"ok": False, "error": "text must be 6..400 chars"}
+        want["text"] = text
+    # ── CORE (2026-08-28, his design): a row pinned as load-bearing identity. Core rows
+    # lead the self block's facts section so who she is cannot drift off the end of a
+    # growing list, and the chapter fold never archives one. A mark, not a class: it
+    # composes with any class/kind and moves nothing else about the row.
+    if core is not None:
+        want["core"] = 1 if core else 0
     if not name or not want:
         return {"ok": False, "error": "need a row name and at least one label"}
     if "speaker" in want and want["speaker"] not in ("user", "self"):
@@ -631,7 +657,10 @@ def relabel(name: str, speaker: str = None, mem_class: str = None,
             return {"ok": False, "error": "no row named %r" % name}
         for f, v in want.items():
             old = hit.get(f, "")
-            if (old or "") == (v or ""):
+            if f == "core":
+                if int(old or 0) == int(v or 0):
+                    continue
+            elif (old or "") == (v or ""):
                 continue
             before[f] = old
             changed[f] = v
@@ -642,13 +671,105 @@ def relabel(name: str, speaker: str = None, mem_class: str = None,
         if changed:
             note = " | operator relabel %s: %s" % (
                 time.strftime("%Y-%m-%d", time.gmtime()),
-                ", ".join("%s %s->%s" % (f, before[f] or "(none)", changed[f] or "(none)")
+                ", ".join(("text was: %r" % (before[f] or "")[:80]) if f == "text"
+                          else "%s %s->%s" % (f, before[f] or "(none)", changed[f] or "(none)")
                           for f in sorted(changed)))
             hit["src"] = (hit.get("src") or "") + note
             _write(rows)
         text = lc.strip_prefix(hit.get("text", ""))
     return {"ok": True, "name": name, "changed": changed, "was": before, "text": text[:160],
             "stats": stats()}
+
+
+FOLDABLE_KINDS = ("journal", "thought", "narration", "dream", "spoke_up", "feeling")
+FOLD_AFTER_DAYS = 14.0
+
+
+def fold_into_chapters() -> dict[str, Any]:
+    """THE STORY ABSORBS ITS OWN SOURCES, ONCE THEY HAVE AGED OUT OF USE (2026-08-28).
+
+    His design, near-verbatim: "the current memory fills up and becomes a written chapter
+    that creates the story, and then the memory used to fill that chapter should be
+    archived, and the refill starts... memories marked as core remain."
+
+    Her narrative lane grows 24–33 rows a day and nothing ever left it: every evening's
+    diary exhaust stayed a live recall candidate forever, thinning the pools and burying
+    the story under its own raw material. Once a week `weekly_chapter` distils those rows
+    into one paragraph that stands in her prefix — after which the rows it covered are
+    RAW FOOTAGE OF A SCENE THE FILM ALREADY CONTAINS.
+
+    So: a her-lane narrative row is folded into its chapter — retired with the chapter
+    named as what absorbed it — when ALL of these hold:
+
+      * its kind is one of FOLDABLE_KINDS: the diary exhaust, never the distillates
+        (chapter / self_description) and never his lane, whose testimony has its own laws;
+      * it is older than FOLD_AFTER_DAYS (14): every consumer window — becoming's 7 days,
+        the next chapter's 7 — has moved past it, so folding starves nothing (fold the
+        night the chapter is written and TOMORROW'S becoming would read an empty week);
+      * a LIVE chapter's week covers its timestamp ([chapter.ts − support_days, chapter.ts]):
+        no chapter, no fold — the story has not been written yet, so the sources stay;
+      * it is not CORE (pinned identity outlives every cycle), not private-secret, and
+        not itself carrying dependents.
+
+    This is CONSOLIDATION, not contradiction: nothing here judges a row wrong, and the
+    verdict law (an inference may not retire ground truth) is about competing claims, not
+    about a summary absorbing its own named sources. The tombstone keeps everything —
+    text, timestamps, mentions — and `retired_because` names the chapter, so the panel's
+    retired list reads as the story's footnotes rather than as loss. VRAM is untouched by
+    design and honestly so: the prefix budget governs VRAM; what this buys is recall
+    pools and an IDF table that measure her, not her backlog.
+    """
+    import time as _t
+    now = _t.time()
+
+    def _age_days(ts: str) -> float:
+        # timegm, NOT mktime: registry stamps are UTC, and mktime reads a struct as
+        # LOCALTIME — every age would be skewed by the zone offset (+10h here), which is
+        # exactly the class G-CLOCK exists for, and it caught this line the night it was
+        # written.
+        import calendar as _cal
+        try:
+            return (now - _cal.timegm(_t.strptime((ts or "")[:19], "%Y-%m-%dT%H:%M:%S"))) / 86400.0
+        except Exception:
+            return -1.0                    # unparseable age folds nothing
+
+    with _reg_lock():
+        rows = _rows()
+        _backup()
+        chapters = [r for r in rows if not r.get("lifecycle")
+                    and r.get("speaker") == "self" and (r.get("kind") or "") == "chapter"]
+        windows = []
+        for c in chapters:
+            end = c.get("ts") or ""
+            span = float(c.get("support_days") or 7) + 0.5
+            windows.append((c, end, span))
+        folded, by_chapter = 0, {}
+        for r in rows:
+            if r.get("lifecycle") or r.get("speaker") != "self":
+                continue
+            if (r.get("kind") or "") not in FOLDABLE_KINDS:
+                continue
+            if r.get("core") or r.get("mem_class") == "private-secret":
+                continue
+            ts = r.get("ts") or ""
+            if _age_days(ts) < FOLD_AFTER_DAYS:
+                continue
+            home = next((c for c, end, span in windows
+                         if ts <= end and _age_days(ts) - _age_days(end) <= span), None)
+            if home is None:
+                continue                    # its week has no chapter yet; the sources stay
+            r["lifecycle"] = 1
+            r["superseded_by"] = home.get("name", "")
+            r["superseded_at"] = _t.strftime("%Y-%m-%dT%H:%M:%SZ", _t.gmtime())
+            r["retired_because"] = ("folded into the chapter of %s"
+                                    % (home.get("ts") or "")[:10])
+            folded += 1
+            by_chapter[(home.get("ts") or "")[:10]] =                 by_chapter.get((home.get("ts") or "")[:10], 0) + 1
+        if folded:
+            _write(rows)
+    return {"ok": True, "folded": folded, "chapters": by_chapter,
+            "why": ("" if folded else
+                    "nothing aged past every consumer window under a written chapter")}
 
 
 def retire_orphans() -> dict[str, Any]:

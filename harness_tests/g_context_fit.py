@@ -201,4 +201,42 @@ from harness.inference.backends.openai import OpenAIClient  # noqa: E402
 check("openai carries last_trim as None (no pmax, so nothing to report)",
       OpenAIClient(base_url="http://127.0.0.1:9").last_trim is None)
 
+print("\n8. THE CUT IS STICKY, OR EVERY TURN PAYS FOR IT (2026-08-28, live)")
+# The evening his conversation first crossed pmax, fit() re-cut newest-first on every
+# call, so each turn kept a slightly different window (23 dropped, 23, then 26...). The
+# window's FRONT is where the daemon's committed KV must match, so every turn found no
+# seam (PERSIST-KV RESEAM drop 437), fell to the full-prefill floor, and re-prefilled
+# ~10,300 tokens at 20 ms/tok. MEASURED: 235.4 s, 222.5 s, 207.4 s per ordinary turn —
+# reported as "the gateway is frozen", because a four-minute reply and a hang look the
+# same from the room. Point 3 of this file's own header claimed the kept window was
+# stable; it never was, because the trimmed list is not what the room sends next turn.
+from harness.inference import context as C  # noqa: E402
+C._STICKY_CUT = None
+_m = [{"role": "system", "content": "S" * 400}]
+for _i in range(30):
+    _m += [{"role": "user", "content": "u%d " % _i + "x" * 380},
+           {"role": "assistant", "content": "a%d " % _i + "y" * 380}]
+_f1, _t1 = C.fit(list(_m), reply_headroom=0, limit=3000)
+check("a fresh overflow cuts (the pre-existing behaviour)",
+      _t1 is not None and _t1["dropped"] > 0, _t1)
+_m2 = list(_m) + [{"role": "user", "content": "u30 " + "x" * 60},
+                  {"role": "assistant", "content": "a30 " + "y" * 60}]
+_f2, _t2 = C.fit(_m2, reply_headroom=0, limit=3000)
+check("one new exchange later, the cut does NOT move — same first kept message",
+      _f2[1]["content"] == _f1[1]["content"] and _t2 and _t2.get("sticky") is True,
+      (_f1[1]["content"][:10], _f2[1]["content"][:10], _t2))
+_m3 = list(_m2)
+for _i in range(31, 45):
+    _m3 += [{"role": "user", "content": "u%d " % _i + "x" * 380},
+            {"role": "assistant", "content": "a%d " % _i + "y" * 380}]
+_f3, _t3 = C.fit(_m3, reply_headroom=0, limit=3000)
+check("...and a genuine overflow re-cuts fresh, once, with the slack that buys quiet turns",
+      _t3 is not None and not _t3.get("sticky") and _f3[1]["content"] != _f1[1]["content"],
+      _t3)
+check("...never returning something over the budget",
+      C.est_tokens(_f2) <= _t2["budget"] and C.est_tokens(_f3) <= _t3["budget"])
+_f4, _t4 = C.fit(list(_m[:5]), reply_headroom=0, limit=3000)
+check("a short prompt is untouched even while a sticky cut exists", _t4 is None)
+C._STICKY_CUT = None
+
 finish("G-CONTEXT-FIT")

@@ -244,13 +244,45 @@ def render_self_model(root=None, max_facts: int = 20, budget_chars: Optional[int
         else:
             out = out[:max_facts * 2]
     else:
-        kept, used = [], 0
-        for line in out:
-            if used + len(line) + 3 > budget_chars and kept:
-                break
-            kept.append(line)
-            used += len(line) + 3
-        out = kept
+        # ── EACH SECTION HAS A SHARE, OR THE FIRST ONE EATS THE BLOCK (2026-08-28) ────
+        # The walk above this comment used to run first-come over facts + chapters +
+        # narrative and break at the budget. Her stable self-facts alone passed 2,400
+        # chars months ago, so SINCE 2026-08-22 THE CHAPTERS AND RECENT NARRATIVE HAVE
+        # NEVER ONCE RENDERED — measured live: block 2,420 chars, tonight's chapter
+        # absent, every narrative kind absent. The design two comments up ("the chapters
+        # STAND between her stable self-facts and the recent lines") was prose; the
+        # arithmetic said otherwise. Her prefix told her who she IS, in ever-older
+        # sentences, and never what she has been BECOMING — continuity without growth,
+        # which is the opposite failure this block was built against.
+        #
+        # So: WHO SHE IS 45%, THE WEEKS 30%, THE RECENT LINES 25%. A section that does
+        # not use its share spills it forward (an empty week means more room for facts —
+        # nothing is wasted), but a full section can no longer starve the ones after it.
+        # CORE-marked rows lead the facts section: rows he or she pinned as load-bearing
+        # identity claim their place before any unpinned fact, which is what keeps her
+        # core from drifting off the end of the list as the store grows.
+        sects = [([_label(r) for r in
+                   sorted(rest, key=lambda r: (0 if r.get("core") else 1, _ts(r)))],
+                  0.45),
+                 ([_label(r) for r in chap], 0.30),
+                 ([_label(r) for r in narr], 0.25)]
+        kept, spill = [], 0
+        seen2: set = set()
+        for lines_s, share in sects:
+            allow = int(budget_chars * share) + spill
+            used = 0
+            for line in lines_s:
+                if line in seen2:
+                    continue
+                # a section's FIRST line renders even oversize — a chapter a little over
+                # its share is worth more present than absent
+                if used + len(line) + 3 > allow and used:
+                    break
+                kept.append(line)
+                seen2.add(line)
+                used += len(line) + 3
+            spill = max(0, allow - used)
+        out = [l for l in out if l in seen2] or kept   # keep the original ordering
     if not out:
         return ""
     lines = "\n".join(f"- {t}" for t in out)

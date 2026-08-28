@@ -1551,6 +1551,11 @@ def _mem_row_json(e: Dict[str, Any]) -> Dict[str, Any]:
         "support_days": e.get("support_days", 0),
         "superseded_by": e.get("superseded_by", ""),
         "retired_because": e.get("retired_because", ""),
+        # CORE (2026-08-28): the write landed on his FIRST click and the panel showed
+        # nothing — this serializer is a fixed field list, and `core` was not on it.
+        # The star wrote the row, the read hid it, and "pin as core" looked dead while
+        # three rows sat pinned on disk. The panel cannot toggle what it cannot see.
+        "core": 1 if e.get("core") else 0,
     }
 
 
@@ -4127,6 +4132,43 @@ def _run_stdlib(host: str, port: int) -> None:
         h.send_header("Access-Control-Allow-Headers", "Content-Type")
         h.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 
+    # ── SERVE-STALL: WHEN THE GATEWAY STOPS SERVING, THE LOG NAMES THE HOLDER ──────
+    # (2026-08-28, live, unexplained at the time.) For 14.5 minutes — 20:05:08 to
+    # 20:19:36 — no HTTP request was served: the room's ~10s pulse polls vanish from the
+    # log, his page went blank and would not reload. The PROCESS was fine: kairos spoke
+    # at 20:12, HA ingested at 20:15, the daemon answered a turn in 6.5 s mid-window. So
+    # either the accept loop or something every handler funnels through was held — and
+    # nothing recorded by whom. This instrument exists so the NEXT stall is a diagnosis
+    # instead of a mystery: any request stamps the clock; a watcher thread notices three
+    # quiet minutes and dumps EVERY thread's stack to the log, once per quiet spell.
+    # An idle night with the room closed produces one dump per spell — noise bounded,
+    # and honestly labelled below. faulthandler is stdlib and signal-safe.
+    _SERVE_BEAT = {"at": time.time(), "dumped": False}
+
+    def _serve_stall_watch():
+        import faulthandler
+        while True:
+            time.sleep(30.0)
+            quiet = time.time() - _SERVE_BEAT["at"]
+            if quiet > 180.0 and not _SERVE_BEAT["dumped"]:
+                _SERVE_BEAT["dumped"] = True
+                logger.warning("[gateway] SERVE-STALL: no HTTP request served for %.0f s "
+                               "— dumping every thread's stack (one dump per spell; "
+                               "harmless if the room is simply closed)", quiet)
+                try:
+                    _p = os.path.join(_ROOT_DIR, "var", "serve-stall.trace")
+                    with open(_p, "a") as _f:
+                        _f.write("\n=== SERVE-STALL %s (quiet %.0fs) ===\n"
+                                 % (time.strftime("%Y-%m-%d %H:%M:%S"), quiet))
+                        faulthandler.dump_traceback(file=_f)
+                except Exception as _exc:
+                    logger.warning("[gateway] SERVE-STALL dump failed: %s", _exc)
+            elif quiet <= 180.0:
+                _SERVE_BEAT["dumped"] = False
+
+    threading.Thread(target=_serve_stall_watch, name="serve-stall-watch",
+                     daemon=True).start()
+
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *a):  # quiet
             pass
@@ -4188,6 +4230,7 @@ def _run_stdlib(host: str, port: int) -> None:
             return True
 
         def do_POST(self):  # noqa: N802
+            _SERVE_BEAT["at"] = time.time()
             if self._guard():
                 return
             try:
@@ -4450,7 +4493,9 @@ def _run_stdlib(host: str, port: int) -> None:
                         res = ops.relabel(body.get("name", ""),
                                           speaker=body.get("speaker"),
                                           mem_class=body.get("mem_class"),
-                                          kind=body.get("kind"))
+                                          kind=body.get("kind"),
+                                          text=body.get("text"),
+                                          core=body.get("core"))
                     elif p == "/v1/decisions/decide":
                         from harness.skills import decisions as _dec
                         res = _dec.decide(body.get("id", ""), body.get("choice", ""),
@@ -5045,6 +5090,7 @@ def _run_stdlib(host: str, port: int) -> None:
                 self.send_error(404)
 
         def do_GET(self):  # noqa: N802
+            _SERVE_BEAT["at"] = time.time()
             # GETs are guarded too. Reading /v1/memory or /v1/senses from a foreign
             # page is not catastrophic the way a POST is, but it is his room, his
             # notes and his facts, and there is no reason for a web page he happens
