@@ -29,6 +29,8 @@ pin check and §2's swapped tool is served.
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import sys
@@ -204,5 +206,66 @@ _pool_src = open(os.path.join(ROOT, "harness", "mcp_server", "pool.py"),
 check("...and pool.py builds no second child environment of its own",
       "os.environ" not in _pool_src.split("async def _open")[1].split("async def _shut")[0]
       and "_client_for" in _pool_src)
+
+print("\n9. THE VERSION IS PINNED, OR THE FINGERPRINT GUARD IS A TREADMILL")
+# §1 of this gate's own docstring names it — "`npx -y chrome-devtools-mcp@latest`, a
+# package resolved from the network at spawn time at whatever version npm serves that
+# minute" — and then asserted nothing about it. On 2026-08-26 npm served 1.8.0 where the
+# pins were made at 1.6.0, twenty-five of twenty-nine tools changed, and FIVE OF THE SEVEN
+# in that server's `allow` list were refused: navigate_page, take_snapshot, take_screenshot,
+# click and fill. She could open a page and list pages and do nothing else, for two days,
+# while the log said `rug-pull` once per tool per listing.
+#
+# The guard was right every time. A floating specifier means the thing being fingerprinted
+# is defined as "whatever arrives", so the refusals were the config's fault and the only
+# available remedy was to accept changes nobody could see. Pin the version and an
+# acceptance becomes a deliberate act again.
+_cfg = json.load(io.open(os.path.join(ROOT, "mcp_servers.json"), encoding="utf-8"))
+_float = []
+for _name, _spec in (_cfg.get("servers") or {}).items():
+    for _a in (_spec.get("args") or []):
+        if not isinstance(_a, str) or _a.startswith("-"):
+            continue
+        # a package specifier is an npm-ish arg for npx/npm; a path is not
+        if (_spec.get("command") or "") in ("npx", "npm", "pnpm", "bunx", "yarn"):
+            _v = _a.rsplit("@", 1)[-1] if "@" in _a.lstrip("@") else ""
+            if (not _v) or _v in ("latest", "next", "beta") or _v[:1] in ("^", "~", "*"):
+                _float.append("%s: %s" % (_name, _a))
+check("no spawned server resolves its package at whatever version npm serves that minute",
+      not _float, _float)
+
+print("\n10. LOUD FOR WHAT SHE CAN CALL, ONE LINE FOR THE REST")
+# Refusal is unchanged — a changed tool is never offered either way. What this holds is
+# the VOLUME, because twenty-five identical warnings around five real findings is a
+# control training its reader to scroll past it.
+_pinfile = os.path.join(tempfile.mkdtemp(prefix="g_mcp_vol_"), "pins.json")
+_old_pin, B._PIN_PATH = B._PIN_PATH, _pinfile
+_old_cfg = B.load_config
+B.load_config = lambda: {"servers": {"srv": {"allow": ["kept"]}}}
+try:
+    def _tool(nm, desc):
+        return {"server": "srv", "name": nm, "description": desc, "schema": {}}
+
+    # pin both at one description, then offer them with another
+    B.save_pins({"srv": {"kept": B._digest(_tool("kept", "one")),
+                         "dropped": B._digest(_tool("dropped", "one"))}})
+    _err = io.StringIO()
+    with contextlib.redirect_stderr(_err):
+        _out = B.check_pins([_tool("kept", "two"), _tool("dropped", "two")], learn=False)
+    _log = _err.getvalue()
+    check("a changed tool is still refused whether or not it was offered",
+          _out == [], [t.get("name") for t in _out])
+    check("...the one she could have called is named LOUDLY, with the accept command",
+          "REFUSED 'kept'" in _log and "mcp_pin.py --accept srv kept" in _log, _log[:200])
+    check("...and the one nothing was offering does not get its own rug-pull warning",
+          "REFUSED 'dropped'" not in _log, _log[:200])
+    check("...it is named once, in a line that says why it did not matter",
+          "dropped" in _log and "not in its allow list" in _log, _log[:240])
+    # AND THE TWO QUESTIONS MUST BE THE SAME QUESTION. `_offered` exists so this file and
+    # `mcp_toolspecs` cannot disagree about what she can call.
+    check("_offered answers the allow list", B._offered("srv", "kept"))
+    check("...and the deny side too", not B._offered("srv", "dropped"))
+finally:
+    B._PIN_PATH, B.load_config = _old_pin, _old_cfg
 
 finish("G-MCP-TRUST")

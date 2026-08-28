@@ -217,7 +217,52 @@ same reason.
 **Trust on first use is what this is, said plainly:** it cannot vouch for the *first*
 listing and does not claim to. What it guarantees is that what she was offered yesterday is
 what she is offered today, and that a change is a decision he made rather than one npm made
-for him. Relatedly and deliberately: `chrome-devtools-mcp@latest` is **not** version-pinned
-— it tracks Chrome, and a stale pin there is a browser that silently stops working. Pinning
-fingerprints bounds what a new build may change about the *surface* she is offered; it says
-nothing about the code behind it. That is a recorded trade, not an oversight.
+for him. Pinning fingerprints bounds what a new build may change about the *surface* she is
+offered; it says nothing about the code behind it.
+
+#### The version is pinned too, and it did not use to be (2026-08-28)
+
+This section used to end: *"`chrome-devtools-mcp@latest` is **not** version-pinned — it
+tracks Chrome, and a stale pin there is a browser that silently stops working. That is a
+recorded trade, not an oversight."* The trade was recorded, and then it was measured.
+
+On 2026-08-26 npm served **1.8.0** where the pins had been made at **1.6.0**. Twenty-five
+of the server's twenty-nine tools changed fingerprint, and **five of the seven in its
+`allow` list were refused**: `navigate_page`, `take_snapshot`, `take_screenshot`, `click`
+and `fill`. She could open a page and list pages and do nothing else, for two days. The
+failure the old note feared — *a browser that silently stops working* — is exactly what the
+floating version caused, and it caused it in the harder-to-notice direction: not a tool that
+errors when called, but a tool that quietly is not there, under a log line that says
+`rug-pull` about a version bump.
+
+The two mechanisms are simply incompatible. A fingerprint pin asks *"is this the same tool
+as yesterday?"*; `@latest` defines the tool as *whatever arrives today*. Keeping both means
+the only available remedy is to accept changes nobody can see, which trains the operator to
+accept blindly, which is the whole value of the control. So: **the version is pinned, and an
+upgrade is a deliberate act.** `G-MCP-TRUST` §9 fails if any spawned server's package
+specifier floats again.
+
+Upgrading is now cheap *and* reviewable, because npm keeps every resolved version it has
+ever fetched under `~/AppData/Local/npm-cache/_npx/`. Point a throwaway config at the old
+build and at the new one, list both through `bridge.list_bridged_tools`, and diff the
+`name + description + schema` the fingerprint actually covers. Done for 1.6.0 → 1.8.0, that
+answers in one screen what the digest pair never could: every one of her five refused tools
+gained a **required `pageId`** parameter (*"Targets a specific page by ID."*) and nothing
+else — a real upstream feature for multi-page targeting, no description gained instructions,
+no capability smuggled in. It is also the reason the upgrade is *work* rather than an
+acceptance: `required` means her calls fail without it.
+
+The residual risk is the one the old note named and it has not gone away — a pinned server
+version can fall behind the installed Chrome. What changed is which failure you get: a
+stale pin fails *loudly*, when a tool is called, at a moment you chose; a floating one fails
+*silently*, by removing tools from her hands on npm's schedule.
+
+#### One more thing the log was doing
+
+Pins are checked over the server's **whole** listing, and `allow`/`deny` narrows it
+afterwards — so on 2026-08-26 twenty-five rug-pull warnings were printed per listing, several
+listings per boot, for five findings that mattered. Refusal is unchanged (a changed tool is
+never offered either way), but the volume now follows `_offered()`: a tool she could have
+called is named loudly with its accept command, and the rest are summarised in one line
+that says they were not being offered anyway. A control that cries wolf five times per wolf
+is teaching its reader to scroll past it.
