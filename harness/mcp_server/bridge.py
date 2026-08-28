@@ -257,19 +257,98 @@ def _digest(t: Dict[str, Any]) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
 
-def load_pins() -> Dict[str, Dict[str, str]]:
+# ── A PIN IS A DIGEST *AND* THE TEXT IT WAS TAKEN OF (2026-08-28) ────────────────────
+# It used to be the digest alone: {"browser": {"click": "bf05027b40fda4e1"}}. So when a
+# fingerprint changed, the refusal said `bf05027b40fda4e1 -> 4324b9a732f6e183` and told the
+# operator to accept it "if the change is legitimate" — a judgement nothing in the system
+# could inform, because the thing that changed had never been kept.
+#
+# It cost two days of a dead browser and could only be answered from OUTSIDE: npm hoards
+# every version it has ever fetched under _npx/, so both builds were pointed at through
+# throwaway configs, listed through the real bridge, and diffed by hand. That is an
+# afternoon and a lucky cache, not a control.
+#
+# So a pin is now a record — digest, and the name/description/schema it was taken of — and
+# `mcp_pin.py --diff` prints what moved. THE DIGEST STILL DECIDES. The body is evidence
+# beside it and never authority: `pin_digest` is what `check_pins` compares, exactly as
+# before, and a record whose stored body disagreed with its own digest would be believed
+# on the digest. Old string pins keep working and say "pinned before bodies were kept"
+# rather than pretending to a diff they cannot show.
+def _pin_record(t: Dict[str, Any]) -> Dict[str, Any]:
+    """The record to store for a tool: what it is, and the fingerprint of that."""
+    return {"digest": _digest(t),
+            "name": t.get("name", ""),
+            "description": (t.get("description") or "").strip(),
+            "schema": t.get("schema") or {}}
+
+
+def pin_digest(entry: Any) -> str:
+    """The fingerprint out of a pin, whichever shape it was written in."""
+    if isinstance(entry, str):
+        return entry
+    if isinstance(entry, dict):
+        return str(entry.get("digest") or "")
+    return ""
+
+
+def pin_body(entry: Any) -> Optional[Dict[str, Any]]:
+    """What the tool SAID when it was pinned, or None for a pin written before bodies."""
+    if isinstance(entry, dict) and "description" in entry:
+        return {"name": entry.get("name", ""),
+                "description": entry.get("description") or "",
+                "schema": entry.get("schema") or {}}
+    return None
+
+
+def load_pins() -> Dict[str, Dict[str, Any]]:
     try:
         return json.load(open(_PIN_PATH, encoding="utf-8"))
     except Exception:
         return {}
 
 
-def save_pins(pins: Dict[str, Dict[str, str]]) -> None:
+def save_pins(pins: Dict[str, Dict[str, Any]]) -> None:
     os.makedirs(os.path.dirname(_PIN_PATH), exist_ok=True)
     tmp = _PIN_PATH + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(pins, f, indent=2, sort_keys=True)
     os.replace(tmp, _PIN_PATH)
+
+
+def pin_diff(entry: Any, live: Dict[str, Any]) -> Dict[str, Any]:
+    """What moved between what a tool SAID when it was pinned and what it says now.
+
+    Returns {"why": <one line>, "description": [diff lines], "schema": [diff lines]} —
+    empty lists when that part did not move. `why` is the honest headline, including the
+    one case where there is nothing to show: a pin written before bodies were kept can
+    report that the fingerprint changed and NOT what changed, and saying so is the point.
+    A refusal that names a judgement the operator cannot make is how a control gets
+    disarmed.
+    """
+    import difflib
+    body = pin_body(entry)
+    now = _pin_record(live)
+    if pin_digest(entry) == now["digest"]:
+        return {"why": "unchanged", "description": [], "schema": []}
+    if body is None:
+        return {"why": ("the fingerprint changed, and this pin was written before bodies "
+                        "were kept — there is nothing stored to compare against. "
+                        "Re-pin it with --accept once you have decided, and the NEXT "
+                        "change will be showable."),
+                "description": [], "schema": []}
+
+    def _d(a, b):
+        return [l for l in difflib.unified_diff(a, b, "pinned", "live", lineterm="", n=1)
+                if not l.startswith(("---", "+++"))]
+
+    desc = _d((body["description"] or "").splitlines() or [""],
+              (now["description"] or "").splitlines() or [""])
+    schema = _d(json.dumps(body["schema"], indent=1, sort_keys=True).splitlines(),
+                json.dumps(now["schema"], indent=1, sort_keys=True).splitlines())
+    what = [n for n, d in (("description", desc), ("schema", schema)) if d]
+    return {"why": ("%s changed" % " and ".join(what)) if what
+                   else "name changed, or a field the digest covers that this does not print",
+            "description": desc, "schema": schema}
 
 
 def _offered(server: str, tool: str) -> bool:
@@ -305,14 +384,24 @@ def check_pins(listed: List[Dict[str, Any]], *, learn: bool = True) -> List[Dict
     quiet_by_srv: Dict[str, List[str]] = {}
     for t in listed:
         srv, name = t.get("server", ""), t.get("name", "")
-        have = (pins.get(srv) or {}).get(name)
+        entry = (pins.get(srv) or {}).get(name)
+        have = pin_digest(entry) if entry is not None else None
         now = _digest(t)
         if have is None:
             if learn:
-                pins.setdefault(srv, {})[name] = now
+                pins.setdefault(srv, {})[name] = _pin_record(t)
                 dirty = True
             out.append(t)
         elif have == now:
+            # ── A MATCHING DIGEST PROVES THE BODY, so an old string pin can be upgraded
+            # in place without asking anyone anything. The text in front of us hashes to
+            # the fingerprint that was recorded, which is what "this is the same tool"
+            # MEANS — so storing it adds evidence and moves no trust. Nothing is adopted
+            # on a MISMATCH: that is the case the operator has to see, and inventing a
+            # body for it would be recording the rug-pull as if it had been approved.
+            if learn and pin_body(entry) is None:
+                pins.setdefault(srv, {})[name] = _pin_record(t)
+                dirty = True
             out.append(t)
         elif _offered(srv, name):
             print("[mcp_bridge] REFUSED '%s' from '%s': its description or schema changed "
