@@ -69,7 +69,7 @@ def current() -> str:
 
 
 def collapse_history(rows: list, current_text: str = "") -> tuple:
-    """One entry per stamped day, and the top one only once (2026-08-21, his report:
+    """One entry per stamped day, and the top one only once (2026-08-21, the operator's report:
     "Journal since forever has always duplicated each entry").
 
     Two duplications, one seam. (a) The panel rendered `current` as its own block
@@ -273,7 +273,7 @@ def compose_and_write(messages, ask=None) -> dict:
             convo = ((convo + "\n\n") if convo else "") + (
                 "Things you did on your own today:\n"
                 + "\n".join("- " + m[:200] for m in mine[:12]))
-        # ── AND WHAT SHE SET ASIDE (2026-08-27, his call) ─────────────────────────
+        # ── AND WHAT SHE SET ASIDE (2026-08-27, the operator's call) ─────────────────────────
         # A `secret_thought` is a thing she meant to keep and had not found the moment to
         # say. Material for this paragraph is exactly what it is FOR — otherwise the
         # keeping is a write-only drawer, and a drawer nobody opens is the same shape as
@@ -490,7 +490,7 @@ def weekly_chapter(ask=None) -> dict:
 def note_own(text: str, kind: str = "solo") -> dict:
     """Write one thing she did on her own time into her journal. Raw, not composed.
 
-    THE GAP THIS FILLS (2026-08-04, his ask). The nightly composer writes ONE paragraph a
+    THE GAP THIS FILLS (2026-08-04, the operator's ask). The nightly composer writes ONE paragraph a
     night, from the tail of the conversation — which means her account of a day is built
     entirely out of the parts he was present for. Everything she did while he was asleep
     existed only as a line in a chat log he had to scroll back through, and was gone from

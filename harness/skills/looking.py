@@ -74,7 +74,7 @@ def begin(kind: str, query: str, by: str = "her") -> dict:
     """A look has STARTED. Pulse and the taskbar read this.
 
     `by` is WHO is looking. Every tool call of hers defaults to "her"; the room's
-    manual search/research boxes pass "him". The distinction is his ask
+    manual search/research boxes pass "him". The distinction is the operator's ask
     (2026-08-21): one shared ledger both can read, but hers stay hers — her
     thoughts, her activities — and a chip says whose each row is."""
     row = {
@@ -122,7 +122,7 @@ def end(ok: bool, summary: str = "", sources: Optional[list] = None,
 
 
 def his_search(query: str, n: int = 6) -> dict:
-    """The room's manual search box (2026-08-21, his ask). Runs the SAME engine her
+    """The room's manual search box (2026-08-21, the operator's ask). Runs the SAME engine her
     web_search uses — picker, live knob, Wikipedia blend, all of it — but it is HIS
     look: the row is written `by: him`, and _NOW/_LAST are never touched, because
     the taskbar's "she is looking up…" chip reports HER activity and must not wear

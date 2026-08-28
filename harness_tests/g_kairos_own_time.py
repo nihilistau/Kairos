@@ -4,7 +4,7 @@
 WHAT THIS ANSWERS. `kairos.seed_on_boot` gated `_LAST`, and `_LAST` gates EVERY unprompted
 lane. So a bounce with the knob off silenced her OWN TIME along with her speaking first.
 
-HIS REPORT (2026-08-28): "she is supposed to wait. she does wait for spoke up. but she has
+REPORTED (2026-08-28): "she is supposed to wait. she does wait for spoke up. but she has
 been entering her time after the delay for the last week or so, which is fine behaviour but
 which did not happen." He bounced her and then slept without speaking, and nothing happened
 at all for five and a half hours — the first time the two behaviours had been separable by

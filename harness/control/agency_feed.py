@@ -1,6 +1,6 @@
 """HER OWN TIME, IN ONE PLACE — everything she did while he was away.
 
-HIS ASK, 2026-08-05: "lets do her own agency window with an icon for it, that I can look
+THE ASK, 2026-08-05: "lets do her own agency window with an icon for it, that I can look
 at, her actions, everything she does once I am away and she enters her time/agency mode
 gets shown in there."
 

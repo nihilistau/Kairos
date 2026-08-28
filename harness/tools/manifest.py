@@ -215,7 +215,7 @@ FACTS: Dict[str, ToolFacts] = {
                                note="when he fell asleep and when he was up, AS BOUNDS — a "
                                     "band for going under and a ceiling for waking, because "
                                     "the classifier lags both ways and he describes the "
-                                    "truth itself as fuzzy; bounded by his own words where "
+                                    "truth itself as fuzzy; bounded by the operator's own words where "
                                     "there are any, and abstains rather than invent a night"),
 
     "my_research": ToolFacts("web", "read",

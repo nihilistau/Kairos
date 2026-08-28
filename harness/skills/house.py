@@ -12,7 +12,7 @@ WHAT SHE IS NOT GIVEN, and each omission is deliberate:
     several hundred rows — the same rule house.py keeps for noticing.
   * No switches, ever, whatever the file says. `hands.ACTABLE_DOMAINS` is a closed set and
     it is the floor under the allowlist rather than another copy of it.
-  * No acting while he is away. On request only, on his call, enforced on the clock the
+  * No acting while he is away. On request only, on the operator's call, enforced on the clock the
     room veto already reads.
 """
 

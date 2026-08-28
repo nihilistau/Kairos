@@ -1166,7 +1166,7 @@ def stamp(row: dict, fact: str, speaker: str, src: str,
     #     LIVE       src='reflection'  'Sam is comfortable in open water'
     #
     # HER GUESS TOMBSTONED HIS TESTIMONY. He told her a true thing about himself; she inferred the
-    # opposite (models do this); the inference won; and his own words became a tombstone. Ask her
+    # opposite (models do this); the inference won; and the operator's own words became a tombstone. Ask her
     # now and the only live row says he is fine with open water.
     #
     # That is the identity bug in a new costume — "Kairos" ate "Sam" the same way. TWO CLAIMS,

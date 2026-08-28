@@ -11,7 +11,7 @@ WHAT THIS HOLDS, and the order is the order of how badly it is needed:
   §3 OBSERVED IS NOT INFERRED. `observed` is what the watch measured; `facts` is what was
      concluded. Collapsing them is how "he is stressed" ends up wearing a measurement's
      clothes, and verdict.may_supersede exists because that matters.
-  §4 THE TAIL SHOWS WHEN IT MOVES (2026-08-26, his ask: "she can see my heart pacing").
+  §4 THE TAIL SHOWS WHEN IT MOVES (2026-08-26, the operator's ask: "she can see my heart pacing").
      Three real readings, so the noticing is HERS. Hidden when flat, because "58, 58, 58"
      spends her budget to say nothing and teaches her the number is furniture.
   §5 ONE SEAM FOR THE ROOM AND FOR HER. /v1/telemetry/now renders what body.read() decides
@@ -242,12 +242,33 @@ check("...and no body note is ever concatenated onto his message",
       not [ln for ln in _app_src.splitlines()
            if "_tel_b.present()" in ln and "content" in ln and "role" not in ln],
       "riding on his words is what made the wardrobe note read as an order")
-check("...and it is IDEMPOTENT — last turn's row is removed before this turn's",
-      'msgs[:] = [m for m in msgs if not m.get("_tel")]' in _app_src,
-      "stacked notes diverge the persist-KV cache at the insert point and read as "
-      "standing orders")
-check("...and the removal runs BEFORE the insert",
-      _app_src.index('if not m.get("_tel")') < _app_src.index('"role": "system", "_tel": 1'))
+# ── THIS CHECK USED TO ASSERT THE BUG (2026-08-28) ───────────────────────────────────
+# It required `msgs[:] = [m for m in msgs if not m.get("_tel")]` — strip last turn's note,
+# insert a fresh one — on the reasoning that "stacked notes diverge the persist-KV cache
+# at the insert point". That is exactly backwards, and it cost three minutes a turn on his
+# machine: the commit was built WITH the note, so REMOVING it is what makes this turn's
+# prompt differ from the commit. Twelve tokens of divergence, a refused rewind, and a
+# 9,000-token re-prefill at 13 ms/tok.
+#
+#     PERSIST-KV: rewind(12) refused — full-prefill floor
+#     TURN-PHASE: prefill 8875 tok in 114781 ms
+#
+# The note's TEXT was not even changing; five reads in a row said the same thing. Its
+# POSITION did, because the list grows. So the invariant is inverted: an unchanged note
+# stays exactly where it is, and nothing is ever removed.
+#
+# COMMENTS ARE STRIPPED BEFORE THIS IS CHECKED. The old string still appears above, in the
+# prose explaining why it is gone — and a source check that cannot tell code from a comment
+# is how the first version of this passed against the fix.
+_code = chr(10).join(ln.split("#", 1)[0] for ln in _app_src.splitlines())
+check("last turn's note is NOT removed — removing it is what diverges the cache",
+      'msgs[:] = [m for m in msgs if not m.get("_tel")]' not in _code,
+      "the committed KV was built with it; deleting it invalidates from that point on")
+check("...and an unchanged note is not said twice",
+      "_said in _prev_tel" in _code,
+      "re-inserting the same text at a new index costs the whole prefix")
+check("...and the previous note is read before the new one is built",
+      _code.index("_prev_tel = next(") < _code.index('"role": "system", "_tel": 1'))
 check("...and it never goes in the CACHED prefix",
       "_tel" not in open(os.path.join(ROOT, "harness", "agent.py"), encoding="utf-8").read(),
       "a heart rate at KV token 0 is stale within the minute or re-prefills every turn")

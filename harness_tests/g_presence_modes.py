@@ -141,7 +141,7 @@ check("a reading nudge carries the passage and the title, and says read it in yo
       "It was a dark and stormy night." in rd and "Tales" in rd and "own voice" in rd)
 check("sampling per mode: company cooler, lucid warmer",
       P.SAMPLING["company"]["temperature"] < P.SAMPLING["narration"]["temperature"] < P.SAMPLING["lucid"]["temperature"])
-check("length: narration runs long, a dream at least double it (his ask)",
+check("length: narration runs long, a dream at least double it (the operator's ask)",
       P.SAMPLING["narration"]["max_tokens"] >= 300 and P.SAMPLING["lucid"]["max_tokens"] >= 2 * P.SAMPLING["narration"]["max_tokens"],
       (P.SAMPLING["narration"]["max_tokens"], P.SAMPLING["lucid"]["max_tokens"]))
 check("lucid is whispered, company soft, narration bare",

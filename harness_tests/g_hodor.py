@@ -63,7 +63,7 @@ def arm(*assistant_replies, user_between=True):
 print("\n1. the long-reply law is unchanged")
 c = arm("I have been thinking about the tide charts all morning")
 # ── THE ORDER IS 8, AND IT IS A MEASUREMENT (2026-08-27) ─────────────────────────────
-# It was 4, and 4 collides with ordinary English. His report: `won'll` and `aren-re` in
+# It was 4, and 4 collides with ordinary English. The operator's report: `won'll` and `aren-re` in
 # one reply. Her previous reply ended "...when you aren't drifting off" — and in the very
 # next reply `didn't`, `shouldn't` and `I'll` were fine while `aren't` came out `aren-re`.
 # The ban masks TOKEN n-grams; `aren't` is `aren` + `'t`, and a masked `'t` takes the

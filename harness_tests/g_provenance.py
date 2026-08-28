@@ -329,7 +329,7 @@ _w = _app._memory_why_json(_c["name"])
 check("/v1/memory/why answers with the row, its supports and its dependents",
       _w.get("ok") and _w["row"]["name"] == _c["name"] and len(_w["supports"]) == 2
       and _w["missing_supports"] == ["a_name_that_never_existed"], _w.get("error"))
-check("...and the audit lane DOES show the retired support (it is his call, not hers)",
+check("...and the audit lane DOES show the retired support (it is the operator's call, not hers)",
       any(r["lifecycle"] and r["name"] == _s1 for r in _w["supports"]))
 check("...and an unknown name is a clean 'no such row', not a stack trace",
       _app._memory_why_json("nope")["ok"] is False)

@@ -44,7 +44,7 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 LOG = os.environ.get("SP_AMBIENT_LOG",
                      os.path.join(_ROOT, "var", "senses", "ambient.jsonl"))
 # TWO DEFAULTS, ON PURPOSE — not drift. serve.py's door default is PERSONAL (it
-# names Sam, his room, her voice — 2026-08-21, his ask for "a shared, more
+# names Sam, his room, her voice — 2026-08-21, the operator's ask for "a shared, more
 # personalized experience"), because the door builds HIS stack. This fallback is
 # the env-less one (gates, bare imports) and assumes nothing about an operator.
 PROMPT = os.environ.get(
@@ -118,7 +118,7 @@ _BOOT_AT = time.monotonic()     # when THIS process opened its eyes
 
 def _on_boot_ok() -> bool:
     """May an overdue capture fire straight after a start/bounce? Default NO
-    (2026-08-21, his call, same shape as the kairos act-first-at-bounce knobs):
+    (2026-08-21, the operator's call, same shape as the kairos act-first-at-bounce knobs):
     a bounce empties the kairos activity state, so the recency signal cannot
     testify and the guard would fail open — the one capture at 04:01 that
     prompted this. Off means the first capture waits a full quiet window from

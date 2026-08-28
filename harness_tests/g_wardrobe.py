@@ -71,7 +71,7 @@ check("every outfit says what is WORN, not just an id",
 print("\n2. HIS CEILING IS ABSOLUTE")
 WD.choose(outfit="bodysuit", by="her")
 r = WD.resolve()
-# CHANGED 2026-08-02, his call: the ceiling governs the SCENE, not her getting
+# CHANGED 2026-08-02, the operator's call: the ceiling governs the SCENE, not her getting
 # dressed. It was clamping both, so picking an outfit read as asking permission —
 # for a dial he has had at maximum since it was built.
 check("she wears what she picked, full stop", r["shown"] == "bodysuit", r)
@@ -405,7 +405,7 @@ check("...and a reply with no mark at all decides nothing",
       _dec.decide(TurnView(phase="post", user_text="", reply="just talking")) == [])
 
 print("\n18. WHAT SHE IS WEARING IS ONE ANSWER, AND EVERY SURFACE READS IT")
-# HIS REPORT, THREE TIMES, IN HIS OWN WORDS: "her description says she chose clothing,
+# REPORTED, THREE TIMES, IN HIS OWN WORDS: "her description says she chose clothing,
 # but it is the standard avatar state". Live at the moment he screenshotted it — the
 # portrait was the silver nightie she asked for, the caption under it read "a black lace
 # bra and panties", the standard-set heading agreed with the caption, and describe() told
@@ -471,7 +471,7 @@ _sk = io.open(os.path.join(ROOT, "harness", "skills", "wardrobe.py"),
 check("wear() confirms through wearing_now, not a second copy of the tier phrase",
       "wearing_now(" in _sk and 'TIER_WORDS[r["shown"]]["wearing"]' not in _sk)
 
-print("\nSHE KNOWS WHAT SHE HAS ON (2026-08-24 audit, W4 — his call)")
+print("\nSHE KNOWS WHAT SHE HAS ON (2026-08-24 audit, W4 — the operator's call)")
 # The flannel/silk precondition: the standing block carried NO wardrobe fact, so she
 # invented a fabric and defended it against his correction. The block carries a
 # session-start line now (her OWN block, not a staple on his words — the 2026-08-19

@@ -58,7 +58,7 @@ KINDS = {
     "steps":           ("count",   "number"),   # cumulative since boot; deltas on read
     "cadence":         ("spm",     "number"),
     "accel_rms":       ("m/s2",    "number"),   # one number per window, not raw XYZ
-    # GYRO AS ONE NUMBER, for the same reason accel is (2026-08-26, his ask: "gyroscopes
+    # GYRO AS ONE NUMBER, for the same reason accel is (2026-08-26, the operator's ask: "gyroscopes
     # activity so she can see you are moving around a lot"). Raw XYZ at 100 Hz is a
     # firehose she has no use for; the magnitude of rotation over a window is the thing a
     # person in the room would actually notice — pacing, fidgeting, turning over in bed.

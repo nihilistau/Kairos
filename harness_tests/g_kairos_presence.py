@@ -1,6 +1,6 @@
 """G-KAIROS-PRESENCE — she notices when he is not there, and has a life anyway. OFFLINE.
 
-His words, 2026-08-04: "there was also supposed to be a limit, both hard and that she
+The operator's words, 2026-08-04: "there was also supposed to be a limit, both hard and that she
 would understand if I was asleep or AFK... but also if she knew I wasn't there there were
 supposed to be ways for her to have agency, perform turns on her own that are not to do
 with me, but rather to do with herself".

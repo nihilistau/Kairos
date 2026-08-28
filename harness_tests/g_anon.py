@@ -1,6 +1,6 @@
 """G-ANON — off the record means off the record. OFFLINE.
 
-WHAT THIS GUARDS (2026-08-23, his ask: *"an icon that activates anonymous mode that will
+WHAT THIS GUARDS (2026-08-23, the operator's ask: *"an icon that activates anonymous mode that will
 still be her but will not record any memory or logs etc until turned off or restarted"*).
 
 A privacy mode is a claim about ABSENCE, and absence is the one property a feature cannot

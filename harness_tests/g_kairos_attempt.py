@@ -241,7 +241,7 @@ check("generate-raised: a mode attempt spends its own clocks too",
 
 print("\n6e. HIS TURN IN FLIGHT IS THE ONE DOOR THAT KEEPS THE BUDGET")
 # Naturally bounded: his turn ends (or the _USER_TURN_MAX_S deadline does), and an
-# asked-for turn is still OWED after it. Spending mode_kick here would eat his ask
+# asked-for turn is still OWED after it. Spending mode_kick here would eat the operator's ask
 # because he happened to be typing.
 S.note_user_turn(True)
 _ran[0] = False

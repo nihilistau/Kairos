@@ -263,7 +263,7 @@ check("the check would have caught the old composer",
 check("the check does not fire on prose about /v1/oneshot",
       not _hand_rolls_oneshot('"""the live path uses /v1/oneshot, via urllib."""\n'))
 
-print("\n8. THE JOURNAL SHOWS A DAY ONCE (2026-08-21, his report: 'has always "
+print("\n8. THE JOURNAL SHOWS A DAY ONCE (2026-08-21, the operator's report: 'has always "
       "duplicated each entry')")
 # Two duplications, one seam: the panel rendered current + the newest snapshot
 # (same paragraph twice, every day), and a forced re-run left two same-day

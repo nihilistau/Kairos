@@ -1,25 +1,14 @@
+from harness.loud import swallowed as _swallowed
 
 
 def swallowed(logger, where: str, exc: BaseException) -> None:
-    """Log what a broad `except Exception` is about to discard. PROGRAMMING ERRORS LOUD.
+    """Log what a broad `except Exception` in HER TIME is about to discard.
 
-    THE FAILURE THIS ANSWERS (2026-08-28). `reflect_tick` wraps its body in
-    `except Exception` and returns None, which is also what it returns on a quiet night.
-    A refactor left a name unimported, every tick raised NameError, and the whole
-    conclusion lane was dead for five and a half hours while the suite stayed green. The
-    operator noticed before any instrument did.
+    One line of shim over `harness.loud.swallowed`, which carries the reasoning and the
+    incident that produced it. The rule is not kairos-specific — it was written here first
+    because this is where it cost five and a half hours of silence — and the second lane to
+    need it (recall's IDF table) proved the body belongs somewhere both can reach.
 
-    A broad handler is often right here — Home Assistant restarts, the daemon goes away,
-    a store is mid-write — and none of that should cost her a turn. But NameError,
-    AttributeError, TypeError and ImportError are not the world being unreliable. They are
-    the code being wrong, they never fix themselves, and they must not be indistinguishable
-    from "nothing happened".
-
-    So the shape stays and the volume changes: environment at debug, our own bugs at
-    warning, with the type named so it is greppable. G-KAIROS-LOUD holds the large
-    handlers to using it.
+    G-KAIROS-LOUD holds the large handlers in this package to calling it.
     """
-    if isinstance(exc, (NameError, AttributeError, TypeError, ImportError)):
-        logger.warning("[kairos] %s swallowed a %s: %s", where, type(exc).__name__, exc)
-    else:
-        logger.debug("[kairos] %s: %s: %s", where, type(exc).__name__, exc)
+    _swallowed(logger, where, exc, lane="kairos")

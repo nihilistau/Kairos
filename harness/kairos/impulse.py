@@ -159,7 +159,7 @@ class KairosConfig:
     away_after: int = 2                  # unanswered speak-ups before she concludes he is out
     # AND EACH UNANSWERED ONE BUYS MORE SILENCE. The threshold multiplies rather than
     # repeating, so the sequence is 4 min, 8, 12 — not four minutes forever. This is the
-    # "increase the timeout" half of his ask, and it is what stops the machine-gunning he
+    # "increase the timeout" half of the operator's ask, and it is what stops the machine-gunning he
     # actually saw: 18:56, 18:59, 19:07, three in eleven minutes.
     backoff_mult: float = 1.0            # extra checkin_idle_s per unanswered speak-up
     quiet_after_him_s: float = 0.0       # no discretionary word until HE has been quiet this long (0 = off)
@@ -837,7 +837,7 @@ def solo_did_the_thing(n: int, called: "list|tuple|set",
                        marks: "frozenset|set|tuple" = ()) -> tuple:
     """LAW for her own time, beside `solo_worth_saying`: did she actually do it?
 
-    `solo_worth_saying` asks whether the turn is HERS — not performed at him. This asks
+    `solo_worth_saying` asks whether the turn is HERS — not performed at him. Tthe operator's asks
     whether it HAPPENED. Two different questions, and the second has never been asked.
 
     `marks` is which mark families the reply carried (interceptor.marks_present). It is a

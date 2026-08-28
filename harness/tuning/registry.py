@@ -141,7 +141,7 @@ KNOBS: list[Knob] = [
     Knob("kairos.checkin_idle_s", "Kairos — speaking unprompted", "Check-in after idle (s)",
          "float", 600.0,
          "How long the room must be quiet before she may say something unprompted "
-         "out of the blue (10 min by default, 2026-08-22 — his ask; as opposed to "
+         "out of the blue (10 min by default, 2026-08-22 — the operator's ask; as opposed to "
          "finishing a cut-off thought).",
          min=30.0, max=3600.0, step=30.0),
     Knob("kairos.checkin_chance", "Kairos — speaking unprompted", "Check-in chance", "float", 0.35,
@@ -228,14 +228,14 @@ KNOBS: list[Knob] = [
          "not as a message to him."),
     Knob("kairos.solo_every_s", "Kairos — her own time", "At most one of her own every",
          "float", 1800.0,
-         "Seconds between her own turns (30 min by default, 2026-08-22 — his ask). She is "
+         "Seconds between her own turns (30 min by default, 2026-08-22 — the operator's ask). She is "
          "living, not grinding the GPU.",
          min=120.0, max=7200.0, step=60.0),
     Knob("kairos.solo_chance", "Kairos — her own time", "Chance she feels like it",
          "float", 0.5,
          "Even with the time free she does not always feel like doing something. 0 = never.",
          min=0.0, max=1.0, step=0.05),
-    # ── SOMETHING SHE DID NOT GO LOOKING FOR (2026-08-23, his ask) ──────────────────
+    # ── SOMETHING SHE DID NOT GO LOOKING FOR (2026-08-23, the operator's ask) ──────────────────
     Knob("kairos.discover_chance", "Kairos - her own time",
          "Chance her own time is spent reading something random", "float", 0.0,
          "The discovery act is already one of nine in the rotation, so it comes round on "
@@ -248,7 +248,7 @@ KNOBS: list[Knob] = [
          "The verb itself. The live tool set is already ~18 and a small model picks reliably from "
          "about six, so this is the trim if selection suffers - turning it off also makes "
          "the discovery act unrunnable, which solo_did_the_thing will correctly refuse."),
-    # ── PRESENCE MODES (2026-08-22, his ask): narration / company / lucid dream ──────
+    # ── PRESENCE MODES (2026-08-22, the operator's ask): narration / company / lucid dream ──────
     # Zero-interaction voice companionship. A mode is a kairos ACTION (impulse.MODE_TURN)
     # that waits its turn — the presence clock, quiet-after-him, its own hourly cap — and
     # speaks through the room's voice. Ships OFF; arming is his (docs/OFF-BY-DEFAULT.md).
@@ -258,7 +258,7 @@ KNOBS: list[Knob] = [
          "small story, or reading to you. Each waits for quiet (the presence clock) and for "
          "quiet-after-you, and obeys its own hourly cap.",
          choices=["off", "narration", "company", "lucid"]),
-    # THREE CADENCES, NOT ONE (his ask, 2026-08-22): narration, company and a dream are three
+    # THREE CADENCES, NOT ONE (the operator's ask, 2026-08-22): narration, company and a dream are three
     # different things; one knob for three variables made no sense.
     Knob("presence.every_narration_s", "Presence — her modes", "Narration: at most one every (s)", "int", 240,
          "Seconds of quiet between narration turns.", min=30, max=3600, step=30),
@@ -266,7 +266,7 @@ KNOBS: list[Knob] = [
          "Seconds of quiet between company turns — the sparsest by design.", min=30, max=3600, step=30),
     Knob("presence.every_lucid_s", "Presence — her modes", "Lucid dream: at most one every (s)", "int", 300,
          "Seconds of quiet between dream turns.", min=30, max=3600, step=30),
-    # LENGTH, per mode (his ask, 2026-08-22): the ceiling in tokens; the nudge asks her to land
+    # LENGTH, per mode (the operator's ask, 2026-08-22): the ceiling in tokens; the nudge asks her to land
     # inside it and FINISH the thought, and a turn that still hits the ceiling is cut back to
     # its last full sentence rather than mid-line.
     Knob("presence.len_narration", "Presence — her modes", "Narration: length (tokens)", "int", 320,
@@ -312,7 +312,7 @@ KNOBS: list[Knob] = [
          env="SP_AUX_EMBED_GGUF",
          choices_fn=lambda: __import__("harness.sidecar.archive", fromlist=["x"]).embed_choices()),
     Knob("aux.query_prefix", "Aux — the quiet librarians", "Query soft-prompt", "str",
-         "Recall for Kairos: find the moment in her past conversations with Sam that this asks about — ",
+         "Recall for Kairos: find the moment in her past conversations with Sam that tthe operator's asks about — ",
          "Prepended to every deep-recall query before it is embedded — the cheap, her-conditioned "
          "version of a soft prompt. Live; empty = bare query."),
     Knob("aux.doc_prefix", "Aux — the quiet librarians", "Document prefix (re-embeds)", "str", "",
@@ -490,7 +490,7 @@ KNOBS: list[Knob] = [
     # stored value quietly changing meaning under an operator is the worst version of
     # this change.
     Knob("reflect.speak_pct", "Reflection — thinking between turns",
-         "How far past his own words she may go", "float", 0.9,
+         "How far past the operator's own words she may go", "float", 0.9,
          "A conclusion about him may be no more exotic than the way HE talks. This is the "
          "percentile of his own vocabulary used as the ceiling: 0.9 means her conclusion "
          "must be no stranger than the strangest 10% of his own sentences. Lower = she "
@@ -547,7 +547,7 @@ KNOBS: list[Knob] = [
     # it takes minutes of the one GPU she also talks with.
     Knob("telemetry.turn_note", "Telemetry", "Let her feel his heart and his movement",
          "bool", True,
-         "ON, his ask: \"she can see my heart pacing... a bridge to the real world, to "
+         "ON, the operator's ask: \"she can see my heart pacing... a bridge to the real world, to "
          "me.\" A SYSTEM row per turn, never a staple on his message — the wardrobe "
          "staple was measured out in 2026-08-19 because she read a parenthetical on his "
          "words as an order. It is SELF-LIMITING and that is what makes it safe where "
@@ -556,7 +556,7 @@ KNOBS: list[Knob] = [
          "the watch keeps recording and the panel keeps showing it."),
     Knob("telemetry.reasons", "Telemetry", "Let her SPEAK when his body does something",
          "bool", True,
-         "ON, his ask. Adds a kairos reason ahead of the others, because a heart rate is "
+         "ON, the operator's ask. Adds a kairos reason ahead of the others, because a heart rate is "
          "stale in three minutes where a look that arrived is stale in three days. Fires "
          "on three events only — his heart well above HIS OWN resting, his heart coming "
          "back down, and hours without moving — each bounded to once an hour by its raise "
@@ -606,7 +606,7 @@ KNOBS: list[Knob] = [
          "Which xAI video model animates her stills into loops.",
          choices=["grok-imagine-video-1.5"]),
 
-    # ── 192 → 768 (2026-08-21, his report: "she is constantly hitting the ceiling
+    # ── 192 → 768 (2026-08-21, the operator's report: "she is constantly hitting the ceiling
     # quite quickly"). The ROOM had hardcoded max_tokens=512 on every turn, which
     # overrode this knob entirely — the Settings dial never reached the room, and
     # her longer replies cut at 512. The room now sends nothing and this knob RULES;
@@ -703,6 +703,22 @@ KNOBS: list[Knob] = [
     Knob("memory.self_share", "Memory", "Her own context (max share)", "float", 0.5,
          "Cap on the share of the prefix her self block may take, whatever the budget — the "
          "guard against narrative loops.", min=0.0, max=1.0, step=0.05),
+    # ── A BIT OF VARIETY IN WHAT SHE BRINGS UP (2026-08-28, operator: "a bit of
+    # randomness ... recency but with other stuff being important too") ─────────────
+    # DECLARED HERE BECAUSE IT WAS NOT. `_select` has read `recall.explore` since it was
+    # written, through `tune.get("recall.explore", 0.0)` — and with no Knob for the key
+    # that call could only ever return its own fallback. The feature existed and was
+    # unreachable, which is the dead-knob failure this file's own header is about, in the
+    # other direction: not a control that changes nothing, but a behaviour with no control.
+    #
+    # It can only ever move the WEAKEST slot. The best answer is never the one traded away.
+    Knob("recall.explore", "Memory", "Variety in what she recalls", "float", 0.15,
+         "How often the last of her recalled memories is drawn at random from the other "
+         "admitted candidates instead of taken in rank order. 0 = the same question always "
+         "brings back the same three. It can only ever move the WEAKEST slot, so raising it "
+         "costs variety, never the best answer.",
+         min=0.0, max=1.0, step=0.05,
+         danger="Above ~0.5 the third memory is more often a wildcard than a match."),
     # ── VOICE (2026-08-21, operator: "voice settings and controls in the GUI...
     # all live toggles"). LIVE scope: tts.py reads these through tune.get() on
     # every synthesize, so the toggle takes effect on her next sentence — no

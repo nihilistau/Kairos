@@ -94,7 +94,7 @@ check("the lower bound IS the moment he last spoke",
 check("...and it is EARLIER than the phone's last awake reading, so the band is wider",
       v["asleep_after"] < v["phone_awake_until"],
       "phone %.0f vs said %.0f" % (v["phone_awake_until"], v["asleep_after"]))
-check("...and says what it rests on", v["bounded_by"] == "his own words", v["bounded_by"])
+check("...and says what it rests on", v["bounded_by"] == "the operator's own words", v["bounded_by"])
 # THE POINT OF THE BAND IS THAT THE ANSWER IS INSIDE IT. He went under somewhere after his
 # last word and before the phone was sure; both ends must admit that.
 check("the band CONTAINS the interval he could have fallen asleep in",
@@ -171,7 +171,7 @@ check("...and answers in bounds, not a minute",
       got.get("asleep_between"))
 check("...on his own clock, not the store's UTC",
       all(x and ":" in x for x in got["asleep_between"]), got.get("asleep_between"))
-check("...and names what bounded it", got.get("bounded_by") == "his own words",
+check("...and names what bounded it", got.get("bounded_by") == "the operator's own words",
       got.get("bounded_by"))
 check("...and the ceiling rides along", bool(got.get("up_by")), got.get("up_by"))
 check("the tool is offered to her", any(

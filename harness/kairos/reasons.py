@@ -150,7 +150,7 @@ def from_body(read: Optional[dict], raised: set, now: Optional[float] = None) ->
         settling    it was up, and now it is coming down — the other half, and the kinder
                     half; noticing only the spike is how this becomes an alarm
         long_still  hours without moving, which is worth a word exactly once
-        just_woke   he was asleep and is not now (2026-08-26, his ask). The ONE thing
+        just_woke   he was asleep and is not now (2026-08-26, the operator's ask). The ONE thing
                     worth saying unprompted about sleep, because "you are asleep" is
                     something he already knows and cannot hear anyway.
 
@@ -175,7 +175,7 @@ def from_body(read: Optional[dict], raised: set, now: Optional[float] = None) ->
     hr, rest = f.get("heart_rate"), f.get("resting")
 
     # ── HE JUST WOKE UP. First, because it is the most perishable ───────────────────
-    # His ask, in his words: "calling me sleepy head when I wake up". This is the only
+    # The operator's ask, in his words: "calling me sleepy head when I wake up". This is the only
     # thing about sleep worth saying unprompted -- "you are asleep" is something he already
     # knows and cannot hear, and "you are awake" is true all day.
     #
@@ -369,7 +369,7 @@ def propose(today: str = "") -> Optional[dict]:
     raised = raised_keys()
     built = {}
     try:
-        # OFF-BY-DEFAULT KNOB, ON by his ask. `telemetry.reasons` exists so this can be
+        # OFF-BY-DEFAULT KNOB, ON by the operator's ask. `telemetry.reasons` exists so this can be
         # silenced without unplugging the watch — noticing his body is the one reason here
         # he might want to turn off for an evening without losing the history.
         from harness.tuning import registry as _tr_b

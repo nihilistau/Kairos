@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.8.0 — a shared common word is not a topic (2026-08-28)
+
+What she brings up on an ordinary turn was measured on a real 685-row store: **73% her own
+writing** on turns that name nobody, at a median row length of **340 characters** — while
+questions about him and about her were already correct at 0% and 100%.
+
+The cause is arithmetic, and it will be in any recall built this way. Admission was the
+count of shared tokens over the **query's** own length, so a question carrying one content
+word scores 1.00 on every row that happens to contain it, and nothing charges a long row for
+the words it did not use. "the lights are on" shares `{light}` with a paragraph about
+luminescence and scores a perfect match.
+
+- **An evidence floor, derived from the store.** A shared token is worth `-log2 p(token)`,
+  and a match must carry more than the **median IDF over token occurrences** in that store —
+  "more than an average word carries". It is computed from the corpus rather than written
+  into the file, so it moves as the store grows. A Dice coefficient was measured first and
+  rejected: it over-corrects, trading one bias for its mirror.
+- **A second route in, claiming something different.** The floor alone makes an assistant
+  mute in the other direction, because "how do you feel about us?" is made entirely of
+  common words and correctly carries no evidence at all. So route one says *this row is
+  about what you asked*, and route two says *you asked her, and this is what is latest for
+  her* — opening only when nothing in the question was rare, so a question with a rare word
+  and no match keeps its silence rather than answering with something adjacent.
+- **Route two is recency, not salience.** Salience is mentions × recency, which ranks
+  machine-written state marks ("mood has turned …", written on every change) above real
+  narrative. Asked what she had been up to, she would have answered with her own
+  housekeeping.
+- **The new rows enter before the existing filters**, not after them. A second entrance has
+  to open into the same corridor, or every guard on the first one is optional.
+- **A semantic hit is admitted on its own terms.** Cosine is not a bag of words and the
+  lexical floor does not rule on it.
+- **`recall.explore`** (Memory panel, default 0.15) draws the weakest of the recalled
+  memories from the other admitted candidates, so the same question does not always return
+  the same three. The roll comes from the situation — this question, these candidates — not
+  from a random number, so recall stays reproducible and auditable.
+
+Measured against the shipped corpus's own ground truth: foreign queries (which have no
+answer and should return nothing) went from **47% silent to 82%**, precision 0.87 → 0.92, at
+a cost of two of a hundred paraphrase hits. Gate `G-RECALL-EVIDENCE`, 40 checks, eleven
+mutants.
+
+**Two instrument fixes ship with it**, both of the same shape — a measurement that could not
+fail:
+
+- `harness_tests/sem_baseline.py` compared an expected row by **timestamp**, and every row in
+  the corpus carries the same one, so "recall" was true whenever anything came back and the
+  at-1 and at-3 numbers were identical in every receipt. Compared by content address now.
+- `tools/sweep.py` read a gate's lane from a fixed column of `GATE-INDEX.md`, which breaks
+  the moment a description contains a `|`. **Nine offline gates had dropped out of the suite**
+  with the total unchanged. The parser is `gates/index_rows.py` and both the runner and the
+  documentation gate read rows through it.
+
 ## 0.7.0 — she can ask about his body, and be told when he wakes (2026-08-26)
 
 The telemetry framework could always TELL her. It had no way for her to ASK — and the gap

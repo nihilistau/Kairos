@@ -125,7 +125,7 @@ def latest(kind: str, rows: Optional[List[dict]] = None,
     return best
 
 
-# ── THE TAIL (2026-08-26, his ask) ────────────────────────────────────────────────────
+# ── THE TAIL (2026-08-26, the operator's ask) ────────────────────────────────────────────────────
 # "make heart rate something she can see not just average. maybe a tail or a reading of
 # the last three entries... she can see my heart pacing etc... a bridge to the real world,
 # to me."
@@ -349,7 +349,7 @@ def sleep_interval(rows: List[dict], now: float,
     # Absence of data is not evidence of waking, which is the same rule this whole area
     # already runs on one level up ("absence is only information if you can prove you were
     # looking"). So when the stream stops right after the run, the classifier's edge is not
-    # an observation of anything and only his own words can bound it. If he has not spoken
+    # an observation of anything and only the operator's own words can bound it. If he has not spoken
     # either, the answer is that there is no answer — which is a THIRD state, distinct from
     # "still asleep", and the caller has to be able to tell them apart.
     nxt = next((t for (t, _v) in xs if t > last), None)
@@ -378,7 +378,7 @@ def sleep_interval(rows: List[dict], now: float,
         "phone_awake_from": lows_after[0] if lows_after else None,
         "still_asleep": (not blind) and (not said_after) and (now - last) < 3600,
         "hours": round((last - first) / 3600.0, 1),
-        "bounded_by": ("his own words" if (said or said_after) else "the phone alone"),
+        "bounded_by": ("the operator's own words" if (said or said_after) else "the phone alone"),
         "samples": len(run),
     }
 
@@ -589,7 +589,7 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
                 facts["crude"] = True
                 why.append("nothing measured his sleep, so this is our own reading at "
                            "%d%% from: %s" % (int(c), "; ".join(terms) or "very little"))
-        # ── HE JUST WOKE UP (2026-08-26, his ask: "calling me sleepy head when I wake") ──
+        # ── HE JUST WOKE UP (2026-08-26, the operator's ask: "calling me sleepy head when I wake") ──
         # A TRANSITION, not a state, and the difference is the whole point: "he is awake"
         # is true all day and worth saying never; "he was asleep twenty minutes ago and is
         # not now" is worth saying once, and only for a little while.
@@ -634,7 +634,7 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
     #
     # So the room outranks the phone, and it is not a tie-break: a turn in the room is
     # OBSERVED and a classifier is INFERRED, which is this store's oldest rule arriving
-    # at the one seam that had not heard it. His words for the same thing: "50/50 would
+    # at the one seam that had not heard it. The operator's words for the same thing: "50/50 would
     # lean towards awake."
     #
     # NOT A GUESS WHEN IT DOES NOT KNOW. No session, no scheduler, a fresh boot — the
@@ -672,7 +672,7 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
         facts["hr_swing"] = round(max(vals) - min(vals), 1)
 
     # ── HOW MUCH HE IS MOVING, not just whether ─────────────────────────────────────
-    # his ask: "gyroscopes activity so she can see you are moving around a lot". One
+    # the operator's ask: "gyroscopes activity so she can see you are moving around a lot". One
     # number per window; the watch does the reducing, she gets the feeling.
     # HIS WRIST, not his phone. gyro_rms from a phone is the phone being picked up, put in
     # a pocket, or waved at a cat -- and it arrives under the same kind name. Caught in

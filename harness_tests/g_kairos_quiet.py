@@ -12,7 +12,7 @@ bounce/restart like before. make them knobs defaulted to off."):
   2. kairos.seed_on_boot — seed() is the mechanism that lets her open the
      conversation after a restart; the knob makes it opt-in.
 
-Both DEFAULT OFF: shipping defaults are the polite direction, arming is his call
+Both DEFAULT OFF: shipping defaults are the polite direction, arming is the operator's call
 (the room's tuning panel, no restart needed — the scheduler reads tune per fire).
 
 WHERE THE GATE LIVES, AND WHAT IT COVERS NOW (2026-08-23). a1ecf2a moved the decision

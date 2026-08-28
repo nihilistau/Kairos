@@ -108,6 +108,24 @@ rowfiles = [m.group(1) for l in idx.splitlines() if l.startswith("| G-") or l.st
             for m in [re.search(r"`harness_tests/([gh]_[a-z0-9_]+\.py)`", l)] if m]
 dead = sorted({f for f in rowfiles if not os.path.exists(os.path.join(ROOT, "harness_tests", f))})
 check("every GATE-INDEX row's file exists", not dead, dead[:8])
+# ── AND EVERY ROW PARSES, WHICH IS NOT THE SAME CLAIM (2026-08-28) ────────────────────
+# The two checks above ask whether a gate is DOCUMENTED. The sweep asks something else of
+# the same rows — which lane is this gate in — and reads it out of a fixed cell. A pipe in
+# the DESCRIPTION shifts every later cell along, so the lane comes out as a fragment of the
+# sentence before it and the row is quietly not OFFLINE any more. Ten rows were in that
+# state and NINE OFFLINE GATES had dropped out of `tools/sweep.py` — g_narrative,
+# g_sight_backends, g_control_surface, g_persona_layers, g_backend_seam, g_cfg_derive,
+# g_reflection_loop, g_wardrobe, g_marks_leak — while this gate reported the index green,
+# because "has a row" was all it ever asked. Write prose pipes as \\| .
+sys.path.insert(0, ROOT)
+from gates import index_rows as _ix      # noqa: E402  (the sweep's own parser, not a copy)
+_bent = _ix.malformed()
+check("every GATE-INDEX gate row parses into its five cells", not _bent, _bent[:6])
+# AND THE SHAPE IS LOAD-BEARING, so the lane must actually read as a lane.
+_lanes = {cs[_ix.LANE].split()[0] for cs, _l in _ix.rows() if len(cs) == _ix.CELLS
+          and cs[_ix.LANE]}
+_odd = sorted(x for x in _lanes if not x.startswith(("OFFLINE", "LIVE", "VOICE", "SKIP")))
+check("...and every lane cell names a lane", not _odd, _odd[:6])
 readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
 check("README links the four doors (START-HERE, AGENTS, docs/README, GATE-INDEX)",
       all(x in readme for x in ("START-HERE.md", "AGENTS.md", "docs/README.md", "gates/GATE-INDEX.md")))

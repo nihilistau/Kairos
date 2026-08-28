@@ -186,7 +186,7 @@ def query_prefix() -> str:
     from harness.tuning import registry as _tr
     return str(_tr.tune_or_env(
         "aux.query_prefix", "SP_AUX_QUERY_PREFIX",
-        "Recall for Kairos: find the moment in her past conversations with Sam that this asks about — ") or "")
+        "Recall for Kairos: find the moment in her past conversations with Sam that tthe operator's asks about — ") or "")
 
 
 def doc_prefix() -> str:

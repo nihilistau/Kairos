@@ -38,7 +38,7 @@ the brief; this is how it is built today.
   seven and G-AVATAR checks the mirror both ways. Her `[MOOD:]` mark picks the face.
 - **Outfits** — `OUTFITS` in `harness/control/wardrobe.py`: four named sets (`t0`–`t3` are opaque
   path keys — "the mesh top", "the sheer tee", "the black lace set", "the lace bodysuit"), each with
-  `wearing`/`about`/`calls` in plain words. **No ceiling and no rung since 2026-08-21** (his call:
+  `wearing`/`about`/`calls` in plain words. **No ceiling and no rung since 2026-08-21** (the operator's call:
   "she or I decide any ceilings"): the grid is faces × outfits and nothing gates it; the roleplay
   ladder paces scenes and does not touch her clothes.
 - **Wants** — what the grid cannot hold. `wardrobe.request()` turns her sentence (or his, from
@@ -111,7 +111,7 @@ read per generation.
 
 ## 4b. Affinity — what she reaches for, and what he said about it
 
-His ask (2026-08-25): *"the more she uses a set of clothing or the more I comment on it it
+The operator's ask (2026-08-25): *"the more she uses a set of clothing or the more I comment on it it
 could be noted somewhere."* **Both halves already existed**, and the answer to the ask was
 that nothing had ever told HER.
 
@@ -130,7 +130,7 @@ that nothing had ever told HER.
 
 What landed on 2026-08-25 is the last mile: **`describe()` speaks it back to her**, once a
 garment clears a score of three (below that a fresh install would be told about a favourite
-of one), quoting his own words when there are any. The panel and her tools read the same
+of one), quoting the operator's own words when there are any. The panel and her tools read the same
 function.
 
 > **THE CORRECTION THIS SECTION EXISTS TO CARRY (2026-08-25).** The first cut of the feature

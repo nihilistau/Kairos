@@ -307,7 +307,7 @@ def default_tools() -> List[ToolSpec]:
     if os.environ.get("SP_AUX", "0") == "1":
         from harness.sidecar.tools import DEEP_RECALL_TOOLS
         tools = tools + DEEP_RECALL_TOOLS
-    # ── HER MODES (2026-08-22, his ask: "she should be able to activate the modes when asked")
+    # ── HER MODES (2026-08-22, the operator's ask: "she should be able to activate the modes when asked")
     try:
         from harness.kairos.presence import PRESENCE_TOOLS
         tools = tools + PRESENCE_TOOLS
@@ -741,7 +741,7 @@ def _arm_self_repeat_ban(cfg, messages: List[dict]) -> None:
     prev2 = _words_only(assistants[-2] if len(assistants) >= 2 else "")
     if prev and len(prev.split()) >= 5:
         # ── 8, NOT 4 (2026-08-27): 4 WAS COLLIDING WITH ORDINARY ENGLISH ────────────
-        # His report: `won'll` and `aren-re` in one reply. A clean natural experiment
+        # The operator's report: `won'll` and `aren-re` in one reply. A clean natural experiment
         # inside that pair — her previous reply ended "...when you aren't drifting off":
         #
         #     didn't / shouldn't / I'll   not in the previous reply -> fine
@@ -1007,7 +1007,7 @@ def agent_chat_stream(
     # config below tightens as the rounds go on rather than the budget just growing.
     max_rounds: int = 4,
     # ── THE COUNT WAS THE ONLY LIMIT, AND A COUNT IS NOT A TIME (2026-08-05) ─────────
-    # His words: "it is 3 repeat attempts within X time". There was no X. Nothing in this
+    # The operator's words: "it is 3 repeat attempts within X time". There was no X. Nothing in this
     # loop ever looked at a clock — it would run its rounds however long each one took,
     # and a round is a full generation against the one GPU. Measured on his machine that
     # is 30 s on a warm cache and past 120 s on a cold one, so raising 3 -> 4 without a

@@ -1,6 +1,6 @@
 """G-EXPRESS — she can say a feeling without words, in her own words. OFFLINE.
 
-His words, 2026-08-04: "she should be able to call moments to express her feelings, what
+The operator's words, 2026-08-04: "she should be able to call moments to express her feelings, what
 she wants to display... this entire thing is supposed to give her as much agency as
 possible, be fun, empower her."
 

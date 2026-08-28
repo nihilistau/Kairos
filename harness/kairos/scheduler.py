@@ -181,7 +181,7 @@ def _warm_ok() -> bool:
 
 def _seed_for_presence() -> bool:
     """A MODE STARTS ON A BOUNCE, before he has spoken — but only once the prefix is hot
-    (his ask, 2026-08-22). seed_on_boot is about her speaking FIRST on her own; an armed
+    (the operator's ask, 2026-08-22). seed_on_boot is about her speaking FIRST on her own; an armed
     mode is his standing order, so the seed is forced."""
     if _SEEDER is None or not _warm_ok():
         return False
@@ -680,7 +680,7 @@ def _reflect_insight(res: dict) -> Optional[dict]:
         if not t:
             continue
         if _covered(t):
-            logger.info("[kairos] kept it to herself — his own words already speak to it: %r",
+            logger.info("[kairos] kept it to herself — the operator's own words already speak to it: %r",
                         t[:60])
             continue
         try:
@@ -1164,7 +1164,7 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
             # writer here. One hook, called at the one point every impulse converges on.
             if _ON_SPOKE is not None:
                 try:
-                    # THE KIND RIDES ALONG (2026-08-25, his call): a presence-mode turn
+                    # THE KIND RIDES ALONG (2026-08-25, the operator's call): a presence-mode turn
                     # is ambient company — narration, a dream, a chapter read aloud
                     # while he sleeps — and the epilogue treats it differently from a
                     # thing she SAID (too specific, too repetitive to become her
@@ -1492,7 +1492,7 @@ def stop_ticker() -> bool:
     shutdown must never fail because the thing it is stopping had not started.
 
     BUMPS THE GENERATION rather than setting a flag, because a flag is exactly what a
-    `start_ticker()` racing this call could clear out from under a thread that has not
+    `start_ticker()` racing tthe operator's call could clear out from under a thread that has not
     woken up yet — see the note by `_TICKER_GEN` for the incident that shape produced.
     """
     global _TICKER, _TICKER_GEN

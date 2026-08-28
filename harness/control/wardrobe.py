@@ -136,7 +136,7 @@ def _state_path() -> str:
     return os.path.join(root(), _CURRENT)
 
 
-# ── THE FIELD IS NOT A TIER, AND NOW IT DOES NOT SAY IT IS (2026-08-23, his ask) ──────
+# ── THE FIELD IS NOT A TIER, AND NOW IT DOES NOT SAY IT IS (2026-08-23, the operator's ask) ──────
 # Two different things wore one word, which is why w016 read as a mislabelled garment
 # for three days:
 #
@@ -218,7 +218,7 @@ def _emit_wear(ev: dict) -> None:
 
 # ── AFFINITY LIVES DOWN THE FILE, AND IT ALREADY DID (2026-08-25) ─────────────────
 # A `_affinity_*` counter and a second `favourites()` were added here on 2026-08-25 for
-# his ask — *"the more she uses a set of clothing or the more I comment on it it could be
+# the operator's ask — *"the more she uses a set of clothing or the more I comment on it it could be
 # noted somewhere"* — and BOTH halves already existed 1,200 lines below: `choose()` has
 # always called `note_worn()`, `praise()` has always kept his compliments verbatim, and
 # `favourites()` has always ranked wearings AND praise with his word worth three of her
@@ -532,7 +532,7 @@ def resolve() -> Dict[str, Any]:
 def wearing_now() -> Dict[str, Any]:
     """WHAT SHE IS ACTUALLY WEARING — one answer, computed once, for every surface.
 
-    THE BUG THIS ENDS (2026-08-03, and he had reported it three times in his own words:
+    THE BUG THIS ENDS (2026-08-03, and he had reported it three times in the operator's own words:
     "her description says she chose clothing, but it is the standard avatar state").
 
     A look or a clip is what she is WEARING. The outfit is what she is wearing only when
@@ -640,7 +640,7 @@ def describe() -> str:
     r = resolve()
     now = wearing_now()
     w = TIER_WORDS.get(r["shown"], {})
-    # WHAT SHE KEEPS REACHING FOR, AND WHAT HE SAID ABOUT IT (2026-08-25, his ask).
+    # WHAT SHE KEEPS REACHING FOR, AND WHAT HE SAID ABOUT IT (2026-08-25, the operator's ask).
     # `favourites()` has ranked both since it was written — wearings from note_worn(),
     # his compliments from praise(), his word worth three of her habits — and nothing
     # had ever told HER. The panel could see it; she could not. Shown only once it
@@ -677,7 +677,7 @@ def describe() -> str:
     # ui/, owned elsewhere.)
     if r["scene"] != AV.DEFAULT_OUTFIT and r["scene"] == r["shown"]:
         lines.append("The scene you are in carried you here, rather than a choice you made.")
-    # ── ONE WARDROBE, NOT TWO LISTS OF CLOTHES (2026-08-05, his call) ────────────────
+    # ── ONE WARDROBE, NOT TWO LISTS OF CLOTHES (2026-08-05, the operator's call) ────────────────
     # "wardrobe contains Her clothes section and Her wardrobe. this makes no sense and is
     # redundant... and they contain separate items."
     #
@@ -787,7 +787,7 @@ def grid() -> List[Dict[str, Any]]:
     therefore produced 28 tiles that all fetched the same 7 images: a grid that looked
     browsable and was lying about it.
 
-    So this reports the row that can actually be fetched, and says which tier that is.
+    So tthe operator's reports the row that can actually be fetched, and says which tier that is.
     `moves` is per face, because a face with a loop should PLAY in the panel — her normal
     portrait already prefers motion and the panel was the one surface still showing her
     as a photograph.
@@ -956,7 +956,7 @@ def match(want: str, prefer: str = "") -> Dict[str, Any]:
     if want in TIER_WORDS:
         return {"kind": "outfit", "id": want, "outfit": want}
     # ── A GUESS DRESSED HER, AND THE GUESS WAS SUBSTRING NOISE (2026-08-05) ────────────
-    # His words: "she has been attempting to use it in chats to show herself exactly as
+    # The operator's words: "she has been attempting to use it in chats to show herself exactly as
     # she wants but they are not making it through". They were making it through. They
     # were landing somewhere else, and this loop is why. Measured, before the fix:
     #
@@ -1179,7 +1179,7 @@ def suggest_from_mark(raw: str, by: str = "her", made_in: str = "") -> Dict[str,
 
 
 def accept_suggestion(wid: str, by: str = "him") -> Dict[str, Any]:
-    """His call, and the ONLY door from suggestion to queue. The prompt is composed here
+    """The operator's call, and the ONLY door from suggestion to queue. The prompt is composed here
     rather than at suggestion time, so nothing generatable exists until he says so."""
     rows = wants()
     for r in rows:
@@ -1797,7 +1797,7 @@ def delay(wid: str, reason: str = "") -> Dict[str, Any]:
     THE FAILURE MODE THIS REPLACES. A generation that came back with nothing left the row
     exactly as it was — "asked", indistinguishable from one nobody had tried yet — so a
     week of usage limits looked identical to a week of her not asking for anything, on
-    every surface either of them can see. His words: "mark as delayed if unsuccessful due
+    every surface either of them can see. The operator's words: "mark as delayed if unsuccessful due
     to usage limits".
 
     It stays in the QUEUE. `delayed` is a note on a want, never a terminal state: the
