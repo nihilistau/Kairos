@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.8.1 — pin the version, or the fingerprint guard is a treadmill (2026-08-28)
+
+The bridge fingerprints every external tool's `name + description + schema` and refuses one
+whose fingerprint later changes — the rug-pull, where a tool keeps its name and its
+description becomes an instruction. That guard and a floating package specifier cannot both
+be right, and this shipped with both.
+
+`mcp_servers.json` ran `chrome-devtools-mcp@latest`. npm re-resolves that whenever its cache
+expires — six versions landed on one machine between February and August — and each
+resolution changed the advertised schemas, so the guard fired. It was correct every time. On
+2026-08-26 npm served 1.8.0 where the pins had been made at 1.6.0: 25 of 29 tools changed,
+and **five of the seven in that server's `allow` list were refused** — `navigate_page`,
+`take_snapshot`, `take_screenshot`, `click`, `fill`. The assistant could open a page and list
+pages and nothing else, for two days, under a log line saying `rug-pull` about a version
+bump.
+
+- **The version is pinned**, and an upgrade is a deliberate act. That restored all five with
+  **zero acceptances**: 28 of 29 pinned digests reproduce exactly at the pinned version.
+- **`G-MCP-TRUST` §9 fails if any spawned server's package specifier floats** — `@latest`,
+  `@next`, `^`, `~`, or no version at all. The gate's own docstring had named
+  `npx -y chrome-devtools-mcp@latest`, "a package resolved from the network at spawn time at
+  whatever version npm serves that minute", and asserted nothing about it.
+- **This reverses a decision `docs/MCP.md` had recorded** — that `@latest` was deliberate
+  because the server tracks Chrome, and a stale pin is "a browser that silently stops
+  working". The old reasoning is kept beside the measurement that overturned it: the floating
+  version is what silently stopped it working, and in the worse direction — not a tool that
+  errors when called, but a tool that quietly is not there. The residual risk is unchanged
+  and named; what changed is that a stale pin fails loudly, when you call it, on your
+  schedule.
+- **Refusals are now proportionate.** Pins are checked over a server's whole listing and
+  `allow`/`deny` narrows it afterwards, so 25 rug-pull warnings printed per listing for 5
+  findings that mattered — and the operator was invited to trust-decide 20 tools nothing was
+  offering. Refusal is unchanged; the volume follows a new `_offered()`, which is also the
+  single place that answers the allow/deny question so it and `mcp_toolspecs` cannot drift.
+
+**A limitation worth knowing about, now written down:** a pin stores a 16-hex digest and not
+the pinned text, so a refusal cannot show you what changed — it asks you to judge a change
+nothing can display. It was answerable here only because npm keeps every version it has
+fetched, so both builds could be listed through the real bridge and diffed by hand. Done for
+1.6.0 → 1.8.0, that says in one screen what the digest pair never could: every refused tool
+gained a **required `pageId`** parameter and nothing else — a real multi-page feature, no
+description gained instructions — which is also why upgrading is work rather than an
+acceptance, since `required` means existing calls fail without it.
+
+`G-MCP-TRUST` 45/45, four new mutants.
+
 ## 0.8.0 — a shared common word is not a topic (2026-08-28)
 
 What she brings up on an ordinary turn was measured on a real 685-row store: **73% her own

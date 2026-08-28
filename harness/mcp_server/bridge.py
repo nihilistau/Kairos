@@ -272,6 +272,25 @@ def save_pins(pins: Dict[str, Dict[str, str]]) -> None:
     os.replace(tmp, _PIN_PATH)
 
 
+def _offered(server: str, tool: str) -> bool:
+    """Could this tool ever reach her? The `allow`/`deny` question, asked in ONE place.
+
+    `mcp_toolspecs` applies these two keys when it builds her tool list; this is the same
+    question earlier, for deciding how loudly to complain about a pin that no longer
+    matches. It is a function rather than a second copy of the filter so the two cannot
+    drift — that drift is this repository's most expensive recurring bug, and a security
+    control that disagrees with the thing it protects is the worst place for it.
+    """
+    try:
+        spec = (load_config().get("servers", {}) or {}).get(server, {}) or {}
+    except Exception:
+        return True                       # cannot tell: assume she can, and be loud
+    allow = spec.get("allow")
+    if allow is not None and tool not in allow:
+        return False
+    return tool not in set(spec.get("deny", []))
+
+
 def check_pins(listed: List[Dict[str, Any]], *, learn: bool = True) -> List[Dict[str, Any]]:
     """Drop tools whose fingerprint changed since first sight; pin the ones we have not seen.
 
@@ -283,6 +302,7 @@ def check_pins(listed: List[Dict[str, Any]], *, learn: bool = True) -> List[Dict
         return listed
     pins = load_pins()
     out, dirty = [], False
+    quiet_by_srv: Dict[str, List[str]] = {}
     for t in listed:
         srv, name = t.get("server", ""), t.get("name", "")
         have = (pins.get(srv) or {}).get(name)
@@ -294,11 +314,28 @@ def check_pins(listed: List[Dict[str, Any]], *, learn: bool = True) -> List[Dict
             out.append(t)
         elif have == now:
             out.append(t)
-        else:
+        elif _offered(srv, name):
             print("[mcp_bridge] REFUSED '%s' from '%s': its description or schema changed "
                   "since it was pinned (%s -> %s). This is what a rug-pull looks like. If "
                   "the change is legitimate, accept it with: python tools/mcp_pin.py --accept "
                   "%s %s" % (name, srv, have, now, srv, name), file=sys.stderr)
+        else:
+            # ── LOUD FOR WHAT SHE CAN CALL, ONE LINE FOR THE REST (2026-08-28) ──────
+            # Refusal is unchanged: a changed tool is never offered, whatever this
+            # prints. What changed is the VOLUME, and the reason is a measurement.
+            #
+            # On 2026-08-26 chrome-devtools-mcp moved 1.6.0 -> 1.8.0 and 25 of its 29
+            # tools changed. TWENTY of those are dropped by that server's `allow` list
+            # a moment later and could not be called by anyone; five were real. So the
+            # log carried twenty-five identical rug-pull warnings per listing, several
+            # listings per boot, around five findings — and an operator reading it was
+            # being asked to make trust decisions about tools she is never offered.
+            # A control that cries wolf five times per wolf is training you to ignore it.
+            quiet_by_srv.setdefault(srv, []).append(name)
+    for _srv, _names in sorted(quiet_by_srv.items()):
+        print("[mcp_bridge] %d changed tool(s) from '%s' were refused but are not in its "
+              "allow list, so nothing was offering them anyway: %s"
+              % (len(_names), _srv, ", ".join(sorted(_names))), file=sys.stderr)
     if dirty:
         try:
             save_pins(pins)
