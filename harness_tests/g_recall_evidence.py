@@ -251,6 +251,58 @@ check("...and route two answers with the LATEST instead",
 check("...and not with the mood marks",
       not any("mood has turned" in t for t in texts(hits)), texts(hits))
 
+# ── 5b. AND A SEAT FOR THE FAR PAST (2026-08-28, his ask: "not only recent memories
+# valued so much over old ones"). MEASURED live before the fix: on neutral turns every
+# pick was under 9 days old (median 4.0, 0 of 12 over 30 days) — route two's pool was
+# the newest 3k rows full stop, so the wildcard could only ever swap recent for recent.
+# The pool's tail now carries the most SALIENT rows older than 30 days; recency keeps
+# the ORDER (the top picks stay the latest), and the explore roll can reach an elder.
+print("\n5b. A SEAT FOR THE FAR PAST")
+import json as _json
+_regp = os.environ["SP_RECALL_REGISTRY"]
+_rows5 = [_json.loads(l) for l in open(_regp, encoding="utf-8") if l.strip()]
+_aged = 0
+for _r in _rows5:
+    if (_r.get("speaker") == "self" and not _r.get("lifecycle")
+            and "mood has turned" in _r.get("text", "") and _aged < 3):
+        _r["ts"] = "2026-07-01T00:00:00Z"          # 45+ days in this fixture's past
+        _r["mentions"] = 40                        # what mattered REPEATEDLY, long ago
+        _aged += 1
+with open(_regp, "w", encoding="utf-8") as _f:
+    for _r in _rows5:
+        _f.write(_json.dumps(_r, ensure_ascii=False) + "\n")
+_seen5 = {}
+_real5 = M._select
+M._select = lambda q, sc, k, t, m=None: (_seen5.__setitem__("days", [
+    (e.get("ts") or "")[:10] for _s, e in sc]) or _real5(q, sc, k, t, m))
+M.search_memories_ranked_rows("what have you been up to?", k=3)
+M._select = _real5
+_days5 = _seen5.get("days", [])
+check("an elder (>30 days) sits in route two's candidate pool",
+      any(d.startswith("2026-07") for d in _days5), _days5)
+# Provenance is proved on the DATA, not on list positions (the ranker re-orders by
+# salience and _select restores recency — both by design): more than 2k her-lane rows
+# are NEWER than the elders, so the recency window alive[:2k] cannot have contained
+# them. Only the elder seat brings them in.
+_her_newer = sum(1 for r in M._load()
+                 if not r.get("lifecycle") and r.get("speaker") == "self"
+                 and (r.get("ts") or "") > "2026-07-02")
+check("...brought in by the elder seat, not by the recency window reaching them",
+      _her_newer > 6, "only %d her-lane rows newer than the elders (need > 2k=6)" % _her_newer)
+# The roll is a DIGEST of the situation, not a die — deterministic per (question,
+# candidates), so one fixture cannot demand the elder specifically. What must hold is
+# REACHABILITY: the elder is among the candidates the wildcard draws from, which with
+# the pool-membership leg above is the whole claim. Verified live on his store: with
+# the roll forced on, a 45-day row landed in her three.
+TUNE.set_many({"recall.explore": 1.0})
+_picks5 = M.search_memories_ranked_rows("what have you been up to?", k=3)
+TUNE.set_many({"recall.explore": 0.0})
+check("...and the roll draws from a pool the elder is in (top picks may or may not be it)",
+      len(_picks5) == 3, [(e.get("ts") or "")[:10] for _s, e in _picks5])
+check("...while the TOP pick stays the latest — recency keeps the order",
+      _picks5 and not (_picks5[0][1].get("ts") or "").startswith("2026-07"),
+      (_picks5[0][1].get("ts") or "")[:10] if _picks5 else "-")
+
 print("\n6. THE WORDS OUTRANK ALIVENESS")
 # BOTH ROUTES MUST BE POPULATED or the precedence is untested. A first cut asked "how do
 # you feel about the light in the workshop", which matched FIVE rows lexically — so

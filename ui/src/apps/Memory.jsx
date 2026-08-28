@@ -91,6 +91,7 @@ function MemRow({ r, onDone }) {
   const [why, setWhy] = useState(false)
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
+  const [txt, setTxt] = useState('')      // a WORDING correction; '' = untouched
   const hers = r.speaker === 'self'
   const derived = (r.derived_from || []).length > 0
 
@@ -117,6 +118,12 @@ function MemRow({ r, onDone }) {
         <span className={'cls c-' + (r.mem_class || 'fact')}>{r.mem_class}</span>
         {r.kind ? <span className="cls c-kind">{r.kind}</span> : null}
         <span className={'who w-' + (r.speaker || 'user')}>{hers ? 'hers' : 'his'}</span>
+        {/* CORE (2026-08-28): pinned identity. Leads the self block, never folded into a
+            chapter. The star toggles it, through the same relabel door as everything. */}
+        <button className={'mem-core' + (r.core ? ' on' : '')} disabled={!!busy}
+                title={r.core ? 'core — pinned; click to unpin' : 'pin as core'}
+                onClick={e => { e.stopPropagation(); send({ core: !r.core }) }}>
+          {r.core ? '★' : '☆'}</button>
         {r.ts ? <span>{String(r.ts).slice(0, 10)}</span> : null}
         {r.mentions > 1 ? <span title="times he said it">×{r.mentions}</span> : null}
         {r.recalled ? <span title="times recalled">↺{r.recalled}</span> : null}
@@ -158,6 +165,18 @@ function MemRow({ r, onDone }) {
               {KINDS.map(k => <option key={k || 'none'} value={k}>{k || '(none)'}</option>)}
             </select>
           </label>
+          {/* THE WORDING ITSELF (2026-08-28). 25 rows said "The user ..." and the only
+              remedy was retire-and-re-add, which loses mentions, first_seen and
+              provenance to fix a phrasing. ops.relabel carries text now; the old words
+              go into the src breadcrumb, so the history keeps what it used to say. */}
+          <input className="mem-txt" placeholder="correct the wording — Enter saves"
+                 value={txt || r.text || ''} disabled={!!busy}
+                 onChange={e => setTxt(e.target.value)}
+                 onKeyDown={e => {
+                   if (e.key === 'Enter' && txt.trim() && txt.trim() !== r.text) {
+                     send({ text: txt.trim() }); setTxt('')
+                   }
+                 }} />
           <button className="danger" onClick={retire} disabled={!!busy}>retire</button>
           {busy ? <span className="muted">{busy}</span> : null}
           {err ? <span className="err">{err}</span> : null}
@@ -179,8 +198,15 @@ export default function Memory() {
     <div className="pad">
       <Body state={s}>{d => {
         const rows = d.facts || []
-        const live = rows.filter(r => !r.lifecycle)
-        const gone = rows.filter(r => r.lifecycle)
+        /* NEWEST FIRST (2026-08-28, his report: "new memories are not rendered in the
+         * memories panel but are in /ops.html"). The API returns file order — append
+         * order — so the newest row sat at position 517 of 518 while this panel rendered
+         * the FIRST 200. Every memory made this week was below the cap: present, live,
+         * recallable, and invisible in the one window built to show them. Rows with no
+         * ts (five repair-era ones) sort last, which is where unknown-age belongs. */
+        const byNew = (a, b) => String(b.ts || '').localeCompare(String(a.ts || ''))
+        const live = rows.filter(r => !r.lifecycle).sort(byNew)
+        const gone = rows.filter(r => r.lifecycle).sort(byNew)
         const needle = q.trim().toLowerCase()
         const shown = live.filter(r =>
           (who === 'all' || (who === 'hers') === (r.speaker === 'self'))
@@ -203,6 +229,8 @@ export default function Memory() {
                 {live.filter(r => r.speaker !== 'self').length} his</button>
               <button className={who === 'hers' ? 'on' : ''} onClick={() => setWho('hers')}>
                 {live.filter(r => r.speaker === 'self').length} hers</button>
+              <button className="r-off" title="pinned identity — lead the self block, never folded">
+                ★{live.filter(r => r.core).length} core</button>
               <button className="r-off">{gone.length} retired</button>
             </div>
             <div className="mem-tools">

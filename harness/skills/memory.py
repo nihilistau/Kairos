@@ -675,6 +675,24 @@ def remember(fact: str, source: str = "", *, kind: str = "", mem_class: str = ""
             if _text(e).strip() == fact.strip():
                 return _reinforce(e, "")
 
+        # ── AN INFERENCE DOES NOT UNDO A RETIREMENT (2026-08-28) ─────────────────────
+        # A tombstone is never reinforced (above) — but the same TEXT re-admitted as a
+        # NEW row walked straight past it. Said by HIM again, that is right: fresh
+        # testimony outranks old curation, and the new row stands beside the tombstone.
+        # Re-minted by the CONSOLIDATOR re-reading an old transcript, it silently undid
+        # a decision a person made in the panel an hour earlier — his report, verbatim:
+        # "retired memories stay retired... it seems a little flaky". The paraphrase
+        # passes (consolidator, reflection) are refused re-admission of a retired text;
+        # the refusal names the tombstone so the log says WHY nothing was stored.
+        if any(s in (source or "") for s in ("reflection", "consolidator")):
+            ft_norm = fact.strip().lower()
+            for e in existing:
+                if e.get("lifecycle") and _text(e).strip().lower() == ft_norm:
+                    return ("not stored — %r was retired (%s) and a %s pass may not "
+                            "re-admit it; only being told again can"
+                            % (fact[:60], e.get("superseded_at")
+                               or e.get("retired_because") or "tombstoned", source))
+
         ft = _toks(fact)
         if ft:
             for e in existing:
@@ -1337,8 +1355,22 @@ def search_memories_ranked_rows(query: str, k: int = 5, min_overlap: float = 0.2
         # question about a person wants is the LATEST — measured, her last night's thinking
         # and his last night's conclusions, which is what the question was for.
         alive.sort(key=lambda e: (e.get("ts") or ""), reverse=True)
-        n = len(alive[:3 * k]) + 1.0
-        for i, e in enumerate(alive[:3 * k]):
+        # ── AND A SEAT FOR THE FAR PAST (2026-08-28, his ask: "not only recent memories
+        # valued so much over old ones"). MEASURED before this: on neutral turns every
+        # pick was under 9 days old (median 4.0, 0 of 12 over 30 days), because this pool
+        # was the newest 3k rows full stop. Recency stays the ORDER — an open question
+        # about a person still wants what is latest — but the tail of the pool now holds
+        # the most SALIENT rows older than 30 days, so `recall.explore`'s wildcard (and
+        # an empty slot) can hand back an old thread. Salience picks the elders because
+        # for the far past, what mattered repeatedly beats what happened last: the exact
+        # opposite of the recent end, and both are right for their span.
+        pool = alive[:2 * k]
+        _cut = "%sT00:00:00Z" % time.strftime("%Y-%m-%d", time.gmtime(time.time() - 30 * 86400))
+        elders = [e for e in alive[2 * k:] if (e.get("ts") or "") < _cut]
+        elders.sort(key=lambda e: -_alive(e))
+        pool += elders[:k]
+        n = len(pool) + 1.0
+        for i, e in enumerate(pool):
             scored.append((band * (1.0 - i / n), e))
 
     scored.sort(key=lambda x: -x[0])

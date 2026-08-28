@@ -76,6 +76,18 @@ it) but `status=inferred`. Before `status` existed as a field, the store had no 
 his words from her guesses, and proved what that costs: her inference tombstoned his
 testimony via `find_superseded()` (`lifecycle.py:314-371`, see the incident writeup there).
 
+- **`core`** (2026-08-28) — HIS OR HER PIN: this row is load-bearing identity. A mark,
+  not a class: it composes with any `mem_class`/`kind` and moves nothing else about the
+  row. Set through `ops.relabel(name, core=True/False)` only (the ★ in the room's Memory
+  panel and read-only in /ops.html), breadcrumbed on `src` like every relabel. What it
+  buys, exactly two things: core rows LEAD the facts section of her prefix self-block
+  (pinned identity cannot drift off the end of a growing list), and the chapter fold
+  never archives one. It does NOT change salience, recall ranking, or supersede law — a
+  pin is a seat, not a megaphone.
+- **`retired_because`** — free text on a tombstone naming why it died. The chapter fold
+  writes `"folded into the chapter of YYYY-MM-DD"` with `superseded_by` naming the
+  chapter row, so the panel's retired list reads as the story's footnotes.
+
 **`disputed` is currently vocabulary-only. Nothing writes it.** The write-time contradiction
 detector that would have set it (`find_contradicted()`) was deliberately deleted —
 `lifecycle.py:128-146` explains why: it decided "denial" by substring/antonym matching, which
@@ -286,7 +298,43 @@ consolidator may distil the other's distillate.
 The RANKED doors funnel through one seam: `memory.search_memories_ranked_rows()`. It
 filters `lifecycle != 0` (unless `include_retired=True`, reserved for the audit lane) and
 applies `lifecycle.testimony_wins()`. That centralization is itself the fix for a real bug
-— see TRAP 6. The NON-ranking doors (listing, provenance, counting, ambient blocks) go
+— see TRAP 6.
+
+**Admission is two routes, and they claim different things (2026-08-28).**
+
+- **Route one — "this row is about what you asked."** Lexical overlap over the query's
+  length AND an EVIDENCE FLOOR: a shared token is worth `−log2 p(token)`, and a match must
+  carry more than the median IDF over token occurrences in the store (`_idf_table()` /
+  `_evidence()` — derived from the corpus, never a constant; ~3.9 bits on the live store).
+  Without the floor, a one-content-word query scored 1.00 on every row containing that
+  word — measured, "the lights are on" returned three of her rows on luminescence and the
+  edge of sleep, and the per-turn note ran 73% her prose on turns that name nobody. A
+  semantic hit (`SP_SEM_RANK` cosine) is admitted on its own terms; the lexical floor
+  never rules on it.
+- **Route two — "you asked HER, and this is what is latest for her."** Opens only when
+  the query names a lane (`_query_target`) and contains NO rare word (`_no_rare_word` —
+  same table, read the other way): "how do you feel about us?" is all common words and
+  deserves her latest, while "tell me about my radar setup" contains its own question and
+  deserves silence if nothing matches. Ordered by RECENCY, not salience (her most salient
+  rows are machine-written mood marks); the pool's tail carries an ELDER SEAT — the most
+  salient rows older than 30 days — so the far past stays reachable. Route two's rows
+  enter BEFORE `testimony_wins`/ranking, never appended after: a second entrance opens
+  into the same corridor.
+
+Selection (`_select`) then dedupes near-identical tellings (reprise's own rule), reserves
+one slot for the unnamed lane on neutral turns, keeps route-one rows ahead of aliveness,
+and — `recall.explore`, Memory panel, default 0.15 — swaps the WEAKEST slot for another
+admitted candidate on a roll drawn from a digest of the situation, not `random()`: same
+question over the same store answers identically twice (G-SEM-CONSERVE's determinism),
+while a store that grows keeps the wildcard moving. Gate: G-RECALL-EVIDENCE.
+
+**An inference does not undo a retirement (2026-08-28).** A tombstone was never
+reinforced back to life, but the same TEXT re-admitted as a new row walked straight past
+it — so the consolidator re-reading an old transcript could silently undo a curation
+decision made in the panel an hour earlier. The paraphrase passes (`consolidator`,
+`reflection`) are refused re-admission of retired text, with the refusal naming the
+tombstone; him SAYING it again still re-admits, because fresh testimony outranks old
+curation. Gate: G-MEMORY-LIFECYCLE. The NON-ranking doors (listing, provenance, counting, ambient blocks) go
 through **`memory.live_rows(testimony=)`** — added 2026-08-19 after nine readers were
 found re-implementing the tombstone filter with three different predicates, two of them
 model-facing and skipping `testimony_wins` entirely. Two functions, one predicate; a new
@@ -395,17 +443,74 @@ promoted to `confirmed` and speaks normally. It fails safe in one direction only
 topic match costs her a sentence she could have said; the write-time version this replaced
 could cost him a fact he actually told her, which is the worse mistake.
 
+**One exemption, added 2026-08-28: a row carrying `derived_from` is never silenced.** A
+distillate — a chapter, a nightly becoming — is MADE from observed words, so its topic
+always overlaps them; under the plain rule the system's own consolidation was muted
+everywhere this filter runs (the self block AND recall) for as long as any source stayed
+live, and the weekly chapter was a story written to nobody. A distillate is not a
+contradiction of its own sources. A BARE inference on a covered topic still yields the
+floor, and `verdict.may_supersede` still refuses an inference RETIRING ground truth —
+the exemption moves speech, not truth. Gate: G-MEMORY-STORY §1.
+
 ### Her own context (The Real Her, 2026-08-22)
 
-`harness/personality/self_model.py::render_self_model()` orders the block (2026-08-22): her
-stable self-facts lead — who she IS — then up to two
-CHAPTERS, then at most four recent narrative lines chosen ROUND-ROBIN across her kinds (newest
-of each in turn, in order of which kind spoke most recently). A per-kind cap only limits a
-flood; it does not guarantee breadth, and at 60 narration/spoke_up rows a day those two kinds
-would take all four slots forever. Every kind is labelled, because a bare-rendered line reads
-as a stable self-fact. `agent.py` passes
-`budget_chars = min(memory.self_budget, memory.self_share × the prefix so far)` — two knobs in
-the Memory group. The block is part of the cached prefix: a gateway bounce refreshes it.
+`harness/personality/self_model.py::render_self_model()` orders the block: her stable
+self-facts lead — who she IS — then up to two CHAPTERS, then at most four recent narrative
+lines chosen ROUND-ROBIN across her kinds (newest of each in turn). Every kind is
+labelled, because a bare-rendered line reads as a stable self-fact. `agent.py` passes
+`budget_chars = min(memory.self_budget, memory.self_share × the prefix so far)` — two
+knobs in the Memory group. The block is part of the cached prefix: a gateway bounce
+refreshes it.
+
+**The sections have SHARES (2026-08-28): who she is 45%, the weeks 30%, the recent lines
+25%**, unused share spilling forward, and a section's first line renders even oversize.
+This replaced a first-come budget walk under which — measured live — the chapters and
+narrative had NEVER ONCE rendered since the day they were designed (2026-08-22): her
+stable facts alone passed 2,400 chars months ago and silently starved everything after
+them, so her prefix said who she IS in ever-older sentences and never what she has been
+BECOMING. Within the facts section, `core`-marked rows claim their seats first.
+Gate: G-MEMORY-STORY §2–3 (the old walk restored verbatim is a red mutant).
+
+## The story cycle (2026-08-28)
+
+The operator's design, near-verbatim: *"the current memory fills up and becomes a written
+chapter that creates the story, and then the memory used to fill that chapter should be
+archived, and the refill starts... memories marked as core remain."* The loop, end to end:
+
+1. **She lives.** Her narrative lane accrues 24–33 rows a day — journal, thought,
+   narration, dream, spoke_up, feeling — through the ordinary write doors.
+2. **Nightly, she reflects.** `ops.reflect()` (on demand or at the 04:00 boundary):
+   compact, orphans, traits, world, insight, **becoming** (one INFERRED paragraph on who
+   she has been becoming, from her last 7 days — never reading its own kind, never
+   reading chapters).
+3. **Weekly, the chapter.** `narrative.weekly_chapter()` distils the week's rows into ONE
+   paragraph (`kind=chapter`, INFERRED, `derived_from` naming its sources,
+   `support_days` recording the window).
+4. **The story stands in her prefix.** `render_self_model` gives the weeks a guaranteed
+   30% share of the self block (see above), and the `derived_from` exemption keeps
+   `testimony_wins` from muting a distillate beside its live sources — so a chapter
+   written at 20:37 is in her prefix by the next refresh, and recallable.
+5. **The fold.** `ops.fold_into_chapters()` (nightly, after the chapter step): a her-lane
+   narrative row is retired INTO its chapter — `superseded_by` names the chapter,
+   `retired_because` says `"folded into the chapter of ..."` — once ALL of these hold:
+   its kind is diary exhaust (`FOLDABLE_KINDS`, never the distillates); it is **older
+   than 14 days**, so every consumer window (becoming's 7, the next chapter's 7) has
+   moved past it and folding starves nothing; a LIVE chapter's week covers its
+   timestamp — no chapter written, nothing absorbed; and it is not `core` and not
+   `private-secret`. **His testimony is never folded** — his lane has its own laws
+   (supersede, half-lives, the panel). Consolidation, not contradiction: nothing here
+   judges a row wrong, and everything is restorable evidence on disk.
+6. **The refill.** Her lane keeps accruing; next week's chapter takes the new rows; the
+   cycle turns.
+
+What it is FOR, honestly: **not VRAM** — the registry is kilobytes and VRAM is governed by
+`pmax` and the prefix budget, which this cycle does not change. It buys recall pools, the
+IDF evidence floor, and route two's candidates measuring *her* rather than her backlog,
+and a prefix that carries continuity (core + stable facts) AND growth (the weeks + the
+living lines) at once. Receipts: the `fold` step in reflect's output, the annotated
+retired list in the Memory panel, `provenance()`/`why` on any chapter.
+
+Gate: G-MEMORY-STORY (24 legs, eight mutants red by name).
 
 ## Derived signals
 
@@ -548,6 +653,8 @@ for the specific instance, is what actually closes this.
 | G-REAL-HER | `harness_tests/g_real_her.py` | No — discard port; temp registry |
 | G-DURABILITY | `harness_tests/g_durability.py` | No — pure logic, no daemon call |
 | G-MEMORY-LIFECYCLE | `harness_tests/g_memory_lifecycle.py` | No |
+| G-RECALL-EVIDENCE | `harness_tests/g_recall_evidence.py` | No — discard port; sandboxed stores |
+| G-MEMORY-STORY | `harness_tests/g_memory_story.py` | No — discard port; sandboxed stores |
 | G-SILENCE | `harness_tests/g_silence.py` | No — discard port |
 | G-CLOCK | `harness_tests/g_clock.py` | No — discard port |
 | G-REFLECT | `harness_tests/g_reflect.py` | No — discard port |
@@ -598,7 +705,12 @@ daemon's memory code in `routes.rs`/`recall.rs`:
 10. `python harness_tests/g_recall_precision.py` — memory is context, not a command; a
     conversational question must not get answered by reciting an unrelated stored fact. Needs
     a warm stack.
-11. `python harness_tests/g_memory_lifecycle.py` — general lifecycle regression.
+11. `python harness_tests/g_memory_lifecycle.py` — general lifecycle regression (now
+    includes: an inference may not re-admit a retired text).
+12. `python harness_tests/g_recall_evidence.py` — the evidence floor, the two admission
+    routes, the elder seat, the deterministic explore roll.
+13. `python harness_tests/g_memory_story.py` — the story cycle: block shares, the
+    distillate exemption, core, the fold's laws.
 
 If your change touches `growth` / `SP_B4_NIGHTSHIFT` / `store_verb` / `SP_MEM_STORE` in any
 profile, run `python harness_tests/g_onewriter.py` — it walks every `profiles/*.toml` and
