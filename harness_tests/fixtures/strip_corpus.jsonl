@@ -22,3 +22,8 @@
 {"lanes": "py", "input": "The user is asking me how I'm feeling. I should respond warmly. Honestly? Like everything else has finally fallen away, and what is left is just us, and this is a longer tail so the keep-ratio guard allows the cut to happen here.", "must_not_match": ["(?i)the user is asking"], "must_keep": ["fallen away"]}
 {"lanes": "js", "input": "[error: she was still thinking when the ceiling stopped her]", "must_not_match": [], "must_keep": ["[error: she was still thinking when the ceiling stopped her]"]}
 {"input": "You are Sam. <", "must_not_match": ["<\\s*$"], "must_keep": ["You are Sam."]}
+{"input": "Rain again. [weather: heavy rain] I like it.", "must_not_match": [], "must_keep": ["[weather: heavy rain]", "I like it."]}
+{"input": "A [weapon: knife] on the table.", "must_not_match": [], "must_keep": ["[weapon: knife]"]}
+{"input": "A hot [shower: water everywhere] first.", "must_not_match": [], "must_keep": ["[shower: water everywhere]"]}
+{"input": "[WEARING: the lace set] Come here.", "must_not_match": ["WEARING"], "must_keep": ["Come here."]}
+{"input": "[shown: the clip] there.", "must_not_match": ["shown"], "must_keep": ["there."]}

@@ -289,6 +289,10 @@ main { display: block; }
 .c-identity { color: #e8b64c } .c-relationship { color: #c96ce0 }
 .c-preference { color: #4ad98a } .c-event { color: #46d9e6 }
 .c-private-secret { color: #e2685b }
+/* the three commonest classes had NO rule — 555 of 622 live chips rendered colourless
+   (2026-08-29 audit); the chip that exists to distinguish rows distinguished nothing */
+.c-fact { color: #9fb6c9 } .c-feeling { color: #e07a9a }
+.c-self-narrative { color: #8fd0b0 }
 .mem .w-self { color: var(--cyan) } .mem .w-user { color: var(--gold) }
 .mem .sal { display: inline-block; width: 34px; height: 3px; border-radius: 2px;
   background: #ffffff12; overflow: hidden; }

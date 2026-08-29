@@ -725,6 +725,12 @@ KNOBS: list[Knob] = [
          "0 keeps everything. Above 0, the nightly reflection removes whole days older "
          "than this window.",
          min=0, max=3650, step=1,
+         # the profile's [telemetry].keep_days maps to this env var and was read by
+         # NOTHING for its whole life (2026-08-29 audit, F1) — a profile that set it
+         # got unbounded ~10 MB/day growth under a comment saying otherwise. Now the
+         # env carries the boot default and the panel stays override-only, the same
+         # contract every scope="profile" knob keeps.
+         scope="profile", env="SP_TELEMETRY_KEEP_DAYS",
          danger="Days beyond the window are DELETED at the next 04:00 pass — there is "
                 "no undo, and her sleep/waking answers cannot reach past what is kept."),
     Knob("recall.explore", "Memory", "Variety in what she recalls", "float", 0.15,

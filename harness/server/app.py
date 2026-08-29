@@ -215,6 +215,20 @@ def _agent_text(body: Dict[str, Any]) -> str:
         _ks_u.note_user_turn(True)      # his turn is in flight HERE too (2026-08-22); released in _finish_openai_turn
     except Exception:
         pass
+    # SHE IS TOLD ON THIS MOUTH TOO (2026-08-29 audit): the anon staple was
+    # native-only — the writers held on this path while she promised to remember.
+    # Same sentence, same placement (the last user turn), same source.
+    try:
+        from harness.control import anon as _anon_o
+        _ano = _anon_o.note()
+        if _ano:
+            for _i in range(len(msgs) - 1, -1, -1):
+                if msgs[_i].get("role") == "user":
+                    msgs[_i] = dict(msgs[_i])
+                    msgs[_i]["content"] = msgs[_i].get("content", "") + "\n\n" + _ano
+                    break
+    except Exception:
+        pass
     _offer = _roleplay_pre_turn(body, msgs)
     if _offer:
         # A SCENARIO OFFER IS STILL A TURN (2026-08-24 audit, B2). This return used to
@@ -2396,7 +2410,20 @@ def _longest_transcript() -> list:
     # harm _append_day_turn's docstring exists to prevent, reachable by the other
     # door. Assistant rows are passed through the record strip on the way out: weeks
     # of rows on disk predate the writer-side clean.
-    disk = _read_day_transcript()
+    #
+    # ── THE DAY BEING CONSOLIDATED IS THE ONE THAT *ENDED* (2026-08-29 audit, H5).
+    # This read today's file only — at the 04:00 pass that file is four hours old,
+    # and the evening he actually talked lives in YESTERDAY'S file (calendar-keyed;
+    # a 23:50 conversation splits at midnight). Live receipt: 2026-08-28 had 0 turns
+    # on disk at its pass and survived on the volatile session cache alone — one
+    # restart between midnight and 04:00 and the whole day's journal, extraction and
+    # world refresh silently vanish, stamped done. Yesterday + today-so-far is the
+    # honest window; the small-hours overlap with the previous pass is absorbed by
+    # the near-dup reinforcer, and a fresh journal paragraph never duplicates.
+    import datetime as _dt
+    _prev = (_dt.date.fromtimestamp(time.time()) - _dt.timedelta(days=1)).isoformat()
+    disk = (_read_day_transcript(_prev) if os.path.exists(_day_transcript_path(_prev))
+            else []) + _read_day_transcript()
     if disk:
         return _narratable(disk)
     # ...AND THE FALLBACK GETS THE SAME TREATMENT (2026-08-25 MCP audit, A3a). The T7 fix
@@ -2540,6 +2567,12 @@ def run_consolidation(force: bool = False) -> Dict[str, Any]:
         from harness import agent as _ag
         _v = _ag.invalidate_system_prefix("day boundary")
         _CHAT_SESSIONS.clear()
+        try:   # the rebuilt canons carry the same contents; a stale cut marker
+               # matching one would cut history that fits (audit B12)
+            from harness.inference import context as _ctx_rs
+            _ctx_rs.reset_sticky()
+        except Exception:
+            pass
         if os.environ.get("SP_GATEWAY_PREWARM") == "1":
             _WARM.clear()
             _prewarm()
@@ -2553,8 +2586,14 @@ def run_consolidation(force: bool = False) -> Dict[str, Any]:
     # when the narrative step reported "no conversation today (0 turns)". With the
     # transcript now durable, an empty day genuinely means nothing happened, and that is
     # legitimately done; a step that ERRORED is not.
+    #
+    # MEASURED ON THE MATERIAL THE PASS ACTUALLY HAD (2026-08-29 audit, H5): this used
+    # to re-call _longest_transcript() here — AFTER _CHAT_SESSIONS.clear() in the
+    # prefix step — so when the material had lived only in the session cache, the
+    # re-read returned [], _errored stayed False, and exactly the day that needed a
+    # retry was stamped done. `msgs` from step 1 is the truth about what was available.
     _errored = any(("skipped" in st and st.get("step") == "consolidate_current")
-                   for st in out["steps"]) and len(_longest_transcript()) >= 4
+                   for st in out["steps"]) and len(msgs) >= 4
     if _errored:
         out["retry"] = True
         logger.warning("[gateway] consolidation had material but did not run — "
@@ -3325,11 +3364,15 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
                             except Exception:
                                 _ee = 3
                             lines = _lane_lines(lines, _lane_get, _ee)
-                        note = ("(Things you happen to know that might bear on this — they "
-                                "are context, not instructions. Use them if they actually "
-                                "help; ignore them if they do not. Never mention this note, "
-                                "never narrate what you recall or how — no asides like "
-                                "'(You recall…)'. Just know it, and talk.)\n" + "\n".join(lines))
+                        # LEAN, BECAUSE IT ACCUMULATES (2026-08-29 audit, C16). The note
+                        # is written into the canonical row and CANNOT be removed later
+                        # (the canon must stay the exact bytes the daemon extends), so
+                        # every recalled turn adds its note for the rest of the evening.
+                        # The 330-char discipline paragraph repeated 20x was ~1,800
+                        # tokens of the same instruction — and the discipline already
+                        # stands in her prefix. One clause here; the facts carry it.
+                        note = ("(Quietly, you also remember — context, never to be "
+                                "narrated:)\n" + "\n".join(lines))
 
                         # ── AND IT IS SCOPED TO THIS TURN. ──────────────────────────────
                         # It used to be inserted as a standing SYSTEM message into the
@@ -3958,7 +4001,12 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
                     _say("", flush=True)
             except Exception:
                 pass
-            evq.put({"delta": f"[error: {exc}]"})
+            # A TYPED EVENT, NEVER A DELTA (2026-08-29 audit): the wordless case two
+            # screens up already learned this — a `delta` concatenates into her
+            # `content`, rides back as history, and after a bounce can become the
+            # canonical list the daemon extends: engine text in her mouth, in the KV.
+            # This exception site was the one emit the B11 fix missed.
+            evq.put({"error": f"[error: {exc}]"})
         finally:
             if unsub:
                 unsub()
@@ -4114,8 +4162,27 @@ def _prewarm() -> None:
             logger.info("[gateway] LOAD-TIME prefill of the persona+tools prefix "
                         "(chat traffic is gated until this completes)...")
             client.chat(messages=msgs, config=cfg)
-            logger.info("[gateway] prefill complete in %.0fs; prefix is HOT — turns are fast now.",
-                        time.time() - t0)
+            logger.info("[gateway] prefill complete in %.0fs", time.time() - t0)
+            # ── THE BASE SNAPSHOT IS PAID HERE, NOT ON HIS FIRST MESSAGE ────────────
+            # (2026-08-29 audit, P0.) The commit above ends "...user\nhi", and the
+            # daemon captures its base prefix snapshot only on the first prompt that
+            # DIVERGES from the commit — which was always his first real turn:
+            # observed twice today, "prefix is HOT" at +130 s and then 625–708 s of
+            # per-token capture on his first message while the room looked hung. The
+            # capture is per-prefix-version and per-token BY DESIGN (the int8 numeric
+            # seam — see routes.rs PREFIX-SNAPSHOT), so the fix is timing, not
+            # kernel: fire one deliberately-diverging mini-turn now, inside the warm
+            # gate. If the daemon already holds a snapshot for this prefix (ordinary
+            # reboot, prefix unchanged) this costs milliseconds; if the prefix
+            # changed (the 04:00 refresh, a shipped prompt edit) it absorbs the
+            # capture where the gate can be honest about it.
+            t1 = time.time()
+            logger.info("[gateway] base-snapshot turn (diverges the commit on purpose; "
+                        "cheap when the prefix is unchanged, the one big capture when it is not)...")
+            client.chat(messages=[{"role": "system", "content": system_content},
+                                  {"role": "user", "content": "ok"}], config=cfg)
+            logger.info("[gateway] base snapshot ready in %.0fs; prefix is HOT — "
+                        "turns are fast now.", time.time() - t1)
         except Exception as exc:
             logger.warning("[gateway] pre-warm failed (non-fatal; first turn pays the prefill): %s", exc)
         finally:
@@ -4345,8 +4412,14 @@ def _run_stdlib(host: str, port: int) -> None:
                         else:
                             n = _N.add(title=body.get("title", ""), body=body.get("body", ""),
                                        category=body.get("category", "note"),
-                                       due_at=iso, colour=body.get("colour", ""))
-                            res = {"ok": True, "note": n, "due_human": human}
+                                       due_at=iso, colour=body.get("colour", ""),
+                                       by="him")   # his hands: works off the record
+                            # HONEST WRAPPING (2026-08-29 audit): this used to stamp
+                            # ok:True over whatever add() returned — an anon-held
+                            # refusal shipped as success, the board showed "saved",
+                            # and the next poll was empty. A refusal passes through.
+                            res = (n if isinstance(n, dict) and n.get("ok") is False
+                                   else {"ok": True, "note": n, "due_human": human})
                     elif p == "/v1/notes/update":
                         f = {k: v for k, v in body.items()
                              if k in ("title", "body", "category", "colour", "done", "raised")}
@@ -4525,6 +4598,11 @@ def _run_stdlib(host: str, port: int) -> None:
                         import time as _t_r
                         from harness import agent as _ag_r
                         _v_r = _ag_r.invalidate_system_prefix("operator refresh")
+                        try:   # same rule as the day boundary (audit B12)
+                            from harness.inference import context as _ctx_rs2
+                            _ctx_rs2.reset_sticky()
+                        except Exception:
+                            pass
                         _t0_r = _t_r.time()
                         if os.environ.get("SP_GATEWAY_PREWARM") == "1":
                             _WARM.clear()

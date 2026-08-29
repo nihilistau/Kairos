@@ -15,8 +15,12 @@ to self-modify its own mood/voice/traits). Human-editable AND machine-editable, 
 from __future__ import annotations
 
 import os
+import threading
 from pathlib import Path
 from typing import Dict, Tuple
+
+# one lock for the state block's read-modify-write (2026-08-29 audit, M7)
+_STATE_LOCK = threading.Lock()
 
 
 def persona_path() -> str:
@@ -140,9 +144,20 @@ def write_state(path: str, state: Dict[str, str]) -> None:
         _SHADOW.clear()
         _SHADOW.update({k: v for k, v in (state or {}).items() if v})
         return
-    p = Path(path)
-    text = p.read_text(encoding="utf-8") if p.exists() else ""
-    prose, _ = parse_persona(text)
-    block = [STATE_SECTION] + [f"{k}: {state[k]}" for k in KNOWN if state.get(k)] \
-        + [f"{k}: {v}" for k, v in state.items() if k not in KNOWN and v]
-    p.write_text(prose.rstrip() + "\n\n" + "\n".join(block) + "\n", encoding="utf-8")
+    # ── LOCKED AND ATOMIC (2026-08-29 audit, M7). Four writers share this file — the
+    # post-turn spine (worker thread), her own tools mid-turn, the night curator, and
+    # the editor door — and this was a bare read...write_text: two writers raced
+    # last-write-wins (a [TRAIT:+patient] from one thread lost to an ambient turn's
+    # write on another), and a truncation mid-read shrank the prose silently, because
+    # parse_persona never raises. One process-wide lock for the read-modify-write, and
+    # tmp+os.replace so a reader never sees half a file (the same pattern
+    # wardrobe.set_overlay uses).
+    with _STATE_LOCK:
+        p = Path(path)
+        text = p.read_text(encoding="utf-8") if p.exists() else ""
+        prose, _ = parse_persona(text)
+        block = [STATE_SECTION] + [f"{k}: {state[k]}" for k in KNOWN if state.get(k)] \
+            + [f"{k}: {v}" for k, v in state.items() if k not in KNOWN and v]
+        tmp = Path(str(p) + ".tmp")
+        tmp.write_text(prose.rstrip() + "\n\n" + "\n".join(block) + "\n", encoding="utf-8")
+        os.replace(tmp, p)

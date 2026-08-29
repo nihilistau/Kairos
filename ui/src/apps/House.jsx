@@ -1,4 +1,5 @@
 import { usePoll, Body } from './panel.jsx'
+import * as api from '../api.js'
 
 /* THE HOUSE — a beachhead, and honest about being one.
  *
@@ -27,10 +28,16 @@ import { usePoll, Body } from './panel.jsx'
  * Prefix `ha-`, per the appRegistry CSS-ownership rule G-ROOM-CSS enforces.
  */
 export default function House () {
-  const d = usePoll('/v1/house/now', 15000)
+  /* THE PANEL THAT COULD NEVER OPEN (2026-08-29 audit). This first shipped as
+   * usePoll with the route STRING where it wants a function, read
+   * its fields off the poll wrapper instead of .data, and used Body without the
+   * {state, children:fn} contract. Three independent crashes, and with no
+   * ErrorBoundary in the room at the time, clicking 🏠 blanked the whole room.
+   * Now it is shaped like every other panel; api.house is the one spelling. */
+  const s = usePoll(api.house, 15000)
 
-  if (!d) return <Body><div className="ha-dim">asking…</div></Body>
-
+  return (
+    <Body state={s}>{d => {
   const configured = !!d.configured
   const alive = !!d.alive
   const ents = d.entities || []
@@ -43,7 +50,7 @@ export default function House () {
   const label = { off: 'not configured', up: 'connected', down: 'unreachable' }[state]
 
   return (
-    <Body>
+    <div className="pad house">
       <div className="ha-head">
         <span className={'ha-dot ha-' + state} />
         <span className="ha-state">{label}</span>
@@ -89,6 +96,8 @@ export default function House () {
         {d.watching && d.watching.length ? ` except ${d.watching.length} watched entities` : ''}
         . Her body readings are in the ♥ panel.
       </div>
-    </Body>
+    </div>
+  )
+    }}</Body>
   )
 }

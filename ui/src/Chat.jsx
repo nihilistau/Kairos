@@ -155,7 +155,16 @@ export default function Chat({ onMood }) {
           else if (ev.persona) {
             const rest = last.events.filter(e => !e.persona)
             const prevP = last.events.find(e => e.persona)
-            last.events = [...rest, { persona: { ...(prevP ? prevP.persona : {}), ...ev.persona } }]
+            /* `changed` is a SIBLING of persona on the wire ({persona: state, changed: true})
+               and was read as a child — the chip never once showed its ◆ (2026-08-29 audit,
+               the same field/value mismatch the comment at the chip itself was written for).
+               Fold it in here so the render side reads one object. And the LIVE mood chip
+               re-syncs from the server state — live.mood was sticky on her last mark and
+               ignored adjust_mood()/panel changes for the rest of the session. */
+            const merged = { ...(prevP ? prevP.persona : {}), ...ev.persona,
+                             changed: !!(ev.changed || (prevP && prevP.persona.changed)) }
+            last.events = [...rest, { persona: merged }]
+            if (onMood && ev.persona.mood) onMood(String(ev.persona.mood))
           }
           /* (`ev.final` handler removed 2026-08-24 — the gateway stopped emitting it
              when the analysis cut moved to the record; a dead handler over a retired
@@ -221,8 +230,15 @@ export default function Chat({ onMood }) {
       try {
         const { messages } = await api.kairosOutbox()
         if (!alive || !messages?.length) return
+        /* HER OWN-TIME TURNS WEAR THE SWITCH TOO (2026-08-29 audit): send() stamps
+           otr and this poller did not, so turns she SPOKE during a private hour sat
+           unstamped and were re-sent as history forever after the switch went off —
+           the exact bug the history filter was written for, on the other path that
+           appends turns. Same cheap GET, same err-to-off. */
+        let otrNow = false
+        try { const a = await api.anon(); otrNow = !!(a && a.on) } catch (_) {}
         setTurns(h => [...h, ...messages.map(m => ({
-          role: 'assistant', content: m.text, unprompted: true,
+          role: 'assistant', content: m.text, unprompted: true, otr: otrNow || undefined,
           // `at` is the scheduler's own stamp, not the moment the poll happened to
           // notice. She may have spoken three minutes before this tick drained it, and
           // showing the drain time would put her words at the wrong point in his evening.

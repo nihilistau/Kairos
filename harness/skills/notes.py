@@ -135,7 +135,7 @@ def get(note_id: str) -> Optional[dict]:
 
 def add(title: str, body: str = "", category: str = "note",
         due_at: str = "", colour: str = "", speaker: str = "",
-        watch: str = "") -> dict:
+        watch: str = "", by: str = "her") -> dict:
     """Pin something to the board. Returns the note.
 
     A WATCH IS A NOTE WITH A PREDICATE INSTEAD OF A TIME (2026-07-13).
@@ -157,8 +157,12 @@ def add(title: str, body: str = "", category: str = "note",
     # remember() were held; a NOTE written mid-anon-evening landed on the board and
     # survived the mode — the evening's content, on disk, under a different door. Same
     # guard, same receipt, fail-closed like every other anon door.
+    # ...HELD FOR HER TOOLS, NEVER FOR HIS HANDS (2026-08-29 audit). ANON-MODE.md's
+    # own rule: a note HE types on the board is his deliberate act and must still
+    # work; a note SHE writes mid-evening is the content the switch promises to keep
+    # off disk. The board route passes by="him"; every tool path takes the default.
     from harness.control import anon as _anon
-    if _anon.holds("notes.add"):
+    if by != "him" and _anon.holds("notes.add"):
         return {"ok": False, "held": True, "why": _anon.WHY}
 
     title = (title or "").strip()

@@ -83,6 +83,12 @@ DOORS: Dict[str, tuple] = {
     "net.search":       ("web search", "web searches"),
     "net.research":     ("research question", "research questions"),
     "net.provider":     ("request to a third party", "requests to a third party"),
+    # ── DECLARED LATE (2026-08-29 audit, M5): both were GUARDED on 2026-08-28 and never
+    # declared, so holds() held them fail-closed while the exit receipt said
+    # "held back 1 x conversation.store" — an id where the receipt promises English.
+    # The receipt is the whole evidence the mode did anything; it speaks prose now.
+    "notes.add":          ("note for the board", "notes for the board"),
+    "conversation.store": ("kept piece of the conversation", "kept pieces of the conversation"),
 }
 
 

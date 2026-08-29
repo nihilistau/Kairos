@@ -4,10 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kairos-companion"
-version = "0.8.4"   # keep in step with CHANGELOG.md — it read 0.1.0 through
-                    # two releases (fixed 2026-08-25)
+version = "0.8.6"   # keep in step with CHANGELOG.md — it read 0.1.0 through
+                    # two releases (fixed 2026-08-25), then sat at 0.8.4 through
+                    # 0.8.5 (fixed 2026-08-29): this comment is the tripwire
 description = "A local-first AI companion framework: durable, auditable memory that never deletes, unprompted speech with reasons, a room UI — against any OpenAI-compatible endpoint on one consumer GPU."
 readme = "README.md"
+# WINDOWS-ONLY today, and honestly so (2026-08-29 audit): serve.py's process
+# control is CREATE_NO_WINDOW/taskkill/powershell and crashes uncaught on
+# POSIX. The harness itself is portable; the launcher is not, yet.
+classifiers = ["Operating System :: Microsoft :: Windows"]
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "nihilistau" }]
@@ -22,7 +27,11 @@ http = ["httpx>=0.27"]          # the sp-daemon transport (only with [engine] ki
 server = ["flask>=3.0"]         # nicer gateway than the stdlib fallback
 config = ["pyyaml>=6.0"]        # YAML config files
 embeddings = ["sentence-transformers>=2.2"]  # real local embeddings
-all = ["httpx>=0.27", "flask>=3.0", "pyyaml>=6.0", "sentence-transformers>=2.2"]
+# the export ships harness/mcp_server/ and the inbound bridge; the dependency was
+# declared in the source pyproject 2026-08-25 and this overlay missed it (2026-08-29)
+mcp = ["fastmcp>=3.0", "mcp>=1.20"]
+all = ["httpx>=0.27", "flask>=3.0", "pyyaml>=6.0", "sentence-transformers>=2.2",
+       "fastmcp>=3.0", "mcp>=1.20"]
 
 [project.scripts]
 harness = "harness.cli.main:main"

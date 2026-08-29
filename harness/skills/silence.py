@@ -60,10 +60,13 @@ MIN_BITS_STANDING = 4.0
 def enabled() -> bool:
     """SP_SILENCE_ANSWER — mapped in serve.py, DEFAULT OFF.
 
-    Off for a reason that is recorded rather than vague: the attention ledger is four days
-    deep, which is below MIN_LEDGER_DAYS, so this returns nothing either way today. The knob
-    exists so that arming it is a decision he makes once the ledger is deep enough, not
-    something that switches itself on quietly when a counter crosses a line.
+    ARMED on companion 2026-08-29: the ledger reached 25 attended days (floor 14) and
+    the read-first receipt was taken — against the live store the armed answer to every
+    probe was SILENCE, because no dimension clears the corroboration bar yet. The knob
+    stays a knob: arming was a decision made against the written condition, not a
+    counter switching itself on — and the 2026-08-29 audit's lesson stands beside it:
+    an arming condition that "arrives on its own" needs a reader, because this one
+    arrived eleven days before anyone noticed.
     """
     return os.environ.get("SP_SILENCE_ANSWER", "0") == "1"
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { usePoll, Body } from './panel.jsx'
 import { When } from '../room/When.jsx'
 import * as api from '../api.js'
@@ -36,7 +36,12 @@ import * as api from '../api.js'
  * Prefix `bd-`, per the appRegistry CSS-ownership rule that G-ROOM-CSS enforces.
  */
 export default function Board() {
-  const s = usePoll(() => api.notes(true), 20000)
+  /* STABLE IDENTITY OR AN UNBOUNDED LOOP (2026-08-29 audit): an inline arrow is a
+   new fn every render; usePoll re-subscribes on [fn, ms], run() sets state, state
+   re-renders — /v1/notes was refetched as fast as the network allowed. Same fix
+   Setup.jsx already carries. */
+  const pollNotes = useCallback(() => api.notes(true), [])
+  const s = usePoll(pollNotes, 20000)
   const [busy, setBusy] = useState('')
   const [editing, setEditing] = useState('')   // note id being edited
   const [draft, setDraft] = useState(null)     // the add form, or null when closed

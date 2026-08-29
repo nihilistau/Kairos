@@ -10,9 +10,17 @@ export function usePoll(fn, ms = 0) {
   const runRef = useRef(null)
   useEffect(() => {
     let alive = true
-    const run = () => fn()
-      .then(d => alive && set(s => ({ loading: false, data: d, error: null })))
-      .catch(e => alive && set(s => ({ loading: false, data: s.data, error: String(e.message || e) })))
+    let inflight = false
+    // NEVER STACK REQUESTS ON A SLOW DOOR (2026-08-29 audit): setInterval keeps firing
+    // while a 12s door is still answering, and each unanswered request holds a server
+    // thread. One in flight at a time; a skipped tick just waits for the next.
+    const run = () => {
+      if (inflight) return
+      inflight = true
+      fn()
+        .then(d => { inflight = false; if (alive) set(s => ({ loading: false, data: d, error: null })) })
+        .catch(e => { inflight = false; if (alive) set(s => ({ loading: false, data: s.data, error: String(e.message || e) })) })
+    }
     runRef.current = run
     run()
     if (!ms) return () => { alive = false }

@@ -52,11 +52,17 @@ def consolidate_personality(messages: Optional[List[dict]] = None,
     memory-okf-personality tier. Returns {state, pruned, snapshot_addr}."""
     path = persona_path or _persona_path()
 
-    # 1) EXTRACT the shifts the model expressed in the assistant turns (persists via write_state)
-    if messages:
-        assistant = "\n".join(m.get("content", "") for m in messages if m.get("role") == "assistant")
-        if assistant.strip():
-            apply_personality_tags(assistant, path)
+    # 1) THE REPLAY IS RETIRED (2026-08-29 audit, M8). This re-applied every mark in
+    # the day's assistant turns, last-mark-wins — from a RECORDING. Every mark is
+    # applied LIVE now on all three mouths and her unprompted turns (_settle_turn →
+    # run_post_turn, the 08-24 A4 fix), so the only thing the replay could do is
+    # overwrite a LATER state change that did not come from a mark: she calls
+    # adjust_mood("quiet") at midnight, or he sets a mood from ops.html, and at 04:00
+    # the transcript's last [MOOD:flirty] wrote over it — she woke in a mood a
+    # recording chose. The docstring above already concedes the live path leaves this
+    # pass nothing to extract; its keep is the CAP and the hand-edited file (below).
+    # `messages` stays in the signature: the callers still pass it, and a future
+    # missed-mark reconciler would want it — but it must reconcile, never replay.
 
     # 2) PRUNE: dedup + cap traits (drift-control)
     text = Path(path).read_text(encoding="utf-8") if Path(path).exists() else ""

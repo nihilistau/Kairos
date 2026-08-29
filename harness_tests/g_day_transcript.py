@@ -175,7 +175,7 @@ check("the turn is written from his words", call > 0,
 check("...bound before anything is stapled onto the message list", 0 < bind < call)
 check("...and the epilogue's day write passes them through verbatim",
       "_append_day_turn(human_text, reply_text, synthetic=synthetic)" in src)
-for marker, what in (("Things you happen to know", "the recall note"),
+for marker, what in (("Quietly, you also remember", "the recall note"),
                      ("note_for_question(user_text)", "the silence note")):
     at = src.index(marker)
     check("%s is stapled onto msgs AFTER the operator's words were taken" % what, at > bind)
@@ -185,8 +185,9 @@ check("the helper takes a string, so a mutated msgs cannot reach it",
 print("\n6. a day that FAILED is not stamped done")
 check("the marker is conditional now",
       "if _errored:" in src and 'out["retry"] = True' in src, "unconditional mark")
-check("...and 'no conversation' is still allowed to finish the day",
-      'len(_longest_transcript()) >= 4' in src)
+check("...and 'no conversation' is still allowed to finish the day — measured on the "
+      "material the pass HAD, not a re-read after the cache clear (2026-08-29, H5)",
+      'len(msgs) >= 4' in src and 'len(_longest_transcript()) >= 4' not in src)
 
 print("\n7. a broken write costs her nothing")
 # A transcript that cannot be written must never cost her a reply she already spoke.

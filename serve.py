@@ -224,7 +224,9 @@ def build_env(c: dict) -> dict:
     #
     # (HISTORY: when this was written, store_verb was still true in 12 of 13 profiles
     # including the live one. BOTH flags are false in ALL profiles since 2026-07-14 —
-    # G-ONEWRITER 35/35 — and the refusal below is what keeps that true.)
+    # G-ONEWRITER — and the refusal below is what keeps that true. (Its count is a
+    # function of the profile count: 35/35 was measured over 14 profiles; 2 remain,
+    # and the gate prints 13/13 today — 2026-08-29 audit F7.)
     #
     # So the fix for "an invariant enforced in one of two paths is enforced in neither" was itself
     # applied to one of two paths. On the live profile, "note that I'll be late" still goes to the
@@ -655,7 +657,11 @@ def build_env(c: dict) -> dict:
         "SP_MEM_OKF_STORE": "0",
         "SP_NIGHTSHIFT_LIVE": "0",  # MORE capture paths — growth=false never reached these
         "SP_NIGHTSHIFT_OFFLINE": "0",
-        "SP_B4_ADMIT_PERSONAL": "0",
+        # POLARITY (2026-08-29 audit): routes.rs reads `!= Ok("0")` as require-personal,
+        # i.e. "0" DISABLES the admission guard — the old pin was the firehose spelled
+        # as "off". Inert while every nightshift path above is 0, and wrong the day one
+        # re-arms; "1" is the pin that means what this block says.
+        "SP_B4_ADMIT_PERSONAL": "1",
         # veto
         # ── THE DRAFTER PATHWAY, FINALLY REACHABLE (audit, 2026-07-29) ────────────
         # The engine reads 16 SP_DRAFT_*/SP_EAGLE_* knobs. TWO were mapped here, so by

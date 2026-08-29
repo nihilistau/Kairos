@@ -445,6 +445,59 @@ check("...and her words are untouched",
 check("a single interior space is still a single interior space",
       "sat here thinking" in _out, _out)
 print("\nG-MARKS-LEAK: %d pass, %d fail" % (PASS, FAIL))
+print(chr(10) + "10. THE THIRD MOUTH RUNS THE KERNEL (2026-08-29 audit, D20/D21)")
+# /v1/voice had four regex literals for a stripper and hand-built its request: no
+# system prefix (she was not herself on voice), no fit, no byteexact seam, and
+# [MOOD:]/<channel|> reached the SPEAKER verbatim. Now it goes through
+# client.chat_stream(extra=inject_frames) with the one speech kernel; this drives
+# voice_turn with marks STRADDLING deltas and checks every edge. Pure stubs — no
+# store, no daemon: system_bundle is stubbed so no real persona is read.
+import numpy as _np
+from harness.voice import service as _V
+_V.native.available = lambda: True
+_V.native.encode = lambda pcm: _np.zeros((3, 4), dtype=_np.float32)
+_V.native.status = lambda: {"E": 4}
+import harness.agent as _AG
+_sb_real = _AG.system_bundle
+_AG.system_bundle = lambda *a, **k: ("STUB-SYSTEM-PREFIX for the voice leg", None)
+_seen = {}
+
+
+class _FC:
+    supports = {"inject_frames"}
+    def chat_stream(self, messages=None, config=None, extra=None, **kw):
+        _seen["messages"], _seen["extra"] = messages, extra
+        yield "<channel|>[MOOD:soft] I hea"
+        yield "rd you, [VOICE:lo"
+        yield "w] love."
+
+
+import harness.inference.client as _CL
+_gc_real = _CL.get_client
+_CL.get_client = lambda: _FC()
+try:
+    import base64 as _b64
+    _pcm = (_np.random.randn(16000) * 3000).astype("int16").tobytes()
+    _tr = []
+    _out = b"".join(_V.voice_turn({"audio_b64": _b64.b64encode(_pcm).decode()}, _tr)).decode()
+    _deltas = "".join(json.loads(l[6:]).get("delta", "") for l in _out.splitlines()
+                      if l.startswith("data: ") and l[6:].strip().startswith("{"))
+    check("marks and channel tags never reach the voice deltas (straddled included)",
+          "[MOOD" not in _deltas and "[VOICE" not in _deltas
+          and "<channel" not in _deltas and "heard you" in _deltas, repr(_deltas))
+    check("...and the session record is her words, record-stripped",
+          _tr and _tr[-1]["content"] == "I heard you, love.",
+          _tr[-1:])
+    check("the voice prompt carries the system prefix (she is herself on this mouth)",
+          _seen["messages"][0]["role"] == "system"
+          and "STUB-SYSTEM-PREFIX" in _seen["messages"][0]["content"])
+    check("the frames ride the ONE door (chat_stream extra), not a hand-built body",
+          isinstance(_seen.get("extra"), dict) and "inject_frames" in _seen["extra"]
+          and _seen["extra"].get("inject_ph") == _V.VOICE_PH)
+finally:
+    _CL.get_client = _gc_real
+    _AG.system_bundle = _sb_real
+
 rdir = os.path.join(ROOT, "var", "sem", "receipts")
 os.makedirs(rdir, exist_ok=True)
 with io.open(os.path.join(rdir, "g_marks_leak.json"), "w", encoding="utf-8") as f:

@@ -62,4 +62,31 @@ idx_comm = open(os.path.join(ROOT, "console", "room", "index.html"), encoding="u
 check("console/room/index.html names the committed assets",
       all(os.path.basename(c) in idx_comm for c in committed), [os.path.basename(c) for c in committed])
 shutil.rmtree(out, ignore_errors=True)
+
+print("\nPANEL CONTRACTS — the class the House crash lived in (2026-08-29 audit)")
+# G-ROOM-CSS proves class names and this gate proves bytes; NEITHER proved a panel
+# could MOUNT. House.jsx shipped with usePoll('<url string>') and a contractless
+# <Body>, and with no ErrorBoundary the click blanked the whole room. These are
+# structural legs over the source — cheap, and they pin the exact three mistakes.
+import re as _re
+_apps = sorted(glob.glob(os.path.join(ROOT, "ui", "src", "apps", "*.jsx"))) \
+      + [os.path.join(ROOT, "ui", "src", "Chat.jsx")]
+_bad_str = [os.path.basename(p) for p in _apps
+            if _re.search(r"""usePoll\(\s*['"]""", open(p, encoding="utf-8").read())]
+check("no panel hands usePoll a string (it takes a FUNCTION)", not _bad_str, _bad_str)
+_bad_body = []
+for p in _apps:
+    _src = open(p, encoding="utf-8").read()
+    for m in _re.finditer(r"<Body\b([^>]*)>", _src):
+        if "state=" not in m.group(1):
+            _bad_body.append(os.path.basename(p))
+check("every <Body> is given its state prop", not _bad_body, _bad_body)
+_main = open(os.path.join(ROOT, "ui", "src", "main.jsx"), encoding="utf-8").read()
+check("every window body mounts inside the PanelBoundary",
+      "class PanelBoundary" in _main and "<PanelBoundary" in _main
+      and "getDerivedStateFromError" in _main)
+check("usePoll never stacks requests on a slow door (in-flight latch)",
+      "inflight" in open(os.path.join(ROOT, "ui", "src", "apps", "panel.jsx"),
+                         encoding="utf-8").read())
+
 finish("G-ROOM-BUNDLE")

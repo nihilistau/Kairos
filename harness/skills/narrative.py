@@ -285,7 +285,14 @@ def compose_and_write(messages, ask=None) -> dict:
                 "Thoughts you set aside for yourself lately (draw on these only if one "
                 "belongs in tonight's paragraph):\n"
                 + "\n".join("- " + t[:200] for t in _kept[:8]))
-        today = time.strftime("%A %d %B %Y", time.gmtime())
+        # THE DAY THE ENTRY IS ABOUT, on HIS clock (2026-08-29 audit, M5). This was
+        # gmtime — right only by the accident that UTC+10 at an 04:00 local pass lands
+        # on yesterday's date, and wrong the moment the composer runs at any other
+        # hour or the zone changes. The entry describes the day that ENDED: shift the
+        # local clock back past the 04:00 boundary (5h covers it with margin), so the
+        # 04:05 pass stamps Friday for Friday's evening and a forced evening run still
+        # stamps today. collapse_history keys on this "As of <day>" string.
+        today = time.strftime("%A %d %B %Y", time.localtime(time.time() - 5 * 3600))
         prompt = (
             "You are Kairos, writing a private line in your own journal about you and "
             "Sam. Below is your previous entry (may be empty) and the recent "

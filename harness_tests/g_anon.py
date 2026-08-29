@@ -331,6 +331,17 @@ check("HIS answer to an old question still lands — the mode quiets the room, "
 check("...and it is on disk", "he answered during the private hour" in
       io.open(os.environ["SP_DECISIONS"], encoding="utf-8").read())
 
+# The two doors DECLARED on 2026-08-29 are driven inside THIS same session so the
+# census below can hold them like every other door (they used to be driven only in
+# §10, after leave() cleared the tally — the census was green for an ordering reason).
+try:
+    from harness.skills import notes as _NT7
+    _NT7.add("a mid-evening note through her path", body="held")
+    from harness.skills.conversation_memory import store_conversation as _SC7
+    _SC7([{"role": "user", "content": "a mid-evening keep"}], summary="held")
+except Exception as _exc7:
+    print("  (door drive for census failed: %s)" % _exc7)
+
 print("\n7. THE DOOR TABLE IS CLOSED")
 _held = AN.state()["held"]
 _missing = [d for d in AN.DOORS if d not in _held]
@@ -411,5 +422,34 @@ finally:
 _n10b = _NT.add("a thing from after the evening", body="keep this one")
 check("...and the board works again once the mode ends", _n10b.get("held") is not True,
       _n10b)
+
+print("\n11. THE RECEIPT SPEAKS ENGLISH, AND HIS HANDS STILL WORK (2026-08-29 audit)")
+# (a) The doors driven in §10 were GUARDED but never DECLARED, so the exit receipt
+# said "held back 1 x conversation.store" — an id where prose was promised. §7's
+# census ran before §10 ever drove them, so the gate was green for an ordering
+# reason. This census runs LAST, after every door in this file has been driven.
+check("every door this gate ever held is DECLARED in anon.DOORS (final census)",
+      all(d in AN.DOORS for d in ("notes.add", "conversation.store")),
+      [d for d in ("notes.add", "conversation.store") if d not in AN.DOORS])
+check("...and phrase() speaks prose for both",
+      "x" not in AN.phrase("notes.add", 2).split()[1]
+      and AN.phrase("conversation.store", 1).split(" ", 1)[1][0].isalpha(),
+      (AN.phrase("notes.add", 2), AN.phrase("conversation.store", 1)))
+# (b) ANON-MODE.md's own rule: a note HE types is his deliberate act and still
+# works; a note SHE writes holds. The route passes by="him"; tools take the default.
+AN.enter()
+try:
+    _his = _NT.add("his own hand on the board", body="typed in the panel", by="him")
+    check("a note from HIS hands lands during the mode", _his.get("held") is not True
+          and _his.get("id"), _his)
+    _hers = _NT.add("her tool call mid-evening", body="hers")
+    check("...while her tool path is held, same instant", _hers.get("held") is True, _hers)
+    # (c) the memory panel door tells the truth about a held write
+    from harness.maintenance import ops as _OPS
+    _padd = _OPS.add("a fact typed into the panel mid-evening")
+    check("ops.add reports a held write as held, never as stored",
+          _padd.get("ok") is False and _padd.get("held") is True, _padd)
+finally:
+    AN.leave()
 
 finish("G-ANON")

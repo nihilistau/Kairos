@@ -116,11 +116,17 @@ _CURRENT = "wardrobe.json"
 # Everything here is a word that carries no garment: articles, possessives, and the verbs
 # of asking. Nothing that could name a thing she owns is in it — dropping "black" or
 # "silver" to make a phrase shorter would make her wardrobe smaller, quietly.
+# ...ONE list for search() as well (2026-08-29 audit, H4): search grew its own
+# _FILLER copy in the file whose comment above says "ONE list", and the two
+# disagreed on ten words — so search_wardrobe("remove them") found a row that
+# wear("remove them") then refused. The union below carries no garment word.
 _ASK_STOP = frozenset({
     "the", "and", "with", "for", "her", "his", "she", "you", "your", "that",
     "this", "just", "out", "off", "into", "onto", "some", "something", "wear",
     "wearing", "put", "get", "got", "want", "like", "look", "looks", "one",
     "little", "bit", "very", "really", "all", "still", "now", "back", "them",
+    "a", "an", "my", "any", "anything", "thing", "in", "of", "or", "it",
+    "is", "are", "have", "has", "about",
 })
 
 
@@ -510,7 +516,8 @@ def import_clip(src: str, made_in: str = "lace-set", label: str = "",
            "label": label or (meta["wearing"] + (" · " + meta["where"] if meta["where"] else "")),
            "kind": "clip", "added": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
            **meta}
-    rows = [r for r in clips() if r.get("file") != name]
+    # RAW, for the same reason _wants_raw exists: a hidden clip must survive an import.
+    rows = [r for r in clips(all=True) if r.get("file") != name]
     rows.append(row)
     _write_index(rows)
     return row
@@ -711,6 +718,12 @@ def describe() -> str:
     lines.append("Hanging there — * is on you, NEW is one you have never worn. "
                  "wear(\"...\") takes any of them:")
     for t in AV.OUTFIT_IDS:
+        # HIDE REACHES THE STANDARD SET TOO (2026-08-29 audit, M4): remove() refuses
+        # outfits with "hide it instead" — and hide did nothing to her on this one
+        # asset class: still listed, still matchable, still worn. Every outfit door
+        # consults the overlay now (here, the match ruling, take-off).
+        if not _offered(overlay_for(t)):
+            continue
         mark = "*" if (now["kind"] == "outfit" and t == r["shown"]) else \
                ("-" if t in r["allowed"] else "x")
         lines.append("  %s %s" % (mark, TIER_WORDS.get(t, {}).get("wearing", t)))
@@ -822,10 +835,9 @@ def search(want: str, limit: int = 12) -> List[Dict[str, Any]]:
     # owns nothing, which is the exact failure this function exists to end. Filler is
     # dropped, and if the remaining words together match nothing, ANY of them will do: a
     # near miss she can see beats a confident no.
-    _FILLER = {"the", "a", "an", "my", "one", "with", "that", "this", "some", "any",
-               "something", "anything", "thing", "in", "of", "and", "or", "for", "it",
-               "is", "are", "have", "has", "got", "like", "about", "wear", "wearing"}
-    words = [t for t in re.split(r"[^a-z0-9]+", w) if len(t) > 1 and t not in _FILLER]
+    # ONE list with match() — see _ASK_STOP's note (2026-08-29): a private copy here
+    # disagreed on ten words and pointed her at a door that refused.
+    words = [t for t in re.split(r"[^a-z0-9]+", w) if len(t) > 1 and t not in _ASK_STOP]
     out, seen = [], set()
     try:
         r = resolve()
@@ -1018,6 +1030,12 @@ def match(want: str, prefer: str = "") -> Dict[str, Any]:
         words = {w.strip(".,;:!?'\"—") for w in label.split()}
         for c in (l.get("calls") or ()):
             words.update(w.strip(".,;:!?'\"—") for w in str(c).lower().split())
+        # HIS TAGS ARE VOCABULARY (2026-08-29 audit, H4): the closet's "other words
+        # it answers to" field wrote row["tags"] and only search() ever read it —
+        # search said she owned it, wear() refused it, and a junk want was filed.
+        # One vocabulary: label + calls + his tags, for both rungs.
+        for c in (l.get("tags") or ()):
+            words.update(w.strip(".,;:!?'\"—") for w in str(c).lower().split())
         if toks and all(t in words for t in toks):
             return 200 + 10 * len(toks)
         # ── AND THE COUNTING RUNG COULD NOT SEE `calls` (2026-08-24) ───────────────
@@ -1047,6 +1065,8 @@ def match(want: str, prefer: str = "") -> Dict[str, Any]:
         """The outfit whose written name or calls-word this IS — or ''. One vocabulary,
         consulted from two places; growing a copy is the divergence this docstring bans."""
         for t, w in TIER_WORDS.items():
+            if not _offered(overlay_for(t)):   # a hidden outfit cannot rule (M4)
+                continue
             names = [w["name"].lower()] + [c.lower() for c in w.get("calls", ())]
             if any(want == n or re.search(r"\b%s\b" % re.escape(n), want) for n in names):
                 return t
@@ -1271,7 +1291,7 @@ def suggest_from_mark(raw: str, by: str = "her", made_in: str = "") -> Dict[str,
         return {}
     if not prose or len(prose) < 3:
         return {}
-    rows = wants()
+    rows = _wants_raw()
     key = _norm_want(prose)
     if not key:
         return {}
@@ -1315,7 +1335,7 @@ def suggest_from_mark(raw: str, by: str = "her", made_in: str = "") -> Dict[str,
 def accept_suggestion(wid: str, by: str = "him") -> Dict[str, Any]:
     """The operator's call, and the ONLY door from suggestion to queue. The prompt is composed here
     rather than at suggestion time, so nothing generatable exists until he says so."""
-    rows = wants()
+    rows = _wants_raw()
     for r in rows:
         if r.get("id") != wid:
             continue
@@ -1341,7 +1361,23 @@ def accept_suggestion(wid: str, by: str = "him") -> Dict[str, Any]:
 # suggestion he has said no to is not re-offered.
 
 
-def wants(state: str = "") -> List[Dict[str, Any]]:
+def _wants_raw(state: str = "") -> List[Dict[str, Any]]:
+    """EVERY row on disk, hidden ones included — the ONLY reader a writer may use.
+
+    ── A FILTERED READER FED THE WRITERS, AND TEN ROWS DIED (2026-08-29 audit) ────────
+    The 2026-08-28 `_offered` filter below was correct for display — and every
+    read-modify-write in this file went through it, while `_write_wants` truncates and
+    rewrites the whole file. So the first write after he hid a look in the closet
+    deleted the hidden rows from disk: her words, the provenance, the praise, the worn
+    history — measured, ten rows gone against the pre-suggest-test backup, restored
+    from it the same night. The id high-water mark was computed over the filtered list
+    too, so hiding the highest want would have re-issued its id and overwritten its
+    files.
+
+    THE RULE, so it does not come back wearing a different verb: a reader that filters
+    must never feed a writer. Writers read RAW; the display filter lives in `wants()`
+    at the edge. G-WARDROBE-WORDS holds the door: a write after a hide must preserve
+    the hidden row, by name."""
     out: List[Dict[str, Any]] = []
     try:
         with open(_wants_path(), encoding="utf-8") as f:
@@ -1351,7 +1387,10 @@ def wants(state: str = "") -> List[Dict[str, Any]]:
                     out.append(json.loads(ln))
     except Exception:
         return []
-    out = [w for w in out if not state or w.get("state") == state]
+    return [w for w in out if not state or w.get("state") == state]
+
+
+def wants(state: str = "") -> List[Dict[str, Any]]:
     # ── RETIRED IS RETIRED, ON EVERY PATH (2026-08-28) ──────────────────────────────
     # `looks()` and `clips()` end with `_offered`; this did not, and neither did
     # `arrivals()`. So he hid a garment and retired another in the panel, and both were
@@ -1360,8 +1399,9 @@ def wants(state: str = "") -> List[Dict[str, Any]]:
     # which is the worst kind of control: it looks like it worked.
     #
     # The filter belongs on every producer or on none, and it is the same `_offered` the
-    # other two use rather than a second spelling of it.
-    return [w for w in out if _offered(overlay_for(w.get("id") or ""))]
+    # other two use rather than a second spelling of it. DISPLAY ONLY — writers use
+    # `_wants_raw` (see its docstring for the night this distinction cost ten rows).
+    return [w for w in _wants_raw(state) if _offered(overlay_for(w.get("id") or ""))]
 
 
 def _write_wants(rows: List[Dict[str, Any]]) -> None:
@@ -1518,7 +1558,7 @@ def request(want: str, made_in: str = AV.DEFAULT_OUTFIT, by: str = "her",
             err += ("; kept what you meant as a suggestion (%s: %r) for him to look at"
                     % (_s["id"], _s.get("want", "")[:48]))
         return {"ok": False, "error": err, "suggestion": _s or None}
-    rows = wants()
+    rows = _wants_raw()
     # ── SHE CANNOT SEE HER OWN QUEUE WHILE SHE IS ASKING (2026-08-04) ───────────────
     # w001 and w006 carry IDENTICAL want text — "the silver nightie, by the window,
     # morning light instead of rain" — and four of her six looks are the same garment.
@@ -1589,7 +1629,7 @@ def request(want: str, made_in: str = AV.DEFAULT_OUTFIT, by: str = "her",
 
 def fulfil(wid: str, file: str = "", state: str = "made", loop: str = "") -> Dict[str, Any]:
     """Mark a want made (or refused). The generator calls this; so can he."""
-    rows = wants()
+    rows = _wants_raw()
     hit = None
     for r in rows:
         if r.get("id") == wid:
@@ -1741,7 +1781,7 @@ def note_worn(what: str, kind: str = "look", by: str = "her") -> None:
     # [WEAR:] mark, her wear() tool, and his panel. Three callers each remembering to
     # stamp it is three chances for one of them not to.
     try:
-        rows = wants()
+        rows = _wants_raw()
         hit = next((r for r in rows if r.get("id") == what and not r.get("worn_at")), None)
         if hit is not None:
             hit["worn_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -1779,7 +1819,7 @@ def praise(what: str, said: str, by: str = "him") -> Dict[str, Any]:
     part worth having. She should be able to recall that he said 'that one, wear that
     again' rather than that an integer went up.
     """
-    rows = wants()
+    rows = _wants_raw()
     for r in rows:
         if r.get("id") == what:
             r.setdefault("praise", []).append(
@@ -1947,7 +1987,7 @@ def delay(wid: str, reason: str = "") -> Dict[str, Any]:
     It stays in the QUEUE. `delayed` is a note on a want, never a terminal state: the
     boundary picks it up again next time, and `tries` counts how often it has come round
     so a thing that will never work stops looking like a thing about to."""
-    rows = wants()
+    rows = _wants_raw()
     for r in rows:
         if r.get("id") == wid:
             r["state"] = "delayed"
@@ -1961,7 +2001,7 @@ def delay(wid: str, reason: str = "") -> Dict[str, Any]:
 
 def mark_seen(wid: str = "") -> int:
     """Looking is what makes a thing no longer new — not the making of it."""
-    rows = wants()
+    rows = _wants_raw()
     disk = _scan_dir()
     n = 0
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())

@@ -202,6 +202,22 @@ def _take_off_if_on(aid: str) -> None:
         WD.choose(look="", by="him")
     if st.get("clip") == aid:
         WD.choose(clip="", by="him")
+    # ...and the standard set (2026-08-29 audit, M4): hiding the outfit she is WEARING
+    # moves her to the first still-offered one — a portrait in hidden clothes is the
+    # inconsistency this function exists to prevent, on the asset class it skipped.
+    if st.get("outfit") == aid:
+        try:
+            _fallback = next((t for t in AV.OUTFIT_IDS
+                              if t != aid and _offered_outfit(t)), None)
+            if _fallback:
+                WD.choose(outfit=_fallback, by="him")
+        except Exception:
+            pass
+
+
+def _offered_outfit(t: str) -> bool:
+    ov = WD.overlay_for(t)
+    return not (ov.get("hidden") or ov.get("removed_at"))
 
 
 # ── IMPORT: his files, through the same tooling ───────────────────────────────────────

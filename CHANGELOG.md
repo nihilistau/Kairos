@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.8.6 — the audit night (2026-08-29)
+
+A six-pass read-only audit of the whole system, then the fixes in severity order.
+
+- **A filtered reader fed the writers.** Hiding a garment deleted the hidden want rows
+  on the next wardrobe write (the display filter fed every read-modify-write while the
+  writer truncates the file). Writers read raw now; the id high-water mark counts raw
+  rows; the clip importer reads the unfiltered index. THE RULE: a reader that filters
+  must never feed a writer.
+- **One panel can no longer blank the room.** Every window body mounts inside an error
+  boundary; the House panel (which had never once mounted) is shaped like every other
+  panel; a poller identity bug that refetched as fast as the network allowed is fixed,
+  and the poll hook never stacks requests on a slow door.
+- **The story cycle may not eat itself.** The fold matches on CONTAINMENT (a row folds
+  into the distillate that names it in derived_from — chapter or nightly becoming),
+  and the orphan sweep knows consolidated from vanished, so a chapter can never be
+  starved into the next night's orphan pass by its own fold.
+- **Off the record, tightened**: her own-time turns wear the switch in the room's
+  history; panels report held writes honestly; a note typed by YOUR hands still lands
+  (hers holds); the voice and OpenAI mouths are told the mode is on; every held door is
+  declared and the receipt speaks English.
+- **The first message of the day stops paying the snapshot.** The prewarm fires a
+  deliberately-diverging mini-turn inside the warm gate, so the base-KV capture happens
+  where the boot banner can be honest about it — not on your first hello.
+- **The voice lane goes through the one door**: system prefix, the fit ceiling, the
+  profile seams, and the one speech kernel — instead of a hand-built request body
+  with a four-literal stripper.
+- **Wardrobe vocabulary is one vocabulary**: your "other words it answers to" tags
+  reach the matcher, not just search; one stop list; `[weather: …]` is prose, not a
+  WEAR mark that eats the sentence; hiding a standard outfit actually hides it.
+- Export hygiene: the correct install command on the front page, the Windows-only
+  constraint declared, the retired console page no longer ships, pyproject carries the
+  mcp extra and the right version, and the exporter sweeps `__pycache__` from the
+  target (compiled files embed local paths the text scrub cannot see).
+
 ## 0.8.5 — the story panel, and a mouth that failed politely (2026-08-29)
 
 - **The Story panel** (📖 in the dock): what stands in her prefix line by line, each

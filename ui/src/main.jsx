@@ -28,6 +28,30 @@ const DIRS = ['n','s','e','w','ne','nw','se','sw']
 const MIN_W = 280
 const MIN_H = 160
 
+/* ONE PANEL MUST NEVER TAKE THE ROOM DOWN (2026-08-29 audit). React unmounts the
+ * whole tree on an uncaught render error, and there was no boundary anywhere — the
+ * House panel's crash blanked chat and every other window until F5. Every window
+ * body mounts inside this now: a broken panel shows its error in its own frame and
+ * the rest of the room keeps breathing. Class component because error boundaries
+ * still cannot be hooks. */
+class PanelBoundary extends React.Component {
+  constructor(p) { super(p); this.state = { err: null } }
+  static getDerivedStateFromError(err) { return { err } }
+  componentDidCatch(err) { console.error('[panel]', this.props.title, err) }
+  render() {
+    if (this.state.err) {
+      return <div className="pad err">
+        this panel hit an error — the rest of the room is fine.{' '}
+        <button onClick={() => this.setState({ err: null })}>retry</button>
+        <div className="muted" style={{ marginTop: 6, fontSize: 11 }}>
+          {String(this.state.err).slice(0, 200)}
+        </div>
+      </div>
+    }
+    return this.props.children
+  }
+}
+
 function Win({ w }) {
   const app = byId(w.appId)
   const drag = useRef(null)
@@ -118,7 +142,7 @@ function Win({ w }) {
           <button className="lt lt-red" onClick={() => wm.close(w.appId)} title="close" />
         </span>
       </div>
-      <div className="body"><Body /></div>
+      <div className="body"><PanelBoundary title={app.title}><Body /></PanelBoundary></div>
       {DIRS.map(d => (
         <div key={d} className={'grip g-' + d} onMouseDown={onResize(d)} />
       ))}

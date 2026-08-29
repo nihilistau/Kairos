@@ -193,7 +193,8 @@ for the exact rows). Having both the daemon's word-count-and-a-pronoun rule and 
 `is_memorable()` deciding what a memory is, independently, is the same two-authorities shape
 as everything else in the TRAPS section.
 
-**HISTORY — DISARMED EVERYWHERE 2026-07-14 (G-ONEWRITER 35/35).** When this section was
+**HISTORY — DISARMED EVERYWHERE 2026-07-14 (G-ONEWRITER; 35/35 then, over the 14
+profiles of that era — the count tracks the profile count, 13/13 today).** When this section was
 written, `growth = true` was live in 8 other profiles and any of them re-armed the daemon
 writer. Both daemon write flags are `false` in every profile on disk (14 when this was written; two remain after the 2026-08-26 retirement), and `serve.py`
 **refuses to boot** any profile arming either while `agent.authority = "spine"` — so the
@@ -241,7 +242,7 @@ none of the admission gate, the identity firewall, or the supersede logic either
 
 Only path 1 (`memory.remember()`) is authoritative in the sense of enforcing every invariant
 this store has. Paths 2 and 3 are daemon-side bypasses that write the *same* registry file
-with weaker or no guarantees — **both off in all 14 profiles since 2026-07-14, refused at
+with weaker or no guarantees — **both off in every profile since 2026-07-14 (14 then, two now), refused at
 boot (G-ONEWRITER)**; the maintenance writer `harness/maintenance/ops.py` is the second
 live Python writer (tombstone/quarantine semantics, under `memory.registry_lock()`).
 
@@ -491,15 +492,25 @@ archived, and the refill starts... memories marked as core remain."* The loop, e
    `testimony_wins` from muting a distillate beside its live sources — so a chapter
    written at 20:37 is in her prefix by the next refresh, and recallable.
 5. **The fold.** `ops.fold_into_chapters()` (nightly, after the chapter step): a her-lane
-   narrative row is retired INTO its chapter — `superseded_by` names the chapter,
-   `retired_because` says `"folded into the chapter of ..."` — once ALL of these hold:
-   its kind is diary exhaust (`FOLDABLE_KINDS`, never the distillates); it is **older
-   than 14 days**, so every consumer window (becoming's 7, the next chapter's 7) has
-   moved past it and folding starves nothing; a LIVE chapter's week covers its
-   timestamp — no chapter written, nothing absorbed; and it is not `core` and not
-   `private-secret`. **His testimony is never folded** — his lane has its own laws
-   (supersede, half-lives, the panel). Consolidation, not contradiction: nothing here
-   judges a row wrong, and everything is restorable evidence on disk.
+   narrative row is retired INTO the distillate that ABSORBED it — `superseded_by`
+   names the absorber, `retired_because` says `"folded into the chapter of ..."` (or
+   `"folded into her becoming of ..."`) — once ALL of these hold: its kind is diary
+   exhaust (`FOLDABLE_KINDS`, never the distillates); it is **older than 14 days**, so
+   every consumer window (becoming's 7, the next chapter's 7) has moved past it and
+   folding starves nothing; a LIVE distillate **names it in `derived_from`** — the
+   chapter, or the nightly becoming — because containment is proof of absorption and a
+   time window is only proximity (2026-08-29: the window matcher folded rows the
+   chapter never read, and thoughts/feelings no chapter can contain; chapters beat
+   becomings when both claim a row); and it is not `core` and not `private-secret`. A
+   row nothing ever absorbed stays live and decays by half-life — the honest fate of a
+   thought no summary contains. **His testimony is never folded** — his lane has its
+   own laws (supersede, half-lives, the panel). And the orphan sweep knows the
+   difference between vanished and consolidated: a support retired INTO a distillate
+   still counts as standing under it (`lifecycle.orphaned_distillates`), so the fold
+   can never starve its own chapter into the next night's orphan pass — the failure
+   that would otherwise have deterministically killed every un-pinned chapter 14 days
+   after it was written. Consolidation, not contradiction: nothing here judges a row
+   wrong, and everything is restorable evidence on disk.
 6. **The refill.** Her lane keeps accruing; next week's chapter takes the new rows; the
    cycle turns.
 
@@ -518,7 +529,7 @@ fold archived into them as footnotes, the narrative lanes by kind, and the backu
 receipt at the foot. Edits go through the same two doors as the Memory panel
 (`relabel` for wording/core, `forget` to tombstone); the panel owns no verbs.
 
-Gate: G-MEMORY-STORY (30 legs, nine mutants red by name).
+Gate: G-MEMORY-STORY (38 legs, eleven mutants red by name).
 
 ## Derived signals
 
@@ -606,8 +617,8 @@ anywhere in this tree must check a producer actually exists for it before a cons
 allowed to branch on it — that check is now literally a gate (`g_secret.py` §4, "every class
 the decider branches on must be one the writer can produce").
 
-**2. + 3. — FIXED 2026-07-14 (G-ONEWRITER 35/35).** `growth` and `store_verb` are `false`
-in all 14 profiles and `serve.py` refuses to boot a profile arming either under
+**2. + 3. — FIXED 2026-07-14 (G-ONEWRITER, 35/35 at the 14-profile era).** `growth` and `store_verb` are `false`
+in every profile (14 then, two now) and `serve.py` refuses to boot a profile arming either under
 `authority="spine"`. Kept as numbered stubs so the trap numbering elsewhere in this file
 stays resolvable; the mechanics of what the armed paths did are in write-paths 2 and 3
 above, now labelled HISTORY. (These two entries said "on right now" until 2026-08-19 —

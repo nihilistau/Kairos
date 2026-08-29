@@ -460,7 +460,12 @@ def reflect() -> dict[str, Any]:
     # comes from the knob; 0 keeps everything, exactly as before this line existed.
     try:
         from harness.tuning import registry as _tune_r
-        _keep = int(_tune_r.get("telemetry.keep_days", 0) or 0)
+        # the PROFILE carries the boot default (SP_TELEMETRY_KEEP_DAYS — mapped in
+        # serve.py and, until the 2026-08-29 audit, read by NOTHING: a profile that
+        # set [telemetry].keep_days got unbounded ~10 MB/day growth under a comment
+        # promising otherwise); the tuning override still wins when he sets it live.
+        _keep = int(_tune_r.get("telemetry.keep_days", 0)
+                    or os.environ.get("SP_TELEMETRY_KEEP_DAYS") or 0)
         if _keep > 0:
             from harness.telemetry import store as _tel_s
             _pr = _tel_s.prune(_keep)
@@ -589,7 +594,15 @@ def add(fact: str, speaker: str = "user") -> dict[str, Any]:
         res = M.remember(fact, source="operator")
     finally:
         M.reset_author(tok)
-    return {"ok": not res.startswith("not stored"), "result": res, "stats": stats()}
+    # AN ANON HOLD IS A REFUSAL, NOT A SUCCESS (2026-08-29 audit): remember() returns
+    # anon.WHY ("off the record — ...") when the switch is on, which does not start
+    # with "not stored", so the panel showed "stored" over a write that never landed.
+    # Deliberately a refusal rather than a his-hands exemption: a memory row feeds HER,
+    # and "nothing this conversation is written down" should hold for her store even
+    # from his panel — the honest refusal tells him why, and he can flip the switch.
+    _held = res.startswith("off the record")
+    return {"ok": (not res.startswith("not stored")) and not _held,
+            "held": _held, "result": res, "stats": stats()}
 
 
 RELABEL_FIELDS = ("speaker", "mem_class", "kind")
@@ -629,7 +642,9 @@ def relabel(name: str, speaker: str = None, mem_class: str = None,
     # first_seen and provenance to fix a WORDING. Same four rules as the labels: the old
     # text goes into the src breadcrumb, so what the row used to say is part of its
     # history rather than gone. The sem-index row keyed on the old text orphans and
-    # re-mints on the next pass; dedupe keys likewise follow the new words.
+    # the NEW words are minted below, at the end of this function (2026-08-29: this
+    # comment used to promise a re-mint pass that never existed); dedupe keys likewise
+    # follow the new words.
     if text is not None:
         text = text.strip()
         if not (6 <= len(text) <= 400):
@@ -677,6 +692,19 @@ def relabel(name: str, speaker: str = None, mem_class: str = None,
             hit["src"] = (hit.get("src") or "") + note
             _write(rows)
         text = lc.strip_prefix(hit.get("text", ""))
+    # ── THE SEM-INDEX FOLLOWS THE WORDS, NOW, NOT "ON THE NEXT PASS" (2026-08-29
+    # audit, H3): the comment above promised a re-mint pass that never existed —
+    # mint() is called from remember() only — so every text-corrected row silently
+    # lost the semantic admission route forever. Measured live: exactly the 20
+    # relabeled rows had no semindex row, including "Sam uses an RTX 2060" and the
+    # pet's name — the facts he cared enough to fix. Same non-blocking contract as
+    # the writer's mint: a failure is a tick, never an error in the panel.
+    if changed.get("text"):
+        try:
+            from harness.skills import semindex as _sem_rl
+            _sem_rl.mint(changed["text"], hit.get("ts", ""))
+        except Exception:
+            pass
     return {"ok": True, "name": name, "changed": changed, "was": before, "text": text[:160],
             "stats": stats()}
 
@@ -706,8 +734,9 @@ def fold_into_chapters() -> dict[str, Any]:
       * it is older than FOLD_AFTER_DAYS (14): every consumer window — becoming's 7 days,
         the next chapter's 7 — has moved past it, so folding starves nothing (fold the
         night the chapter is written and TOMORROW'S becoming would read an empty week);
-      * a LIVE chapter's week covers its timestamp ([chapter.ts − support_days, chapter.ts]):
-        no chapter, no fold — the story has not been written yet, so the sources stay;
+      * a LIVE distillate NAMES it in `derived_from` (the chapter, or the nightly
+        becoming) — containment, never a time window; no absorber, no fold
+        (2026-08-29: the window matched rows the chapter never read — see below);
       * it is not CORE (pinned identity outlives every cycle), not private-secret, and
         not itself carrying dependents.
 
@@ -736,13 +765,37 @@ def fold_into_chapters() -> dict[str, Any]:
     with _reg_lock():
         rows = _rows()
         _backup()
-        chapters = [r for r in rows if not r.get("lifecycle")
-                    and r.get("speaker") == "self" and (r.get("kind") or "") == "chapter"]
-        windows = []
-        for c in chapters:
-            end = c.get("ts") or ""
-            span = float(c.get("support_days") or 7) + 0.5
-            windows.append((c, end, span))
+        # ── CONTAINMENT, NOT COINCIDENCE (2026-08-29 audit, H1/H2) ──────────────────
+        # The first cut matched rows to chapters by TIME WINDOW: anything foldable
+        # inside [chapter.ts − support_days, chapter.ts] was tombstoned as "folded into
+        # the chapter" — including 32 rows (simulated on the live store) the chapter
+        # never read, and 21 of kinds (`thought`, `feeling`) no chapter can even
+        # contain. A tombstone asserting a summary that does not exist. Worse, folding
+        # 100% of a chapter's supports made the NEXT night's retire_orphans eat the
+        # chapter itself ("all supports retired") — the live chapter survived only
+        # because the operator had hand-pinned 14 rows core.
+        #
+        # THE RULE NOW: a row folds into the distillate that NAMES it in derived_from
+        # — the chapter, or the nightly becoming (kind=self_description) — because
+        # derived_from IS the proof of absorption; a time window is only proof of
+        # proximity. Rows nothing ever absorbed stay live and decay by half-life,
+        # which is the honest fate of a thought no summary contains. This also retires
+        # the support_days window arithmetic (3 row-bearing days ≠ the week's span)
+        # that stranded ~3.5 days of every quiet week as permanently unfoldable.
+        # Chapters beat becomings when both claim a row: the week-level story is the
+        # better footnote anchor. orphaned_distillates() holds the other half of the
+        # law: a support retired INTO a distillate still counts as standing under it.
+        absorber: dict[str, dict] = {}
+        for c in rows:
+            if c.get("lifecycle") or c.get("speaker") != "self":
+                continue
+            kind = c.get("kind") or ""
+            if kind not in ("chapter", "self_description"):
+                continue
+            for nm in (c.get("derived_from") or []):
+                prev = absorber.get(nm)
+                if prev is None or (prev.get("kind") != "chapter" and kind == "chapter"):
+                    absorber[nm] = c
         folded, by_chapter = 0, {}
         for r in rows:
             if r.get("lifecycle") or r.get("speaker") != "self":
@@ -751,20 +804,21 @@ def fold_into_chapters() -> dict[str, Any]:
                 continue
             if r.get("core") or r.get("mem_class") == "private-secret":
                 continue
-            ts = r.get("ts") or ""
-            if _age_days(ts) < FOLD_AFTER_DAYS:
+            if _age_days(r.get("ts") or "") < FOLD_AFTER_DAYS:
                 continue
-            home = next((c for c, end, span in windows
-                         if ts <= end and _age_days(ts) - _age_days(end) <= span), None)
+            home = absorber.get(r.get("name") or "")
             if home is None:
-                continue                    # its week has no chapter yet; the sources stay
+                continue                    # nothing ever absorbed it; it stays, honestly
             r["lifecycle"] = 1
             r["superseded_by"] = home.get("name", "")
             r["superseded_at"] = _t.strftime("%Y-%m-%dT%H:%M:%SZ", _t.gmtime())
-            r["retired_because"] = ("folded into the chapter of %s"
-                                    % (home.get("ts") or "")[:10])
+            _day = (home.get("ts") or "")[:10]
+            r["retired_because"] = (
+                "folded into the chapter of %s" % _day
+                if (home.get("kind") or "") == "chapter"
+                else "folded into her becoming of %s" % _day)
             folded += 1
-            by_chapter[(home.get("ts") or "")[:10]] =                 by_chapter.get((home.get("ts") or "")[:10], 0) + 1
+            by_chapter[_day] = by_chapter.get(_day, 0) + 1
         if folded:
             _write(rows)
     return {"ok": True, "folded": folded, "chapters": by_chapter,

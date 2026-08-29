@@ -41,11 +41,17 @@ def main() -> int:
     _, state = parse_persona(PERSONA.read_text(encoding="utf-8"))
     traits = [t.strip().lower() for t in state.get("traits", "").split(",") if t.strip()]
 
-    # extracted shifts from the transcript
-    mood_ok = state.get("mood") == "reflective"
-    voice_ok = state.get("voice") == "gentle"
-    trait_add = "patient" in traits
-    trait_rm = "terse" not in traits
+    # ── THE REPLAY IS RETIRED (2026-08-29 audit, M8) — this gate used to assert the
+    # OPPOSITE: that the marks in MESSAGES landed here. Every mark is applied LIVE on
+    # all three mouths and her unprompted turns now (_settle_turn → run_post_turn),
+    # so the nightly replay could only OVERWRITE a later direct state change with the
+    # recording's last mark — she called adjust_mood("quiet") at midnight and woke
+    # flirty because the transcript said so at 21:00. The state below stands for a
+    # midnight direct write: the curator must leave it exactly alone.
+    mood_ok = state.get("mood") == "neutral"      # NOT the transcript's "reflective"
+    voice_ok = state.get("voice") == "dry"        # NOT the transcript's "gentle"
+    trait_add = "patient" not in traits           # no mark is applied from a recording
+    trait_rm = "curious" in traits                # ...and nothing real is lost
     # THE DUPLICATE IS GONE — asserted on the OUTCOME, and separately on the pass that
     # does it. `r["pruned"]` used to be the whole test, and it went to 0 on 2026-08-03
     # when the WRITER started sanitising traits (a captured `+` and a markdown escape had

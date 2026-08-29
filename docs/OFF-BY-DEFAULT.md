@@ -36,6 +36,12 @@ are no longer "off", so they are deliberately not §-headed with their knob name
 asserts that no ledger section describes a knob that is actually ON, and it caught exactly that
 the moment these three flipped.
 
+**Armed 2026-08-29, the written condition met (audit night):**
+
+| Knob | What it does now | Watch for |
+|---|---|---|
+| `silence_answer` | When he asks a what-have-I-gone-quiet-about-shaped question, she may answer from the attention ledger — which dimensions of his life have gone quiet, with the evidence floors (two attended days of span, never sub-day cadence, corroboration bar) deciding what counts. Armed with the read-first receipt: against the live store every probe answered SILENCE — no dimension clears the bar yet, so arming changed nothing on day one and it speaks only when a real pattern exists. | The first REAL silence it names: silence quotes the claim, so a misattributed registry row becomes her noticing a sentence he never said. The 07-30 curation cleaned the store once; the admission filter is still the leak to watch. |
+
 **Armed 2026-07-30, operator's call, live profile `companion`:**
 
 | Knob | What it does now | Watch for |
@@ -161,17 +167,14 @@ was written the day before arming, kept because the reasoning is the boundary's 
 | **What would arm it** | Flip `[music].enabled` when he wants her DJing again. That is genuinely all. |
 | **The wider question it raises, ledgered with it** | His same message asked whether more of the tool surface should load dynamically or stop being tools at all. The tiering already exists (core up front, extra as a load-on-demand gist index) — what has never been done is a MEASURED census: which extra-tier tools she has actually called (the by-name call log landed 2026-08-24 makes this a one-grep question after a week of log), which index lines have never earned their tokens, and which tool-shaped things would serve better ambient (the wardrobe line's precedent). `g_notes_tools` is the named instrument for selection quality. A census with receipts, not a redesign on a hunch. |
 
-### 5. `SP_SILENCE_ANSWER` — what has gone quiet, at answer time
+### 5. what has gone quiet, at answer time — **ARMED 2026-08-29**
 
-| | |
-|---|---|
-| **Code** | `harness/skills/silence.py`; per-turn note in `app.py`, one standing-world line |
-| **Gate** | `harness_tests/g_silence_answer.py` — 32/32 |
-| **Why off** | **THE EVIDENCE BASE IS TOO THIN, and this is enforced rather than trusted.** `MIN_LEDGER_DAYS = 14`; the attention ledger is **5 days** deep. With the knob forced on today the module still returns nothing and says why: *"attention ledger is 5 day(s); 14 needed before an absence can mean anything."* |
-| **What would arm it** | Nine more days of `presence.jsonl`. That is the whole condition, and it arrives on its own — check `silence.why_quiet()`. Then read what it would actually say before arming, because the store still contains misattributed rows (below). **Revisited 2026-08-21: THE CONDITION HAS ARRIVED** — `presence.present_days_total()` = 17 attended days (the ledger skipped 2026-07-16 → 2026-08-19 while the presence write was armed on one of two turn paths; fixed 2026-08-19, rows resume 08-20). Not armed yet, on purpose: the row's own second step — *read what it would actually say before arming* — is still owed. Arming condition now: run `silence.what_she_would_say()` against the live store once, read it, and if it names only real silences, set `SP_SILENCE_ANSWER=1` in the profile with the receipt here. |
-| **Blocker — CLEARED 2026-07-30** | Registry rows stored as `speaker=user` that were plainly hers or junk. Silence QUOTES the claim, so a misattributed row becomes *her noticing a sentence he never said*. **Curated: 7 rows tombstoned** (86 live → 79) — "I can take a look if you like ;)" and "I was silent because I was asleep" (her voice as his testimony), "I am excited." (a mood, not a fact), and four garbled or truncated captures. Nothing deleted: all went through `memory.forget()`, which tombstones. Deliberately KEPT: "the kettle is my favorite!" — plausibly a real preference of his, consistent with his other rows about small tactile rituals, and the span/cadence floors already stopped it topping the ranking. |
-| **Still worth watching** | The capture path produced 3 rows from one short conversation and **2 were junk** ("I am excited.", "as much I as I want to have some fun together."). Curation is a mop; the admission filter is the leak. |
-| **Already fixed here** | `person.silences()` now floors the span (two separate attended days) and the cadence (never sub-day) — a burst inside one conversation is not a rhythm. That cut five junk silences to one on the live store. |
+Moved to the ARMED table above. The row's history stays, condensed: off because the
+attention ledger was 5 days against a 14-day floor; the 2026-07-30 curation tombstoned 7
+misattributed rows so silence could quote safely; the span/cadence floors cut burst-junk;
+the condition ("nine more days — it arrives on its own") arrived ~2026-08-18 and sat
+UNNOTICED for eleven days until the 2026-08-29 audit — the lesson the ARMED row carries:
+an arming condition that arrives on its own needs a reader.
 
 ### 6. semantic ranking at the recall seam — **ARMED 2026-08-23**
 
@@ -249,7 +252,7 @@ reason; none of the reasons were written down.
 | `SP_POUW_MINING` | **MEASURED AGAINST.** Mining was an unconditional `tokio::spawn` — ~1.03 synthetic receipts/second for 773 minutes into an unbounded Vec nothing read. | The mesh/DHT work actually needing receipts, with a reader and a bound. |
 | `SP_BACKUP_EPISODES` | **MEASURED — disk arithmetic.** `var/memory/eps` is 1.2 GB of KV snapshots; hourly copies would fill the disk in a day. The registry that references them IS backed up — a restore loses replay fidelity, not the record. Gate: `harness_tests/g_backup.py`. | Episode storage becoming incremental/deduplicated, or a backup target that is not the same disk. |
 | `SP_SPINE_TOOLSET` | **MEASURED AGAINST (live-play 4).** The per-turn toolset swap rewrites the system prompt, diverging the persist-KV cache at token 0 — a full re-prefill of the conversation; building/code messages stalled for minutes. Coding tools live in the load-on-demand index tier instead. | A toolset swap that does not touch the system prompt (e.g. tool-tier selection below the prompt seam), measured against the persist-KV hit rate. |
-| `SP_MEM_STORE` | **CAPABILITY, retired — the daemon's `store_verb` write path.** One of the two daemon writers G-ONEWRITER exists for: registry writes with `speaker` hardcoded, no status, no admission, no firewall, and zero model inference. `serve.py` refuses to boot any profile arming it while `agent.authority = "spine"`. Gate: `harness_tests/g_onewriter.py` — 35/35. | Only a deliberate move of memory authority back to the daemon (`authority != "spine"`), which is an architecture decision, not a knob flip. |
+| `SP_MEM_STORE` | **CAPABILITY, retired — the daemon's `store_verb` write path.** One of the two daemon writers G-ONEWRITER exists for: registry writes with `speaker` hardcoded, no status, no admission, no firewall, and zero model inference. `serve.py` refuses to boot any profile arming it while `agent.authority = "spine"`. Gate: `harness_tests/g_onewriter.py` (count tracks the profile count; 13/13 on today's two profiles). | Only a deliberate move of memory authority back to the daemon (`authority != "spine"`), which is an architecture decision, not a knob flip. |
 | `SP_B4_NIGHTSHIFT` | **CAPABILITY, retired — the daemon's `growth` write path.** The other daemon writer; same refusal in `serve.py`, same gate. The 2026-07-12 "one memory authority" fix turned this one off and missed `store_verb` — the pair is why the refusal walks *both* flags on *every* profile. | Same condition as `SP_MEM_STORE`, and never separately from it. |
 | `SP_VOICE_EAR` | **CAPABILITY — a fallback selector.** Forces the legacy CTC "ear" over the native encoder-free audio path (`voice/service.py` prefers native — raw audio into the model's own `embed_audio` projection — when available; the CTC ear was a transcription substitute). Mapped through the door 2026-08-19; before that it was a getenv no served stack could reach. | Debugging the native audio path, for the duration of the hunt. |
 | `SP_MCP_UNSANDBOXED` | **CAPABILITY, held by design (2026-08-19, operator's call: sandboxed-first).** The FastMCP server used to register the UNSANDBOXED read/write/list and run_shell/run_powershell/run_python under bare names — the exposure agent.all_tools() deliberately shadows. Default surface is now the workspace-rooted file tools + web + clock; this knob arms the executors. Gate: `harness_tests/h_mcp_server.py` (asserts both surfaces). | An external MCP client that genuinely needs shell/python on this machine, armed knowingly for that client — never as a convenience default. |
