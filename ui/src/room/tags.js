@@ -65,8 +65,13 @@
 // harness_tests/tags_mirror_check.js now CONSTRUCTS each one in a real JS engine,
 // because reading a file as text can never tell you that a regex compiles.
 const _loose = (w) => w.slice(0, -1).split('').join('[_ -]?') + '[_ -]?' + w.slice(-1) + '?(?:[_ -]?[a-z]+)*'
-const _N = ['MOOD', 'VOICE', 'TRAITS', 'TRAIT', 'TRAI', 'TRAIL', 'WEAR', 'SHOW']
-  .map(_loose).join('|')
+/* STRICT stems for WEAR/SHOW (2026-08-29 audit, H3), mirroring the server's
+ * _loose_name_strict: the open suffix + optional last letter made WEA-/SHO-
+ * sufficient prefixes, so `[weather: heavy rain]` was eaten from his screen while
+ * the server wore 'heavy rain'. Full stem, conjugations from a closed set. */
+const _strict = (w, suf) => w.split('').join('[_ -]?') + '(?:[_ -]?(?:' + suf + '))?'
+const _N = ['MOOD', 'VOICE', 'TRAITS', 'TRAIT', 'TRAI', 'TRAIL'].map(_loose)
+  .concat([_strict('WEAR', 's|ing|ed|_now'), _strict('SHOW', 's|n|ed|_now')]).join('|')
 /* THE CLOSER IS OPTIONAL AT A LINE END (2026-08-24), mirroring the server's
  * `_STRIP_LOOSE`, which has read `(?:\]+|(?=\n)|$)` since 2026-08-06 while this copy
  * still demanded `\]+`. Measured in her transcripts: `[VOX:soft, wistful]` closes fine,
@@ -246,7 +251,7 @@ export function forSpeech(text) {
  * prose, not her machinery. */
 const _TAG_WORDS = ['mood', 'voice', 'trait', 'wear', 'show']
 const _NOT_MARKS = new Set(['shower', 'showers', 'showdown', 'showcase', 'showroom',
-  'showing', 'showings', 'wearer', 'wearers', 'weary', 'wearable', 'wearables',
+  'showing', 'showings', 'wearer', 'wearers', 'weather', 'weapon', 'weapons', 'weary', 'wearable', 'wearables',
   'weariness', 'moody', 'moodboard', 'traitor', 'traitors', 'voiceover', 'voicemail'])
 
 /* ...AND THREE EDITS IS TOO FAR TO GUESS. `VOX` is Latin for voice and it is three

@@ -90,8 +90,31 @@ PER_MSG_TOKENS = 6
 TRIM_TO = 0.80
 
 # The sticky cut (see fit()): (role, content fingerprint) of the first kept message from
-# the last fresh cut. Process-wide like the client singleton it serves; a bounce clears it.
-_STICKY_CUT = None
+# the last fresh cut, KEYED BY CONVERSATION (2026-08-29 audit, B6). One process-wide slot
+# served every session — his chat, her kairos lane, the OpenAI mouth — and each fresh cut
+# overwrote the others' marker, so two long conversations clobbered each other into a
+# full re-prefill per turn: the exact 235/222/207 s failure the sticky was written to
+# end, resurrected by the singleton. The key is the conversation's FIRST message (the one
+# row that never changes for a session); a bounce clears the table, a miss falls through
+# to a fresh cut, and the table is capped so abandoned sessions cannot grow it forever.
+_STICKY_CUTS: dict = {}
+_STICKY_MAX = 64
+
+# THE BUDGET THE STICKY TEST SEES MUST NOT FLIP MID-TURN (2026-08-29 audit, B7, observed
+# live): budget() subtracts the caller's max_tokens, and the answering round bumps
+# 120→512 — a window sized in the band between them passed the test on one call of a
+# turn and failed on the next, and the re-cut cost an 8,160-token boundary drop (82
+# messages of her memory) over a knob that has nothing to do with context. fit()
+# reserves at least this floor, so both rounds of a turn measure the same budget.
+STICKY_HEADROOM_FLOOR = 768
+
+
+def reset_sticky() -> None:
+    """Forget every cut marker. Called at the day boundary and the operator refresh:
+    the canons are rebuilt from the durable transcript with the SAME message contents,
+    and yesterday's marker matching a row in the rebuilt canon would cut history that
+    fits (2026-08-29 audit, B12)."""
+    _STICKY_CUTS.clear()
 
 
 def _fp(m) -> str:
@@ -168,7 +191,7 @@ def fit(msgs: List[Dict[str, Any]],
     fires every turn is a window, and a window that silently slides is the failure mode
     this file is named after, not the fix for it."""
     msgs = list(msgs or [])
-    b = budget(reply_headroom, limit)
+    b = budget(max(int(reply_headroom or 0), STICKY_HEADROOM_FLOOR), limit)
     before = est_tokens(msgs)
     if before <= b or len(msgs) <= 2:
         return msgs, None
@@ -193,12 +216,17 @@ def fit(msgs: List[Dict[str, Any]],
     # quiet turns between cuts. The marker is the first kept message's identity, not an
     # index: prepended or vanished history (a bounce, a different session) simply misses
     # and falls through to a fresh cut.
-    global _STICKY_CUT
-    if _STICKY_CUT is not None:
+    _skey = (tail[0].get("role"), _fp(tail[0])) if tail else None
+    _marker = _STICKY_CUTS.get(_skey)
+    if _marker is not None:
         idx = next((i for i, m in enumerate(tail)
-                    if (m.get("role"), _fp(m)) == _STICKY_CUT), None)
+                    if (m.get("role"), _fp(m)) == _marker), None)
         if idx is not None and idx > 0:
             kept = head + tail[idx:]
+            # A KEPT WINDOW STARTS WITH HIM on this path too (2026-08-29, B10): the
+            # fresh cut popped leading non-user rows and the sticky return did not.
+            while len(kept) > len(head) + 1 and kept[len(head)].get("role") != "user":
+                kept.pop(len(head))
             after = est_tokens(kept)
             if after <= b:
                 return kept, {"dropped": len(msgs) - len(kept), "kept": len(kept),
@@ -226,7 +254,10 @@ def fit(msgs: List[Dict[str, Any]],
         keep.pop(0)
 
     out = head + keep
-    _STICKY_CUT = (keep[0].get("role"), _fp(keep[0])) if keep else None
+    if _skey is not None and keep:
+        if len(_STICKY_CUTS) >= _STICKY_MAX and _skey not in _STICKY_CUTS:
+            _STICKY_CUTS.pop(next(iter(_STICKY_CUTS)))
+        _STICKY_CUTS[_skey] = (keep[0].get("role"), _fp(keep[0]))
     return out, {"dropped": len(msgs) - len(out), "kept": len(out),
                  "before": before, "after": est_tokens(out), "budget": b}
 

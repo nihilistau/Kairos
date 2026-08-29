@@ -211,7 +211,7 @@ print("\n8. THE CUT IS STICKY, OR EVERY TURN PAYS FOR IT (2026-08-28, live)")
 # same from the room. Point 3 of this file's own header claimed the kept window was
 # stable; it never was, because the trimmed list is not what the room sends next turn.
 from harness.inference import context as C  # noqa: E402
-C._STICKY_CUT = None
+C.reset_sticky()
 _m = [{"role": "system", "content": "S" * 400}]
 for _i in range(30):
     _m += [{"role": "user", "content": "u%d " % _i + "x" * 380},
@@ -237,6 +237,41 @@ check("...never returning something over the budget",
       C.est_tokens(_f2) <= _t2["budget"] and C.est_tokens(_f3) <= _t3["budget"])
 _f4, _t4 = C.fit(list(_m[:5]), reply_headroom=0, limit=3000)
 check("a short prompt is untouched even while a sticky cut exists", _t4 is None)
-C._STICKY_CUT = None
+C.reset_sticky()
+
+print("\n9. ONE MARKER PER CONVERSATION, ONE BUDGET PER TURN (2026-08-29 audit)")
+# B6, observed live: the marker was a process-wide singleton, so his chat and her
+# kairos lane clobbered each other's cut point — every turn of both re-cut fresh and
+# re-prefilled. B7, observed live at 17:45: budget() subtracts the caller's
+# max_tokens and the answering round bumps 120->512, flipping the fit test between
+# two calls of the SAME turn (an 8,160-token boundary drop over a decode knob).
+_mB = [{"role": "system", "content": "S" * 400},
+       {"role": "user", "content": "SESSION-B opener " + "z" * 380}]
+for _i in range(30):
+    _mB += [{"role": "user", "content": "bu%d " % _i + "p" * 380},
+            {"role": "assistant", "content": "ba%d " % _i + "q" * 380}]
+_fa1, _ta1 = C.fit(list(_m), reply_headroom=0, limit=3000)      # session A cuts
+_fb1, _tb1 = C.fit(list(_mB), reply_headroom=0, limit=3000)     # session B cuts
+_fa2, _ta2 = C.fit(list(_m) + [{"role": "user", "content": "u-again " + "x" * 40}],
+                   reply_headroom=0, limit=3000)                # A again
+check("two conversations keep two markers — B's cut does not move A's",
+      _ta2 is not None and _ta2.get("sticky") is True
+      and _fa2[1]["content"] == _fa1[1]["content"], (_ta2, _fa2[1]["content"][:12]))
+_fb2, _tb2 = C.fit(list(_mB) + [{"role": "user", "content": "b-again " + "z" * 40}],
+                   reply_headroom=0, limit=3000)
+check("...and A's did not move B's", _tb2 is not None and _tb2.get("sticky") is True,
+      _tb2)
+# THE HEADROOM FLIP: same conversation, same turn, two max_tokens. Both calls must
+# measure the same budget (the floor), so the second reuses the first's window.
+C.reset_sticky()
+_fh1, _th1 = C.fit(list(_m), reply_headroom=120, limit=4000)
+_fh2, _th2 = C.fit(list(_m), reply_headroom=512, limit=4000)
+check("a 120->512 max_tokens bump cannot flip the window (one floored budget)",
+      _th1 is not None and _th2 is not None
+      and _th1["budget"] == _th2["budget"] and _th2.get("sticky") is True,
+      (_th1 and _th1["budget"], _th2 and _th2["budget"], _th2))
+check("reset_sticky() forgets every marker (the day-boundary hook)",
+      (C.reset_sticky() or C.fit(list(_m), reply_headroom=0, limit=3000)[1]
+       .get("sticky") is None))
 
 finish("G-CONTEXT-FIT")

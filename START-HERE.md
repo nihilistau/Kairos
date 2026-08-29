@@ -12,7 +12,7 @@ compile — the engine is whichever server you point the profile at.)*
 ## Boot
 
 ```
-pip install -r requirements.txt
+pip install -e ".[http]"
 # start an OpenAI-compatible server: LM Studio (default :1234) or llama-server (:8080)
 python serve.py companion            # boots the GATEWAY; the engine is yours
 ```

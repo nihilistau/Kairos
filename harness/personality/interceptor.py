@@ -56,6 +56,7 @@ from harness.personality.persona_file import parse_persona, write_state
 # the VALUE (`_mood_value`, `_ok`), which is the rule this file has always lived by — but
 # "what counts as the name" is one question and must have one answer.
 from harness.inference.stream_processor import _loose_name as _lname  # noqa: E402
+from harness.inference.stream_processor import _loose_name_strict as _lstrict  # noqa: E402
 
 
 # `[...]` OR `<...>` — she uses both wrappers; live: `<TRAIT:+playful>`.
@@ -89,8 +90,12 @@ _TRAIT = re.compile(r"[\[<]\s*(?:%s)\s*[:\-]([+-]?)([^\]>]+)[\]>]" % _lname("TRA
 #
 # The value group stays as it was: `+` for WEAR (a garment has a name) and `*` for SHOW,
 # because `[SHOW:]` with nothing in it is the mark and its own undo.
-_WEAR = re.compile(r"[\[<]\s*(?:%s)\s*[:\-]([^\]>]+)[\]>]" % _lname("WEAR"), re.I)
-_SHOW = re.compile(r"[\[<]\s*(?:%s)\s*[:\-]([^\]>]*)[\]>]" % _lname("SHOW"), re.I)
+# STRICT stems (2026-08-29 audit, H3): _lname's open suffix + optional last letter
+# made WEA-/SHO- sufficient prefixes — [weather: heavy rain] wore 'heavy rain',
+# filed a permanent want, spent an image, and the strip family ate the sentence.
+# Full stem + closed conjugation set; [WEARING:] still lands, [weapon:] never.
+_WEAR = re.compile(r"[\[<]\s*(?:%s)\s*[:\-]([^\]>]+)[\]>]" % _lstrict("WEAR", "s|ing|ed|_now"), re.I)
+_SHOW = re.compile(r"[\[<]\s*(?:%s)\s*[:\-]([^\]>]*)[\]>]" % _lstrict("SHOW", "s|n|ed|_now"), re.I)
 # The strip regex that used to live here was a SECOND COPY of the one in
 # stream_processor.py — and this is the copy that runs on the served path, so when the
 # 26B started emitting `[TRAIТ:+flirty]` (Cyrillic Т) and unterminated tags, THIS is

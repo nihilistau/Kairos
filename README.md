@@ -18,6 +18,12 @@ retire an observation; every verdict is a ruling of a committed finite table, no
 
 ## Quick start
 
+> **Windows-only today, honestly:** `serve.py`'s process control uses Windows-native
+> calls (`taskkill`, `CREATE_NO_WINDOW`) and fails on Linux/macOS. The harness itself
+> is portable Python; the launcher is not, yet. On POSIX you can run the gateway
+> directly (`python -m harness.server.app` with the profile's env set) — a portable
+> launcher is on the list.
+
 ```bash
 pip install -e ".[http]"                      # zero hard deps on the core path; httpx for the client
 cp -r persona-template persona                # her identity — yours to edit, gitignored

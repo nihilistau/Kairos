@@ -128,18 +128,27 @@ class SPDaemonClient:
         prompt_tokens: Optional[List[int]] = None,
         config: Optional[InferenceConfig] = None,
         on_event: Optional[Callable[[StreamEvent], None]] = None,
+        extra: Optional[Dict[str, Any]] = None,
     ) -> Generator[str, None, InferenceResponse]:
         """Stream tokens from ``POST /v1/chat``.
 
         Yields the text delta of each token; returns the aggregated
         :class:`InferenceResponse` when the stream closes. ``on_event`` (if
         given) receives the normalized :class:`StreamEvent` for each line.
+
+        ``extra`` merges additional daemon-body keys (e.g. the voice lane's
+        ``inject_frames``/``inject_ph``) AFTER to_sp_chat resolves the profile
+        seams — so a lane with a special payload still gets byteexact/eot
+        resolution and the fit() ceiling instead of hand-building a second door
+        (2026-08-29 audit, D20: the voice lane was exactly that second door).
         """
         if self._client is None:
             raise RuntimeError("httpx is required for SPDaemonClient (pip install httpx)")
 
         cfg = config or InferenceConfig()
         body = cfg.to_sp_chat(prompt=prompt, messages=messages, prompt_tokens=prompt_tokens)
+        if extra:
+            body.update(extra)
         # ── THE CEILING, COUNTED (2026-08-23) ────────────────────────────────────────
         # Past pmax the daemon declines the prefill and returns an EMPTY stream in 11 ms,
         # which the room used to render as her having nothing to say. THIS is the door

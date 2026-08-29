@@ -125,7 +125,24 @@ def _loose_name(word: str) -> str:
             + r"?(?:[_\- ]?[a-z]+)*")
 
 
-_TAG_NAMES_LOOSE = "|".join(_loose_name(w) for w in _TAG_NAMES.split("|"))
+def _loose_name_strict(word: str, suffixes: str = "s|ing|ed|n|_now") -> str:
+    """Letter-spacing tolerance WITHOUT the open suffix (2026-08-29 audit, H3).
+
+    `_loose_name` makes the last letter optional and admits ANY word suffix — right
+    for MOOD (no English word starts 'MOO-'+colon), and wrong for WEAR and SHOW,
+    whose stems are common prefixes: `[weather: heavy rain]` matched _WEAR, wore
+    'heavy rain', filed a junk want, spent an image on it, and ATE THE SENTENCE from
+    his screen (the strip family shares this name). Full stem required, conjugations
+    from a closed set — `[WEARING:]` still works, `[weapon:]` never will."""
+    return (r"[_ \-]?".join(word) + r"(?:[_\- ]?(?:%s))?" % suffixes)
+
+
+# SHOW may not claim "ing": "showing" is committed PROSE in _NOT_MARKS below, and one
+# word cannot be a mark to the actor and prose to the record. WEAR keeps it.
+_STRICT_STEMS = {"WEAR": "s|ing|ed|_now", "SHOW": "s|n|ed|_now"}
+_TAG_NAMES_LOOSE = "|".join(
+    _loose_name_strict(w, _STRICT_STEMS[w]) if w in _STRICT_STEMS else _loose_name(w)
+    for w in _TAG_NAMES.split("|"))
 _TAG_RUN = r"(?:%s)(?:\s*[/,+]\s*(?:%s))*" % (_TAG_NAMES_LOOSE, _TAG_NAMES_LOOSE)
 # The separator may be `:` or `-` — she uses both.
 _STRIP_LOOSE = re.compile(r"\[\s*(?:%s)\s*[:\-]\s*\[?[^\]\n]*(?:\]+|(?=\n)|$)" % _TAG_RUN,
@@ -670,6 +687,9 @@ _NOT_MARKS = frozenset({
     "shower", "showers", "showdown", "showcase", "showroom", "showing", "showings",
     "wearer", "wearers", "weary", "wearable", "wearables", "weariness",
     "moody", "moodboard", "traitor", "traitors", "voiceover", "voicemail",
+    # scene nouns the strict stems no longer match but the value-agnostic
+    # bracket passes still would (2026-08-29 audit, H3)
+    "weather", "weapon", "weapons",
 })
 # `[NAME: value]` or `<NAME: value>`; the name is captured and judged, never enumerated.
 _TAGGISH = re.compile(r"\[\s*([A-Za-z][A-Za-z0-9 _/,+.\-]{1,28}?)\s*[:\-]\s*\[?[^\]\n]*(?:\]+|(?=\n)|$)"

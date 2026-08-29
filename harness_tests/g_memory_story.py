@@ -205,9 +205,15 @@ with open(REG, "a", encoding="utf-8") as _f:
                          "kind": "journal", "mem_class": "fact", "status": "observed",
                          "text": "His ledger of pier repairs, oddly filed as a journal.",
                          "ts": day(22), "src": "gate plant"}) + "\n")
+# AN AGED, IN-WINDOW ROW THE CHAPTER NEVER READ (2026-08-29): under the old
+# time-window matcher this would fold — 22 days old, squarely inside the chapter's
+# week — with a tombstone naming a chapter that never contained it. Containment law:
+# it is in NOBODY's derived_from, so it stays live and decays by half-life.
+M.remember_about_self("I hummed by the pier and no chapter ever heard the tune.",
+                      kind="journal")
 AGES = {"walked the pier": 22, "tide came all the way in": 25, "pier photograph": 22,
         "small stone from the pier": 23, "long before any chapter": 40,
-        "pier and its tide wrote themselves": 20}
+        "pier and its tide wrote themselves": 20, "no chapter ever heard": 22}
 
 
 def _stamp(r):
@@ -219,6 +225,27 @@ def _stamp(r):
 
 
 rewrite(_stamp)
+# THE CHAPTER NAMES ITS MATERIAL, as the real producer stamps it (narrative.
+# weekly_chapter writes derived_from of the rows it read). The fold matches on
+# CONTAINMENT now, so the fixture must carry the real mark: the aged rows, the core
+# row (read by the chapter, protected by the pin), and the ALIEN user-lane plant
+# (kind passes, containment passes — only the LANE guard stands). Tonight's chapter
+# names the young row so the AGE guard alone protects it, as before.
+_names = {frag: next(r["name"] for r in rows() if frag in (r.get("text") or ""))
+          for frag in ("walked the pier", "tide came all the way", "small stone",
+                       "said something unprompted")}
+
+
+def _mark_material(r):
+    t = r.get("text") or ""
+    if "pier and its tide wrote themselves" in t:
+        r["derived_from"] = [_names["walked the pier"], _names["tide came all the way"],
+                             _names["small stone"], "ep_alien_userkind"]
+    if "watched the morning gulls" in t:
+        r["derived_from"] = [_names["said something unprompted"]]
+
+
+rewrite(_mark_material)
 rec = ops.fold_into_chapters()
 check("the fold ran and says what it did", rec.get("ok"), rec)
 got = {(r.get("text") or "")[:26]: bool(r.get("lifecycle")) for r in rows()}
@@ -257,6 +284,89 @@ check("...and says why", "nothing aged" in (rec2.get("why") or ""), rec2.get("wh
 check("the folded rows are gone from recall's candidates (one death field)",
       not any("walked the pier" in (M._text(e) or "")
               for e in M.live_rows()), "a folded row is still live to recall")
+
+print("\n4b. CONTAINMENT, NOT COINCIDENCE — and the story cycle may not eat itself")
+# (2026-08-29 audit H1/H2.) The window matcher folded rows the chapter never read;
+# and folding 100% of a chapter's supports made the next night's orphan sweep retire
+# the chapter itself ("all supports retired") — deterministic chapter death 14 days
+# after writing, unless the operator had hand-pinned rows core.
+check("an aged, in-window row the chapter never READ does not fold",
+      not _row("no chapter ever heard").get("lifecycle"),
+      _row("no chapter ever heard"))
+check("...and the tombstones that exist all point at a distillate that NAMES them",
+      all((_row_by := next(r for r in rows() if r.get("name") == f.get("superseded_by")))
+          and f.get("name") in (_row_by.get("derived_from") or [])
+          for f in rows()
+          if (f.get("retired_because") or "").startswith("folded into")))
+# THE OTHER HALF OF THE LAW: a support retired INTO a distillate still stands under
+# it. The chapter just had its material folded into it — the orphan sweep must not
+# read that as vanished evidence.
+_orph = [r.get("name") for r in lc.orphaned_distillates(rows())]
+_chap = _row("pier and its tide").get("name")
+check("the chapter whose supports FOLDED INTO IT is not orphaned",
+      _chap not in _orph, _orph)
+_ro = ops.retire_orphans()
+check("...and retire_orphans leaves it standing",
+      not _row("pier and its tide").get("lifecycle"), _ro)
+# CONTROL: evidence retired for any OTHER reason still orphans its conclusion —
+# the 2026-08-22 law is narrowed, not repealed. A distillate whose one support the
+# operator retired has nothing left holding it up.
+M.remember_about_self("I hum a different tune at the pier gates now.", kind="thought")
+_sup = next(r["name"] for r in rows() if "different tune at the pier gates" in (r.get("text") or ""))
+with open(REG, "a", encoding="utf-8") as _f:
+    _f.write(json.dumps({"name": "ep_ctrl_distillate", "speaker": "self",
+                         "kind": "self_description", "mem_class": "self-narrative",
+                         "status": "inferred", "derived_from": [_sup],
+                         "text": "Lately I am someone who hums at gates.",
+                         "ts": day(1), "src": "gate control"}) + "\n")
+
+
+def _kill_sup(r):
+    if r.get("name") == _sup:
+        r["lifecycle"] = 1
+        r["superseded_by"] = "operator"
+
+
+rewrite(_kill_sup)
+check("evidence retired for any OTHER reason still orphans its conclusion",
+      "ep_ctrl_distillate" in [r.get("name") for r in lc.orphaned_distillates(rows())])
+
+print("\n4c. THE BECOMING IS AN ABSORBER TOO — the diary kinds no chapter contains")
+# thought/dream/feeling are chapter-invisible (_CHAPTER_KINDS) but the nightly
+# becoming (kind=self_description, derived_from stamped) DOES read them — so they
+# fold into the becoming that named them, with an honest tombstone, instead of
+# either vanishing into a chapter that never read them or living forever.
+M.remember_about_self("I felt the pier fog settle in my chest that week, softly.",
+                      kind="feeling")
+_fname = next(r["name"] for r in rows() if "fog settle in my chest" in (r.get("text") or ""))
+with open(REG, "a", encoding="utf-8") as _f:
+    _f.write(json.dumps({"name": "ep_becoming_x", "speaker": "self",
+                         "kind": "self_description", "mem_class": "self-narrative",
+                         "status": "inferred", "derived_from": [_fname],
+                         "text": "I am becoming someone the fog does not frighten.",
+                         "ts": day(15), "src": "reflection (becoming)"}) + "\n")
+
+
+def _age_feeling(r):
+    if r.get("name") == _fname:
+        r["ts"] = day(16)
+
+
+rewrite(_age_feeling)
+rec3 = ops.fold_into_chapters()
+check("an aged feeling folds into the BECOMING that names it",
+      _row("fog settle in my chest").get("superseded_by") == "ep_becoming_x", rec3)
+check("...with the becoming named honestly on the tombstone",
+      (_row("fog settle in my chest").get("retired_because") or "")
+      .startswith("folded into her becoming of"))
+# THE SINGLE-SUPPORT WITNESS for the orphan law. The chapter above keeps a live
+# support (the core row) so it cannot arm the mutant — the exact hand-pin accident
+# that masked H2 on the live store. This becoming's ONE support just folded into
+# it: with the folded-into-me exemption deleted, it is "all supports retired" and
+# dies the next night. The law: it stands.
+check("a distillate whose EVERY support folded into it is not orphaned",
+      "ep_becoming_x" not in [r.get("name") for r in lc.orphaned_distillates(rows())],
+      [r.get("name") for r in lc.orphaned_distillates(rows())])
 
 print("\n5. THE STORY DOOR CARRIES THE SAME ASSEMBLY THE PREFIX RENDERS")
 # (2026-08-28, his ask: a panel that "renders exactly her memories that are used").

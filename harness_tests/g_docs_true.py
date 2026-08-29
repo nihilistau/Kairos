@@ -47,6 +47,16 @@ RETIRED = [
      "`agent` is the retired reference model profile — the live one is companion"),
     (re.compile(r"Migration target \(see MIGRATION-MAP\.md\)"), "2026-08-21",
      "the 1-line README stubs were replaced with real orientation files"),
+    # ── 2026-08-29 audit: START-HERE said "`agent` ... still runnable" for THREE DAYS
+    # after the profile was deleted, and hid from this gate two ways at once — the
+    # command pattern above bans only the literal launch-command form, and the line carried the
+    # word "retired", which the amnesty below waves through. "Still runnable" (or
+    # present-tense running-ness of a deleted profile) is a CLAIM, not a history note,
+    # so it gets its own pattern — and the amnesty word-list cannot save it, because
+    # this entry is checked with amnesty=False in the loop below.
+    (re.compile(r"still runnable|still boots|can still be (?:run|served|booted)", re.I),
+     "2026-08-26",
+     "nothing deleted is 'still runnable' — the retired profiles are gone from profiles/"),
 ]
 
 
@@ -73,11 +83,14 @@ for p in PROSE:
     for n, line in _prose_lines(p):
         # a line that itself says the thing is retired/removed/gone is allowed to name it
         low = line.lower()
-        if any(w in low for w in ("removed", "retired", "replaced", "gone", "died", "history",
-                                  "no longer", "used to", "never existed", "was the", "were the",
-                                  "until 2026", "before 2026", "first cut", "the old ", "legacy")):
-            continue
+        _amnesty = any(w in low for w in ("removed", "retired", "replaced", "gone", "died", "history",
+                                          "no longer", "used to", "never existed", "was the", "were the",
+                                          "until 2026", "before 2026", "first cut", "the old ", "legacy"))
         for pat, when, why in RETIRED:
+            # "still runnable" is a live CLAIM even on a line that says "retired" —
+            # that exact line hid here for three days (2026-08-29 audit).
+            if _amnesty and "still runnable" not in pat.pattern:
+                continue
             if pat.search(line):
                 hits.append("%s:%d  [%s, retired %s] %s" % (rel, n, pat.pattern[:28], when, line.strip()[:90]))
 for h in hits:

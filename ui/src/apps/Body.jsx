@@ -57,7 +57,10 @@ function Tail({ vals, trend, unit }) {
 export default function Body() {
   // 5s: fast enough that a climbing heart is visibly climbing, slow enough that the panel
   // is not a load generator. The store is a file read; this is not free.
-  const s = usePoll(api.telemetryNow, 5000)
+  /* 15s, not 5s (2026-08-29 audit): /v1/telemetry/now measured at ~12s on this box,
+     and a 5s interval permanently stacked ~2.4 in-flight requests, each holding a
+     server thread. usePoll also skips a tick while one is in flight now. */
+  const s = usePoll(api.telemetryNow, 15000)
   const [hours, setHours] = useState(6)
   const [hist, setHist] = useState(null)
   const [err, setErr] = useState('')

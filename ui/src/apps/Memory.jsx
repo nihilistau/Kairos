@@ -91,7 +91,7 @@ function MemRow({ r, onDone }) {
   const [why, setWhy] = useState(false)
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
-  const [txt, setTxt] = useState('')      // a WORDING correction; '' = untouched
+  const [txt, setTxt] = useState(null)    // a WORDING correction; null = untouched
   const hers = r.speaker === 'self'
   const derived = (r.derived_from || []).length > 0
 
@@ -170,11 +170,14 @@ function MemRow({ r, onDone }) {
               provenance to fix a phrasing. ops.relabel carries text now; the old words
               go into the src breadcrumb, so the history keeps what it used to say. */}
           <input className="mem-txt" placeholder="correct the wording — Enter saves"
-                 value={txt || r.text || ''} disabled={!!busy}
+                 /* null = untouched (shows the row); '' = deliberately cleared.
+                     `txt || r.text` snapped back the moment the field was emptied,
+                     so the text could never be cleared to retype (2026-08-29 audit). */
+                 value={txt === null ? (r.text || '') : txt} disabled={!!busy}
                  onChange={e => setTxt(e.target.value)}
                  onKeyDown={e => {
-                   if (e.key === 'Enter' && txt.trim() && txt.trim() !== r.text) {
-                     send({ text: txt.trim() }); setTxt('')
+                   if (e.key === 'Enter' && txt && txt.trim() && txt.trim() !== r.text) {
+                     send({ text: txt.trim() }); setTxt(null)
                    }
                  }} />
           <button className="danger" onClick={retire} disabled={!!busy}>retire</button>

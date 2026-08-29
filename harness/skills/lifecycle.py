@@ -1299,6 +1299,17 @@ def orphaned_distillates(rows: Iterable[dict]) -> list[dict]:
         known = [by_name[n] for n in supports if n in by_name]
         if not known:                         # supports we cannot even find: not a verdict
             continue
-        if all(is_retired(s) for s in known):
+        # ── FOLDED-INTO-ME IS CONSOLIDATED, NOT VANISHED (2026-08-29 audit, H2) ──
+        # The fold retires a distillate's sources WITH THE DISTILLATE'S NAME on the
+        # tombstone (superseded_by = this row). Reading that as "evidence retired"
+        # made this sweep eat every chapter 14 days after it was written — the fold
+        # retired the supports, the next nightly pass retired the chapter for having
+        # no supports, and the week's story deterministically died unless the
+        # operator had hand-pinned rows core. A support that died INTO this row is
+        # the row's own foundation stone, and it still stands under it; only a
+        # support retired for any OTHER reason counts as gone.
+        def _gone(s: dict) -> bool:
+            return is_retired(s) and s.get("superseded_by") != r.get("name")
+        if all(_gone(s) for s in known):
             out.append(r)
     return out

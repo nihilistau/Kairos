@@ -91,6 +91,17 @@ def voice_turn(body: Dict[str, Any], transcript: list) -> Iterator[bytes]:
         "The user just spoke to you out loud. First understand exactly what they "
         "said, then reply directly and briefly to their actual words — do not "
         "invent content you did not hear:")
+    # ── SHE IS TOLD ON THIS MOUTH TOO (2026-08-29 audit). The anon staple lived only
+    # on the native chat path, so on a voice turn she could promise to remember a
+    # private utterance: the writers refused and she was never told why — the exact
+    # lie-by-omission the staple exists to prevent. Same one sentence, same source.
+    try:
+        from harness.control import anon as _anon_v
+        _an = _anon_v.note()
+        if _an:
+            instr = instr + "\n\n" + _an
+    except Exception:
+        pass
     turn = list(transcript)
     turn.append({"role": "user", "content": instr})
     transcript.append({"role": "user", "content": "[voice message]"})
@@ -104,25 +115,58 @@ def voice_turn(body: Dict[str, Any], transcript: list) -> Iterator[bytes]:
         yield ev({"delta": "[voice-in is not available on this engine — speak to me in text]"})
         yield b"data: [DONE]\n\n"
         return
-    req = {
-        "messages": turn,
-        "inject_frames": [f.tolist() for f in frames],
-        "inject_ph": VOICE_PH,
+    # ── THROUGH THE ONE DOOR (2026-08-29 audit, D20-D23). This lane hand-built its
+    # request and posted it raw, which made it a SECOND DOOR in five separate ways:
+    # no system prefix (she was not herself on voice — no persona, no coda — and the
+    # prompt shared nothing with the committed KV, evicting his conversation both
+    # ways); no context.fit() (a long transcript walked into pmax and got the empty
+    # 200); no byteexact resolution (the daemon default REFUSES on this MoE); a third
+    # eot_bias literal; and no stripper but four regex literals, so [MOOD:] and
+    # thought markers reached the screen and the TTS verbatim. sight.py was fixed for
+    # exactly this class; this was the lane the fix did not reach. Now: one prefix
+    # (system_bundle), one seam (to_sp_chat via chat_stream + extra), one ceiling
+    # (fit inside chat_stream), one speech kernel (speech_delta) with _clean kept for
+    # the audio-specific artifacts on top.
+    try:
+        from harness.agent import system_bundle
+        _sysc, _ = system_bundle()
+        msgs = [{"role": "system", "content": _sysc}] + turn
+    except Exception:
+        msgs = turn                        # a missing bundle must not cost the turn
+    from harness.inference.inference_config import InferenceConfig
+    cfg = InferenceConfig(
+        temperature=float(body.get("temperature", 0.3)),
+        repetition_penalty=1.15,
         # P1.5: double the ceiling — voice replies were truncating mid-sentence.
-        "max_tokens": int(body.get("max_tokens", 256)),
-        "temperature": float(body.get("temperature", 0.3)),
-        "repetition_penalty": 1.15,
-        "eot_bias": float(body.get("eot_bias", 1.0)),
-    }
+        max_tokens=int(body.get("max_tokens", 256)))
+    _extra = {"inject_frames": [f.tolist() for f in frames], "inject_ph": VOICE_PH}
+    if "eot_bias" in body:                 # an explicit caller value still wins
+        _extra["eot_bias"] = float(body["eot_bias"])
+    from harness.inference import stream_processor as _sp
+    _pend: dict = {"buf": ""}          # the kernel's held-tail seed, as app.py seeds it
     reply_parts: list = []
     try:
-        for delta in client.chat_stream_raw(req) if hasattr(client, "chat_stream_raw") \
-                else _raw_stream(client, req):
+        # speech_delta passes COMPLETE marks through on purpose (the room draws
+        # chips from them); this client SPEAKS its deltas, so marks are stripped
+        # here too — safe per-delta because the kernel already holds partial ones.
+        for delta in client.chat_stream(messages=msgs, config=cfg, extra=_extra):
             reply_parts.append(delta)
-            yield ev({"delta": _clean(delta)})
+            vis = _sp.speech_delta(_pend, delta)
+            if vis:
+                vis = _clean(_sp.strip_tags(vis))
+                if vis.strip():
+                    yield ev({"delta": vis})
+        vis = _sp.speech_delta(_pend, "", flush=True)
+        if vis:
+            vis = _clean(_sp.strip_tags(vis))
+            if vis.strip():
+                yield ev({"delta": vis})
     except Exception as exc:
         yield ev({"delta": f"[voice turn error: {exc}]"})
-    final = _clean("".join(reply_parts)).strip()
+    # strip_for_record, not just control surfaces: the session transcript is a
+    # RECORD, and a [MOOD:] mark recorded as her words comes back as an example
+    # of her own voice (the record-lane rule, applied to the third mouth).
+    final = _clean(_sp.strip_for_record("".join(reply_parts))).strip()
     if final:
         transcript.append({"role": "assistant", "content": final})
     yield b"data: [DONE]\n\n"
@@ -141,26 +185,7 @@ def _clean(s: str) -> str:
     return _CTRL.sub("", s)
 
 
-def _raw_stream(client, req: Dict[str, Any]) -> Iterator[str]:
-    """POST the raw /v1/chat body (inject_frames isn't in InferenceConfig) and
-    yield deltas — thin urllib fallback over the daemon's SSE."""
-    import urllib.request
-    url = getattr(client, "base_url", None) or os.environ.get(
-        "SP_DAEMON_URL", "http://127.0.0.1:3000")
-    r = urllib.request.Request(url.rstrip("/") + "/v1/chat",
-                               data=json.dumps(req).encode(),
-                               headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(r, timeout=600) as resp:
-        for raw in resp:
-            s = raw.decode("utf-8", "replace").strip()
-            if not s.startswith("data:"):
-                continue
-            p = s[5:].strip()
-            if p == "[DONE]":
-                return
-            try:
-                o = json.loads(p)
-            except Exception:
-                continue
-            if o.get("delta"):
-                yield o["delta"]
+# (_raw_stream deleted 2026-08-29: chat_stream_raw never existed anywhere, so this
+# urllib fallback WAS the lane — the hand-built second door D20 describes. The one
+# client carries inject_frames via chat_stream(extra=...) now.)
+

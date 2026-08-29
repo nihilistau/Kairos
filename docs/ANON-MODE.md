@@ -104,9 +104,19 @@ convicts itself instead of sitting there decorative.
 
 *"she remembers what happened on exit."*
 
-Both tables above answer the question *what got WRITTEN* — the twelve write doors stop the
-evening reaching his disk, the five egress doors stop it leaving the machine, and both were
-doing their job. The server never persisted a single OTR turn. She carried the private hour
+**THE CONTRACT, IN ONE SENTENCE (2026-08-29): off the record means _not written down and
+not sent off the machine_ — it does not mean gone from her head, and it cannot: the
+evening stays in her live context until the switch goes off and the room stops re-sending
+it (below), or the stack restarts.** External MCP servers are the one surface neither
+table covers — a bridged tool call is its own egress, named here so nobody reads the
+switch as covering it.
+
+Both tables above answer the question *what got WRITTEN* — the fourteen write doors stop
+the evening reaching his disk (notes.add and conversation.store joined the declared table
+2026-08-29; they were guarded from 08-28 but the receipt named them by id), the five
+egress doors stop it leaving the machine, and both were doing their job. A note typed BY
+HIS HANDS on the board is the one deliberate exception on the write side — his act, not
+the evening's content — while her tool path to the same board holds. The server never persisted a single OTR turn. She carried the private hour
 anyway — after the switch went off, for as long as the room's scrollback lasted — because
 **the ROOM kept re-sending those turns as prompt history**. Nothing was recorded and nothing leaked; the conversation simply stayed
 in her context, which is the one place a two-door structure built around *disk* and *wire* had
