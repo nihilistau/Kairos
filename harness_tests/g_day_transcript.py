@@ -47,6 +47,15 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# ── A RED FOR THE CONSOLE ENCODING, NOT FOR THE SUBJECT (2026-08-31) ──────────────────
+# §10's heading quotes his report, and his report contains "◆". On a cp1252 console the
+# print itself raises UnicodeEncodeError, the gate dies mid-run at exit 1, and the sweep
+# reports it as RED under the LAST HEADING IT MANAGED TO PRINT — §6, which is fine. That
+# is `_gate.utf8_stdout()`'s exact remit (it was written for g_narrative and
+# g_sem_dominate dying the same way); this file predates it and never called it.
+from _gate import utf8_stdout  # noqa: E402
+utf8_stdout()
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 SB = os.path.join(tempfile.gettempdir(), "_g_day_transcript")
@@ -174,7 +183,7 @@ check("the turn is written from his words", call > 0,
       "the epilogue no longer settles with _human")
 check("...bound before anything is stapled onto the message list", 0 < bind < call)
 check("...and the epilogue's day write passes them through verbatim",
-      "_append_day_turn(human_text, reply_text, synthetic=synthetic)" in src)
+      "_append_day_turn(human_text, reply_text, synthetic=synthetic, acts=acts)" in src)
 for marker, what in (("Quietly, you also remember", "the recall note"),
                      ("note_for_question(user_text)", "the silence note")):
     at = src.index(marker)
@@ -266,6 +275,41 @@ check("a leading run of hers is dropped, not left dangling",
 check("an empty turn never becomes a blank message",
       not any(not m["content"].strip() for m in
               A._chat_from_rows(_rows + [{"role": "user", "content": "   "}], keep=8)))
+
+print("\n10. HER ACTS SURVIVE THE REFRESH (2026-08-30: 'chips still vanish — only "
+      "◆warm ❧soft show')")
+# Marks come out of her TEXT and were already filed as row metadata (his F5 report,
+# 2026-08-25). The acts row — tools, wear, recall, what she looked at — arrives as SSE
+# events and died with the stream, so the room's restore drew a bare turn. The turn's
+# collector hands them to the writer; /v1/day passes rows through whole; the room maps
+# r.acts back into the same acts row a live turn renders.
+_acts_in = [{"tool": {"name": "read_journal", "result": "three entries"}},
+            {"wear": {"label": "the black lace set"}},
+            {"recall": ["My cat's name is Tuffy."]}]
+A._append_day_turn("what do you remember?", "Tuffy, of course. [MOOD:warm]",
+                   acts=_acts_in)
+_arow = next((r for r in reversed(A._read_day_transcript())
+              if r.get("role") == "assistant"), {})
+check("the acts land on her row, beside the marks",
+      _arow.get("acts") == _acts_in, _arow.get("acts"))
+check("...and the marks are still filed too (the two lanes are siblings)",
+      any(m.get("kind") == "mood" for m in _arow.get("marks", [])), _arow.get("marks"))
+check("a turn with no acts writes no acts key (readers ignore what is absent)",
+      "acts" not in next((r for r in A._read_day_transcript()
+                          if r.get("role") == "assistant"), {}))
+# the writer caps the count so a runaway tool loop cannot bloat the record
+A._append_day_turn("again?", "again. ", acts=[{"tool": {"name": "t%d" % i}}
+                                              for i in range(40)])
+_arow2 = next((r for r in reversed(A._read_day_transcript())
+               if r.get("role") == "assistant"), {})
+check("...and a runaway act list is capped at the writer",
+      len(_arow2.get("acts", [])) <= 12, len(_arow2.get("acts", [])))
+# THE OTHER HALF LIVES IN THE ROOM: the mount maps r.acts into the events row.
+_chat_src = io.open(os.path.join(ROOT, "ui", "src", "Chat.jsx"), encoding="utf-8").read()
+check("the room's restore maps r.acts into the acts row it already renders",
+      "r.acts" in _chat_src and "events:" in _chat_src, "ui/src/Chat.jsx lost the mapping")
+check("...and the collector feeds the epilogue (acts=_acts at the settle)",
+      "acts=_acts)" in src, "the SSE shell no longer hands its acts to _settle_turn")
 
 shutil.rmtree(SB, ignore_errors=True)
 # ── THE CONVERSATION DOES NOT END AT MIDNIGHT (2026-08-28) ───────────────────────────

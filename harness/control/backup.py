@@ -64,6 +64,8 @@ import time
 import zipfile
 from typing import Dict, List, Optional, Tuple
 
+from harness.store_io import replace_atomic
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 ENABLED = os.environ.get("SP_BACKUP", "1") != "0"
@@ -217,7 +219,7 @@ def run_once(reason: str = "manual") -> Dict:
                 raise OSError(f"archive verify failed at {bad}")
             if "MANIFEST.json" not in z.namelist():
                 raise OSError("archive has no manifest")
-        os.replace(part, final)                   # ATOMIC
+        replace_atomic(part, final)                   # ATOMIC
         rec.update(ok=True, name=name, size=os.path.getsize(final),
                    seconds=round(time.time() - started, 2), excluded=skipped)
         _write_index(rec)

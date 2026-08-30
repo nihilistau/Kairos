@@ -179,8 +179,18 @@ check("the staging ring is reachable only under that lock",
           if n not in ("moe_resident", "moe_stage")),
       "moe_stage writes the shared slot; a caller outside the lock would race it")
 print("\n3. THE ROUTES HOLD THE LOCK THEY SAY THEY HOLD")
-# The bug: `let qm = { let sguard = ...lock(); ... };` — guard scoped to the inner
-# block, dropped on its brace, body runs unlocked. Three routes carried it.
+# RETARGETED 2026-08-30. This section asserted the 08-23 fix — the SESSION lock held
+# at statement level through the forward — and the 08-29 engine session PROVED that
+# invariant was the wrong one: the streaming chat worker serializes on the DEVICE
+# lock (`cuda_kvdecode_handle`) and never touches `app.session` mid-forward, so a
+# session-held capture ran CONCURRENTLY with a live turn, the shared MoE scratch was
+# freed under running kernels, and the context wedged for 25 minutes (the routes.rs
+# preamble carries the full incident). The invariant NOW: borrow `qm` under a brief
+# session lock that is DROPPED (borrow_qm), then hold the device lock for the whole
+# forward (device_guard) — never the session lock into the device lock (AB-BA with
+# the chat worker's device→session order). This gate went red the night the better
+# invariant landed, which is the correct behaviour of a gate over a superseded rule;
+# it holds the new one now.
 block_scoped = re.findall(r"let qm = \{\s*\n\s*let mut sguard[^}]*?\n\s*\};", rs)
 check("no route re-acquires-and-drops the session lock just to borrow qm",
       not block_scoped, "%d route(s) still scope the guard to the borrow" % len(block_scoped))
@@ -188,11 +198,18 @@ for route in ("v1_capture", "v1_recall_rank", "v1_embed"):
     i = rs.find("pub async fn %s(" % route)
     check("%s exists" % route, i > 0)
     body = rs[i:i + 9000]
-    check("...%s takes the session lock at statement level, not in a sub-block" % route,
-          re.search(r"\n        let mut sguard = app\.session", body) is not None,
-          "the guard must outlive the forward it protects")
-check("and the reason is written where the next reader will be",
-      "The comment was the intent; the braces" in rs)
+    check("...%s borrows qm briefly and then holds the DEVICE lock" % route,
+          "borrow_qm(&app)?" in body
+          and re.search(r'device_guard\(&app, "', body) is not None,
+          "the forward must run under the device lock, not the session lock")
+    check("...%s never holds the session lock through its forward" % route,
+          re.search(r"\n        let mut sguard = app\.session", body) is None,
+          "a session-held forward races the chat worker on the MoE scratch (the wedge)")
+check("the lock-order invariant is written where the next reader will be",
+      "LOCK-ORDER INVARIANT" in rs and "ONE FORWARD AT A TIME ON THIS DEVICE" in rs)
+check("...and the fallback path is a lock too, never a no-op",
+      "DEVICE_FALLBACK_LOCK" in rs and "no kvdecode handle" in rs,
+      "Option::map's 'no handle, no lock' is the F-3 silent no-op")
 
 print("\n4. THE PROBE THAT FOUND IT IS OFF, AND REACHABLE")
 check("SP_G4_NAN_PROBE is mapped in serve.py (a knob not mapped there does not exist)",

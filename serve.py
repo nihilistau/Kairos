@@ -357,6 +357,18 @@ def build_env(c: dict) -> dict:
         # now; the gate is harness_tests/g_verbatim.py.
         "SP_CUDA_DECODE_INT8": "1" if kv.get("int8", True) else "0",
         "SP_DAEMON_KVDECODE_RING_W": str(kv["ring_w"]),
+        # A LONG one-shot scratch may use that same ring instead of paying Pmax on every
+        # layer (2026-08-30). Default OFF: it changes what an auxiliary forward's SWA
+        # layers see, and those forwards write into her memory. Mapped here because a
+        # knob the profile cannot reach is a knob that does not exist — the arming
+        # condition lives beside `scratch_ring` in the profile.
+        "SP_SCRATCH_RING": "1" if kv.get("scratch_ring", False) else "0",
+        # The ceiling a one-shot scratch may not exceed, in POSITIONS. v1_oneshot returns
+        # 413 above it rather than allocating into WDDM paging — the 2026-08-30 wedge, where
+        # a 20k-token prompt asked for 4.30 GB, cudaMalloc SUCCEEDED, and the forward crawled
+        # for hours holding the device lock. Profile-reachable because the right value is a
+        # property of the CARD (headroom once warm), not of the code.
+        "SP_ONESHOT_PMAX_MAX": str(kv.get("oneshot_pmax_max", 6144)),
         "SP_DAEMON_KVDECODE_PMAX": str(kv["pmax"]),
         # ── THE 32-TOKEN CLIFF (2026-07-13) ─────────────────────────────────────────────
         # MEASURED: 164 SECONDS to say "Hello! How are you today?".

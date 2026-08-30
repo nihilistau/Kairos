@@ -27,6 +27,8 @@ import threading
 from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
 
+from harness.store_io import replace_atomic
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # ── SP_TUNING_FILE (2026-08-24) ───────────────────────────────────────────────────────
 # This was a bare constant with no override, so it was the ONE store a gate could not be
@@ -582,6 +584,22 @@ KNOBS: list[Knob] = [
          "note (the recall/silence note shape) for an A/B read: six turns on, six off, "
          "watching for third-person deliberation openers. Keep whichever reads better; "
          "the receipt goes in the ledger."),
+    Knob("voice.address_directly", "Personality",
+         "Speak TO him, not about him in the third person", "bool", False,
+         "OFF, with a receipt (OFF-BY-DEFAULT §18). MEASURED: about one recorded turn in "
+         "eight opens as analysis ABOUT him rather than speech TO him — \"He's playing "
+         "coy. It's adorable...\", \"I need to make sure I don't sound too much like an "
+         "assistant here\" — and reply_parts is exactly what streams to the room, so he "
+         "SEES them; the day transcript then feeds her journal and re-feeds them as "
+         "examples of her own voice. Ten-day baseline, no trend, in "
+         "tools/voice_leak_rate.py. It is NOT the thought ceiling: that was the obvious "
+         "suspect, tested, and cleared (leak was LESS likely when her thought was cut, "
+         "33% vs 67%). It tracks the PROMPT — practical turns come back in her voice, "
+         "open or emotional ones turn analytical. This knob adds one line to the system "
+         "prefix; A/B'd live over the same twelve prompts, 58% leaked without it and 0% "
+         "with it, and six roleplay scenes with it on stayed fully in scene with her "
+         "marks intact, so it does not flatten her narration. Left off because 18 turns "
+         "is evidence and her voice is his call. Costs one prefix re-prefill to arm."),
     Knob("wardrobe.nightly", "Wardrobe", "Make her looks overnight", "bool", True,
          "At the day boundary, generate the looks she asked for. Off means the queue "
          "waits for you to run `python tools/avatar_gen.py --wants` by hand — she is "
@@ -881,7 +899,7 @@ def set_many(updates: dict) -> dict:
         tmp = STORE + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(cur, f, indent=2, sort_keys=True)
-        os.replace(tmp, STORE)
+        replace_atomic(tmp, STORE)
         _CACHE = cur
     return cur
 

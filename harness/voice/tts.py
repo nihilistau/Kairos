@@ -42,6 +42,8 @@ import urllib.error
 import urllib.request
 from typing import Optional
 
+from harness.store_io import replace_atomic
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # the sibling checkout, by RELATIVE position (no absolute path in a public tree); the profile's
@@ -294,7 +296,7 @@ def synthesize(text: str, voice: str | None = None, steps: int | None = None,
         tmp = path + ".part"
         with open(tmp, "wb") as f:
             f.write(wav)
-        os.replace(tmp, path)          # atomic: a reader never sees a partial wav
+        replace_atomic(tmp, path)          # atomic: a reader never sees a partial wav
         _trim_cache()
     return wav, {"cached": False, "key": k, "seconds": round(dt, 2), "voice": voice,
                  "backend": backend}

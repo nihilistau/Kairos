@@ -60,6 +60,16 @@ CONVICTED = [
     "g_real_her.py", "g_journal_loop.py", "g_pk2_sse_v2_offline.py",
     "g_pk2_toolrobust_offline.py", "g_sem_table.py", "g_toolcore_names.py",
     "g_tuning.py", "g_watch.py", "g_watchdog.py", "h_aux.py", "h_mcp_server.py",
+    # CONVICTED BY A DIFFERENT ROUTE (2026-08-31). The behavioural audit cleared this one
+    # — it wrote to her live wardrobe and put it back — and it was still the most
+    # dangerous file in the list. `livestore.paths()` never covered `catalog.json`, so §8
+    # and §9 restore his panel edits by CALLING unhide; and on his machine, with the room
+    # running, the gateway holds that file open and Windows refuses the atomic replace, so
+    # the first `hide()` died on an unhandled traceback. It crashed BEFORE the write that
+    # time. Three lines later and one of her garments stays hidden with no red to say so.
+    # It grades her real closet off a COPY now (`_gate.seed_avatar`); named here so the
+    # copy cannot be quietly reverted back into her store.
+    "g_wardrobe_words.py",
 ]
 
 # Roots the sandbox does NOT have to cover, with the reason. Written down rather than

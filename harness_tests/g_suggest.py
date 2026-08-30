@@ -28,6 +28,7 @@ OFFLINE. No GPU, no daemon.
 import io
 import json
 import os
+import re
 import sys
 import time
 
@@ -196,7 +197,17 @@ _api = io.open(os.path.join(ROOT, "ui", "src", "api.js"), encoding="utf-8").read
 check("api.js exposes accept, pointed at the accept route",
       "wardrobeAccept" in _api and "/v1/wardrobe/want/accept" in _api)
 _jsx = io.open(os.path.join(ROOT, "ui", "src", "apps", "Wardrobe.jsx"), encoding="utf-8").read()
-check("the panel calls it", "api.wardrobeAccept(w.id)" in _jsx)
+# ── THE ROW VARIABLE IS READ, NOT ASSUMED (2026-08-31) ────────────────────────────────
+# These anchors hard-coded `w.id`, and `w` was ALSO the name of the poll handle three
+# lines above the map — the shadow that made `w.refresh()` in dismiss/accept/make-it-now
+# read a want row, find no method and throw. Fixing that shadow (the row is `q` now)
+# turned three of this gate's checks red for a rename, which is a gate grading the
+# spelling instead of the wiring. So the row variable is taken FROM the map that binds
+# it, and the checks stay about the button calling the door with that row's id.
+_rowvar = re.search(r"\(d\.wants \|\| \[\]\)\.map\((\w+) =>", _jsx)
+check("the queue maps its rows", bool(_rowvar), _jsx[:0])
+_R = _rowvar.group(1) if _rowvar else "w"
+check("the panel calls it", "api.wardrobeAccept(%s.id)" % _R in _jsx)
 # ANCHORED TO THE BUTTON, not to the file. `"w.stage === 'suggested'" in _jsx` passed on a
 # mutant that opened the accept button to EVERY row, because the same test appears in the
 # label a few lines above and the substring was still there. Read the branch that actually
@@ -204,12 +215,12 @@ check("the panel calls it", "api.wardrobeAccept(w.id)" in _jsx)
 _i_acc = _jsx.index("wr-accept")
 _before = _jsx[max(0, _i_acc - 900):_i_acc]
 check("...only for a suggestion — the branch GUARDING the button, not the file",
-      "w.stage === 'suggested' ? (" in _before, _before[-90:])
+      "%s.stage === 'suggested' ? (" % _R in _before, _before[-90:])
 # ACCEPT AND GENERATE ARE TWO DECISIONS. Collapsing them would spend an image on one click.
 _seg = _jsx[_i_acc:_i_acc + 700]
 check("...and accepting does NOT also generate", "wardrobeGenerate" not in _seg, _seg[:70])
 check("dismiss is the same broom the rest of the queue uses",
-      "api.wardrobeDismiss(w.id)" in _jsx and "dismissSuggestion" not in _jsx)
+      "api.wardrobeDismiss(%s.id)" % _R in _jsx and "dismissSuggestion" not in _jsx)
 _css = io.open(os.path.join(ROOT, "ui", "src", "room.css"), encoding="utf-8").read()
 for _cls in (".wr-want.wr-suggested", ".wr-gen.wr-accept", ".wr-mark"):
     check("room.css defines %s" % _cls, _cls in _css)

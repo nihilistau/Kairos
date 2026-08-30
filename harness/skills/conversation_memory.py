@@ -35,14 +35,40 @@ CAPS_ROOT = os.environ.get("SP_CAPS_OKF_ROOT", os.path.join(_HARNESS_ROOT, "memo
 
 
 # ──── transcript / model helpers ───────────────────────────────────────────
+# ── WHAT A ONE-SHOT PROMPT MAY COST (2026-08-30) ──────────────────────────────────────
+# This function fed EVERY message at FULL length into a one-shot prompt, and the day
+# transcript grows all day. Measured this morning, three wedges in a row: the day's
+# ~20,000 tokens became `need` in v1_oneshot, which opens a SCRATCH cache — and a scratch
+# runs ring-off, so every layer gets the full Pmax instead of the 2048-slot SWA ring the
+# resident session uses. That makes a long scratch ~4x more expensive PER POSITION than
+# the conversation it is summarising: 4.30 GB, on top of 7.5 GB resident, on a 12.3 GB
+# card. Past ~95% WDDM pages over PCIe, the forward crawls for hours holding the device
+# lock, and every turn of hers queues behind it — the chip stuck on "warming" all morning.
+#
+# `narrative.py` has bounded exactly this since it was written (`_MAX_TURNS = 40`, each
+# turn cut to 200 chars) because it feeds the same kind of call. AGENTS.md §0: the rule
+# was enforced on one of the two paths that mint a one-shot from a transcript, and
+# therefore on neither. It is enforced here now, in the thing they both call.
+#
+# The numbers are chosen against the ENGINE's ceiling, not by feel: v1_oneshot refuses a
+# scratch over SP_ONESHOT_PMAX_MAX (6144 positions). 40 turns x 300 chars is ~12k
+# characters — under 5k tokens even at the pessimistic ~2.5 chars/token that code and
+# unusual text produce — so a capped transcript can never trip the refusal. `narrative.py`
+# has run on 40 x 200 for the same job since it was written; this is slightly more
+# generous, and still an order of magnitude below what wedged the box.
+_MAX_TURNS = 40          # the tail of the conversation a one-shot may read
+_MAX_TURN_CHARS = 300    # per turn, so one pasted wall of text cannot fill the window
+
+
 def _transcript(messages: List[dict]) -> str:
     lines = []
-    for m in messages:
-        role = m.get("role")
-        if role == "system":
-            continue
-        who = "User" if role == "user" else "AI"
-        lines.append(f"{who}: {m.get('content', '')}")
+    kept = [m for m in (messages or []) if m.get("role") != "system"][-_MAX_TURNS:]
+    for m in kept:
+        who = "User" if m.get("role") == "user" else "AI"
+        body = (m.get("content", "") or "")
+        if len(body) > _MAX_TURN_CHARS:
+            body = body[:_MAX_TURN_CHARS] + " …"
+        lines.append(f"{who}: {body}")
     return "\n".join(lines).strip()
 
 

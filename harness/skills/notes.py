@@ -32,6 +32,8 @@ import time
 import uuid
 from typing import Any, Optional
 
+from harness.store_io import replace_atomic
+
 _NOTE_LOCK = threading.RLock()
 
 # ── the lane ──────────────────────────────────────────────────────────────────
@@ -93,7 +95,7 @@ def _write_all(rows: list[dict]) -> None:
         with open(tmp, "w", encoding="utf-8") as f:
             for r in rows:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
-        os.replace(tmp, p)
+        replace_atomic(tmp, p)
 
 
 def _now() -> str:

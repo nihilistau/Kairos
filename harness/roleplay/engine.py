@@ -35,6 +35,7 @@ import re
 import threading
 from dataclasses import dataclass, field
 
+from harness.store_io import replace_atomic
 from harness.roleplay import ladder as L
 from harness.roleplay.scenarios import SCENARIOS, Scenario, by_id, deck, suggest
 
@@ -127,7 +128,7 @@ def _save(session: str, sc) -> None:
         tmp = p + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(sc.to_json(), f)
-        os.replace(tmp, p)
+        replace_atomic(tmp, p)
     except Exception as exc:
         log.warning("[roleplay] could not persist scene: %s", exc)
 

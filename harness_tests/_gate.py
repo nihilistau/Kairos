@@ -117,6 +117,18 @@ _STORE_ENV = (
 )
 
 
+# What each root pointed at BEFORE the sandbox replaced it. A gate that wants to grade
+# her REAL data without writing to it (see `seed_avatar`) has no other way to find it:
+# by the time `harness.` is importable the variable is already the temp dir, and
+# recomposing the path in the gate is the duplicated arithmetic livestore.py warns about.
+_REPLACED: dict = {}
+
+
+def real_store(var: str) -> str:
+    """What `var` pointed at before `sandbox()` replaced it — "" if it was unset."""
+    return _REPLACED.get(var) or ""
+
+
 def sandbox(name: str = "gate", persona: str = "") -> str:
     """Point every store this repo owns at a fresh temp dir. Returns its path.
 
@@ -126,6 +138,8 @@ def sandbox(name: str = "gate", persona: str = "") -> str:
     `persona` seeds persona.md, because a gate that needs one usually needs it non-empty.
     """
     import tempfile
+    for _v in _STORE_ENV:
+        _REPLACED.setdefault(_v, os.environ.get(_v))
     sb = tempfile.mkdtemp(prefix=name.replace(".py", "") + "_")
     os.environ["SP_RECALL_REGISTRY"] = os.path.join(sb, "memory", "registry.jsonl")
     os.makedirs(os.path.join(sb, "memory"), exist_ok=True)
@@ -156,6 +170,59 @@ def sandbox(name: str = "gate", persona: str = "") -> str:
         f.write(persona or "She is dry and warm.\n\n## Personality state\nmood: neutral\n")
     return sb
 
+
+# ── HER REAL CLOSET, COPIED, SO A GATE CAN GRADE IT WITHOUT WRITING TO IT (2026-08-31) ─
+# Some gates have to read her ACTUAL inventory — G-WARDROBE-WORDS says so in its own
+# header ("her state is not a fixture"), and a matcher graded over a fixture wardrobe
+# grades a wardrobe nobody wears. Until now that meant writing to the live store and
+# putting it back afterwards, which failed twice over on his machine:
+#
+#   * WHILE THE ROOM IS RUNNING the gateway holds `catalog.json` open, and Windows
+#     refuses `os.replace` onto an open file — so `catalog.hide()` died mid-gate with
+#     PermissionError, an unhandled traceback that took the whole run with it and left
+#     a `catalog.json.tmp` behind. Red for an environmental reason, on his own machine,
+#     on the gate that holds his panel edits.
+#   * `livestore.paths()` never covered `catalog.json` — the overlay did not exist when
+#     it was written. §8/§9 restore it by CALLING unhide, so a crash between the hide and
+#     the unhide leaves one of her garments hidden and nothing green to say so.
+#
+# So: sandbox as usual, then copy her store into it. Metadata verbatim — the whole point
+# is her real wants, her real overlay, her real labels — and every media file stood in by
+# a single byte, because `avatar.have()` and `wardrobe.clips()` ask `getsize(...) > 0` and
+# nothing in this repo decodes the pixels. 112 MB of loops copied per run would be a gate
+# nobody runs twice.
+_MEDIA = (".png", ".jpg", ".jpeg", ".webp", ".webm", ".mp4", ".mov", ".mkv", ".m4v")
+
+
+def seed_avatar() -> str:
+    """Fill the sandbox's SP_AVATAR_DIR from her live one. Returns the SOURCE dir.
+
+    "" means there is no live store on this machine — a fresh clone, or the export. That
+    is a SKIP for the caller, never a silent pass: a gate that grades an empty wardrobe
+    is grading a wardrobe nobody has.
+    """
+    import shutil
+    live = real_store("SP_AVATAR_DIR") or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "var", "room", "avatar")
+    dst = os.environ.get("SP_AVATAR_DIR") or ""
+    if not dst or not os.path.isdir(live):
+        return ""
+    for here, _dirs, files in os.walk(live):
+        rel = os.path.relpath(here, live)
+        out = dst if rel == "." else os.path.join(dst, rel)
+        os.makedirs(out, exist_ok=True)
+        for fn in files:
+            tgt = os.path.join(out, fn)
+            try:
+                if fn.lower().endswith(_MEDIA):
+                    with open(tgt, "wb") as f:
+                        f.write(bytes(1))      # present and non-empty is the whole contract
+                else:
+                    shutil.copy2(os.path.join(here, fn), tgt)
+            except OSError:
+                pass                        # a file that vanished mid-walk is not the test
+    return live
 
 # ── A TURN A GATE DROVE IS NOT THEIR CONVERSATION (2026-08-27) ───────────────────────
 # The gateway already quarantines any chat request that DECLARES itself synthetic

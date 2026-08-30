@@ -280,6 +280,7 @@ def _agent_text(body: Dict[str, Any]) -> str:
 def _settle_turn(human_text: str, reply_text: str, *, record: bool = True,
                  marks: bool = True, capture: bool = True, close_his_turn: bool = True,
                  stances: bool = True, synthetic: "str|None" = None,
+                 acts: "list|None" = None,
                  latch: "Dict[str, Any]|None" = None) -> list:
     """Every debt a finished turn owes the rest of the system, in ONE function, because
     the list kept being re-implemented as trailing inline code with bypasses (2026-08-24
@@ -314,14 +315,33 @@ def _settle_turn(human_text: str, reply_text: str, *, record: bool = True,
             _ks_f.note_user_turn(False)
         except Exception:
             pass
-    if capture:
+    # ── SYNTHETIC QUARANTINES THE MEMORY LANES TOO (2026-08-30) ─────────────────────
+    # `synthetic` marked the DAY TRANSCRIPT and nothing else, so a driver that declared
+    # itself synthetic still minted FACTS — and the capture lane attributes them to HIM.
+    # AGENTS.md §0 exactly: the quarantine rule was enforced on one of the lanes a fake
+    # turn feeds, and therefore on neither.
+    #
+    # Found by falling into it. An overnight probe (think_probe.py) drove ~30 turns to
+    # measure her voice, every one declared synthetic, and the day transcript excluded
+    # them perfectly — while `_capture_after_turn` wrote "i had a rough day at work
+    # honestly", "i'm thinking of repainting the study" and "remind me to call the
+    # plumber on thursday" into the registry as things Sam SAID. Twenty rows, six of
+    # them attributed to him, plus two board reminders. That is the 2026-08-03
+    # false-memory incident, arriving through the front door, from the maintainer.
+    # (Quarantined after the fact: lifecycle=1, superseded_by=quarantine:synthetic-probe,
+    # reason attached, nothing erased.)
+    #
+    # A turn nobody typed is not a memory of him, is not a stance of hers, and is not a
+    # thing to put on his board. It is only a record that it happened, which is what the
+    # transcript flag already provides. One flag, every lane it should have governed.
+    if capture and not synthetic:
         try:
             _capture_after_turn(human_text)
         except Exception as exc:
             logger.warning("[gateway] capture skipped: %s", exc)
     text = (reply_text or "").strip()
     if record and text:
-        _append_day_turn(human_text, reply_text, synthetic=synthetic)
+        _append_day_turn(human_text, reply_text, synthetic=synthetic, acts=acts)
     receipts: list = []
     if marks and text:
         try:
@@ -337,7 +357,14 @@ def _settle_turn(human_text: str, reply_text: str, *, record: bool = True,
             # ambient company, and filing its lines as who she is is how her self
             # lane filled with dream fragments too specific and too repetitive to
             # mean anything the next morning.
-            if stances:
+            # ...AND NOT FROM A TURN NOBODY TYPED (2026-08-30). `src="her reply"` rows
+            # are minted here, so a synthetic driver wrote HER stances too — fourteen of
+            # the twenty rows the overnight probe had to quarantine came from this
+            # branch, not from capture. Her marks still APPLY (the dials are hers to
+            # move, and a test turn she answered warmly did warm her), but what she said
+            # to a prompt he never sent does not become something she believes about
+            # him. Same flag, same reason, the other lane.
+            if stances and not synthetic:
                 try:
                     from harness.skills import memory as _mem_rh
                     if any(r.kind == "persona_shift" and r.ok and r.verified is not False
@@ -1966,7 +1993,8 @@ def _day_transcript_path(day: str = "") -> str:
 
 
 def _append_day_turn(user_text: str, final: str,
-                     synthetic: "str|None" = None) -> None:
+                     synthetic: "str|None" = None,
+                     acts: "list|None" = None) -> None:
     """Append this turn to today's durable transcript.
 
     THE DAY MUST OUTLIVE THE PROCESS. The consolidator reads the day's conversation to
@@ -2047,13 +2075,20 @@ def _append_day_turn(user_text: str, final: str,
         except Exception:
             pass
         _amark = {"marks": _marks[:8]} if _marks else {}
+        # HER ACTS SURVIVE THE SAME WAY (2026-08-30, his report: "chips still vanish on
+        # refresh — only ◆warm ❧soft show"). Marks come from her TEXT and were already
+        # filed above; but the acts row — tools she called, what she wore via wear(),
+        # what she recalled, what she looked at — arrives as SSE events and died with
+        # the stream. The turn's collector hands them here, trimmed at the writer so a
+        # verbose tool result cannot bloat the record; readers ignore unknown keys.
+        _aacts = {"acts": acts[:12]} if acts else {}
         with open(p, "a", encoding="utf-8") as f:
             if user:
                 f.write(json.dumps({"role": "user", "content": user, "at": _at,
                                     **_extra}) + "\n")
             if rec:
                 f.write(json.dumps({"role": "assistant", "content": rec, "at": _at,
-                                    **_extra, **_amark}) + "\n")
+                                    **_extra, **_amark, **_aacts}) + "\n")
     except Exception as exc:
         logger.warning("[gateway] could not append the day transcript: %s", exc)
 
@@ -3145,6 +3180,23 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
     # what she saw comes back as text that enters the turn as HER OBSERVATION.
     # It is not a caption from some other model; it is the served checkpoint's own
     # eyes, one step earlier in the same turn.
+    # ── THE TURN'S ACTS, KEPT FOR THE RECORD (2026-08-30, his report: "chips still
+    # vanish on refresh — only ◆warm ❧soft show"). Marks survive a refresh because the
+    # day writer parses them back out of her text; the ACTS row — tools, wear, recall,
+    # what she looked at — exists only as SSE events, so the restore had nothing to
+    # draw. Every chip-worthy emit below also appends a trimmed copy here, and
+    # _pay_turn_debts hands the list to _settle_turn → _append_day_turn, which files
+    # it beside the marks. Trimmed AT APPEND so a verbose tool result cannot ride
+    # into the record; the writer caps the count.
+    _acts: list = []
+
+    def _act(ev: dict) -> None:
+        try:
+            if len(_acts) < 24:
+                _acts.append(ev)
+        except Exception:
+            pass
+
     _img = body.get("image_b64") or ""
     if _img:
         try:
@@ -3166,6 +3218,7 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
             # DISPLAY SLICE ONLY — she already has the full _seen injected above.
             # 400 starved the chat chip's expanded view (2026-08-21, the white-
             # jumper photo); the event now carries enough to read whole.
+            _act({"image": {"seen": _seen[:220]}})
             yield ("data: " + json.dumps({"image": {"seen": _seen[:1600]}}) + "\n\n").encode()
         except Exception as _exc:
             yield ("data: " + json.dumps({"image": {"error": str(_exc)[:200]}}) + "\n\n").encode()
@@ -3221,9 +3274,14 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
     evq: "_queue.Queue" = _queue.Queue()
 
     def on_tool(name, args, result):
+        _act({"tool": {"name": name, "result": str(result)[:120]}})
         evq.put({"tool": {"name": name, "args": args, "result": str(result)[:600]}})
 
     def on_look(ev):
+        # only the settled phase is worth the record; 'start' is stream progress
+        if isinstance(ev, dict) and ev.get("phase") != "start":
+            _act({"looking": {"phase": ev.get("phase"),
+                              "q": str(ev.get("q") or ev.get("tool") or "")[:80]}})
         evq.put({"looking": ev})
 
     # ── ADR-008 PRE-TURN SPINE (both default-off; null floor = wave-3 behavior) ──
@@ -3397,6 +3455,7 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
                                 msgs[_i]["content"] = (msgs[_i].get("content", "")
                                                        + "\n\n" + note)
                                 break
+                        _act({"recall": [str(x)[:120] for x in (facts or [])][:6]})
                         if typed:
                             yield ("data: " + json.dumps({"recall": facts}) + "\n\n").encode()
                 elif dec.kind == "select_toolset":
@@ -3739,7 +3798,8 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
         final_text = "".join(reply_parts)
         receipts = _settle_turn(_human, final_text, latch=_st["settled"],
                                 synthetic=(str(body.get("synthetic"))
-                                           if body.get("synthetic") else None))
+                                           if body.get("synthetic") else None),
+                                acts=_acts)
         if typed:
             # ── THE TAGS SHE ACTUALLY EMITTED THIS TURN (operator request, 2026-07-29)
             # The {persona} event at the top of the turn shows the state she STARTED
@@ -3848,7 +3908,8 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
             # emits at its one writer, so the chip no longer depends on which door she
             # took. Unsubscribed in the same `finally` as the lookup seam.
             from harness.control import wardrobe as _WDe
-            unsub_wear = _WDe.subscribe_wear(lambda ev: evq.put({"wear": ev}))
+            unsub_wear = _WDe.subscribe_wear(
+                lambda ev: (_act({"wear": ev}), evq.put({"wear": ev})))
             kw = {"config": cfg, "on_tool": on_tool, "mutate_messages": True}
             if turn_tools is not None:
                 kw["tools"] = turn_tools
@@ -5935,6 +5996,14 @@ def _run_stdlib(host: str, port: int) -> None:
         # conversation from the day when a presence mode is armed and nothing is live yet
         _ks.set_seeder(_seed_kairos_from_day)
         def _warm_for_presence() -> bool:
+            # PREWARM OFF MEANS NOTHING WILL EVER SET _WARM (2026-08-30): _prewarm()
+            # is the event's only writer and runs only behind SP_GATEWAY_PREWARM=1.
+            # _await_warm knows this; this closure did not — and since the scheduler
+            # now holds ALL impulses on cold (not just the mode seed), a prewarm-off
+            # profile would have muted her for the whole process lifetime.
+            import os as _os_wp
+            if _os_wp.environ.get("SP_GATEWAY_PREWARM") != "1":
+                return True
             try:
                 from harness.inference.backends import supports as _sup_w
                 return _WARM.is_set() or not _sup_w("warm")

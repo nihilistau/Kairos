@@ -19,6 +19,8 @@ import threading
 from pathlib import Path
 from typing import Dict, Tuple
 
+from harness.store_io import replace_atomic
+
 # one lock for the state block's read-modify-write (2026-08-29 audit, M7)
 _STATE_LOCK = threading.Lock()
 
@@ -160,4 +162,4 @@ def write_state(path: str, state: Dict[str, str]) -> None:
             + [f"{k}: {v}" for k, v in state.items() if k not in KNOWN and v]
         tmp = Path(str(p) + ".tmp")
         tmp.write_text(prose.rstrip() + "\n\n" + "\n".join(block) + "\n", encoding="utf-8")
-        os.replace(tmp, p)
+        replace_atomic(tmp, p)

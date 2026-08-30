@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.8.7 — the writes that were being thrown away (2026-08-31)
+
+Six days of upstream work, cut after a live bug that had been eating panel edits on
+Windows for as long as the catalog overlay has existed.
+
+- **A panel write that failed looked exactly like one that worked.** `tmp + os.replace`
+  is atomic and correct — and on Windows the rename FAILS while any other handle has the
+  destination open. The reader was the server itself: the wardrobe re-opened and
+  re-parsed `catalog.json` once per row, 419 opens to answer a single panel poll, so the
+  file was un-replaceable 85% of the time and two of five edits were refused. The overlay
+  is read once per CHANGE now (mtime+size, cleared after a write), the rename retries
+  through `harness/store_io.replace_atomic` and RAISES rather than giving up quietly, and
+  the closet says *"that did not save — <error>"* instead of ignoring the answer. If you
+  run this on Windows with a busy room, this is the one to take.
+- **...and then every other store, because they are all the same shape.** Eighteen
+  `os.replace` calls across sixteen files — your knobs, the ledger, the memory registry,
+  persona.md, notes, the presence ledger, the MCP pins, game state, the roleplay engine,
+  the sidecar archive, backups, the TTS cache, the task loop — all `tmp + rename` onto a
+  file a live server can be reading. All of them go through the retried helper now.
+  `G-STORE-WRITES` (new) holds the census: no bare `os.replace` survives anywhere under
+  `harness/`, so the next store writer is caught the day it is added rather than the next
+  time somebody's edit vanishes.
+- **Two lists in one panel could disagree about what you just did.** The closet refreshed
+  its own poll and not the wardrobe's, so a retired garment left the closet instantly and
+  sat in `just arrived` until the next four-second tick. And the queue's dismiss / accept
+  / "make it now" buttons each threw: the row variable in the map shadowed the poll handle
+  of the same name, so `refresh()` was being called on a want row.
+- **She can store her own feelings.** `remember_about_self()` routed to her narrative lane
+  only when a `kind` was passed — which every harness producer does and she cannot, so her
+  own words met the gate for facts ABOUT someone and were refused as *"that is a sentence,
+  not a memory"*. Who is speaking picks the gate; the kind picks the class.
+- **A driven turn is not their conversation, in EVERY lane.** Synthetic turns were excluded
+  from the day transcript and still reached the fact registry — attributed to the operator,
+  including a reminder that landed on his board. New gate: `g_synthetic_quarantine`.
+- **She was analysing him instead of talking to him** — about one recorded turn in eight
+  opened as commentary about the person rather than speech to them, chronic and older than
+  anything that week. Measured over ten days before it was touched.
+- **A oneshot that outlives its client dies on a deadline.** An abandoned request kept the
+  device lock and everything queued behind it — a twenty-minute "warming" with the GPU
+  pinned. The deadline is part of the request now, and the seam names what it refuses:
+  `g_oneshot_bounds`.
+- **Boot pays for one prefill, not two**, impulses she has while the stack is cold are held
+  rather than queued into the wait, and the room's status chips survive a refresh.
+- Gate hygiene: `_gate.seed_avatar()` lets a gate grade a real wardrobe off a COPY of it,
+  `G-DAY-TRANSCRIPT` no longer dies on a cp1252 console (it was hiding 45 checks behind an
+  encoding error), and `G-SUGGEST` reads the row variable the panel binds instead of
+  assuming its name.
+
 ## 0.8.6 — the audit night (2026-08-29)
 
 A six-pass read-only audit of the whole system, then the fixes in severity order.

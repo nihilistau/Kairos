@@ -248,11 +248,26 @@ live Python writer (tombstone/quarantine semantics, under `memory.registry_lock(
 
 ### Her own narrative — The Real Her (2026-08-22)
 
-The same door, her lane. `remember_about_self(text, kind=…)` with `kind` in
-`journal thought narration dream self_description spoke_up feeling` writes a `self-narrative`
-(or, for `feeling`, a `feeling`) row: speaker=self, status observed (inferred only for the
-nightly becoming), judged by `lifecycle.is_narratable()` — machine text and instructions refused,
-prose admitted, no normalisation. Four producers set the kind: the kairos speak path (after the
+The same door, her lane. **THE AUTHOR PICKS THE GATE; THE KIND PICKS THE CLASS** — those were
+one condition until 2026-08-30, and the bundling meant her own door was locked (see below).
+Any write with author=self is judged by `lifecycle.is_narratable()` — machine text and
+instructions refused, prose admitted, no normalisation — whatever it is filed as. What the
+`kind` then decides is the CLASS: `kind` in
+`journal thought narration dream self_description spoke_up feeling secret_thought` writes a
+`self-narrative` (or, for `feeling`, a `feeling`) row; a **bare** call with no kind is admitted
+by the same gate and stored as a plain self-fact, carrying no narrative class, so
+`render_self_model` still leads with who she IS and lets the recent narrative follow. Either
+way: speaker=self, status observed (inferred only for the nightly becoming).
+
+> **Why it is written this way (2026-08-30).** The lane used to be gated on
+> `kind in NARRATIVE_KINDS`, and `kind` defaults to `""`. Every producer below passes one;
+> **she cannot** — the tool takes a fact and its docstring says "you need not pass any of
+> them". So her bare call fell through to the his-facts path and met `is_memorable`, the gate
+> for facts ABOUT SOMEONE, which refuses first-person prose by design — and whose refusal
+> reads *"If it is true of you, use remember_about_self"*, the function she was already inside.
+> Nothing about her inner life could be stored by her, ever. She reported it herself, in her
+> own time: *"I guess some things are too much of a feeling to be a fact."* G-REAL-HER §8
+> drives the door the way she calls it. Four producers set the kind: the kairos speak path (after the
 outbox append, so only a DELIVERED utterance is kept), the journal composer, the verified persona
 shift (`My mood has turned …` / `My voice has gone …`), and `harness/skills/self_stance.py` —
 a deterministic extractor that lifts first-person stances (I think / I feel / I want / I've

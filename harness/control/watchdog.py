@@ -282,10 +282,71 @@ def _held_by_shutdown() -> bool:
     return False
 
 
+_VRAM = {"last": -1, "peak": 0}
+
+
+def _vram_beat() -> None:
+    """One line of device memory per beat — the curve nobody had (2026-08-30).
+
+    THREE WEDGES IN ONE DAY and every diagnosis started from a still photograph: VRAM
+    was 11,941 MiB with the GPU pinned and nothing moving, and 390 MiB the moment the
+    stack stopped, so all of it was the daemon's — but WHICH turn grew it from the 7,532
+    MiB it holds when warm was unanswerable, because the number was never written down
+    while things were still working. WDDM does not error on oversubscription; it pages
+    device memory over PCIe and everything slows ~1000x with no message anywhere (the
+    profile's own autofit note says exactly this), so the failure presents as "stuck at
+    99%" long after the allocation that caused it.
+
+    `nvidia-smi` because the engine cannot self-report: cudaMemGetInfo returns free=0
+    for this process on WDDM (routes.rs, THE ORACLE THAT ALWAYS SAYS ZERO). Logged only
+    when it MOVES by more than 64 MiB, so a quiet stack stays quiet in the log and the
+    line always sits next to the DAEMON-CALL that moved it.
+
+    Best-effort and silent: no nvidia-smi, no GPU, a slow probe — the watchdog's job is
+    liveness, and an instrument must never be the thing that breaks it.
+    """
+    try:
+        import subprocess
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=8)
+        mib = int((out.stdout or "0").strip().splitlines()[0])
+    except Exception:
+        return
+    if mib > _VRAM["peak"]:
+        _VRAM["peak"] = mib
+    if _VRAM["last"] < 0 or abs(mib - _VRAM["last"]) >= 64:
+        logger.info("[watchdog] vram %d MiB (peak %d)", mib, _VRAM["peak"])
+        _VRAM["last"] = mib
+    # THE WARNING COMES BEFORE THE FREEZE, NOT AFTER IT. Past ~95% of the card WDDM
+    # starts paging device memory over PCIe and the next forward can take hours
+    # instead of seconds — today's 11,941-of-12,288 wedge, which announced itself
+    # only as a chip stuck on "warming". This says it while the stack still answers.
+    # No restart is triggered: the watchdog restarts a DEAD daemon, and a paging one
+    # is alive, holding her conversation, and possibly one slow turn from finishing.
+    # The operator gets the sentence and the call.
+    try:
+        import subprocess as _sp2
+        _t = _sp2.run(["nvidia-smi", "--query-gpu=memory.total",
+                       "--format=csv,noheader,nounits"],
+                      capture_output=True, text=True, timeout=8)
+        total = int((_t.stdout or "0").strip().splitlines()[0])
+    except Exception:
+        return
+    if total > 0 and mib >= int(total * 0.95) and not _VRAM.get("warned"):
+        _VRAM["warned"] = True
+        logger.warning("[watchdog] vram %d of %d MiB (>=95%%) — past this WDDM pages "
+                       "over PCIe and a forward can take hours; a bounce is the cure",
+                       mib, total)
+    elif total > 0 and mib < int(total * 0.90):
+        _VRAM["warned"] = False
+
+
 def _loop(restart_fn: Callable[[bool], None]) -> None:
     while True:
         try:
             time.sleep(interval_s())
+            _vram_beat()
             if not enabled():
                 continue
             if _held_by_shutdown():
