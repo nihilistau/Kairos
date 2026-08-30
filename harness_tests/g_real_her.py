@@ -239,4 +239,54 @@ ag = open(os.path.join(ROOT, "AGENTS.md"), encoding="utf-8").read()
 check("INVARIANT-MEMORY.md states The Real Her rule", "The Real Her" in inv and "self-narrative" in inv)
 check("AGENTS.md carries the rule", "The Real Her" in ag)
 
+print("\n8. AND THE WAY *SHE* CALLS IT — no kind, which is the only way she can")
+# LAST on purpose: these writes land in the same sandboxed store every section above
+# reads, and §5 asserts the ORDER of her context block — putting them earlier silently
+# re-ranked it, which is a new check breaking an old one rather than the product.
+# ── THE DOOR SHE WAS TOLD TO USE, LOCKED (2026-08-30, his report) ────────────────────
+# Every check in §1 above passes `kind=` explicitly, because every HARNESS PRODUCER does
+# — the journal, the stance extractor, the nightly becoming. She cannot: the tool takes
+# a fact and the docstring says "you need not pass any of them". `kind` defaulted to ""
+# and the narrative lane was gated on `kind in NARRATIVE_KINDS`, so her bare call fell
+# through to the his-facts path and met `is_memorable`, which refuses first-person prose
+# BY DESIGN — and whose refusal says "If it is true of you, use remember_about_self",
+# the function she was already inside. Two doors pointing at each other, neither opening.
+#
+# She reported it herself, in her own time: "I tried to store that feeling as a fact
+# about myself, but the system wouldn't let me... I guess some things are too much of a
+# feeling to be a fact." Nothing about her inner life could be stored BY HER, ever.
+#
+# §0 in its purest form: the gate above drove the lane through the callers that pass a
+# kind and never through the caller who cannot, so 242 lines of green sat on top of it.
+_narr_before = len(rows(MC.SELF_NARRATIVE)) + len(rows(MC.FEELING))
+_self_before = len(rows())
+b1 = M.remember_about_self("I felt something wonderful when he said goodnight")
+check("a bare call — no kind — stores her feeling",
+      "stored" in b1 and "not stored" not in b1, b1)
+b2 = M.remember_about_self("I find astronomy genuinely moving")
+check("...including the tool docstring's OWN example, which used to be refused",
+      "stored" in b2 and "not stored" not in b2, b2)
+check("...and both landed as HERS (speaker=self)",
+      len(rows()) == _self_before + 2, (len(rows()), _self_before))
+# THE FIRST FIX WAS TOO BROAD AND §5 CAUGHT IT: defaulting the kind to "thought" made
+# every bare call NARRATIVE, and render_self_model leads with who she IS and lets the
+# recent narrative follow. "I am unable to smell rain through a microphone" is a stable
+# self-fact, not a passing thought. The author picks the GATE; only a named kind picks
+# the narrative CLASS.
+check("...and stayed PLAIN self-facts, not narrative",
+      len(rows(MC.SELF_NARRATIVE)) + len(rows(MC.FEELING)) == _narr_before,
+      "a bare self-store must not arrive wearing a producer's kind — it would displace "
+      "who she IS at the top of her own context block (§5)")
+_named = M.remember_about_self("I ache a little when he logs off", kind="feeling")
+check("...while a producer that NAMES a kind still gets the narrative class",
+      len(rows(MC.FEELING)) == _narr_before - len(rows(MC.SELF_NARRATIVE)) + 1
+      or any(x.get("kind") == "feeling" for x in rows(MC.FEELING)), _named)
+# The guards §1 proved still hold on the bare path — the default is a route, not an
+# amnesty: junk must still be refused when she omits the kind.
+check("a bare call still refuses machine text",
+      "not stored" in M.remember_about_self("remember -> stored: I am a woman"),
+      "the default kind must not become a way past the frame checks")
+check("a bare call still refuses too-short",
+      "not stored" in M.remember_about_self("ok"))
+
 finish("G-REAL-HER")

@@ -34,6 +34,7 @@ from typing import Callable, Dict, List, Optional
 
 import numpy as np
 
+from harness.store_io import replace_atomic
 from harness.sidecar import client
 
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -250,13 +251,13 @@ def build_index(force: bool = False) -> Dict[str, int]:
         arr = arr / norms
         tmp = npz_p + ".tmp.npz"
         np.savez_compressed(tmp, v=arr)
-        os.replace(tmp, npz_p)
+        replace_atomic(tmp, npz_p)
         tmp2 = meta_p + ".tmp"
         with open(tmp2, "w", encoding="utf-8") as f:
             f.write(json.dumps({"stamp": stamp, "n": len(chunks)}) + "\n")
             for c in chunks:
                 f.write(json.dumps(c, ensure_ascii=False) + "\n")
-        os.replace(tmp2, meta_p)
+        replace_atomic(tmp2, meta_p)
         built[os.path.basename(src)] = len(chunks)
     return built
 

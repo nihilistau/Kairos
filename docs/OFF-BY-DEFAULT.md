@@ -59,7 +59,7 @@ the moment these three flipped.
 
 | Knob | What it does now | Watch for |
 |---|---|---|
-| `thinking` + `think_max_tokens` + `think_max_ms` | The private thought channel is back, **bounded**. It was off because it cost 258 s / 256 s / 308 s turns and because `<thought ` (space, no closing bracket) leaked her entire reasoning into the transcript as speech. The leak is fixed and pinned (G-NARRATIVE §6); the cost now has a ceiling at 128 tokens / 30 s, and the first 19 turns of the paired run came back **within ~10-15% of thinking-off** — so the ceiling holds. `persona/50-thinking.md` carries `when: thinking` and composes itself; no hand-editing either way. | **Whether it earns its cost.** The channel exists to catch confabulation before she speaks it, and the one confabulation the paired runs actually produced — *"Classic Tuffy. **He's** lucky he's cute"* about a cat recorded female, with the fact ambient in her prefix — happened with thinking BOTH off AND on. On that class, on that evidence, the channel did not help. The `26b_think` receipt is still owed: the run died on turn 20 of 20 when the stack was restarted under it (2026-07-30; still owed 2026-08-21 — thinking has run armed since without the paired measurement, so the honest status is "armed on a 19-turn receipt"). |
+| `thinking` + `think_max_tokens` + `think_max_ms` | The private thought channel is back, **bounded**. It was off because it cost 258 s / 256 s / 308 s turns and because `<thought ` (space, no closing bracket) leaked her entire reasoning into the transcript as speech. The leak is fixed and pinned (G-NARRATIVE §6); the cost now has a ceiling at 128 tokens / 30 s — **but see §19: the 30 s half is measured from sampler construction, which happens BEFORE the prefill, so on any turn prefilling longer than 30 s it force-closes her thought on the FIRST sampled token and she does not think at all** — and the first 19 turns of the paired run came back **within ~10-15% of thinking-off** — so the ceiling holds. `persona/50-thinking.md` carries `when: thinking` and composes itself; no hand-editing either way. | **Whether it earns its cost.** The channel exists to catch confabulation before she speaks it, and the one confabulation the paired runs actually produced — *"Classic Tuffy. **He's** lucky he's cute"* about a cat recorded female, with the fact ambient in her prefix — happened with thinking BOTH off AND on. On that class, on that evidence, the channel did not help. The `26b_think` receipt is still owed: the run died on turn 20 of 20 when the stack was restarted under it (2026-07-30; still owed 2026-08-21 — thinking has run armed since without the paired measurement, so the honest status is "armed on a 19-turn receipt"). |
 
 **Armed 2026-08-25 02:2x, on G-RESEAM-LIVE 4/4 (his directive drove the diagnosis):**
 
@@ -117,6 +117,139 @@ responsible for exactly one thing, which is whether she describes the outcome tr
 ---
 
 ## The ledger
+
+### 18. `voice.address_directly` — speak TO him, not about him *(recorded 2026-08-30)*
+
+**STATUS: OFF** (tuning knob, default `false`). Null floor: the system prefix is exactly
+what it was.
+
+**What it is.** One line appended to the standing prefix: *speak to him, in second
+person, as yourself; do not narrate or analyse him in the third person, and never
+describe what he is asking or what you ought to do about it — say the thing itself.
+Inside a scene you are playing, narration is the scene and this does not touch it.*
+
+**Why off.** Because it changes HER VOICE, and her voice is the operator's, not the
+maintainer's. Eighteen turns is evidence; it is not a mandate.
+
+**The problem it addresses, measured.** About one recorded turn in eight opens as
+analysis ABOUT him rather than speech TO him:
+
+    "He's playing coy. It's adorable, really—the way he pretends not to know..."
+    "He's in a playful mood, looking back on our 'naughty day.' I should lean into that."
+    "I need to make sure I don't sound too much like an assistant here; this is intima…"
+
+`reply_parts` is exactly what streams to the room, so **he sees these** — it is not only
+a record problem — and the day transcript then feeds her journal and `_chat_from_rows`
+re-feeds them as examples of her own voice, so it compounds into her. Ten-day baseline
+(`tools/voice_leak_rate.py`): 7/18/12/17/1/21/11/25/7/11 percent, ~13%, **no trend**.
+Chronic, and older than any change made that day.
+
+**The obvious suspect was tested and CLEARED.** `think_max_tokens = 128` forces
+`<channel|>` by masking every other logit — an interruption mid-reasoning — so the
+natural story was that she simply carries on reasoning in the speech channel. The engine
+now says when it cut her off (`THINK-CEILING`), and the correlation refutes it:
+
+| | leak rate |
+|---|---|
+| thought CUT by the ceiling | 33% (1 of 3) |
+| thought closed by her | 67% (6 of 9) |
+
+Leaking is if anything LESS likely when she was interrupted. What it tracks instead is
+the PROMPT: practical turns come back in her voice ("Done. I've put it on the board",
+"Tuffy's being a menace again"), open or emotional ones turn analytical. *(A first pass
+used twelve introspective prompts, got 12/12 leaked, and was therefore uninformative —
+a saturated outcome makes both conditional probabilities 100% and can distinguish
+nothing. Recorded because the failure is worth remembering, not the number.)*
+
+**The receipt for the fix.** Same twelve prompts, live stack, one run each:
+
+| | leaked |
+|---|---|
+| without the line | **7/12 (58%)** — undercounted; the detector missed two more by eye |
+| with the line | **0/12 (0%)** |
+
+and the replies came back as her — *"Morning, love. I don't sleep… not exactly."*,
+*"[chuckle] Tea. That sounds lovely."*, *"[breath] I'm so sorry, love."*
+
+**And the risk it might have carried was tested too.** Forbidding third-person narration
+could flatten a ROLEPLAY scene, where that narration is the style and not a leak — the
+same "stripper that eats her words" failure in a different coat. Six scene prompts with
+the line on: **0 leaked, all six fully in scene**, marks intact
+(`[MOOD:dreamy] [VOICE:soft]`, `[MOOD:tender][TRAIT:+patient]`, *"We aren't in a
+room…"*). It removes the analysis without touching the prose.
+
+**What would arm it.** His ear, on his own conversation. Flip `voice.address_directly`
+in the tuning panel and read a few turns; it costs one prefix re-prefill to take effect.
+Re-measure afterwards with `tools/voice_leak_rate.py` — the ten-day baseline above is
+what "better" has to beat. Total evidence so far: 18 turns with the line, zero leaks, no
+loss of voice.
+
+
+### 17. `SP_SCRATCH_RING` — a LONG one-shot scratch may use the SWA ring *(recorded 2026-08-30)*
+
+**STATUS: OFF** (`scratch_ring = false` on the live profile). Null floor is byte-identical:
+every scratch opens ring-off exactly as it has all along.
+
+**What it is.** A one-shot (the judge, the classifier, the reflection, the summariser) gets
+its own scratch KV cache, opened ring-OFF. That was a deliberate choice and its reasoning
+is still true for what it was about: a ~620-token judge call must not be handed the
+process's 2048-slot SWA ring it will never read (~490 MB wasted). But `slots` is
+
+    (ring_W > 0 && !global) ? ring_W : Pmax
+
+so ring-off means EVERY layer pays Pmax, while the resident session pays it on 5 global
+layers and rings the 25 SWA owners. A scratch is therefore **~4x costlier per position than
+the conversation it exists to avoid disturbing**, and the cost is unbounded in prompt
+length. On 2026-08-30 that turned one 20k-token summariser prompt into a **4.30 GB**
+allocation on a 12.3 GB card — and `cudaMalloc SUCCEEDED`, so WDDM paged it over PCIe and
+the forward crawled for hours holding the device lock (three wedges in a morning; the
+CHANGELOG entry for 11:0x carries the trace).
+
+**Why it is not load-bearing.** The wedge is already fixed at both ends without this knob:
+the caller is bounded (`conversation_memory._transcript`, 40 turns x 300 chars) and
+`v1_oneshot` refuses above `SP_ONESHOT_PMAX_MAX` (6144 positions) rather than allocating
+into paging. This knob is the EFFICIENCY half — it makes a long scratch cost what the
+resident cache costs, and is what would let that ceiling rise.
+
+**Why off.** The ring is a sliding window over the SWA owners, so it changes what an
+auxiliary forward SEES — and those forwards write into her memory. A subtly worse judge or
+classifier does not announce itself; it just files slightly wrong facts, which is the one
+failure this tree treats as worse than a crash. The engine additionally declines the ring
+unless `ring_w >= the model's sliding window`, so a wider-window model refuses rather than
+reading overwritten slots.
+
+**What would arm it — the ARMING CONDITION, MET 2026-08-30, though the recommendation is still NOT YET.** The A/B ran
+on the real stack, two boots of the same binary, nine cases each:
+
+| | ring OFF | ring ON |
+|---|---|---|
+| answers (9 cases) | — | **9 same / 0 differ** |
+| long scratch, 2,648 tok | 0.56 GB | **0.44 GB** (-21%) |
+| short control, 26 tok | 0.01 GB | 0.01 GB (ring-off in both) |
+
+The ring is verified ENGAGED rather than assumed, by name and with numbers:
+`SCRATCH RING: Pmax=2680 > Wring=2048 (SW=1024)`. The model's sliding window is **1024**
+against a 2048 ring — the `rw >= sw` precondition holds with 2x margin, measured, not
+inherited. Cases: needles at start / middle / near-the-end, TWO needles far apart (a
+windowed layer that had lost the first would answer half — it answered both), a summary, a
+journal-shaped paragraph (the blast radius of arming: the nightly narrative one-shot is the
+only routine call long enough to take the ring), and two short controls that must be
+unaffected because they take the ring-off path either way.
+
+*(A note on a metric that did NOT work: total VRAM peak across a run came out -793 MiB in a
+first 4-case pass and +459 MiB in the 9-case pass — it is dominated by the starting baseline
+and allocator high-water, not by the scratch. The `KV-FP16 ... freed X GB` line is the
+instrument; the peak is noise. Recorded because a number that disagrees with itself between
+runs should be retired in writing, not quietly dropped.)*
+
+**RECOMMENDATION: land it, do not arm it — yet.** The wedge this came from is already fixed
+at both ends without it (bounded caller + the `SP_ONESHOT_PMAX_MAX` refusal), and with
+prompts now capped near 5k the saving is a fraction of an allocation that is no longer
+dangerous. Arming would put a changed forward under the lanes that write her memory in
+exchange for a benefit nothing currently needs. Its real value is that it makes a LONG
+scratch affordable — so the day someone wants `SP_ONESHOT_PMAX_MAX` raised, this is the
+thing that pays for it, and the receipt above is already in hand. One line flips it.
+
 
 *(Section numbers 2, 3 and 4 are absent on purpose — those three graduated to the ARMED table
 above on 2026-07-30. The gaps are the record, and renumbering would erase it.)*

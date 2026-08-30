@@ -794,6 +794,16 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
         if _sd.is_shutting_down():
             logger.info("[kairos] impulse dropped — the stack is shutting down")
             return
+        # ── SHE SPOKE INTO THE BOOT (2026-08-30) ─────────────────────────────────────
+        # The seed is warm-gated (_seed_for_presence) but the impulses it arms were not:
+        # during the ~11-minute base-snapshot capture her self-turns queued on the device
+        # lock, so the operator's first message after warm waited behind a backlog of her
+        # cold-priced turns. Same shape as the shutdown door above, and unmetered for the
+        # same reason "his turn in flight" KEEPS: nothing was burned, and a latched
+        # mode_kick survives to fire on the first tick after the prefix goes hot.
+        if not _warm_ok():
+            logger.info("[kairos] impulse held — the prefix is still cold (boot prewarm)")
+            return
         _sd.note_turn_start()
         try:
             _fire_inner()

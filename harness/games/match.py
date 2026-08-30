@@ -30,6 +30,7 @@ import threading
 import time
 from typing import Any, Dict, List, Optional
 
+from harness.store_io import replace_atomic
 from harness.games import chess as CH
 from harness.games import holdem as HE
 from harness.games import words as WD
@@ -69,7 +70,7 @@ def _write(m: dict) -> None:
         # `_mtime` is cache bookkeeping, not match state. It must never reach the file
         # (where it would be stale by definition) nor a payload.
         json.dump({k: v for k, v in m.items() if k != "_mtime"}, f)
-    os.replace(tmp, p)
+    replace_atomic(tmp, p)
     try:
         m["_mtime"] = os.path.getmtime(p)     # keep the writer's own cache entry valid
     except OSError:

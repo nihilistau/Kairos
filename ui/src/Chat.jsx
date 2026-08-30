@@ -84,6 +84,10 @@ export default function Chat({ onMood }) {
           // the writer files her marks as metadata beside the cleaned text, so a
           // restored turn keeps its chips (2026-08-25, his F5 report)
           savedMarks: Array.isArray(r.marks) ? r.marks : undefined,
+          // and her ACTS the same way (2026-08-30, "chips still vanish on refresh"):
+          // the day writer files the turn's tool/wear/recall/looked events beside the
+          // text, and they render through the same acts row a live turn uses
+          events: Array.isArray(r.acts) && r.acts.length ? r.acts : undefined,
           // a lone assistant row is one she spoke unprompted; say so, as live ones do
           unprompted: r.role === 'assistant' && r.unprompted ? true : undefined,
         })))

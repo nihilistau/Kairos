@@ -48,6 +48,8 @@ import threading
 import time
 from typing import Dict, Optional
 
+from harness.store_io import replace_atomic
+
 _LEDGER_LOCK = threading.Lock()
 
 _DAY = 86400.0
@@ -98,7 +100,7 @@ def _save(days: Dict[str, int]) -> None:
         with open(tmp, "w", encoding="utf-8") as f:
             for d in sorted(days):
                 f.write(json.dumps({"day": d, "turns": days[d]}) + "\n")
-        os.replace(tmp, p)      # atomic: a half-written ledger is worse than a stale one
+        replace_atomic(tmp, p)      # atomic: a half-written ledger is worse than a stale one
     except Exception:
         pass
 

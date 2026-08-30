@@ -262,6 +262,32 @@ imp = I.decide(cfg=I.KairosConfig(enabled=True, presence_mode="lucid"), state=st
 check("his-turn: once he is done, the owed turn comes",
       imp.action == I.MODE_TURN, "%s (%s)" % (imp.action, imp.reason))
 
+print("\n6f. THE COLD-PREFIX DOOR HOLDS, KICK KEPT (boot prewarm in flight)")
+# 2026-08-30, his report: during the ~11-minute base-snapshot capture her self-turns
+# queued on the device lock, so his first message after warm waited behind a backlog of
+# her cold-priced generations. The door is in _fire, beside the shutdown door, and it is
+# the second KEEPS door: nothing was burned, and the asked-for turn is still owed the
+# moment the prefix goes hot. Driven through the real _arm with the real registration
+# seam (set_warm_ok), never by stubbing _warm_ok itself.
+S.set_warm_ok(lambda: False)
+_ran[0] = False
+try:
+    _, st = _drive(I.MODE_TURN, generate=_gen_flag)
+finally:
+    S.set_warm_ok(None)
+check("cold-prefix: generate() was never reached", not _ran[0], _ran)
+check("cold-prefix: no clock is spent",
+      st.last_spoke_at == 0.0 and st.last_mode_at == 0.0,
+      (st.last_spoke_at, st.last_mode_at))
+check("cold-prefix: the asked-for kick is KEPT — the turn is still owed",
+      st.mode_kick is True, st.mode_kick)
+# ...and the bound is real: the moment the prefix is hot, the kept kick may fire.
+st.last_user_at = time.monotonic() - 100000.0
+imp = I.decide(cfg=I.KairosConfig(enabled=True, presence_mode="lucid"), state=st,
+               now=time.monotonic(), reply_text="", eot_margin=None)
+check("cold-prefix: once the prefix is hot, the owed turn comes",
+      imp.action == I.MODE_TURN, "%s (%s)" % (imp.action, imp.reason))
+
 
 print("\n7. K2 — THE RULING JUDGES THE ACT SHE WAS HANDED (discover override)")
 # kairos.discover_chance armed (his dial, default 0.0): the nudge becomes the discovery

@@ -35,6 +35,7 @@ import os
 import shutil
 from typing import Any, Dict, List
 
+from harness.store_io import replace_atomic
 from harness.control import avatar as AV
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -90,7 +91,7 @@ def _mark(sid: str, laid: int) -> None:
         tmp = _marker_path() + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(d, f, indent=1)
-        os.replace(tmp, _marker_path())
+        replace_atomic(tmp, _marker_path())
     except Exception:
         pass
 

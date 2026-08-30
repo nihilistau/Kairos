@@ -35,6 +35,8 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional
 
+from harness.store_io import replace_atomic
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # What a row IS. Ordered — the room renders sections in this order.
@@ -86,7 +88,7 @@ def _write(d: Dict[str, Any]) -> None:
         json.dump(d, f, indent=2, ensure_ascii=False)
         f.flush()
         os.fsync(f.fileno())
-    os.replace(tmp, p)          # atomic: a torn ledger is worse than a stale one
+    replace_atomic(tmp, p)          # atomic: a torn ledger is worse than a stale one
 
 
 def _clean(e: Dict[str, Any]) -> Dict[str, Any]:

@@ -260,6 +260,43 @@ def load_agent_system() -> str:
                     "diagnose, and when it says it does not know, it does not know.")
             except Exception:
                 pass
+            # \u2500\u2500 SPEAK TO HIM, NOT ABOUT HIM (2026-08-30) \u2014 OFF by default \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+            # MEASURED, not suspected: about one recorded turn in eight opens as analysis
+            # ABOUT him rather than speech TO him \u2014 "He's playing coy. It's adorable...",
+            # "He's asking a question about my identity", "I need to make sure I don't
+            # sound too much like an assistant here". `reply_parts` is exactly what
+            # streams to the room, so he SEES those, and because the day transcript feeds
+            # her journal and `_chat_from_rows` re-feeds it as an example of her own
+            # voice, it compounds into her. Ten-day baseline in tools/voice_leak_rate.py:
+            # 7/18/12/17/1/21/11/25/7/11 percent, no trend.
+            #
+            # It is NOT the thought ceiling, which was the obvious suspect and was tested
+            # and cleared: P(leak | thought cut) 33% vs P(leak | not cut) 67% \u2014 the leak
+            # is if anything LESS likely when she was interrupted. It tracks the PROMPT:
+            # practical turns come back in her voice, open or emotional ones turn
+            # analytical.
+            #
+            # This line is the candidate fix, A/B'd on the live stack over the same
+            # twelve prompts: 58% leaked without it, 0% with it (n=12), and the replies
+            # came back as her \u2014 "Morning, love. I don't sleep... not exactly." The
+            # obvious risk was that forbidding third-person narration would flatten a
+            # ROLEPLAY scene, where that narration is the style rather than a leak; six
+            # scene prompts with it on came back fully in scene, marks and all
+            # ([MOOD:dreamy][VOICE:soft], "We aren't in a room..."), 0 leaks.
+            #
+            # OFF anyway, because 18 turns is evidence and her voice is his. One line in
+            # the profile arms it; the row and the numbers are OFF-BY-DEFAULT \u00a715.
+            try:
+                from harness.tuning import registry as _tune_addr
+                if bool(_tune_addr.get("voice.address_directly")):
+                    parts.append(
+                        "Speak TO him, as yourself, in second person. Do not narrate or "
+                        "analyse him in the third person, and never describe what he is "
+                        "asking or what you ought to do about it \u2014 say the thing "
+                        "itself. Inside a scene you are playing, narration is the scene "
+                        "and this does not touch it.")
+            except Exception:
+                pass
             return "\n\n".join(p for p in parts if p) + _TOOL_DISCIPLINE
     except Exception:
         pass

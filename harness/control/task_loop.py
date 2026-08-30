@@ -28,6 +28,7 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from typing import Callable, List, Optional
 
+from harness.store_io import replace_atomic
 from harness.inference.client import SPDaemonClient, get_client
 from harness.inference.inference_config import InferenceConfig
 
@@ -73,7 +74,7 @@ class TaskState:
         tmp = self.path() + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(d, f, indent=2)
-        os.replace(tmp, self.path())   # atomic — a crash never leaves half a state file
+        replace_atomic(tmp, self.path())   # atomic — a crash never leaves half a state file
 
     @classmethod
     def load(cls, task_id: str) -> Optional["TaskState"]:

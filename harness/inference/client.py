@@ -381,10 +381,18 @@ class SPDaemonClient:
         if self._client is None:
             raise RuntimeError("client not connected")
         try:
+            # deadline_s: the daemon is TOLD how long this client will wait (2026-08-30).
+            # The reflect oneshot crawled 33+ minutes after its client gave up at 600 s,
+            # holding the device lock the whole time — "stuck warming, 99% GPU". The
+            # daemon aborts between decode steps once the budget is spent, so an
+            # abandoned oneshot frees the device instead of squatting on it. Slightly
+            # under the HTTP timeout so the daemon's named 503 wins the race with
+            # httpx's own ReadTimeout and the log says WHY.
             r = self._client.post(
                 f"{self.base_url}/v1/oneshot",
                 json={"messages": messages, "max_tokens": int(max_tokens),
-                      "temperature": float(temperature)},
+                      "temperature": float(temperature),
+                      "deadline_s": max(1.0, float(timeout) - 5.0)},
                 timeout=timeout,
             )
             if r.status_code == 404:

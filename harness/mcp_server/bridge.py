@@ -37,6 +37,8 @@ import sys
 import threading
 from typing import Any, Dict, List, Optional
 
+from harness.store_io import replace_atomic
+
 _HARNESS_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _DEF_CONFIG = os.path.join(_HARNESS_ROOT, "mcp_servers.json")
 
@@ -312,7 +314,7 @@ def save_pins(pins: Dict[str, Dict[str, Any]]) -> None:
     tmp = _PIN_PATH + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(pins, f, indent=2, sort_keys=True)
-    os.replace(tmp, _PIN_PATH)
+    replace_atomic(tmp, _PIN_PATH)
 
 
 def pin_diff(entry: Any, live: Dict[str, Any]) -> Dict[str, Any]:

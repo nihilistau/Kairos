@@ -99,37 +99,42 @@ export default function Wardrobe() {
             <span className="wr-count"> nothing hangs in the wardrobe until it moves</span>
           </div>
           <div className="wr-wants">
-            {(d.wants || []).map(w => (
-              <div key={w.id} className={'wr-want wr-' + (w.stage || 'ordered')}>
-                {w.stage === 'making' || w.stage === 'delayed' ? (
+            {/* THE ROW IS `q`, NOT `w` (2026-08-31). This mapped to `w`, shadowing the
+                poll handle of the same name three lines up — so every `w.refresh()` in
+                these three handlers read a want row, found no method, and threw. Dismiss,
+                accept and "make it now" each did their write and then failed silently on
+                the re-read; the 4s tick papered over it, which is why it survived. */}
+            {(d.wants || []).map(q => (
+              <div key={q.id} className={'wr-want wr-' + (q.stage || 'ordered')}>
+                {q.stage === 'making' || q.stage === 'delayed' ? (
                   /* THE PICTURE IT IS WAITING ON. A thumbnail says "this exists and is
                      half-made" in a way the word "making" does not. */
                   <img className="wr-thumb"
-                       src={`/v1/wardrobe/look?id=${encodeURIComponent(w.id)}`} alt=""
+                       src={`/v1/wardrobe/look?id=${encodeURIComponent(q.id)}`} alt=""
                        onError={e => { e.currentTarget.style.display = 'none' }} />
                 ) : null}
-                <span className="wr-t">{(w.kind || 'look') === 'gesture' ? 'moment' : 'look'}</span>
-                {w.want}
-                <span className="wr-half" title={w.stage === 'suggested' ? (w.from_mark || '') : (w.delay_reason || '')}>
-                  {w.stage === 'suggested'
+                <span className="wr-t">{(q.kind || 'look') === 'gesture' ? 'moment' : 'look'}</span>
+                {q.want}
+                <span className="wr-half" title={q.stage === 'suggested' ? (q.from_mark || '') : (q.delay_reason || '')}>
+                  {q.stage === 'suggested'
                      ? (/* SHE REACHED FOR A VERB THAT DOES NOT EXIST (2026-08-27). The
                            prose was kept; nothing is ordered and nothing is being made.
                            Say what she wrote, so the offer can be judged on her words. */
-                        <>she reached for this{w.from_mark ? <> — she wrote <code className="wr-mark">{w.from_mark}</code></> : null}
-                          {w.near?.id ? <> · nearest she has: {w.near.id}</> : null}</>)
-                   : w.stage === 'ordered' ? 'ordered — picture being made'
-                   : w.stage === 'making' ? 'picture done · motion still owed'
-                   : w.stage === 'delayed' ? 'delayed' + (w.tries > 1 ? ` · ${w.tries} tries` : '')
+                        <>she reached for this{q.from_mark ? <> — she wrote <code className="wr-mark">{q.from_mark}</code></> : null}
+                          {q.near?.id ? <> · nearest she has: {q.near.id}</> : null}</>)
+                   : q.stage === 'ordered' ? 'ordered — picture being made'
+                   : q.stage === 'making' ? 'picture done · motion still owed'
+                   : q.stage === 'delayed' ? 'delayed' + (q.tries > 1 ? ` · ${q.tries} tries` : '')
                    : 'not going to be made'}
                 </span>
                 <button className="wr-gen wr-dismiss" title="take it off the list (kept in history)"
                         disabled={!!busy}
                         onClick={async () => {
-                          setBusy('x' + w.id)
-                          try { await api.wardrobeDismiss(w.id); w.refresh() }
+                          setBusy('x' + q.id)
+                          try { await api.wardrobeDismiss(q.id); w.refresh() }
                           finally { setBusy('') }
                         }}>✕</button>
-                {w.stage === 'suggested' ? (
+                {q.stage === 'suggested' ? (
                   /* ACCEPT IS THE ONLY DOOR (2026-08-27). Not "make it now": accepting and
                      generating are two decisions and collapsing them would spend an image
                      on a single click. Accept puts it in the queue as an ordinary want —
@@ -138,17 +143,17 @@ export default function Wardrobe() {
                   <button className="wr-gen wr-accept" disabled={!!busy}
                           title="put it in the queue as a want — nothing is generated yet"
                           onClick={async () => {
-                            setBusy('a' + w.id)
-                            try { await api.wardrobeAccept(w.id); w.refresh() }
+                            setBusy('a' + q.id)
+                            try { await api.wardrobeAccept(q.id); w.refresh() }
                             finally { setBusy('') }
                           }}>accept</button>
-                ) : w.stage !== 'refused' ? (
+                ) : q.stage !== 'refused' ? (
                   /* GENERATE NOW (2026-08-21): one click, this want, via the API —
                      the day-boundary wait is a fallback, not the plan. */
                   <button className="wr-gen" disabled={!!busy || d.genstatus?.running}
                           onClick={async () => {
-                            setBusy(w.id)
-                            try { await api.wardrobeGenerate(w.id); w.refresh() }
+                            setBusy(q.id)
+                            try { await api.wardrobeGenerate(q.id); w.refresh() }
                             finally { setBusy('') }
                           }}>make it now</button>
                 ) : null}
@@ -361,7 +366,12 @@ export default function Wardrobe() {
         </div>
       )}
 
-      <Closet />
+      {/* HIS WRITE IN THE CLOSET IS A WRITE TO THIS PANEL (2026-08-31). Retiring or
+          hiding a garment leaves the closet list at once — Closet re-reads its own
+          door — while `just arrived` and the wardrobe tiles above kept the row until
+          the next 4s tick. Two lists in one panel disagreeing about what he just did
+          reads as "retire does not work"; the server was right the whole time. */}
+      <Closet onWrite={w.refresh} />
 
       <div className="wr-note">
         Hers to drive — three kinds, one act each: clothing is <code>wear</code> /
@@ -459,16 +469,34 @@ function Row({ r, dim, edit, setEdit, op, busy, cats }) {
   )
 }
 
-function Closet() {
+function Closet({ onWrite }) {
   const c = usePoll(api.catalog, 6000)
   const [busy, setBusy] = useState('')
   const [edit, setEdit] = useState(null)        // {id,title,description,category,tags}
   const [imp, setImp] = useState({})            // file -> {category,title,description,loop}
+  const [err, setErr] = useState('')            // a write that did not land, said out loud
   const d = c.data
   if (!d || !d.ok) return null
+  /* ── A WRITE THAT FAILED MUST NOT LOOK LIKE A WRITE THAT WORKED (2026-08-31) ───────
+     This threw the answer away. `/v1/catalog` reports `{ok: false, error}` for a refused
+     write — and on Windows two of five of them WERE refused, because a reader holding
+     catalog.json open makes the atomic rename fail (harness/store_io.py has the
+     measurement). His report was "editing and saving also doesn't seem to work, i just
+     tried retiring two clothing and neither has retired": both writes were answered, both
+     said no, and the room said nothing at all. The retry is the fix; this is the reason
+     the next one will be findable in ten seconds instead of an afternoon. */
   const op = async (body) => {
     setBusy(body.op + ':' + (body.id || body.file || ''))
-    try { const r = await api.catalogOp(body); c.refresh(); return r } finally { setBusy('') }
+    try {
+      const r = await api.catalogOp(body)
+      setErr(r && r.ok === false ? (r.error || 'the write did not land') : '')
+      c.refresh()
+      if (onWrite) onWrite()          // ...and the wardrobe above it, which reads the same rows
+      return r
+    } catch (e) {
+      setErr(String((e && e.message) || e))
+      throw e
+    } finally { setBusy('') }
   }
   const rows = d.rows || []
   const live = rows.filter(r => !r.hidden && !r.removed_at)
@@ -480,6 +508,7 @@ function Closet() {
       <div className="wr-sec">the closet, managed
         <span className="wr-count"> {live.length} on offer · {hidden.length} hidden · {removed.length} retired</span>
       </div>
+      {err ? <div className="wr-empty">that did not save — {err}</div> : null}
 
       <details className="wr-fold" open={(d.inbox || []).length > 0}>
         <summary>bring in your own — inbox ({(d.inbox || []).length})</summary>

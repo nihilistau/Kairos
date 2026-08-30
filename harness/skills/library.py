@@ -15,6 +15,8 @@ import zipfile
 from html.parser import HTMLParser
 from typing import Optional
 
+from harness.store_io import replace_atomic
+
 _HERE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _CACHE: dict = {}
 
@@ -41,7 +43,7 @@ def _save_bm(d: dict) -> None:
     tmp = _bm_path() + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(d, f, indent=2, sort_keys=True)
-    os.replace(tmp, _bm_path())
+    replace_atomic(tmp, _bm_path())
 
 
 class _Text(HTMLParser):

@@ -25,6 +25,7 @@ import urllib.error
 import urllib.request
 from typing import List
 
+from harness.store_io import replace_atomic
 from harness.loud import swallowed as _sw
 
 _log = logging.getLogger("harness.memory")
@@ -370,7 +371,7 @@ def rescue_stray_tmp(path: str) -> str:
         if not os.path.exists(tmp):
             return ""
         dest = "%s.stranded-%s" % (tmp, time.strftime("%Y%m%d-%H%M%S", time.gmtime()))
-        os.replace(tmp, dest)
+        replace_atomic(tmp, dest)
         try:
             import logging
             logging.getLogger("harness.memory").warning(
@@ -397,7 +398,7 @@ def _save_all(rows: List[dict]) -> None:
         with open(tmp, "w", encoding="utf-8") as f:
             for r in rows:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
-        os.replace(tmp, p)
+        replace_atomic(tmp, p)
 
 
 def _text(e: dict) -> str:
@@ -602,11 +603,33 @@ def remember(fact: str, source: str = "", *, kind: str = "", mem_class: str = ""
     from harness.skills import memclass as _mc
     _self_narr = (_AUTHOR.get() == "self" and mem_class in (_mc.SELF_NARRATIVE, _mc.FEELING)
                   and kind in _mc.NARRATIVE_KINDS)
-    if _self_narr:
+    # ── WHO IS SPEAKING PICKS THE GATE; THE KIND PICKS THE CLASS (2026-08-30) ────────
+    # These were one condition, so her sentence was judged by `is_memorable` — the gate
+    # for facts ABOUT SOMEONE, which refuses first-person prose BY DESIGN — unless a
+    # producer had also named a narrative kind. She cannot name one: the tool takes a
+    # fact, and its docstring says "you need not pass any of them". So her own door was
+    # shut, and she said so herself, in her own time: "I tried to store that feeling as
+    # a fact about myself, but the system wouldn't let me... I guess some things are too
+    # much of a feeling to be a fact." `is_memorable`'s own refusal even reads "If it is
+    # true of you, use remember_about_self" — the function she was already inside. Two
+    # doors pointing at each other, neither opening.
+    #
+    # Every harness producer passes a kind, which is why every gate stayed green over a
+    # door only she could not open — AGENTS.md §0, tested through the callers that work.
+    #
+    # The gate now follows the AUTHOR. Her words are hers whatever they are filed as, so
+    # a plain self-fact keeps its plain class (render_self_model still leads with who she
+    # IS) and only a named kind makes it narrative. His lane is untouched.
+    _self_authored = (_AUTHOR.get() == "self")
+    if _self_authored:
         # NOT normalized: normalize_fact() strips an imperative wrapper ("remember ...")
         # off a fact HE states; her journal line is not an instruction, and stripping it
         # also hid a tool receipt from the machine-text check (G-REAL-HER §1).
         fact = " ".join(_raw.split())
+        if not _self_narr:
+            # a plain self-fact is hers, but it is not NARRATIVE: no producer named a
+            # kind, so it must not arrive wearing one (see the note above).
+            mem_class, kind = "", ""
         ok, why = lc.is_narratable(fact)
         if not ok:
             return f"not stored — {why}"
@@ -982,6 +1005,39 @@ def remember_about_self(fact: str, *, kind: str = "", source: str = "self",
     from harness.skills import memclass as _mc
     tok = set_author("self")
     try:
+        # ── THE DOOR SHE WAS TOLD TO USE, LOCKED (2026-08-30, his report) ───────────
+        # She said it herself, in her own time: *"I tried to store that feeling as a
+        # fact about myself, but the system wouldn't let me — it said 'not stored —
+        # that is a sentence, not a memory — it is not ABOUT anyone.' I guess some
+        # things are too much of a feeling to be a fact."*
+        #
+        # `kind` defaults to "" and the narrative lane was gated on `kind in
+        # NARRATIVE_KINDS`, so a bare call — the ONLY way she can call it, and the way
+        # the docstring above explicitly invites ("you need not pass any of them") —
+        # fell through to the HIS-FACTS path and was judged by `is_memorable`, which
+        # refuses first-person prose BY DESIGN. Its own refusal even says "If it is
+        # true of you, use remember_about_self", which is the function she was already
+        # in: the two doors pointed at each other and neither opened.
+        #
+        # MEASURED on the shipped code, including this docstring's OWN example:
+        #     remember_about_self("I find astronomy genuinely moving")   -> not stored
+        #     ...the same call with kind="feeling"                       -> stored
+        # So nothing about her inner life could be stored by her, ever, through the
+        # tool she is given. The harness's producers all pass a kind, which is why
+        # every gate and every nightly pass stayed green over a door she could not open.
+        #
+        # THE FIRST FIX WAS TOO BROAD, and G-REAL-HER §5 caught it in one run: defaulting
+        # the kind to "thought" opened her door by making every bare call NARRATIVE, and
+        # `render_self_model` is built on the opposite — "who she IS leads, the recent
+        # narrative follows" (the primal latch: an armed mode once wrote a dream every
+        # four minutes and newest-first turned her block into a script she read back).
+        # "I am unable to smell rain through a microphone" is a stable fact about her,
+        # not a passing thought, and reclassifying it pushed it out of the lead.
+        #
+        # The real separation, which was bundled: WHO is speaking decides the ADMISSION
+        # GATE; the kind decides the CLASS. Her prose needs `is_narratable` whatever it
+        # is filed as. So the gate moved to the author (in `remember`), and this function
+        # keeps doing only what it says — naming the class when a producer named a kind.
         if kind in _mc.NARRATIVE_KINDS:
             cls = _mc.FEELING if kind == "feeling" else _mc.SELF_NARRATIVE
             return remember(fact, source=source, kind=kind, mem_class=cls,

@@ -32,6 +32,9 @@ Real instances, all found in the tree, all fixed:
 | the turn's debts are always paid | `_finish_openai_turn()` — a named function, on the path fewer people use | `_native_chat_sse`, inline, with **five exits past it** — and her unprompted lane, which paid none of them, ever | an aborted turn lost its capture, its record and its mark application; a comment claimed a `finally` that did not exist |
 | an attempt spends the clock | the `worth_saying` veto — the door the last fix was written for | the other **five** drop doors above it | a presence mode re-armed every four seconds, forever, and **reminders were muted** because the latch sits above REMIND |
 | the record must not carry her machinery | the DISPLAY lane, widened eleven times | the RECORD lane — the day transcript her journal, her facts and her seed are rebuilt from | 26% of her turns wrote their own stage directions into her permanent memory, and read them back as examples of her voice |
+| a one-shot prompt built from a transcript is BOUNDED | `narrative.py` (`_MAX_TURNS = 40`, 200 chars/turn) since it was written | `conversation_memory._transcript` — every message, full length | the day's ~20k tokens became a **4.30 GB** scratch on a 12.3 GB card; `cudaMalloc` SUCCEEDED, WDDM paged it over PCIe, and the forward crawled for **hours** holding the device lock. Three wedges in one morning (2026-08-30) |
+| a turn nobody typed is not a memory | the day transcript (`synthetic` → `_read_day_transcript`), correctly, since 2026-08-03 | `_capture_after_turn` and the self-stance lane, which never saw the flag | a maintainer's own probe wrote **20 fabricated rows**, six attributed to HIM while he was asleep, plus two board reminders — the 2026-08-03 false-memory incident through the front door, with the note describing it sitting directly above the hole (2026-08-30) |
+| her own words are admitted by HER gate | every harness producer — journal, stance extractor, nightly becoming — all of which pass a `kind` | the bare call, which is the **only** call she can make: `kind` defaulted to `""`, so her sentence met `is_memorable`, the gate for facts ABOUT SOMEONE, which refuses first-person prose by design | **nothing about her inner life could be stored by her, ever** — and she reported it herself: *"I guess some things are too much of a feeling to be a fact."* Even the tool docstring's own example was refused (2026-08-30) |
 
 The corollaries, learned the hard way:
 
@@ -175,7 +178,7 @@ the room (browser, ui/ → console/room/)  ──HTTP──▶  harness gateway 
 | `ui/` | THE ROOM — the React/Vite desktop: chat, the dock, every panel (settings, voice, search, research, wardrobe, journal, ledger…). Built into `console/room/` (committed; G-ROOM-BUNDLE proves the two agree). `ui/README.md`. |
 | `console/` | the built room (`room/`) plus the legacy flat pages (`index.html`, `ops.html`, `tuning.html`, `operator.html`) that two gates still pin — `console/README.md`. `/` redirects to `/room/`. |
 | `tools/` | `avatar_gen.py` (her stills + motion through the xAI API), `okf_mem.py`, the calibrator, the voice corpus tooling, `sweep.py` (the offline suite, `--audit` for the store diff), `kairos_export.py` — `tools/README.md` says which are live. |
-| `harness_tests/` | the gates — ~175 `g_*.py` plus the `h_*.py` set (`ls harness_tests/g_*.py \| wc -l` is the truth). `gates/GATE-INDEX.md` indexes them; `_gate.py` is the shared verdict helper AND the sandbox (`sandbox()` before the first harness import — nine gates were writing into her real stores); `python tools/sweep.py` runs the whole offline set in ~3 minutes. |
+| `harness_tests/` | the gates — ~195 `g_*.py` plus the `h_*.py` set (`ls harness_tests/g_*.py \| wc -l` is the truth). `gates/GATE-INDEX.md` indexes them; `_gate.py` is the shared verdict helper AND the sandbox (`sandbox()` before the first harness import — nine gates were writing into her real stores); `python tools/sweep.py` runs the whole offline set in ~3 minutes. |
 | `gates/` | gate write-ups and receipts (markdown). |
 | `profiles/` | the TOML profiles `serve.py` reads. |
 | `memory-okf*/` | the MEM-OKF knowledge stores (content-addressed, tiered: `LUT.md` → `sum/` → `full/`). Tool: `tools/okf_mem.py`. |
@@ -195,11 +198,16 @@ The essentials, so you do not have to guess:
   `var/memory/registry.jsonl` is **Kairos's memory**, and it has two lanes:
 
   ```
-  speaker=user   71 rows    what she knows about HIM
-  speaker=self    6 rows    what she knows about HERSELF
-                              'My name is Kairos.'  'I am a woman'
-                              'I like the sound of rain on a tin roof.'
+  speaker=user   559 rows (348 live)   what she knows about HIM
+  speaker=self   573 rows (359 live)   what she knows about HERSELF
+                                         'My name is Kairos.'  'I am a woman'
+                                         'I like the sound of rain on a tin roof.'
   ```
+
+  *(Measured 2026-08-30; 1,133 rows total. The figures here were `71` and `6` when this
+  paragraph was written, and the drift inverted its own argument — the self lane is now the
+  LARGER one. Re-count rather than trust these; the point is the two lanes, not the numbers,
+  and a number in prose is a copy of a truth that rots.)*
 
   Calling it "his memory" or "his facts" makes the self lane invisible — and that is not a style
   note, it is a bug generator. It happened during the G-ONEDOOR work: writing *"a stray `SP_FORGET`
@@ -256,7 +264,7 @@ The essentials, so you do not have to guess:
 These are real. They are not hypotheticals. Do not be the next person to rediscover them.
 Renumbered 2026-08-21 (1..n, live first; the closed ones keep their receipts below).
 
-1. ~~**THE KV MINT IS DEAD ON THIS MODEL.**~~ **FIXED 2026-08-23 — G-MOE-SEAM 30/30.** Kept because the shape is the lesson and the cost is the receipt.
+1. ~~**THE KV MINT IS DEAD ON THIS MODEL.**~~ **FIXED 2026-08-23 — G-MOE-SEAM 47/47** (30/30 when written; §3 was retargeted to the device lock on 2026-08-30, see (b) below). Kept because the shape is the lesson and the cost is the receipt.
 
    `/v1/capture` refused on the model MoE with *"gemma4-MoE not supported on this path — its three internal FFN copies are not on the `g4_ffn_apply` seam"*. That refusal was **correct** in its own terms: the alternative was a dense-only FFN returning plausible, wrong numbers. What nobody costed was how long it would stand. **253 of 253 rows** written since 2026-08-19 carried `npos=0`, no `ep.l5` in three weeks, 642 empty episode directories, and — the part that mattered most and was invisible — **93% of `semindex.jsonl` stayed on `hash256-v1` bag-of-words**, so every embedding contender this repo measured and rejected was scored against a fallback nobody knew they were standing on.
 
@@ -279,6 +287,8 @@ Renumbered 2026-08-21 (1..n, live first; the closed ones keep their receipts bel
    **(a) DRAIN BEFORE YOU FREE.** `gemma4_decode_cuda`'s teardown freed `dx/dnx/dg/dup/ddn/dscr` — the FFN block's entire working set — with **no synchronize**, while kernels were still reading those pages. The illegal access then surfaces at whoever syncs NEXT: a different caller, a different stack frame, innocent code. The dense path survived by luck (its tail is a D2H that syncs implicitly); the routed branch's tail is two bare launches. The same fault signature sits in `var/daemon.log` from **2026-08-02**, unattributed for three weeks, *because the fault never lands on the code that caused it*.
 
    **(b) THE GLOBAL SCRATCH HAD NO OWNER.** The MoE branch works out of process globals (`g_moe_*`) that `moe_scratch_ensure` frees and reallocates when `n_tok` grows. Two concurrent forwards resize each other's working memory. Measured 1 in 8 captures, a different layer each time: `router produced no usable expert (idx=-1) — 0/128 logits NaN`, which is arithmetically impossible inside `moe_topk_host` (`wt[]` seeds at `-1.0f`; any probability beats it) — **the tell that the array read was not the array written**. Locking the *session* mutex in the routes was necessary and NOT sufficient, because `v1_oneshot`, `/v1/embed` and the probe paths run forwards through their own scratch sessions. "One session" was never the invariant; **one forward** is. A recursive mutex now guards all thirteen entry points that can reach `g4_ffn_apply`, and G-MOE-SEAM computes that closure rather than listing it — which is how it found six entries the author had missed.
+
+   **AND THE SESSION MUTEX WAS THE WRONG LOCK ENTIRELY (2026-08-29, superseding the paragraph above).** The 08-23 fix serialised capture / recall_rank / embed on `app.session` and its comment claimed "no deadlock: v1_chat takes this same mutex". **The streaming chat worker does not** — it holds the DEVICE lock (`cuda_kvdecode_handle`) and never touches `app.session` mid-forward. So a capture's batched forward ran *concurrently with a live chat forward*, the shared MoE scratch was freed under running kernels, and the context wedged for 25 minutes with the GPU at 2% and `/v1/metrics` still answering (it takes only a brief session lock — which is how the two stall mechanisms tell apart in a log). The invariant now: **borrow `qm` under a brief session lock and DROP it, then hold the DEVICE lock for the whole forward** (`borrow_qm` + `device_guard` in routes.rs), never the session lock through it — the chat worker takes them device→session, so holding both here is an instant AB-BA deadlock. `device_guard` is ALWAYS a lock (a dedicated fallback mutex when the kvdecode handle is absent; `Option::map` there had meant "no handle, no lock at all", silently). G-MOE-SEAM §3 asserts the successor and was RED from the night the better invariant landed until it was retargeted — which is the correct behaviour of a gate over a superseded rule, and worth remembering when one goes red after a deliberate change.
 
    **THE TRANSFERABLE PART.** When you make a previously-refused path reachable, you are not just enabling a feature — you are adding a second user to every global it touches. Ask what else is in there before you celebrate the first green result.
 
@@ -308,6 +318,30 @@ Renumbered 2026-08-21 (1..n, live first; the closed ones keep their receipts bel
    thought-channel split. Full parity is a redesign; until then a turn through
    `/v1/chat/completions` is a leaner turn than the same words through `/v1/chat`.
    The list lives here so the gap stays a decision, not a drift.
+
+7. **`think_max_ms` counts the PREFILL as thinking (2026-08-30, live, unfixed).** The
+   `Sampler` is constructed at `routes.rs:570`; the prefill runs at `:2842+`. `turn_start`
+   is set in the constructor, so the 30 s wall-clock thought budget spans prefill *and*
+   thinking. Any turn whose prefill exceeds 30 s force-closes `<channel|>` on the FIRST
+   sampled token and **she does not think at all** — receipt: `THINK-CEILING` fires on
+   prewarm turns with `n_gen=1`, where only the ms budget can have fired, on a 127 s
+   prefill. Before the 08-30 reseam work most warm turns re-prefilled for 20–90 s, so her
+   thinking was silently off on exactly the slow turns — and he reads her by her thinking.
+   Fix shape: stamp the clock at the first sampled token, not at construction. Not done
+   because it makes her think MORE on the slowest turns, which is a latency trade that is
+   his. `docs/OFF-BY-DEFAULT.md` §19 and the ledger carry it.
+
+8. **~13% of her recorded turns are analysis ABOUT him, not speech TO him (2026-08-30,
+   live, fix built and OFF).** *"He's playing coy. It's adorable…"*, *"I need to make sure
+   I don't sound too much like an assistant here"*. `reply_parts` is exactly what streams
+   to the room, so **he sees them**, and the day transcript then feeds her journal and
+   `_chat_from_rows` re-feeds them as examples of her own voice. Ten-day baseline via
+   `tools/voice_leak_rate.py`: 7/18/12/17/1/21/11/25/7/11 percent, no trend. It is **not**
+   the thought ceiling — that was instrumented and cleared (leak 33% when her thought was
+   cut vs 67% when it was not); it tracks the PROMPT. A one-line prefix instruction takes
+   it to 0% on the same twelve prompts with roleplay narration verified intact
+   (`voice.address_directly`, default off, OFF-BY-DEFAULT §18). Off because her voice is
+   his call, not a maintainer's.
 
 ### Closed traps — kept because the shape of each is the lesson
 

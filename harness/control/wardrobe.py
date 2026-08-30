@@ -44,6 +44,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from harness.control import avatar as AV
+from harness.store_io import replace_atomic
 
 # ── WHAT EACH TIER ACTUALLY IS, IN WORDS ──────────────────────────────────────────────
 # Keyed to avatar.TIERS so there is one tier vocabulary, not two. `wearing` is the honest
@@ -331,13 +332,38 @@ def _catalog_path() -> str:
     return os.path.join(root(), _CATALOG)
 
 
+# ── ONE READ PER CHANGE, NOT ONE PER ROW (2026-08-31) ────────────────────────────────
+# `overlay_for()` is called once PER ROW by `wants()`, `_apply_overlay()` and the offer
+# filters, and each call re-opened and re-parsed the whole file: about a hundred opens to
+# answer one panel poll, four seconds apart, from several gateway threads. On Windows a
+# rename over a file that ANY handle has open fails (see harness/store_io.py), so that
+# read pattern was not a race against his writes so much as a near-certainty — 5 of 12
+# measured `POST /v1/catalog` writes were refused while the room was up.
+#
+# Keyed on the file's own mtime+size, so an edit made by anything at all — another
+# process, a hand edit, the exporter — is picked up on the next read. `set_overlay`
+# clears it outright after a write rather than trusting the timestamp, because two writes
+# inside one mtime tick that happen to be the same length would otherwise serve the first.
+_OVERLAY_CACHE: Dict[str, Any] = {}
+
+
 def overlay() -> Dict[str, Dict[str, Any]]:
+    p = _catalog_path()
     try:
-        with open(_catalog_path(), encoding="utf-8") as f:
+        st = os.stat(p)
+        stamp = (p, st.st_mtime_ns, st.st_size)
+    except OSError:
+        return {}
+    if _OVERLAY_CACHE.get("stamp") == stamp:
+        return _OVERLAY_CACHE.get("rows") or {}
+    try:
+        with open(p, encoding="utf-8") as f:
             d = json.load(f)
-        return d if isinstance(d, dict) else {}
     except Exception:
         return {}
+    d = d if isinstance(d, dict) else {}
+    _OVERLAY_CACHE["rows"], _OVERLAY_CACHE["stamp"] = d, stamp
+    return d
 
 
 def overlay_for(aid: str) -> Dict[str, Any]:
@@ -346,7 +372,10 @@ def overlay_for(aid: str) -> Dict[str, Any]:
 
 def set_overlay(aid: str, **fields) -> Dict[str, Any]:
     """Merge fields onto one asset's overlay row. None deletes a field."""
-    d = overlay()
+    # A COPY, because `overlay()` now hands out the cached dict and a writer that mutates
+    # it would change what every reader sees before the bytes are on disk — and would
+    # leave the change in memory if the write below failed.
+    d = dict(overlay())
     row = dict(d.get(aid) or {})
     for k, v in fields.items():
         if v is None:
@@ -359,7 +388,11 @@ def set_overlay(aid: str, **fields) -> Dict[str, Any]:
     tmp = _catalog_path() + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(d, f, indent=1, ensure_ascii=False)
-    os.replace(tmp, _catalog_path())
+    # RETRIED, because a reader holding the file open makes the rename fail on Windows
+    # and his panel edit is thrown away silently — see harness/store_io.py for the
+    # measurement. It still RAISES if it cannot land: the route's error is the truth.
+    replace_atomic(tmp, _catalog_path())
+    _OVERLAY_CACHE.pop("stamp", None)
     return row
 
 
