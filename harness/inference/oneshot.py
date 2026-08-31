@@ -31,6 +31,10 @@ import json
 import os
 from typing import Any, Dict, List, Optional
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 DEFAULT_DAEMON = "http://127.0.0.1:3000"
 
 
@@ -73,7 +77,8 @@ def ask_oneshot(
                 max_tokens=max_tokens, temperature=temperature) or ""
             out = strip_control_surfaces(out).strip()
             return out or None
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "ask_oneshot", _swx, lane="inference")
             return None
 
     url = (daemon or daemon_url()).rstrip("/") + "/v1/oneshot"
@@ -88,7 +93,8 @@ def ask_oneshot(
             headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             text = json.loads(r.read().decode()).get("text") or ""
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "ask_oneshot", _swx, lane="inference")
         return None
     return strip_control_surfaces(text).strip()
 
@@ -116,6 +122,7 @@ def ask_messages(
             headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             text = json.loads(r.read().decode()).get("text") or ""
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "ask_messages", _swx, lane="inference")
         return None
     return strip_control_surfaces(text).strip()

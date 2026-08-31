@@ -43,6 +43,8 @@ from harness.kairos import swallowed
 from harness.control import anon as _anon      # the three log lines below carry HER WORDS
 from harness.tuning import registry as tune
 
+from harness.loud import swallowed as _swallowed
+
 logger = logging.getLogger(__name__)
 
 _LOCK = threading.RLock()
@@ -175,7 +177,8 @@ def set_warm_ok(fn) -> None:
 def _warm_ok() -> bool:
     try:
         return bool(_WARM_OK()) if _WARM_OK is not None else True
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_warm_ok", _swx, lane="kairos")
         return True
 
 
@@ -298,7 +301,8 @@ def _quiet_after_him() -> float:
     """The policy's quiet-after-him floor (2026-08-22 — it lived here as a fire-time drop)."""
     try:
         return float(tune.get("kairos.quiet_after_him_s"))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_quiet_after_him", _swx, lane="kairos")
         return 0.0
 
 
@@ -432,7 +436,8 @@ def _evidence_count() -> int:
     try:
         from harness.skills.memory import _load
         return sum(1 for r in _load() if _is_evidence(r))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_evidence_count", _swx, lane="kairos")
         return -1
 
 
@@ -660,7 +665,8 @@ def _reflect_insight(res: dict) -> Optional[dict]:
             return False
         try:
             return _V.competition(row, rows) == "1"
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "_covered", _swx, lane="kairos")
             return False
 
     pm = PersonModel.from_registry()
@@ -736,7 +742,8 @@ def _due_notes() -> list:
     try:
         from harness.skills import notes as N
         return N.due()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_due_notes", _swx, lane="kairos")
         return []
 
 
@@ -848,8 +855,8 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
                 if _looks_like_scratchpad(reply_text or ""):
                     logger.info("[kairos] continue dropped — that was planning, not a cut-off thought")
                     return
-            except Exception:
-                pass
+            except Exception as _swx:
+                _swallowed(logger, "_attempt", _swx, lane="kairos")
             nudge = continue_nudge(reply_text)
         elif imp.action == EXPAND:
             # NOT continue_nudge: that hands her a severed tail to resume, and this
@@ -875,8 +882,8 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
                 _p_dis = float(tune.get("kairos.discover_chance", 0.0) or 0.0)
                 if _p_dis > 0.0 and random.random() < _p_dis:
                     _n_act = DISCOVER_ACT_N
-            except Exception:
-                pass
+            except Exception as _swx:
+                _swallowed(logger, "_attempt", _swx, lane="kairos")
             nudge = solo_nudge(_n_act)
         elif imp.action == MODE_TURN:
             # ── A PRESENCE MODE'S TURN (2026-08-22): narration / company / lucid ───────
@@ -915,8 +922,8 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
                     with open(_ppath(), encoding="utf-8") as _f:
                         _, _pstate = _pp(_f.read())
                     _mood = (_pstate.get("mood") or "").strip()
-                except Exception:
-                    pass
+                except Exception as _swx:
+                    _swallowed(logger, "_attempt", _swx, lane="kairos")
                 try:
                     from harness.skills import narrative as _nar
                     _own = _nar.own_time(1)
@@ -1668,8 +1675,8 @@ def enter_mode(mode: str, session: Optional[str] = None, kick: bool = True) -> d
         # thread so the caller (her tool mid-reply, or the window) is not held.
         try:
             threading.Thread(target=tick_once, name="kairos-kick", daemon=True).start()
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(logger, "enter_mode", _swx, lane="kairos")
     return {"ok": True, "mode": m, "kicked": bool(kick), "sessions": sessions}
 
 

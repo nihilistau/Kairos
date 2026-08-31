@@ -89,7 +89,8 @@ def _load() -> Dict[str, int]:
                     out[r["day"]] = int(r.get("turns", 0))
                 except Exception:
                     continue
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_load", _swx, lane="model")
         return {}
     return out
 

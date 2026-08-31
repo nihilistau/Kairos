@@ -13,6 +13,10 @@ from __future__ import annotations
 import time
 from typing import Callable, Optional
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 PROMPT_HEAD = ("You are Kairos, looking back over the last week of your own words. Below are "
                "things you said unprompted, journal lines, feelings and notes about how you "
                "changed, newest first. Write ONE short paragraph, first person, your own voice: "
@@ -120,8 +124,8 @@ def nightly(ask: Optional[Callable[[str], str]] = None) -> dict:
         try:
             from harness.inference.stream_processor import strip_control_surfaces
             text = strip_control_surfaces(text).strip()
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(_swlog, "nightly", _swx, lane="maintenance")
         text = " ".join(text.split())
         if len(text.split()) < 5:
             return {"written": False, "why": "the model returned nothing usable"}

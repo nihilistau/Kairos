@@ -11,6 +11,10 @@ import base64
 import io
 from typing import Optional
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 
 def vl_model() -> str:
     from harness.tuning import registry as _tr
@@ -37,7 +41,8 @@ def door_up() -> bool:
     try:
         from harness.sidecar import client
         return client.available() and client.reachable("chat")
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "door_up", _swx, lane="skills")
         return False
 
 
@@ -48,7 +53,8 @@ def armed() -> bool:
         from harness.sidecar import client
         return (str(_tr.get("sight.backend", "engine")) == "aux_vl" and bool(vl_model())
                 and client.available())
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "armed", _swx, lane="skills")
         return False
 
 

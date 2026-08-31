@@ -44,6 +44,10 @@ from typing import Optional
 
 from harness.store_io import replace_atomic
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # the sibling checkout, by RELATIVE position (no absolute path in a public tree); the profile's
@@ -168,8 +172,8 @@ def _tune(key, env_key, env_default):
         v = _t.chosen(key)
         if v is not None:
             return v
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "_tune", _swx, lane="voice")
     return os.environ.get(env_key, env_default)
 
 

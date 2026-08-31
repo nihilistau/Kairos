@@ -44,6 +44,8 @@ import logging
 import os
 from typing import List, Optional
 
+from harness.loud import swallowed as _swallowed
+
 logger = logging.getLogger(__name__)
 
 # The evidence floor. Below this many attended days in the ledger she has not watched the
@@ -76,7 +78,8 @@ def ledger_days() -> int:
     try:
         from harness.model import presence
         return int(presence.present_days_total())
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "ledger_days", _swx, lane="skills")
         return 0
 
 

@@ -24,6 +24,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 
 def _fresh_words(age_s: float) -> str:
     """How old a reading is, in the way a person would say it."""
@@ -83,8 +87,8 @@ def how_is_he() -> Dict[str, Any]:
         rest = None
         try:
             rest = _b.resting()
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(_swlog, "how_is_he", _swx, lane="skills")
         if rest is None:
             bits.append("his resting rate is not learned yet, so I have nothing to "
                         "compare a number against")
@@ -164,16 +168,16 @@ def his_day(hours: float = 8.0) -> Dict[str, Any]:
     for k, r in newest.items():
         try:
             last_seen[k] = _fresh_words(now - _s.parse_iso(r.get("at") or ""))
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(_swlog, "his_day", _swx, lane="skills")
 
     on_wrist = None
     try:
         ob = _b.latest("on_body", rows, now)
         if ob is not None:
             on_wrist = ob.get("value") == "on"
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "his_day", _swx, lane="skills")
 
     return {
         "ok": True,
@@ -257,5 +261,6 @@ def body_tools() -> list:
         from harness.toolcore.tools import ToolSpec
         return [ToolSpec.from_callable(how_is_he), ToolSpec.from_callable(his_day),
                 ToolSpec.from_callable(when_he_slept)]
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "body_tools", _swx, lane="skills")
         return []

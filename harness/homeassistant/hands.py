@@ -48,6 +48,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from . import client as _client
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 # ── THE DOMAINS, AND NOTHING ELSE EVER ───────────────────────────────────────────────
 # Not configurable, on purpose. Every other guard here is something a person can widen;
 # this one is the floor under all of them. Adding a domain is a code change with a gate to
@@ -75,7 +79,8 @@ def present_window() -> Optional[float]:
     try:
         from harness.telemetry.body import ROOM_VETO_S
         return float(ROOM_VETO_S)
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "present_window", _swx, lane="homeassistant")
         return None
 
 
@@ -148,7 +153,8 @@ def _present_now() -> Optional[float]:
     try:
         from harness.telemetry.body import _seconds_since_he_spoke
         return _seconds_since_he_spoke()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_present_now", _swx, lane="homeassistant")
         return None
 
 

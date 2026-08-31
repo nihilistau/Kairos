@@ -161,7 +161,8 @@ def load_table() -> dict:
     with _LOCK:
         try:
             mt = os.path.getmtime(TABLE_PATH)
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_logger, "load_table", _swx, lane="skills")
             return {}
         if _TABLE["mtime"] == mt and _TABLE["cells"] is not None:
             return _TABLE["cells"]
@@ -264,5 +265,6 @@ def shadow(query: str, admitted_rows: list, all_rows: list) -> None:
                 elif not r.get("seam", False):
                     _STATS["divergent"] += 1
                     _witness("divergent", query, c)
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_logger, "shadow", _swx, lane="skills")
         pass                     # the law's shadow may never cost her a sentence

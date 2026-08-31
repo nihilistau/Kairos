@@ -22,6 +22,10 @@ import subprocess
 import time
 from typing import Any, Dict, List
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ── phase charter (HINDSIGHT.md §6) ─────────────────────────────────────────
@@ -101,7 +105,8 @@ def _git(*args: str) -> str:
         out = subprocess.run(["git", "--no-optional-locks", *args], cwd=ROOT,
                              capture_output=True, text=True, timeout=10)
         return out.stdout.strip()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_git", _swx, lane="observability")
         return ""
 
 
@@ -125,8 +130,8 @@ def _phase_status(commits: List[Dict[str, str]]) -> List[Dict[str, Any]]:
         try:
             with open(ovp, encoding="utf-8") as f:
                 overrides = json.load(f)
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(_swlog, "_phase_status", _swx, lane="observability")
     subjects = [c["subject"] for c in commits]
     out = []
     for p in PHASES:
@@ -194,7 +199,8 @@ def _gate_receipts() -> List[str]:
     d = os.path.join(ROOT, "gates")
     try:
         return sorted(e for e in os.listdir(d) if e != "README.md")
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_gate_receipts", _swx, lane="observability")
         return []
 
 

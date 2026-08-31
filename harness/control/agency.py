@@ -19,6 +19,8 @@ from typing import Callable, List, Optional
 from harness.inference.client import SPDaemonClient, get_client
 from harness.inference.inference_config import InferenceConfig
 
+from harness.loud import swallowed as _swallowed
+
 logger = logging.getLogger(__name__)
 
 # ── forget() IS OUT OF THIS VOCABULARY (2026-08-24 audit, B4) ──────────────────────────
@@ -112,7 +114,8 @@ def _daemon_busy(client: SPDaemonClient) -> bool:
     daemon serializes on its resident-cache mutex so this is safety-optional)."""
     try:
         return float(client.metrics().get("tokens_per_sec", 0.0)) > 1.0
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_daemon_busy", _swx, lane="control")
         return False
 
 

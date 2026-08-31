@@ -31,6 +31,8 @@ import os
 import time
 from typing import Optional
 
+from harness.loud import swallowed as _swallowed
+
 logger = logging.getLogger(__name__)
 
 _DEFAULT_ACTIONS = "check_in,solo,expand,muse"
@@ -68,7 +70,8 @@ def pregate(action: str, reason: str, tail: str) -> Optional[bool]:
         return None
     try:
         from harness.sidecar import client
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "pregate", _swx, lane="kairos")
         return None
     if not client.available():
         return None

@@ -29,6 +29,8 @@ from typing import Any, Callable, Dict, List, Optional
 from harness.inference.client import SPDaemonClient, get_client
 from harness.inference.inference_config import InferenceConfig
 
+from harness.loud import swallowed as _swallowed
+
 logger = logging.getLogger(__name__)
 
 # THE BUDGET'S LAST RESORT (2026-08-24 audit, S4). Both tool loops read
@@ -173,7 +175,8 @@ class ToolSpec:
             wait = COOLDOWNS.check(self.name)
             if wait:
                 return wait
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "call", _swx, lane="toolcore")
             pass                      # a rate limiter must never block a tool
         # ── A WRONG KEYWORD IS NOT A FAILED INTENT (2026-08-04) ──────────────────────
         # Live, asked to put on the silver nightie, she produced:
@@ -217,8 +220,8 @@ class ToolSpec:
         try:
             from harness.toolcore.cooldown import COOLDOWNS
             COOLDOWNS.mark(self.name)
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(logger, "call", _swx, lane="toolcore")
         return out
 
     def advertise(self) -> str:

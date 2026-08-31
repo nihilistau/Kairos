@@ -37,6 +37,10 @@ from typing import Any, Dict, List, Optional
 
 from harness.store_io import replace_atomic
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # What a row IS. Ordered — the room renders sections in this order.
@@ -73,8 +77,8 @@ def _read() -> Dict[str, Any]:
             d = json.load(f)
         if isinstance(d, dict) and isinstance(d.get("entries"), list):
             return d
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "_read", _swx, lane="control")
     # A missing or unreadable ledger is an EMPTY ledger, never an exception: the room
     # must render on a fresh clone, and a panel that throws takes its neighbours with it.
     return {"version": 1, "entries": []}

@@ -16,6 +16,10 @@ import sys
 import urllib.parse
 import urllib.request
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _OUT_CAP = 2000
 
 
@@ -125,7 +129,8 @@ def fetch_page_text(url: str, max_chars: int = 40_000) -> str:
         text = _re.sub(r"<[^>]+>", " ", text)
         text = _re.sub(r"\s+", " ", text).strip()
         return text[:max_chars]
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "fetch_page_text", _swx, lane="skills")
         return ""
 
 

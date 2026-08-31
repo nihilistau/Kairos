@@ -16,6 +16,10 @@ import os
 
 import numpy as np
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 VOICE_DIR = os.environ.get("SP_VOICE_DIR", os.path.join(_ROOT, "var", "voice"))
 PROJ_NPZ = os.path.join(VOICE_DIR, "embed_audio.npz")
@@ -40,7 +44,8 @@ def available() -> bool:
             return False
         c.assert_width("audio", int(_weight().shape[0]))
         return True
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "available", _swx, lane="voice")
         return False
 
 

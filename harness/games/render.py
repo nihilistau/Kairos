@@ -30,6 +30,10 @@ from typing import Optional
 
 from harness.games import chess as CH
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 SQ = 96                      # square size in pixels
 MARGIN = 54
 SIZE = SQ * 8 + MARGIN * 2
@@ -56,7 +60,8 @@ def _font(size: int):
             continue
     try:
         return ImageFont.load_default(size)
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_font", _swx, lane="games")
         return None
 
 
@@ -64,7 +69,8 @@ def board_png(fen: str, path: str, last: Optional[str] = None) -> Optional[str]:
     """Render `fen` to `path`. Returns the path, or None when PIL is unavailable."""
     try:
         from PIL import Image, ImageDraw
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "board_png", _swx, lane="games")
         return None
 
     pos = CH.Position(fen)

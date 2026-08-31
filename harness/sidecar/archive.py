@@ -37,6 +37,10 @@ import numpy as np
 from harness.store_io import replace_atomic
 from harness.sidecar import client
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 # the embed seam (tests swap this; live code never should)
@@ -108,7 +112,8 @@ def _chunk_md(path: str) -> List[Dict]:
     try:
         with open(path, encoding="utf-8", errors="replace") as f:
             body = f.read()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_chunk_md", _swx, lane="sidecar")
         return []
     kind = (_FM_KIND.search(body) or [None, ""])[1] if _FM_KIND.search(body) else ""
     if kind not in ("narrative", "own_time"):
@@ -161,7 +166,8 @@ def _chunk_file(path: str) -> List[Dict]:
                     text = text[cut + 1:].strip()
                     tag = "her (cont): " if role != "user" else "him (cont): "
                 turns.append(tag + text)
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_chunk_file", _swx, lane="sidecar")
         return []
     day = _day_of(path)
     chunks: List[Dict] = []
@@ -225,8 +231,8 @@ def build_index(force: bool = False) -> Dict[str, int]:
                     head = json.loads(f.readline())
                 if head.get("stamp") == stamp:
                     continue
-            except Exception:
-                pass
+            except Exception as _swx:
+                _swallowed(_swlog, "build_index", _swx, lane="sidecar")
         chunks = _chunk_file(src)
         if not chunks:
             continue
@@ -332,7 +338,8 @@ def search(query: str, k: int = 5, refresh: bool = True) -> List[Dict]:
         _LAST_REFRESH[0] = _time.monotonic()
         try:
             build_index()
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "search", _swx, lane="sidecar")
             pass                         # stale beats absent
     qv = _EMBED([query_prefix() + query])
     if not qv:
@@ -373,7 +380,8 @@ def _spine_rerank_on() -> bool:
     try:
         from harness.tuning import registry as _tr
         return bool(_tr.get("aux.spine_rerank", True))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_spine_rerank_on", _swx, lane="sidecar")
         return True
 
 
@@ -381,7 +389,8 @@ def _live_texts() -> List[str]:
     try:
         from harness.skills import memory as M
         return [str(r.get("text") or "") for r in M.live_rows()]
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_live_texts", _swx, lane="sidecar")
         return []
 
 
@@ -457,6 +466,6 @@ def embed_choices() -> list:
                 low = full.lower()                 # the FOLDER names carry the kind (…-Embedding-350M-GGUF/)
                 if low.endswith(".gguf") and ("embed" in low or "colbert" in low):
                     out.append(full)
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "embed_choices", _swx, lane="sidecar")
     return sorted(set(out + [cur.replace("\\", "/")]))

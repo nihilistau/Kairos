@@ -39,6 +39,10 @@ from typing import Any, Dict, List, Optional
 
 from harness.store_io import replace_atomic
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _HARNESS_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _DEF_CONFIG = os.path.join(_HARNESS_ROOT, "mcp_servers.json")
 
@@ -305,7 +309,8 @@ def pin_body(entry: Any) -> Optional[Dict[str, Any]]:
 def load_pins() -> Dict[str, Dict[str, Any]]:
     try:
         return json.load(open(_PIN_PATH, encoding="utf-8"))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "load_pins", _swx, lane="mcp_server")
         return {}
 
 
@@ -364,7 +369,8 @@ def _offered(server: str, tool: str) -> bool:
     """
     try:
         spec = (load_config().get("servers", {}) or {}).get(server, {}) or {}
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_offered", _swx, lane="mcp_server")
         return True                       # cannot tell: assume she can, and be loud
     allow = spec.get("allow")
     if allow is not None and tool not in allow:

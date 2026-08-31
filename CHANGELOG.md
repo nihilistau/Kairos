@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.8.12 — nothing under harness/ fails without a name (2026-08-31)
+
+The other half of 0.8.11, and a correction to its arithmetic.
+
+- **Every remaining broad handler that answered with a bare default now says so** — 219
+  sites, each carrying the enclosing function's name and its package as the lane. This is
+  not extra noise: `loud.swallowed` SORTS it. The world stays at debug where nobody has to
+  read it; `NameError`, `AttributeError`, `TypeError` and `ImportError` come out at
+  warning, because those are the code being wrong, they never fix themselves, and they
+  must not be indistinguishable from "nothing happened".
+- **0.8.11's own numbers were wrong.** The census regex ended ``, and after a closing
+  quote at end of line there is no word boundary — so `return ""`, `return {}` and
+  `return []` never matched it. The real figures are **232 handlers over 71 files, ten of
+  them writes**, not 192/67/9. Forty were invisible to the instrument written to find
+  them, including one more write.
+- **That tenth write was `memory.rescue_stray_tmp`**, whose docstring says *"Logged, never
+  silent"*. What fails there is the quarantine of the one record of what a dying process
+  was about to commit — and the next save opens that path `"w"` and overwrites it.
+- The gate's rule is now the whole tree: nothing under `harness/` may answer with a bare
+  default anonymously, `loud.py` must still sort our bugs from the world, and it must
+  actually be adopted — a rule pointing at a helper nobody imports is not a rule.
+
+Behaviour-neutral by construction: every handler still catches what it caught and answers
+what it answered. It just says so first.
+
 ## 0.8.11 — 192 quiet failures, and nine of them wrote (2026-08-31)
 
 The wardrobe audit, applied to the whole harness. 192 broad handlers answering with a bare

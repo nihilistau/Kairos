@@ -24,6 +24,10 @@ import json
 import os
 import urllib.request
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _DAEMON = os.environ.get("SP_DAEMON_URL", "http://127.0.0.1:3000").rstrip("/")
 
 # eot_bias at its default of 4 biases hard toward end-of-turn and the reply comes
@@ -53,8 +57,8 @@ def _look_tokens() -> int:
         c = tune.chosen("senses.look_tokens")
         if c is not None:
             return max(64, min(2048, int(c)))
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "_look_tokens", _swx, lane="skills")
     try:
         return max(64, min(2048, int(os.environ.get("SP_SIGHT_LOOK_TOKENS", "512"))))
     except ValueError:
@@ -168,8 +172,8 @@ def _scrub(text: str) -> str:
     try:
         from harness.inference.stream_processor import strip_control_surfaces
         text = strip_control_surfaces(text)
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "_scrub", _swx, lane="skills")
     # Some replies open with an unmarked thinking preamble ("thought Thinking
     # Process: 1. **Analyze...") and put the description after it. Keep the last
     # paragraph when that shape appears rather than handing back the reasoning.
@@ -268,10 +272,11 @@ def sight_tools():
             from harness.skills import sight_vl as _vl
             if _vl.armed():
                 return _specs()
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(_swlog, "sight_tools", _swx, lane="skills")
         return []
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "sight_tools", _swx, lane="skills")
         return []
 
 

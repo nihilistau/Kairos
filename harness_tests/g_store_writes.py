@@ -233,7 +233,11 @@ _ALLOWED_WRITE_SWALLOWS = {
                              "already gone; the finally-block settle matters more, and "
                              "there is no store and nothing lost",
 }
-_BARE = re.compile(r"^(pass|return (\{\}|\[\]|\"\"|''|None|0|False|True|-1))\b")
+# ANCHORED AT THE END OF THE STATEMENT (2026-08-31). `\b` matched the `return None` inside
+# `return None, str(exc)[:200]` — a handler that REPORTS the failure to its caller, which
+# is the opposite of a swallow. A census that convicts the code doing it right is a census
+# people learn to ignore.
+_BARE = re.compile(r"^(pass|return (\{\}|\[\]|\"\"|''|None|0|False|True|-1))\s*(#.*)?$")
 _BROAD = re.compile(r"^(\s*)except\s+(Exception|BaseException)?(\s+as\s+\w+)?\s*:\s*$")
 _WRITES = re.compile(r"""(\bopen\([^)]*['\"][wa]b?['\"]|replace_atomic\(|os\.replace\(|
                           json\.dump\(|\.write\(|os\.remove\(|shutil\.(copy|move|rmtree)|
@@ -269,6 +273,53 @@ for _here, _dirs, _files in os.walk(os.path.join(ROOT, "harness")):
 
 check("the scan actually walked the tree (>= 100 files)", _scanned >= 100, _scanned)
 check("no swallowed handler hides a WRITE", not _offenders, _offenders)
+
+print("\n6. AND NOTHING UNDER harness/ FAILS WITHOUT A NAME")
+# ── HIS CALL, AFTER I ARGUED AGAINST IT: "do the rest too" (2026-08-31) ──────────────
+# I made the case for stopping at the writes — a read degrading to a default is often
+# exactly right, and 172 edits of noise is how a real signal gets ignored. He was not
+# persuaded, and the argument against him is weaker than it looked: `loud.swallowed`
+# does not ADD noise, it SORTS it. The world stays at debug, where nobody has to read
+# it; `NameError`, `AttributeError`, `TypeError` and `ImportError` come out at warning,
+# because those are our own code being wrong, they never fix themselves, and every time
+# one has hidden in this repo it cost days — a dead conclusion lane for five and a half
+# hours, an IDF floor silently zero, a `[WEAR:]` mark that evaporated.
+#
+# So the rule is now the whole tree: a broad handler may still answer with a default,
+# but it may not do it ANONYMOUSLY. 172 sites across 64 files, mechanically, plus the
+# nine writes and twelve read sites done by hand before it.
+_unbound = []
+for _here, _dirs, _files in os.walk(os.path.join(ROOT, "harness")):
+    _dirs[:] = [d for d in _dirs if d != "__pycache__"]
+    for _fn in sorted(_files):
+        if not _fn.endswith(".py"):
+            continue
+        _fp = os.path.join(_here, _fn)
+        _rel = os.path.relpath(_fp, ROOT).replace("\\", "/")
+        _body = io.open(_fp, encoding="utf-8", errors="replace").read().splitlines()
+        for _i, _ln in enumerate(_body):
+            if not _BROAD.match(_ln):
+                continue
+            _nxt = _body[_i + 1].strip() if _i + 1 < len(_body) else ""
+            if _BARE.match(_nxt):
+                _unbound.append("%s:%d" % (_rel, _i + 1))
+check("no broad handler answers with a bare default anonymously",
+      not _unbound, _unbound[:8] + (["...+%d more" % (len(_unbound) - 8)]
+                                    if len(_unbound) > 8 else []))
+# ...and the rule is worth nothing if the helper it points at is not the shared one.
+_loud = io.open(os.path.join(ROOT, "harness", "loud.py"),
+                encoding="utf-8", errors="replace").read()
+check("loud.py still sorts OUR bugs from the world",
+      "OURS = (NameError, AttributeError, TypeError, ImportError)" in _loud
+      and "logger.warning" in _loud and "logger.debug" in _loud)
+_users = 0
+for _here, _dirs, _files in os.walk(os.path.join(ROOT, "harness")):
+    _dirs[:] = [d for d in _dirs if d != "__pycache__"]
+    _users += sum(1 for _fn in _files if _fn.endswith(".py") and "swallowed" in
+                  io.open(os.path.join(_here, _fn), encoding="utf-8",
+                          errors="replace").read())
+check("...and it is actually adopted (>= 50 files import it)", _users >= 50,
+      "%d files" % _users)
 # ...and the allow-list is not a place to park a real one: every entry must exist and
 # must carry a reason, or it is an exemption nobody agreed to.
 for _rel, _why in _ALLOWED_WRITE_SWALLOWS.items():

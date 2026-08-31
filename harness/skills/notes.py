@@ -34,6 +34,10 @@ from typing import Any, Optional
 
 from harness.store_io import replace_atomic
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _NOTE_LOCK = threading.RLock()
 
 # ── the lane ──────────────────────────────────────────────────────────────────
@@ -74,8 +78,8 @@ def _load_all() -> list[dict]:
             if ln:
                 try:
                     out.append(json.loads(ln))
-                except Exception:
-                    pass
+                except Exception as _swx:
+                    _swallowed(_swlog, "_load_all", _swx, lane="skills")
     return out
 
 

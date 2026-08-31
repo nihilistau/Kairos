@@ -49,6 +49,10 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from harness.skills.lifecycle import topic_of
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 # How many expansion terms may be added. Small on purpose: the seam scores by overlap
 # fraction, so every added term that does NOT match dilutes the score of one that does.
 DEFAULT_K = 3
@@ -75,7 +79,8 @@ def _rows() -> List[dict]:
         # so plain tombstones fed the co-occurrence corpus (AGENTS.md §3: `lifecycle`
         # is the death field).
         return M.live_rows()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_rows", _swx, lane="skills")
         return []
 
 

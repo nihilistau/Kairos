@@ -29,6 +29,10 @@ import threading
 import time
 from typing import Dict, List, Optional
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 DIR = os.environ.get("SP_MUSIC_DIR") or os.path.join(
@@ -237,7 +241,8 @@ def music_tools():
         if os.environ.get("SP_MUSIC", "1") == "0" or not os.path.isdir(DIR):
             return []
         return _specs()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "music_tools", _swx, lane="skills")
         return []
 
 

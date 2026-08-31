@@ -40,6 +40,8 @@ import re
 import time
 from typing import Dict, List, Optional
 
+from harness.loud import swallowed as _swallowed
+
 logger = logging.getLogger(__name__)
 
 # The order in which reasons win. First match takes the turn.
@@ -294,7 +296,8 @@ def from_journal(narrative: str, today: str, raised: set) -> Optional[dict]:
     # formats and remembering which is which.
     try:
         iso = time.strftime("%Y-%m-%d", time.strptime(day, "%A %d %B %Y"))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "from_journal", _swx, lane="kairos")
         return None                       # an unparseable date is not a day that has passed
     if iso >= today:
         return None                       # written today: he was there for it

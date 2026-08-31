@@ -38,6 +38,10 @@ from typing import Any, Dict, List, Optional
 
 from harness.telemetry import store
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 # The words a state kind may take. A state outside its vocabulary is a source bug, and it is
 # refused rather than stored: "asleep" landing in `charging` would quietly poison every
 # reading built on top of it, and unlike a bad number it would never look wrong.
@@ -113,7 +117,8 @@ def record(samples: List[Dict[str, Any]], *, source: str = "",
                 out["held"] = len(samples or ())
                 out["why"] = _anon.WHY
                 return out
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "record", _swx, lane="telemetry")
             pass                       # anon unavailable is not a licence to write
 
     at = store.now_iso()

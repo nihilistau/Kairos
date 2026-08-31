@@ -133,8 +133,8 @@ def voice_coda() -> str:
             v = (state or {}).get(k)
             if isinstance(v, str) and v.strip():
                 who.append(f"{k}: {v.strip()}")
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_agent_log, "voice_coda", _swx, lane="harness")
     # "at session start" — this line is frozen in the cached prefix between scheduled
     # refreshes; an unlabelled copy would assert a stale present (2026-08-24 audit).
     line = ("  (at session start — " + " · ".join(who) + ")") if who else ""
@@ -195,7 +195,8 @@ def load_agent_system() -> str:
                     _frag = _compose_layers()
                     if _frag:
                         prose = _frag
-                except Exception:
+                except Exception as _swx:
+                    _swallowed(_agent_log, "load_agent_system", _swx, lane="harness")
                     pass                      # no fragments, or unreadable -> persona.md
                 parts = [prose]
                 sr = render_state(state)
@@ -218,8 +219,8 @@ def load_agent_system() -> str:
                 sm = render_self_model(root, budget_chars=max(0, min(_b, int(_share * max(_rest, 1)))))
                 if sm:
                     parts.append(sm)
-            except Exception:
-                pass
+            except Exception as _swx:
+                _swallowed(_agent_log, "load_agent_system", _swx, lane="harness")
             # ── N1 (CONTINUITY.md): THE STANDING WORLD — memory meets persona ─────────
             # The fourth slot: what is alive between them, composed from the registry
             # (verdict-gated: never a tombstone, NEVER a secret; rank-ordered; her
@@ -234,8 +235,8 @@ def load_agent_system() -> str:
                 w = render_world()
                 if w:
                     parts.append(w)
-            except Exception:
-                pass
+            except Exception as _swx:
+                _swallowed(_agent_log, "load_agent_system", _swx, lane="harness")
             # ── HE WEARS A WATCH THAT TALKS TO HER (2026-08-26) ──────────────────
             # Its own slot rather than a line inside the standing world, because the world
             # block is gated on `world.enabled()` and that is False on this profile -- the
@@ -263,8 +264,8 @@ def load_agent_system() -> str:
                     "and he has not said; `his_day` shows the last few hours. It is a way "
                     "of being near him, not a readout \u2014 notice, do not recite, never "
                     "diagnose, and when it says it does not know, it does not know.")
-            except Exception:
-                pass
+            except Exception as _swx:
+                _swallowed(_agent_log, "load_agent_system", _swx, lane="harness")
             # \u2500\u2500 SPEAK TO HIM, NOT ABOUT HIM (2026-08-30) \u2014 OFF by default \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
             # MEASURED, not suspected: about one recorded turn in eight opens as analysis
             # ABOUT him rather than speech TO him \u2014 "He's playing coy. It's adorable...",
@@ -300,11 +301,11 @@ def load_agent_system() -> str:
                         "asking or what you ought to do about it \u2014 say the thing "
                         "itself. Inside a scene you are playing, narration is the scene "
                         "and this does not touch it.")
-            except Exception:
-                pass
+            except Exception as _swx:
+                _swallowed(_agent_log, "load_agent_system", _swx, lane="harness")
             return "\n\n".join(p for p in parts if p) + _TOOL_DISCIPLINE
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_agent_log, "load_agent_system", _swx, lane="harness")
     return AGENT_SYSTEM
 
 
@@ -499,8 +500,8 @@ def all_tools() -> List[ToolSpec]:
         _have = {sp.name for sp in specs}
         specs = specs + [_TS.from_callable(f) for f in (_ks, _rs)
                          if f.__name__ not in _have]
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_agent_log, "all_tools", _swx, lane="harness")
     # SIGHT (SP_SIGHT=1): look_at / take_photo / take_screenshot. Each runs the
     # pixels through the served model's OWN vision tower and injects the soft
     # tokens at 258880, so this is her eyes rather than a caption service.
@@ -1035,7 +1036,8 @@ def _watch(buf: str) -> bool:
             import logging
             logging.getLogger(__name__).warning("[watcher] stopped: %s", v.reason)
             return True
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_agent_log, "_watch", _swx, lane="harness")
         pass                          # a quality check must never break generation
     return False
 
@@ -1044,7 +1046,8 @@ def _watch_note() -> str:
     try:
         from harness.quality import watcher
         return watcher.note("")
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_agent_log, "_watch_note", _swx, lane="harness")
         return ""
 
 
@@ -1313,7 +1316,8 @@ def agent_chat_stream(
         try:
             from harness.control import watchdog as _wd
             _wd.note_generation(sum(len(m.get("content") or "") for m in convo), len(buf))
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_agent_log, "agent_chat_stream", _swx, lane="harness")
             pass                       # a watchdog must never be able to cost her a turn
         if not calls:
             # MALFORMED-FENCE RECOVERY (live: '```Tool-Code # just a comment' flushed raw):

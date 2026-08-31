@@ -11,6 +11,10 @@ import re
 import time
 from typing import Iterable, List, Optional
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _W = re.compile(r"[a-z0-9']{3,}")
 HALF_LIFE_DAYS = 90.0
 W_OVERLAP, W_RECENCY, W_BOND = 0.25, 0.10, 0.15
@@ -30,7 +34,8 @@ def _recency(day: str, now: Optional[float] = None) -> float:
     # gate was red for long enough that nobody read it.
     try:
         t = calendar.timegm(time.strptime((day or "")[:10], "%Y-%m-%d"))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_recency", _swx, lane="sidecar")
         return 0.0
     age = max(0.0, ((now or time.time()) - t) / 86400.0)
     return 0.5 ** (age / HALF_LIFE_DAYS)

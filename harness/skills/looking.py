@@ -71,8 +71,8 @@ def _emit(ev: dict) -> None:
     for fn in fns:
         try:
             fn(dict(ev))
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(logger, "_emit", _swx, lane="skills")
 
 
 def begin(kind: str, query: str, by: str = "her") -> dict:
@@ -264,7 +264,8 @@ def looking_tools():
     try:
         from harness.toolcore.tools import ToolSpec
         return [ToolSpec.from_callable(my_research)]
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "looking_tools", _swx, lane="skills")
         return []
 
 

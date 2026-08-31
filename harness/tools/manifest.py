@@ -36,6 +36,10 @@ import os
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 # ── risk classes ────────────────────────────────────────────────────────────
 # Ordered least to most consequential. The point is not to block anything — it is
 # that "she can run shell commands" and "she can read her own notes" should never
@@ -277,8 +281,8 @@ def bridged_facts() -> Dict[str, ToolFacts]:
             note = f"over MCP from '{t.get('server')}'"
             for nm in (t["name"], f"{t.get('server')}_{t['name']}"):
                 out[nm] = ToolFacts(group, risk, arms="SP_MCP_TOOLS", note=note)
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "bridged_facts", _swx, lane="tools")
     return out
 
 

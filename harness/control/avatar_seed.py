@@ -59,7 +59,8 @@ def set_id() -> str:
     try:
         with open(os.path.join(assets_dir(), "SET.json"), encoding="utf-8") as f:
             return str(json.load(f).get("set") or "")
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "set_id", _swx, lane="control")
         return ""
 
 
@@ -72,7 +73,8 @@ def seeded() -> List[str]:
         with open(_marker_path(), encoding="utf-8") as f:
             d = json.load(f)
         return [str(x) for x in (d.get("sets") or [])]
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "seeded", _swx, lane="control")
         return []
 
 
@@ -113,8 +115,8 @@ def _wants_rows(path: str) -> List[Dict[str, Any]]:
                 ln = ln.strip()
                 if ln:
                     out.append(json.loads(ln))
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_wants_rows", _swx, lane="control")
     return out
 
 

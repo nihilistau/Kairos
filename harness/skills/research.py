@@ -58,6 +58,10 @@ from typing import Callable, List, Optional
 
 from harness.skills.delegate import repo_root
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 ARMED = os.environ.get("SP_RESEARCH", "0") == "1"
 TIMEOUT = float(os.environ.get("SP_RESEARCH_TIMEOUT", "600"))
 RECEIPTS = os.environ.get("SP_RESEARCH_RECEIPTS",
@@ -244,7 +248,8 @@ class SidecarResearcher(Researcher):
         try:
             from harness.sidecar import client as _aux
             return _aux.available()
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "available", _swx, lane="skills")
             return False
 
     def ask(self, question: str, depth: str = "normal") -> Answer:
@@ -394,7 +399,8 @@ def research_tools():
         if not ARMED or not backend().available():
             return []
         return [ToolSpec.from_callable(research)]
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "research_tools", _swx, lane="skills")
         return []
 
 

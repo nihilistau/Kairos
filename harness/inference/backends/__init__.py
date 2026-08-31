@@ -34,6 +34,10 @@ SP_CAPS is all of the first group; OPENAI_CAPS is what a generic endpoint gets, 
 """
 from __future__ import annotations
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 SP_CAPS = frozenset({
     "eot_margin", "byteexact", "eot_bias", "raw_logits", "auto_recall", "replay",
     "single_entry", "inject_frames", "tool_names", "prompt_tokens", "oneshot",
@@ -62,5 +66,6 @@ def supports(cap: str) -> bool:
     try:
         from harness.inference.client import get_client
         return cap in getattr(get_client(), "supports", SP_CAPS)
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "supports", _swx, lane="inference")
         return False

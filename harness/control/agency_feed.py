@@ -40,6 +40,10 @@ import re
 import time
 from typing import Any, Dict, List
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # The kinds a row can be. Finite and committed, so a surface can colour them without
@@ -127,7 +131,8 @@ def _memory_rows(kind: str, since: float) -> List[Dict[str, Any]]:
 def _jsonl(path: str) -> List[Dict[str, Any]]:
     try:
         return [json.loads(l) for l in io.open(path, encoding="utf-8") if l.strip()]
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_jsonl", _swx, lane="control")
         return []
 
 
@@ -143,8 +148,8 @@ def _wardrobe_rows(since: float) -> List[Dict[str, Any]]:
     labels = {}
     try:
         labels = {l["id"]: (l.get("label") or l["id"]) for l in WD.looks()}
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "_wardrobe_rows", _swx, lane="control")
     for r in _jsonl(os.path.join(os.path.dirname(WD._state_path()), "worn.jsonl")):
         if (r.get("by") or "her") != "her":
             continue
@@ -190,7 +195,8 @@ def _note_rows(since: float) -> List[Dict[str, Any]]:
     try:
         from harness.skills import notes as N
         rows = N._load_all()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_note_rows", _swx, lane="control")
         return []
     out = []
     for r in rows:

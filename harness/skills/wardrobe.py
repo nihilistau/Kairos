@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import logging
 
+from harness.loud import swallowed as _swallowed
+
 logger = logging.getLogger(__name__)
 
 
@@ -32,16 +34,16 @@ def _ceiling():
     try:
         from harness.tuning import registry as tune
         ceiling = int(tune.get("roleplay.max_heat"))
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_ceiling", _swx, lane="skills")
     try:
         from harness.roleplay import engine as rp
         from harness.server.app import _room_session
         sc = rp.active(_room_session())
         if sc is not None:
             rung = int(sc.heat.level)
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_ceiling", _swx, lane="skills")
     return rung, ceiling
 
 
@@ -97,8 +99,8 @@ def wear(what: str) -> str:
                 filed = (" You have already asked for that one — it is still on his list."
                          if r.get("dup") else
                          " I have put it on his list, so he can make it for you.")
-            except Exception:
-                pass
+            except Exception as _swx:
+                _swallowed(logger, "wear", _swx, lane="skills")
             # A NEAR MISS BEATS A LIST OF DRAWERS (2026-08-28). The refusal handed her
             # the four outfit names and told her to read the whole wardrobe — at the
             # exact moment one line of search would answer. If any word of what she
@@ -110,8 +112,8 @@ def wear(what: str) -> str:
                 if hits:
                     near = (" Close to it, and yours: %s."
                             % "; ".join(h["label"] for h in hits))
-            except Exception:
-                pass
+            except Exception as _swx:
+                _swallowed(logger, "wear", _swx, lane="skills")
             return ("You do not own anything like that yet.%s%s Not sure what you own? "
                     "search_wardrobe(\"a word or two\") answers in one line."
                     % (filed, near))

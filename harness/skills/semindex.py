@@ -64,6 +64,10 @@ import os
 import struct
 import threading
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 MODEL_HASH = "hash256-v1"
 MODEL_L5 = "l5-512-v1"
 MODEL_AUX = "aux-1024-v1"
@@ -151,7 +155,8 @@ def read_ep_l5(out_dir: str):
         if not all(math.isfinite(v) for v in vec):
             return None
         return [round(v, 6) for v in vec]
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "read_ep_l5", _swx, lane="skills")
         return None
 
 
@@ -182,7 +187,8 @@ def aux_tau() -> float:
     and it is his to make, not one to smuggle into a default."""
     try:
         return float(os.environ.get("SP_SEM_TAU_AUX", "0.40"))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "aux_tau", _swx, lane="skills")
         return 0.40
 
 
@@ -201,7 +207,8 @@ def aux_embed(texts):
             if len(v) != _AUX_DIM or not all(math.isfinite(x) for x in v):
                 return None
         return [[round(float(x), 6) for x in v] for v in out]
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "aux_embed", _swx, lane="skills")
         return None
 
 
@@ -514,8 +521,8 @@ def backfill_aux(registry_rows, batch: int = 32) -> dict:
                     continue
                 if r.get("model") == MODEL_AUX:
                     have.add((r.get("addr"), r.get("ts") or ""))
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "backfill_aux", _swx, lane="skills")
     live = list(_live(registry_rows))
     todo = [r for r in live if (addr_of(r["text"]), r.get("ts") or "") not in have]
     upgraded = failed = 0
