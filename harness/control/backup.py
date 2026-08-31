@@ -57,6 +57,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import shutil
 import threading
@@ -64,7 +65,10 @@ import time
 import zipfile
 from typing import Dict, List, Optional, Tuple
 
+from harness.loud import swallowed as _swallowed
 from harness.store_io import replace_atomic
+
+logger = logging.getLogger(__name__)
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -226,11 +230,22 @@ def run_once(reason: str = "manual") -> Dict:
         rec["pruned"] = prune()
     except Exception as exc:
         rec["error"] = f"{type(exc).__name__}: {exc}"[:300]
+        # ── `part` MAY NOT EXIST YET (2026-08-31, G-BACKUP caught it) ───────────────
+        # The failure can land ABOVE the line that names it — a broken destination dies
+        # in the walk — and then `os.path.exists(part)` is an UnboundLocalError. The old
+        # `except Exception: pass` swallowed exactly that, which is how a cleanup that
+        # could never run looked like a cleanup that always did. `_part` is the honest
+        # answer to "was there anything to clean up".
+        _part = locals().get("part")
         try:
-            if os.path.exists(part):              # never leave a .part behind
-                os.remove(part)
-        except Exception:
-            pass
+            if _part and os.path.exists(_part):   # never leave a .part behind
+                os.remove(_part)
+        except Exception as exc2:
+            # "never leave a .part behind" is a promise this made and then swallowed.
+            # A stray half-archive in the backup folder looks like a backup.
+            logger.warning("[backup] %s is still on disk after a failed run (%s: %s)",
+                           os.path.basename(_part), type(exc2).__name__, exc2)
+            _swallowed(logger, "backup cleanup", exc2, lane="backup")
     _last = rec
     return rec
 

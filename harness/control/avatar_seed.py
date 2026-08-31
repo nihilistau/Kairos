@@ -31,12 +31,16 @@ in `catalog.json` and the file it points at was never deleted in the first place
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 from typing import Any, Dict, List
 
-from harness.store_io import replace_atomic
 from harness.control import avatar as AV
+from harness.loud import swallowed as _swallowed
+from harness.store_io import replace_atomic
+
+logger = logging.getLogger(__name__)
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _MARKER = ".seeded.json"
@@ -92,8 +96,13 @@ def _mark(sid: str, laid: int) -> None:
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(d, f, indent=1)
         replace_atomic(tmp, _marker_path())
-    except Exception:
-        pass
+    except Exception as exc:
+        # THE MARKER IS WHAT STOPS IT HAPPENING TWICE. If the record of "this set has
+        # been laid down" does not land, the next boot lays it down again — over a
+        # wardrobe that already has it.
+        logger.warning("[avatar-seed] laid %r but could not record it (%s: %s) — the next "
+                       "boot will seed it again", sid, type(exc).__name__, exc)
+        _swallowed(logger, "avatar_seed marker", exc, lane="avatar")
 
 
 def _wants_rows(path: str) -> List[Dict[str, Any]]:

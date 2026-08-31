@@ -43,12 +43,16 @@ day he spoke to her at all.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
 import time
 from typing import Dict, Optional
 
+from harness.loud import swallowed as _swallowed
 from harness.store_io import replace_atomic
+
+logger = logging.getLogger(__name__)
 
 _LEDGER_LOCK = threading.Lock()
 
@@ -101,8 +105,12 @@ def _save(days: Dict[str, int]) -> None:
             for d in sorted(days):
                 f.write(json.dumps({"day": d, "turns": days[d]}) + "\n")
         replace_atomic(tmp, p)      # atomic: a half-written ledger is worse than a stale one
-    except Exception:
-        pass
+    except Exception as exc:
+        # The ledger this writes is what the room reads back as his days. Losing a write
+        # silently means a day that happened is a day nothing remembers.
+        logger.warning("[presence] the day ledger did not save (%s: %s) — %d day(s) of "
+                       "turns are not on disk", type(exc).__name__, exc, len(days))
+        _swallowed(logger, "presence ledger", exc, lane="presence")
 
 
 def note_turn(ts: Optional[float] = None) -> None:

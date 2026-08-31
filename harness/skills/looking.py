@@ -12,10 +12,15 @@ edit it through this module.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
 import time
 from typing import Any, Optional
+
+from harness.loud import swallowed as _swallowed
+
+logger = logging.getLogger(__name__)
 
 _LOCK = threading.Lock()
 # ── SCOPED TO THE TURN'S THREAD, NOT THE PROCESS (2026-08-24 audit, B10) ────────────
@@ -182,8 +187,13 @@ def his_research(query: str, depth: str = "normal") -> dict:
             rec["by"] = "him"
             with open(ans.receipt, "w", encoding="utf-8") as f:
                 json.dump(rec, f, indent=2, ensure_ascii=False)
-        except Exception:
-            pass
+        except Exception as exc:
+            # WHOSE LOOKUP IT WAS is the fact the his/hers chips render from. A receipt
+            # that silently keeps the wrong `by` is a lookup of his filed as one of hers.
+            logger.warning("[looking] could not stamp %r as his (%s: %s) — the ledger will "
+                           "show it as hers", os.path.basename(ans.receipt),
+                           type(exc).__name__, exc)
+            _swallowed(logger, "looking receipt stamp", exc, lane="looking")
     return {"ok": ans.ok, "text": ans.text, "sources": ans.sources,
             "seconds": ans.seconds, "receipt": ans.receipt,
             "provenance": ans.provenance}

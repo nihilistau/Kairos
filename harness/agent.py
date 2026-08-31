@@ -12,9 +12,14 @@ daemon heuristic required.
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 from typing import Callable, List, Optional
+
+from harness.loud import swallowed as _swallowed
+
+_agent_log = logging.getLogger(__name__)
 
 from harness.inference.client import SPDaemonClient
 from harness.inference.inference_config import InferenceConfig
@@ -348,8 +353,13 @@ def default_tools() -> List[ToolSpec]:
     try:
         from harness.kairos.presence import PRESENCE_TOOLS
         tools = tools + PRESENCE_TOOLS
-    except Exception:
-        pass
+    except Exception as exc:
+        # A TOOLSET THAT IS NOT THERE IS A THING SHE CANNOT DO, and nothing in
+        # her prompt says why. docs/OFF-BY-DEFAULT.md is for what is disarmed on
+        # purpose; this branch is for when it was meant to be armed and broke.
+        _agent_log.warning("[tools] her presence modes is not offered this turn (%s: %s)",
+                           type(exc).__name__, exc)
+        _swallowed(_agent_log, "tools/PRESENCE_TOOLS", exc, lane="tools")
     # ── THE SHELF (2026-08-22, presence modes): she may pick a book up on her own time ──
     # var/library/ — pick_up_book / put_down_book / books_on_the_shelf; behind a live knob
     # (presence.read_tools, default on) so the set can be trimmed if selection suffers.
@@ -358,8 +368,13 @@ def default_tools() -> List[ToolSpec]:
         if bool(_tr_lib.get("presence.read_tools", True)):
             from harness.skills.library import LIBRARY_TOOLS
             tools = tools + LIBRARY_TOOLS
-    except Exception:
-        pass
+    except Exception as exc:
+        # A TOOLSET THAT IS NOT THERE IS A THING SHE CANNOT DO, and nothing in
+        # her prompt says why. docs/OFF-BY-DEFAULT.md is for what is disarmed on
+        # purpose; this branch is for when it was meant to be armed and broke.
+        _agent_log.warning("[tools] her shelf of books is not offered this turn (%s: %s)",
+                           type(exc).__name__, exc)
+        _swallowed(_agent_log, "tools/LIBRARY_TOOLS", exc, lane="tools")
     # ── SOMETHING SHE DID NOT GO LOOKING FOR (2026-08-23) ──────────────────────────
     # One verb, no query: a random encyclopedia article. Her own-time act 'look something
     # up you are curious about' can only DEEPEN an interest, because the query comes from
@@ -375,8 +390,13 @@ def default_tools() -> List[ToolSpec]:
         if bool(_tr_dis.get("kairos.discover_tool", True)):
             from harness.skills.system_tools import read_something_new
             tools = tools + [read_something_new]
-    except Exception:
-        pass
+    except Exception as exc:
+        # A TOOLSET THAT IS NOT THERE IS A THING SHE CANNOT DO, and nothing in
+        # her prompt says why. docs/OFF-BY-DEFAULT.md is for what is disarmed on
+        # purpose; this branch is for when it was meant to be armed and broke.
+        _agent_log.warning("[tools] read_something_new is not offered this turn (%s: %s)",
+                           type(exc).__name__, exc)
+        _swallowed(_agent_log, "tools/read_something_new", exc, lane="tools")
     return [ToolSpec.from_callable(fn) for fn in tools]
 
 

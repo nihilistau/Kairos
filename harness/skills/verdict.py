@@ -31,8 +31,13 @@ NEVER blocks speech. Cutover (the seam consulting ruling() as its filter) is Pha
 and its precondition is a zero-divergence receipt from this shadow.
 """
 import json
+import logging
 import os
 import threading
+
+from harness.loud import swallowed as _swallowed
+
+_logger = logging.getLogger(__name__)
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TABLE_PATH = os.path.join(_ROOT, "harness_tests", "fixtures", "sem", "verdict-table.json")
@@ -231,8 +236,12 @@ def _witness(kind: str, q: str, c: str):
             os.makedirs(d, exist_ok=True)
         with open(p, "a", encoding="utf-8") as f:
             f.write(json.dumps({"kind": kind, "query": q[:120], "cell": c}) + "\n")
-    except Exception:
-        pass
+    except Exception as exc:
+        # SP_SEM_LAW_LOG is only set when somebody is trying to watch the law fire. An
+        # empty file reads as "it never fired", which is the opposite conclusion.
+        _logger.warning("[verdict] SP_SEM_LAW_LOG is set but the witness did not write "
+                        "(%s: %s)", type(exc).__name__, exc)
+        _swallowed(_logger, "verdict witness", exc, lane="verdict")
 
 
 def shadow(query: str, admitted_rows: list, all_rows: list) -> None:
