@@ -27,6 +27,10 @@ import time
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 
 def _addr(record_json: str) -> str:
     return hashlib.sha256(record_json.encode("utf-8")).hexdigest()[:16]
@@ -94,7 +98,8 @@ class TelemetrySink:
                     self.sink(ev.content)
                     if stop is not None and stop.is_set():
                         break
-            except Exception:
+            except Exception as _swx:
+                _swallowed(_swlog, "run", _swx, lane="telemetry")
                 if stop is not None and stop.is_set():
                     break
                 time.sleep(1.0)  # reconnect backoff

@@ -129,7 +129,8 @@ def all_entries(include_dropped: bool = True) -> List[Dict[str, Any]]:
     for e in _read()["entries"]:
         try:
             rows.append(_clean(e))
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "all_entries", _swx, lane="control")
             continue        # a malformed row is skipped, never fatal to the panel
     if not include_dropped:
         rows = [r for r in rows if r["status"] != "dropped"]
@@ -191,7 +192,8 @@ def gate_health(stale_days: int = 7) -> Dict[str, Any]:
     rows: List[Dict[str, Any]] = []
     try:
         names = sorted(os.listdir(d))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "gate_health", _swx, lane="control")
         names = []
     now = time.time()
     for n in names:
@@ -202,7 +204,8 @@ def gate_health(stale_days: int = 7) -> Dict[str, Any]:
             with open(fp, "r", encoding="utf-8") as f:
                 r = json.load(f)
             age = now - os.path.getmtime(fp)
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "gate_health", _swx, lane="control")
             continue
         # NOT EVERY RECEIPT IS A VERDICT. var/sem/receipts/ also holds MEASUREMENTS —
         # voice_baseline and voice_26b record medians and knob settings and assert

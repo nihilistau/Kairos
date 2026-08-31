@@ -56,6 +56,10 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 
 # ── THE TYPED CALL ────────────────────────────────────────────────────────────
 @dataclass
@@ -233,7 +237,8 @@ class ToolGrammar:
         for a in call.args:
             try:
                 args.append(ast.literal_eval(a))
-            except Exception:
+            except Exception as _swx:
+                _swallowed(_swlog, "parse", _swx, lane="toolcore")
                 return ParseError("an argument is not a literal value",
                                   at=ast.unparse(a)[:40] if hasattr(ast, "unparse") else "",
                                   fixable_hint="Pass plain values: strings in quotes, "
@@ -249,7 +254,8 @@ class ToolGrammar:
                                   f"{name} takes: {', '.join(sorted(spec['params'])) or 'nothing'}"))
             try:
                 kwargs[kw.arg] = ast.literal_eval(kw.value)
-            except Exception:
+            except Exception as _swx:
+                _swallowed(_swlog, "parse", _swx, lane="toolcore")
                 return ParseError(f"the value for {kw.arg!r} is not a literal", at=kw.arg,
                                   fixable_hint="Strings in quotes, numbers bare.")
 

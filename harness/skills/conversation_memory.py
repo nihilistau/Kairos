@@ -136,7 +136,8 @@ def _cmd_add_fields() -> set:
         tree = ast.parse(textwrap.dedent(src))
         return {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)
                 and isinstance(n.value, ast.Name) and n.value.id == "a"}
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_cmd_add_fields", _swx, lane="skills")
         return {"root", "full_file", "blob_ref", "addr", "kind", "keys", "summary", "title",
                 "detail", "detail_file", "status", "gate", "commit", "repro", "mem_class",
                 "delivery", "authority", "retrieval_key", "decline_when",

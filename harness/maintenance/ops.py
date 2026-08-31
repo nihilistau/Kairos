@@ -72,7 +72,8 @@ def _rows_and_malformed() -> tuple[list[dict], list[str]]:
                 continue
             try:
                 rows.append(json.loads(ln))
-            except Exception:
+            except Exception as _swx:
+                _swallowed(_swlog, "_rows_and_malformed", _swx, lane="maintenance")
                 bad.append(ln)
     return rows, bad
 

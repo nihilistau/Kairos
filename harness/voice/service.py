@@ -135,7 +135,8 @@ def voice_turn(body: Dict[str, Any], transcript: list) -> Iterator[bytes]:
         from harness.agent import system_bundle
         _sysc, _ = system_bundle()
         msgs = [{"role": "system", "content": _sysc}] + turn
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "voice_turn", _swx, lane="voice")
         msgs = turn                        # a missing bundle must not cost the turn
     from harness.inference.inference_config import InferenceConfig
     cfg = InferenceConfig(

@@ -25,7 +25,8 @@ def vl_max_tokens() -> int:
     try:
         from harness.tuning import registry as _tr
         return int(_tr.get("sight.vl_max_tokens", 220) or 220)
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "vl_max_tokens", _swx, lane="skills")
         return 220
 
 
@@ -33,7 +34,8 @@ def vl_detail() -> str:
     try:
         from harness.tuning import registry as _tr
         return str(_tr.get("sight.vl_detail", "auto") or "auto")
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "vl_detail", _swx, lane="skills")
         return "auto"
 
 
@@ -63,7 +65,8 @@ def vl_choices() -> list:
     try:
         from harness.sidecar import client
         ids = [m for m in client.list_models() if "vl" in m.lower() or "vision" in m.lower()]
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "vl_choices", _swx, lane="skills")
         ids = []
     cur = vl_model()
     return sorted(set(ids + ([cur] if cur else [])))
@@ -93,7 +96,8 @@ def eyes_status() -> dict:
     try:
         from harness.tuning import registry as _tr
         backend = str(_tr.get("sight.backend", "engine") or "engine")
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "eyes_status", _swx, lane="skills")
         backend = "engine"
     return {"backend": backend, "vl_model": vl_model(),
             "door_up": door_up() if backend == "aux_vl" else None, "vl_armed": armed()}

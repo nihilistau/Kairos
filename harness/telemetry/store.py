@@ -183,7 +183,8 @@ def read_day(day: str = "") -> List[Dict[str, Any]]:
                     row = json.loads(line)
                     if isinstance(row, dict):
                         out.append(row)
-                except Exception:
+                except Exception as _swx:
+                    _swallowed(_swlog, "read_day", _swx, lane="telemetry")
                     continue
     except OSError:
         return []
@@ -220,7 +221,8 @@ def verify() -> Dict[str, Any]:
                         row = json.loads(line)
                         kinds[row.get("kind", "?")] = kinds.get(row.get("kind", "?"), 0) + 1
                         sources[row.get("source", "?")] = sources.get(row.get("source", "?"), 0) + 1
-                    except Exception:
+                    except Exception as _swx:
+                        _swallowed(_swlog, "verify", _swx, lane="telemetry")
                         bad += 1
         except OSError:
             continue

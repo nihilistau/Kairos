@@ -44,7 +44,8 @@ def enabled() -> bool:
         from harness.tuning import registry as _tr
         v = _tr.tune_or_env("aux.judge_kairos", "SP_KAIROS_JUDGE", "0")
         return v is True or str(v) == "1" or str(v).lower() == "true"
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "enabled", _swx, lane="kairos")
         return os.environ.get("SP_KAIROS_JUDGE", "0") == "1"
 
 

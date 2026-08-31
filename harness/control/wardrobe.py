@@ -427,9 +427,21 @@ def overlay() -> Dict[str, Dict[str, Any]]:
     try:
         st = os.stat(p)
         stamp = (p, st.st_mtime_ns, st.st_size)
-    except OSError:
-        return {}
-    if _OVERLAY_CACHE.get("stamp") == stamp:
+    except FileNotFoundError:
+        return {}                     # no overlay yet: he has genuinely edited nothing
+    except OSError as exc:
+        # ── THE DOOR ABOVE MY OWN FIX (2026-08-31, second pass) ─────────────────────
+        # The three-way split below is the whole point of this function, and it sat
+        # under `except OSError: return {}` — which catches PermissionError, the exact
+        # WinError 5 this week was about, and answers "he has edited nothing". Every
+        # garment he hid, back on offer; every retired one, back in her list. I wrote
+        # the careful part and left the gate to it open. Only "not there" is `{}`;
+        # anything else falls through to the retry, and then raises.
+        logger.warning("[wardrobe] could not stat catalog.json (%s: %s) — retrying rather "
+                       "than answering that nothing is hidden", type(exc).__name__, exc)
+        _swallowed(logger, "overlay stat", exc, lane="wardrobe")
+        stamp = None
+    if stamp is not None and _OVERLAY_CACHE.get("stamp") == stamp:
         return _OVERLAY_CACHE.get("rows") or {}
     # ── AND AN UNREADABLE OVERLAY IS NOT AN EMPTY ONE (2026-08-31) ──────────────────
     # `except Exception: return {}` here says "he has edited nothing" — which un-hides
@@ -449,7 +461,8 @@ def overlay() -> Dict[str, Dict[str, Any]]:
         _swallowed(logger, "overlay parse", exc, lane="wardrobe")
         return {}
     d = d if isinstance(d, dict) else {}
-    _OVERLAY_CACHE["rows"], _OVERLAY_CACHE["stamp"] = d, stamp
+    if stamp is not None:             # a read we could not stamp must not be cached
+        _OVERLAY_CACHE["rows"], _OVERLAY_CACHE["stamp"] = d, stamp
     return d
 
 

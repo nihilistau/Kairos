@@ -232,7 +232,8 @@ class WikipediaSearcher(Searcher):
             try:
                 with urllib.request.urlopen(req, timeout=15) as r:
                     obj = json.loads(r.read().decode("utf-8", "replace"))
-            except Exception:
+            except Exception as _swx:
+                _swallowed(_swlog, "random_page", _swx, lane="skills")
                 continue
             extract = (obj.get("extract") or "").strip()
             title = (obj.get("title") or "").strip()
@@ -352,7 +353,8 @@ def _pick() -> Searcher:
         from harness.tuning import registry as _t
         v = _t.chosen("search.backend")          # override-only; env is the default
         name = str(v or "").strip().lower()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_pick", _swx, lane="skills")
         name = ""
     if not name:
         name = (os.environ.get("SP_SEARCH_BACKEND") or "ddg").strip().lower()

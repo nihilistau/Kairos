@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.8.13 — the doors above the fixes (2026-08-31)
+
+An outside review, checked line by line against the source. Four findings were real, two
+of them introduced by the previous two versions, and one was the opposite of what it said.
+
+- **`overlay()` opened with `except OSError: return {}` on its `os.stat`.** `OSError`
+  covers `PermissionError`, and `{}` means "you have edited nothing" — every hidden
+  garment back on offer, every retired one back in her list. 0.8.10 added the careful
+  three-way split and left the door to it standing open. Only `FileNotFoundError` answers
+  `{}` now.
+- **The wardrobe panel had eight write doors and 0.8.7 fixed one.** Put-it-on-her,
+  dismiss, accept, make-it-now, make-everything and both ask boxes all awaited the
+  server's answer and discarded it, so a refused write still looked like a completed one.
+  One writer for all of them now, and a refused request keeps your words in the box.
+- **The self-fact tool told her a fact had landed when the store had refused it.**
+  `remember_self` called the writer, threw the writer's sentence away, and answered
+  "noted about myself: …" either way. It returns what the store said now, and the gate
+  calls the TOOL rather than the underlying function — which is why this survived.
+- **The tree-wide swallow rule claimed more than it checked.** It matched a closed list of
+  literal handler bodies while its sentence said "nothing fails without a name", so 134
+  handlers answering with an assignment, a `continue` or `return <name>` were green under
+  it. An `except Exception:` with no binding cannot report what it caught whatever it does
+  next, so the binding is the whole rule now. Zero unbound handlers remain.
+- A gate that recognised the logging helper only under two of its three import aliases was
+  reporting audible handlers as silent ones; it no longer grades the spelling.
+
 ## 0.8.12 — nothing under harness/ fails without a name (2026-08-31)
 
 The other half of 0.8.11, and a correction to its arithmetic.

@@ -169,7 +169,8 @@ def load_table() -> dict:
         try:
             with open(TABLE_PATH, encoding="utf-8") as f:
                 cells = {c: v["ruling"] for c, v in json.load(f)["table"].items()}
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_logger, "load_table", _swx, lane="skills")
             cells = {}
         _TABLE.update(mtime=mt, cells=cells)
         return cells
@@ -223,7 +224,8 @@ def enforce(query: str, scored: list, all_rows: list) -> list:
                     _STATS["enforced_drops"] = _STATS.get("enforced_drops", 0) + 1
                     _witness("enforced_drop", query, c)
         return kept
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_logger, "enforce", _swx, lane="skills")
         return scored
 
 

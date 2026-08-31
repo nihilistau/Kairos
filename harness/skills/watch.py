@@ -42,6 +42,8 @@ from typing import Optional
 from harness.skills import notes as N
 from harness.skills.system_tools import search_web
 
+from harness.loud import swallowed as _swallowed
+
 logger = logging.getLogger(__name__)
 
 
@@ -73,7 +75,8 @@ def due_checks(now: Optional[float] = None, every_hours: float = 6.0) -> list:
             # 5-hour lie in New York, and CORRECT IN LONDON -- which is exactly why no test
             # caught it and why it can only be caught by a test that asserts the ROUND TRIP.
             t = calendar.timegm(time.strptime(last, "%Y-%m-%dT%H:%M:%SZ"))
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "due_checks", _swx, lane="skills")
             out.append(r)
             continue
         if (now - t) >= every_hours * 3600.0:
@@ -142,7 +145,8 @@ def _watch_judge_armed() -> bool:
         from harness.tuning import registry as _tr
         v = _tr.tune_or_env("aux.judge_watch", "SP_AUX_WATCH_JUDGE", "0")
         return v is True or str(v) == "1" or str(v).lower() == "true"
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_watch_judge_armed", _swx, lane="skills")
         return os.environ.get("SP_AUX_WATCH_JUDGE", "0") == "1"
 
 
@@ -168,7 +172,8 @@ def _judge_sidecar(question: str, evidence: str):
     rather than inventing a ruling."""
     try:
         from harness.sidecar import client as _aux
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_judge_sidecar", _swx, lane="skills")
         return _judge(question, evidence)
     if not _aux.available():
         return _judge(question, evidence)

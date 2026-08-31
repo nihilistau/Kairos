@@ -282,7 +282,8 @@ def synthesize(text: str, voice: str | None = None, steps: int | None = None,
                                fmt="wav", speed=lv["speed"])
                 if wav:
                     backend = "xai"
-            except Exception:
+            except Exception as _swx:
+                _swallowed(_swlog, "synthesize", _swx, lane="voice")
                 wav = b""
         if not wav:
             # the local chain never sees the "xai:" spelling — it has its own voices

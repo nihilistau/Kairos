@@ -86,7 +86,8 @@ def _read() -> list:
                     continue
                 try:
                     out.append(json.loads(line))
-                except Exception:
+                except Exception as _swx:
+                    _swallowed(_logger, "_read", _swx, lane="skills")
                     continue
     except Exception as _swx:
         _swallowed(_logger, "_read", _swx, lane="skills")

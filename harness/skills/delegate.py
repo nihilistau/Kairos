@@ -339,7 +339,8 @@ def _run_gates(wt: str, gates=OFFLINE_GATES, timeout: float = 900.0) -> Dict[str
             r = subprocess.run(["python", p], cwd=wt, capture_output=True,
                                text=True, timeout=timeout)
             (passed if r.returncode == 0 else failed).append(g)
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "_run_gates", _swx, lane="skills")
             failed.append(g)
     return {"passed": passed, "failed": failed,
             "summary": "%d/%d" % (len(passed), len(passed) + len(failed))}

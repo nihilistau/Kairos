@@ -101,7 +101,8 @@ def _epub_text_and_title(path: str):
                 p = _Text()
                 p.feed(z.read(n).decode("utf-8", "replace"))
                 out.append("".join(p.parts))
-            except Exception:
+            except Exception as _swx:
+                _swallowed(_swlog, "_epub_text_and_title", _swx, lane="skills")
                 continue
     text = re.sub(r"[ \t]+", " ", "\n".join(out))
     text = re.sub(r"\n\s*\n+", "\n\n", text).strip()
@@ -137,7 +138,8 @@ def books() -> list:
         path = os.path.join(_dir(), fn)
         try:
             title, text = _read(path)
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "books", _swx, lane="skills")
             continue
         b = bm.get(title, {})
         out.append({"title": title, "file": fn, "chars": len(text), "pos": int(b.get("pos", 0)),

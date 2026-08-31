@@ -56,7 +56,8 @@ def _font(size: int):
     for name in ("DejaVuSans.ttf", "seguisym.ttf", "arial.ttf"):
         try:
             return ImageFont.truetype(name, size)
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "_font", _swx, lane="games")
             continue
     try:
         return ImageFont.load_default(size)
@@ -84,7 +85,8 @@ def board_png(fen: str, path: str, last: Optional[str] = None) -> Optional[str]:
     if last and len(last) >= 4:
         try:
             hl = {CH.name_sq(last[:2]), CH.name_sq(last[2:4])}
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "board_png", _swx, lane="games")
             hl = set()
 
     for r in range(8):

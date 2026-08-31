@@ -56,7 +56,8 @@ def _tier_full() -> str:
         try:
             from harness.personality.self_model import HARNESS_ROOT
             tier = str(HARNESS_ROOT / "memory-okf-personality")
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_logger, "_tier_full", _swx, lane="skills")
             tier = os.path.join(os.path.dirname(os.path.dirname(
                 os.path.dirname(os.path.abspath(__file__)))), "memory-okf-personality")
     return os.path.join(tier, "full")
@@ -138,7 +139,8 @@ def _bound_to_row(text: str) -> str:
     t = " ".join((text or "").split())
     try:
         from harness.skills.lifecycle import _NARRATABLE_MAX as _ROW_MAX
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_logger, "_bound_to_row", _swx, lane="skills")
         _ROW_MAX = 600
     if len(t) <= _ROW_MAX:
         return t

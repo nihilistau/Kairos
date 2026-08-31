@@ -208,7 +208,8 @@ def web_search(query: str) -> str:
                     # the READER gets the whole page, not the tool-display cap
                     full = fetch_page_text(hits[0]["url"]) or extract
                     digest = _auxsum.read_long(full, question=query)
-            except Exception:
+            except Exception as _swx:
+                _swallowed(_swlog, "web_search", _swx, lane="skills")
                 digest = ""
             hits[0]["extract"] = (_auxsum.labelled(digest, "the page")[:900] if digest
                                   else extract[:700])   # the silent librarian: labelled, never bare

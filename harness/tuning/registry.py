@@ -947,7 +947,8 @@ def schema() -> dict:
             try:
                 live = list(k.choices_fn() or [])
                 d["choices"] = sorted(set(live + list(k.choices)), key=str)
-            except Exception:
+            except Exception as _swx:
+                _swallowed(_swlog, "schema", _swx, lane="tuning")
                 d["choices"] = list(k.choices)
         d["value"] = get(k.key)
         d["overridden"] = k.key in vals

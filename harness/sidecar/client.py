@@ -37,7 +37,8 @@ def chat_model() -> str:
         from harness.tuning import registry as _tr
         return str(_tr.tune_or_env("aux.chat_model", "SP_AUX_CHAT_MODEL",
                                    "liquidai/lfm2.5-1.2b-instruct") or "liquidai/lfm2.5-1.2b-instruct")
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "chat_model", _swx, lane="sidecar")
         return os.environ.get("SP_AUX_CHAT_MODEL", "liquidai/lfm2.5-1.2b-instruct")
 
 
@@ -98,7 +99,8 @@ def list_models(ttl_s: float = 60.0) -> List[str]:
     ids: List[str] = []
     try:
         ids = [m["id"] for m in (d or {}).get("data", []) if m.get("id")]
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "list_models", _swx, lane="sidecar")
         ids = []
     _MODELS_CACHE.update(at=time.monotonic(), ids=ids)
     return list(ids)

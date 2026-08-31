@@ -124,7 +124,8 @@ def _post(path: str, body: dict, timeout: float = 120.0) -> Optional[dict]:
     except urllib.error.HTTPError as e:
         try:
             _LAST_ERROR[0] = ("http %d: " % e.code) + e.read().decode("utf-8", "replace")[:300]
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "_post", _swx, lane="skills")
             _LAST_ERROR[0] = "http %d" % e.code
         return None
     except Exception as exc:
@@ -150,7 +151,8 @@ def _fetch(url: str, timeout: float = 120.0) -> bytes:
     try:
         with urllib.request.urlopen(url, timeout=timeout) as r:
             return r.read()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_fetch", _swx, lane="skills")
         return b""
 
 
@@ -184,7 +186,8 @@ def tts(text: str, voice_id: str = "", fmt: str = "wav",
                      "Authorization": "Bearer " + k})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             raw = r.read()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "tts", _swx, lane="skills")
         return b""
     if not raw:
         return b""
@@ -194,7 +197,8 @@ def tts(text: str, voice_id: str = "", fmt: str = "wav",
     try:
         d = json.loads(raw.decode("utf-8", "replace"))
         return base64.b64decode(d.get("audio", "")) if d.get("audio") else b""
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "tts", _swx, lane="skills")
         return raw          # unknown container: hand it to the player as-is
 
 
@@ -254,7 +258,8 @@ def image_edit(prompt: str, image_file_id: str = "", image_url: str = "",
     if row.get("b64_json"):
         try:
             return base64.b64decode(row["b64_json"])
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "image_edit", _swx, lane="skills")
             return b""
     if row.get("url"):
         return _fetch(row["url"])

@@ -74,7 +74,8 @@ def _when(v: Any) -> float:
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
         try:
             return float(calendar.timegm(time.strptime(s, fmt)))
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "_when", _swx, lane="control")
             continue
     return 0.0
 
@@ -102,7 +103,8 @@ def _memory_rows(kind: str, since: float) -> List[Dict[str, Any]]:
     root = _mem_root()
     try:
         names = os.listdir(root)
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_memory_rows", _swx, lane="control")
         return out
     for fn in names:
         if not fn.endswith(".md"):
@@ -111,7 +113,8 @@ def _memory_rows(kind: str, since: float) -> List[Dict[str, Any]]:
         try:
             mt = os.path.getmtime(fp)
             body = io.open(fp, encoding="utf-8", errors="replace").read()
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "_memory_rows", _swx, lane="control")
             continue
         if ("mem_kind: %s" % kind) not in body:
             continue

@@ -17,6 +17,10 @@ from typing import Optional
 
 import numpy as np
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 VOICE_DIR = os.environ.get("SP_VOICE_DIR", os.path.join(_ROOT, "var", "voice"))
 # newest ear first: the P1 conversational IR (voice_ctc), else the gated KAI-3 POT IR.
@@ -65,7 +69,8 @@ def _load() -> dict:
                 _state["compiled"] = core.compile_model(model, dev)
                 _state["device"] = dev
                 break
-            except Exception:
+            except Exception as _swx:
+                _swallowed(_swlog, "_load", _swx, lane="voice")
                 continue
     if _state["compiled"] is None:
         raise EarUnavailable(f"no usable OV device (available: {devices})")

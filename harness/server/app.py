@@ -118,7 +118,8 @@ def _knob(name: str, fallback):
         from harness.tuning import registry as _tune
         v = _tune.get(name)
         return fallback if v is None else v
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_knob", _swx, lane="server")
         return fallback
 
 
@@ -686,7 +687,8 @@ def _system_profile() -> str:
                 name = os.path.basename(f)[:-5]
                 try:
                     c = _serve.load_profile(name)
-                except Exception:
+                except Exception as _swx:
+                    _swallowed(logger, "_system_profile", _swx, lane="server")
                     continue
                 if os.path.normcase(c["paths"]["model"]) == os.path.normcase(running):
                     return name
@@ -771,11 +773,13 @@ def _presence_json() -> Dict[str, Any]:
     for k in ("presence.mode", "presence.voice", "presence.intimate", "presence.cue", "presence.read_chance"):
         try:
             knobs[k.split(".", 1)[1]] = _tr.get(k)
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "_presence_json", _swx, lane="server")
             knobs[k.split(".", 1)[1]] = None
     try:
         shelf = _lib.books()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_presence_json", _swx, lane="server")
         shelf = []
     return {"ok": True, "session": sess, "state": st, "shelf": shelf, "knobs": knobs}
 
@@ -1023,7 +1027,8 @@ def _setup_key(path_env: str, default_rel: str = "") -> Dict[str, Any]:
     p = rel if os.path.isabs(rel) else os.path.join(_ROOT_DIR, rel)
     try:
         n = len(open(p, encoding="utf-8").read().strip())
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_setup_key", _swx, lane="server")
         n = -1
     return {"path": rel.replace("\\", "/"), "configured": True,
             "present": n > 0, "bytes": max(0, n)}
@@ -1802,13 +1807,15 @@ def _persona_layers() -> Dict[str, Any]:
             from harness.agent import _SYS as _sys_meta
             from harness.agent import cached_system_content
             in_prefix = cached_system_content()
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "_persona_layers", _swx, lane="server")
             in_prefix, _sys_meta = None, {"version": 0, "built_at": 0.0}
         stale = bool(live_now and in_prefix and live_now not in in_prefix)
         try:
             from harness.inference import context as _ctxq
             _ptok = _ctxq.prefix_tokens(in_prefix) if in_prefix else 0
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "_persona_layers", _swx, lane="server")
             _ptok = 0
         return {
             "ok": True,
@@ -1999,7 +2006,8 @@ def _consolidate_last_day() -> Optional[str]:
     try:
         with open(_consolidate_marker(), encoding="utf-8") as f:
             _CONSOLIDATE_STATE["last_day"] = json.load(f).get("last_day")
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_consolidate_last_day", _swx, lane="server")
         _CONSOLIDATE_STATE["last_day"] = ""      # "" = never, and not None = don't re-read
     return _CONSOLIDATE_STATE["last_day"]
 
@@ -2331,7 +2339,8 @@ def _read_day_transcript(day: str = "", include_synthetic: bool = False) -> list
                 if row.get("synthetic") and not include_synthetic:
                     continue
                 out.append(row)
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_read_day_transcript", _swx, lane="server")
         return out
     return out
 
@@ -3008,7 +3017,8 @@ def _room_pulse() -> Dict[str, Any]:
     try:
         from harness.control import anon as _anon_p
         out["anon"] = _anon_p.state()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_room_pulse", _swx, lane="server")
         out["anon"] = {"on": False}
 
     # her state — mood/voice/traits drive the backdrop's palette.
@@ -3018,7 +3028,8 @@ def _room_pulse() -> Dict[str, Any]:
     # already worked, which is the exact rule this repo is organised around.
     try:
         out["her"] = (_persona_state().get("state") or {})
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_room_pulse", _swx, lane="server")
         out["her"] = {}
 
     # her journal — when she last wrote, and the line itself
@@ -3026,7 +3037,8 @@ def _room_pulse() -> Dict[str, Any]:
         from harness.skills import narrative as _nar
         cur = _nar.current() or ""
         out["journal"] = {"present": bool(cur), "text": cur[:400]}
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_room_pulse", _swx, lane="server")
         out["journal"] = {"present": False}
 
     # looking up — in-flight or last finished. The taskbar chip reads this.
@@ -3043,7 +3055,8 @@ def _room_pulse() -> Dict[str, Any]:
             "armed": st.get("armed"),
             "search_backend": st.get("search_backend") or "ddg",
         }
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_room_pulse", _swx, lane="server")
         out["research"] = {"inflight": False, "armed": False}
 
     # presence
@@ -3176,7 +3189,8 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
     try:
         from harness.kairos import scheduler as _ks_turn
         _ks_turn.note_user_turn(True)
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_native_chat_sse_body", _swx, lane="server")
         _ks_turn = None
     from harness.agent import agent_chat_stream
     from harness.inference import InferenceConfig
@@ -3451,7 +3465,8 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
                             try:
                                 from harness.tuning import registry as _tr_l
                                 _ee = int(_tr_l.get("aux.early_exit_hits") or 3)
-                            except Exception:
+                            except Exception as _swx:
+                                _swallowed(logger, "on_look", _swx, lane="server")
                                 _ee = 3
                             lines = _lane_lines(lines, _lane_get, _ee)
                         # LEAN, BECAUSE IT ACCUMULATES (2026-08-29 audit, C16). The note
@@ -6041,7 +6056,8 @@ def _run_stdlib(host: str, port: int) -> None:
             try:
                 from harness.inference.backends import supports as _sup_w
                 return _WARM.is_set() or not _sup_w("warm")
-            except Exception:
+            except Exception as _swx:
+                _swallowed(logger, "_warm_for_presence", _swx, lane="server")
                 return _WARM.is_set()
         _ks.set_warm_ok(_warm_for_presence)
         _seed_kairos_from_day()

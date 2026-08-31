@@ -241,7 +241,8 @@ def _mint_now(daemon: str, fact: str, out_dir: str):
                 break
             _p = _up
         _free_gb = shutil.disk_usage(_p if os.path.isdir(_p) else ".").free / 1e9
-    except Exception:
+    except Exception as _swx:
+        _sw(_log, "_mint_now", _swx, lane="skills")
         _free_gb = None                   # a broken probe must never block a memory
     if _free_gb is not None:
         try:
@@ -267,7 +268,8 @@ def _mint_now(daemon: str, fact: str, out_dir: str):
         why = ""
         try:
             why = str((json.loads(exc.read().decode()) or {}).get("error", ""))[:400]
-        except Exception:
+        except Exception as _swx:
+            _sw(_log, "_mint_now", _swx, lane="skills")
             why = "HTTP %s" % getattr(exc, "code", "?")
         if why and not _CAPTURE_REFUSED["why"]:
             _CAPTURE_REFUSED.update(why=why, at=time.time(), n=1)
@@ -1358,7 +1360,8 @@ def search_memories_ranked_rows(query: str, k: int = 5, min_overlap: float = 0.2
                     # and takes a lock on every call, and the loop below ran it for
                     # every row in the store.
                     smean = sx.space_mean()
-        except Exception:
+        except Exception as _swx:
+            _sw(_log, "search_memories_ranked_rows", _swx, lane="skills")
             sem_idx, qvec = {}, None      # degrade to lexical, never block
 
     scored = []
@@ -1903,7 +1906,8 @@ def _surprisal_of(row: dict) -> float:
             if pm is not None:
                 val = min(1.0, max(0.0, pm.surprisal(_text(row),
                                                      row.get("mem_class") or "") / 8.0))
-    except Exception:
+    except Exception as _swx:
+        _sw(_log, "_surprisal_of", _swx, lane="skills")
         val = 0.0
     _SURP_CACHE[key] = val
     return val
@@ -1985,7 +1989,8 @@ def _select(query: str, scored: list, k: int, target, matched=None) -> list:
     try:
         from harness.skills import reprise as _rp
         reg = _rp.register_tokens([{"text": _text(e)} for _s, e in scored])
-    except Exception:
+    except Exception as _swx:
+        _sw(_log, "_select", _swx, lane="skills")
         _rp, reg = None, set()
     picked, seen_prefix, rest = [], set(), []
     for s, e in scored:
@@ -1993,7 +1998,8 @@ def _select(query: str, scored: list, k: int, target, matched=None) -> list:
         if _rp is not None:
             try:
                 pref = " ".join(_rp.content_prefix(_text(e), reg, 5))
-            except Exception:
+            except Exception as _swx:
+                _sw(_log, "_select", _swx, lane="skills")
                 pref = ""
         if pref and pref in seen_prefix:
             continue                      # she already says this in a slot above
@@ -2015,7 +2021,8 @@ def _select(query: str, scored: list, k: int, target, matched=None) -> list:
     try:
         from harness.tuning import registry as _tune
         p = float(_tune.get("recall.explore", 0.0) or 0.0)
-    except Exception:
+    except Exception as _swx:
+        _sw(_log, "_select", _swx, lane="skills")
         p = 0.0
     if p > 0.0 and rest and len(picked) >= 2:
         # VARIETY, NOT NONDETERMINISM, and the difference is not pedantry. `random.random()`

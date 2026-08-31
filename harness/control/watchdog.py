@@ -177,7 +177,8 @@ def _daemon_alive() -> bool:
     try:
         from harness.inference.client import get_client
         base = getattr(get_client(), "base_url", "http://127.0.0.1:3000")
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_daemon_alive", _swx, lane="control")
         base = "http://127.0.0.1:3000"
     u = urlparse(base)
     host, port = (u.hostname or "127.0.0.1"), (u.port or 3000)
@@ -313,7 +314,8 @@ def _vram_beat() -> None:
             ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
             capture_output=True, text=True, timeout=8)
         mib = int((out.stdout or "0").strip().splitlines()[0])
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_vram_beat", _swx, lane="control")
         return
     if mib > _VRAM["peak"]:
         _VRAM["peak"] = mib
@@ -333,7 +335,8 @@ def _vram_beat() -> None:
                        "--format=csv,noheader,nounits"],
                       capture_output=True, text=True, timeout=8)
         total = int((_t.stdout or "0").strip().splitlines()[0])
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_vram_beat", _swx, lane="control")
         return
     if total > 0 and mib >= int(total * 0.95) and not _VRAM.get("warned"):
         _VRAM["warned"] = True

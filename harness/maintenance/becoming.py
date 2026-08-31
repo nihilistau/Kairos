@@ -88,7 +88,8 @@ def nightly(ask: Optional[Callable[[str], str]] = None) -> dict:
             try:
                 if lc._age_days(r.get("ts") or "") <= _DAYS:
                     recent.append(r)
-            except Exception:
+            except Exception as _swx:
+                _swallowed(_swlog, "nightly", _swx, lane="maintenance")
                 recent.append(r)
         recent = [r for r in recent
                   if (r.get("kind") or "") not in _EXCLUDE_KINDS and not lc.is_distillate(r)]

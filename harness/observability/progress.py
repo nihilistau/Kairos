@@ -166,7 +166,8 @@ def _migration_map() -> List[Dict[str, Any]]:
     try:
         with open(path, encoding="utf-8") as f:
             lines = f.read().splitlines()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_migration_map", _swx, lane="observability")
         return rows
     for ln in lines:
         if not ln.startswith("|") or ln.startswith("|--") or ln.startswith("|---"):

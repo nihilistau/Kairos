@@ -148,7 +148,8 @@ def record(samples: List[Dict[str, Any]], *, source: str = "",
 def _brief(s: Any) -> str:
     try:
         return str({k: s.get(k) for k in ("source", "kind", "value")})[:120]
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_brief", _swx, lane="telemetry")
         return str(s)[:120]
 
 
