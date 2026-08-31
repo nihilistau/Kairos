@@ -61,6 +61,7 @@ from harness.inference import InferenceConfig, get_client
 from harness.observability import get_logger
 
 logger = get_logger(__name__)
+from harness.loud import swallowed as _swallowed
 
 
 # ──── THE SAMPLER-DEFAULT SEAM (ADR-013) ─────────────────────────────────
@@ -394,8 +395,12 @@ def _settle_turn(human_text: str, reply_text: str, *, record: bool = True,
     try:
         from harness.control.spine import persist_receipts
         persist_receipts()
-    except Exception:
-        pass
+    except Exception as exc:
+        # The flywheel's flush. Silently skipped, the receipts stay in memory and the
+        # durable tier is missing a turn nobody will know to look for.
+        logger.warning("[gateway] spine receipts were not flushed (%s: %s)",
+                       type(exc).__name__, exc)
+        _swallowed(logger, "persist_receipts", exc, lane="gateway")
     return receipts
 
 
@@ -496,8 +501,13 @@ def _arm_turn(msgs: list) -> str:
     try:
         from harness.model import presence
         presence.note_turn()
-    except Exception:
-        pass                                  # a missing receipt must never cost him his turn
+    except Exception as exc:
+        # A missing receipt must never cost him his turn — that stands. But this is the
+        # ledger the room reads back as his days, and a day of turns that recorded none
+        # of them looks exactly like a day he was not here.
+        logger.warning("[gateway] his turn was not noted in the presence ledger (%s: %s)",
+                       type(exc).__name__, exc)
+        _swallowed(logger, "presence.note_turn", exc, lane="gateway")
 
     return human
 
@@ -520,7 +530,14 @@ def _arm_self_turn(nudge: str):
     try:
         from harness.skills import memory as M
         return (M.set_author("self"), M.set_question(nudge or ""))
-    except Exception:
+    except Exception as exc:
+        # ARMING FAILED MEANS THE NEXT WRITE IS FILED AS HIS. This is the G-AUTHOR-CTX
+        # contract, and the night it broke, ~30 driven turns were written into her
+        # registry as facts about a man who was asleep.
+        logger.warning("[gateway] could not arm the self-turn author (%s: %s) — anything "
+                       "she stores in this turn will be filed as HIS",
+                       type(exc).__name__, exc)
+        _swallowed(logger, "_arm_self_turn", exc, lane="memory")
         return None
 
 
@@ -531,8 +548,13 @@ def _disarm_self_turn(tokens) -> None:
         from harness.skills import memory as M
         M.reset_author(tokens[0])
         M.reset_question(tokens[1])
-    except Exception:
-        pass
+    except Exception as exc:
+        # THE RESET IS THE WHOLE CONTRACT. This function exists so "a following prompted
+        # turn cannot inherit hers" (its own docstring). A swallowed reset leaves her
+        # author armed across the next turn — his words, stored as hers.
+        logger.warning("[gateway] the self-turn author did not reset (%s: %s) — the NEXT "
+                       "turn may be attributed to her", type(exc).__name__, exc)
+        _swallowed(logger, "_disarm_self_turn", exc, lane="memory")
 
 
 def _capture_after_turn(human_text: str) -> None:
@@ -581,12 +603,18 @@ def _capture_after_turn(human_text: str) -> None:
             for f in facts[:4]:                   # a turn that yields 5+ facts is a paste
                 try:
                     M.remember(f, source="user turn")
-                except Exception:
-                    pass
+                except Exception as exc:
+                    # A fact she pulled out of his turn and then dropped is a thing he
+                    # told her that she will not have.
+                    logger.warning("[capture] a fact from his turn was not stored "
+                                   "(%s: %s): %r", type(exc).__name__, exc, f[:60])
+                    _swallowed(logger, "capture/remember", exc, lane="memory")
         finally:
             M.reset_author(tok)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("[capture] the capture lane did not run for this turn (%s: %s)",
+                       type(exc).__name__, exc)
+        _swallowed(logger, "_capture_after_turn", exc, lane="memory")
 
 
 def _repeat_guard(body: Dict[str, Any], msgs: list, text: str, cfg) -> str:

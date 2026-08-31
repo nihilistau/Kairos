@@ -41,6 +41,8 @@ from harness.inference.inference_config import InferenceConfig
 
 logger = logging.getLogger(__name__)
 
+from harness.loud import swallowed as _swallowed  # noqa: E402
+
 try:  # httpx is the preferred transport; degrade gracefully if absent
     import httpx
 except Exception:  # pragma: no cover - import guard
@@ -243,8 +245,13 @@ class SPDaemonClient:
                 with open(os.path.join(_dump, "p%03d.json" % _n), "w",
                           encoding="utf-8") as _f:
                     json.dump(body.get("messages") or [], _f, ensure_ascii=False, indent=1)
-        except Exception:
-            pass
+        except Exception as exc:
+            # A DIAGNOSTIC THAT FAILS SILENTLY IS WORSE THAN NO DIAGNOSTIC: somebody set
+            # SP_DUMP_PROMPT precisely because they were trying to see something, and an
+            # empty folder reads as "the prompt was fine".
+            logger.warning("[prompt-dump] SP_DUMP_PROMPT is set but nothing was written "
+                           "(%s: %s)", type(exc).__name__, exc)
+            _swallowed(logger, "prompt dump", exc, lane="inference")
 
         text_parts: List[str] = []
         chat_id: Optional[int] = None

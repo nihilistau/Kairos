@@ -213,4 +213,66 @@ for _rel, _fn, _end in (("harness/control/wardrobe.py", "def _write_wants(", "de
           "replace_atomic(" in _blk_code and '.tmp' in _blk_code,
           [l.strip() for l in _blk_code.splitlines() if "open(" in l])
 
+print("\n5. NO WRITE FAILS IN SILENCE, ANYWHERE UNDER harness/")
+# ── THE AUDIT THIS GENERALISES (2026-08-31, his call: "do the same audit on the rest of
+# the harness"). The wardrobe's three worst bugs this week were all one shape: a write
+# inside a broad handler that answered with a bare default, so a write that FAILED and a
+# write that WORKED were the same event to everyone downstream. The tree-wide count was
+# 192 such handlers over 67 files; classified by what the try-block actually does, nine
+# of them wrote. Eight are fixed (each says what was lost); one is listed below with its
+# reason.
+#
+# THIS LEG IS ABOUT WRITES ONLY, on purpose. Most of the other 183 are a read degrading
+# to a default, which is often exactly right — and demanding a log line at all 183 would
+# be 183 edits of noise, which is how a real signal gets ignored (the same argument
+# G-GATE-SANDBOX makes for not demanding sandbox() from all 136 gates). A swallowed
+# WRITE is different: nothing downstream can tell, and the thing that was lost is gone.
+_ALLOWED_WRITE_SWALLOWS = {
+    # path:line -> why it is allowed to be silent
+    "harness/server/app.py": "the error goodbye written to an SSE socket whose client has "
+                             "already gone; the finally-block settle matters more, and "
+                             "there is no store and nothing lost",
+}
+_BARE = re.compile(r"^(pass|return (\{\}|\[\]|\"\"|''|None|0|False|True|-1))\b")
+_BROAD = re.compile(r"^(\s*)except\s+(Exception|BaseException)?(\s+as\s+\w+)?\s*:\s*$")
+_WRITES = re.compile(r"""(\bopen\([^)]*['\"][wa]b?['\"]|replace_atomic\(|os\.replace\(|
+                          json\.dump\(|\.write\(|os\.remove\(|shutil\.(copy|move|rmtree)|
+                          _write_|set_overlay\()""", re.X)
+
+_offenders, _scanned = [], 0
+for _here, _dirs, _files in os.walk(os.path.join(ROOT, "harness")):
+    _dirs[:] = [d for d in _dirs if d != "__pycache__"]
+    for _fn in sorted(_files):
+        if not _fn.endswith(".py"):
+            continue
+        _scanned += 1
+        _fp = os.path.join(_here, _fn)
+        _rel = os.path.relpath(_fp, ROOT).replace("\\", "/")
+        _body = io.open(_fp, encoding="utf-8", errors="replace").read().splitlines()
+        for _i, _ln in enumerate(_body):
+            _m = _BROAD.match(_ln)
+            if not _m:
+                continue
+            _nxt = _body[_i + 1].strip() if _i + 1 < len(_body) else ""
+            if not _BARE.match(_nxt):
+                continue
+            # the try: that owns this handler, at the same indent
+            _ind, _j, _t = len(_m.group(1)), _i - 1, None
+            while _j >= 0 and _j > _i - 60:
+                if _body[_j].strip() == "try:" and len(_body[_j]) - len(_body[_j].lstrip()) == _ind:
+                    _t = _j
+                    break
+                _j -= 1
+            _blk = "\n".join(_body[(_t if _t is not None else _i - 6) + 1:_i])
+            if _WRITES.search(_blk) and _rel not in _ALLOWED_WRITE_SWALLOWS:
+                _offenders.append("%s:%d" % (_rel, _i + 1))
+
+check("the scan actually walked the tree (>= 100 files)", _scanned >= 100, _scanned)
+check("no swallowed handler hides a WRITE", not _offenders, _offenders)
+# ...and the allow-list is not a place to park a real one: every entry must exist and
+# must carry a reason, or it is an exemption nobody agreed to.
+for _rel, _why in _ALLOWED_WRITE_SWALLOWS.items():
+    check("%-28s is exempt WITH a written reason" % _rel.split("/")[-1],
+          os.path.exists(os.path.join(ROOT, _rel)) and len(_why) > 40, _why[:40])
+
 finish("G-STORE-WRITES")

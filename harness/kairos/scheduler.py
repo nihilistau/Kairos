@@ -971,8 +971,11 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
                     try:
                         _speech.record(imp.action, _speech.DROPPED,
                                        "sidecar pre-judge: nothing new to add", "")
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        # THE DROP LEDGER IS THE INSTRUMENT for "why is she quiet" — the panel renders
+                        # from it. A drop that fails to record is a silence with no reason attached,
+                        # which is exactly what it looks like when she simply had nothing to say.
+                        swallowed(logger, "speech.record(pre-judge)", exc, lane="kairos")
                     return
             except Exception as exc:
                 # the gate must never break her own time -- but a bug in it should be
@@ -1077,8 +1080,11 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
                     try:
                         _speech.record(imp.action, _speech.DROPPED,
                                        "claimed an act it never performed", text)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        # THE DROP LEDGER IS THE INSTRUMENT for "why is she quiet" — the panel renders
+                        # from it. A drop that fails to record is a silence with no reason attached,
+                        # which is exactly what it looks like when she simply had nothing to say.
+                        swallowed(logger, "speech.record(claimed-act)", exc, lane="kairos")
                     return
 
         # A REMINDER IS NOT SUBJECT TO worth_saying(). That gate exists to let her decide,
@@ -1098,8 +1104,11 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
                 try:
                     _speech.record(imp.action, _speech.DROPPED,
                                    "solo_worth_saying: %s" % why_solo, text)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    # THE DROP LEDGER IS THE INSTRUMENT for "why is she quiet" — the panel renders
+                    # from it. A drop that fails to record is a silence with no reason attached,
+                    # which is exactly what it looks like when she simply had nothing to say.
+                    swallowed(logger, "speech.record(worth-saying)", exc, lane="kairos")
                 logger.info('[kairos] solo dropped — %s', why_solo)
                 return
         if imp.action == MODE_TURN:

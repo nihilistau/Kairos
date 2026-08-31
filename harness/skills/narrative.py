@@ -25,8 +25,13 @@ GPU, and the live path uses /v1/oneshot exactly like the slots oracle.
 """
 import hashlib
 import json
+import logging
 import os
 import time
+
+from harness.loud import swallowed as _swallowed
+
+_logger = logging.getLogger(__name__)
 
 _MAX_TURNS = 40          # the tail of the session the composer may read
 _MAX_WORDS = 110         # the paragraph budget
@@ -341,8 +346,13 @@ def compose_and_write(messages, ask=None) -> dict:
                         "mem_delivery: system\nts: %d\n---\n\n%s\n"
                         % (addr, int(time.time()), entry))
             snap = addr
-        except Exception:
-            pass
+        except Exception as exc:
+            # The entry above is written; THIS is the content-addressed copy that survives
+            # in the personality tier. Losing it silently leaves the entry with no
+            # snapshot and nothing saying the pair came apart.
+            _logger.warning("[narrative] the entry saved but its snapshot did not "
+                            "(%s: %s)", type(exc).__name__, exc)
+            _swallowed(_logger, "narrative snapshot", exc, lane="narrative")
         # THE REAL HER (2026-08-22): the entry is memory.
         # AND THE VERDICT IS PART OF THE RECEIPT (2026-08-26). remember_about_self()
         # returns a refusal AS A NORMAL STRING — there was no exception for the bare

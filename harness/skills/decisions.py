@@ -27,10 +27,15 @@ SHAPES. `kind` says what happens on submit and is the whole contract with the pa
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
 import time
 import uuid
+
+from harness.loud import swallowed as _swallowed
+
+_logger = logging.getLogger(__name__)
 
 _LOCK = threading.RLock()
 KINDS = ("once", "route", "note")
@@ -59,7 +64,12 @@ def _append(row: dict) -> bool:
             with open(p, "a", encoding="utf-8") as f:
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
         return True
-    except Exception:
+    except Exception as exc:
+        # `False` is honest and better than `pass` — but it says THAT it failed and never
+        # WHY, and a decision that was never recorded is one nobody can walk back to.
+        _logger.warning("[decisions] a decision row was not recorded (%s: %s)",
+                        type(exc).__name__, exc)
+        _swallowed(_logger, "decisions append", exc, lane="decisions")
         return False
 
 

@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.8.11 — 192 quiet failures, and nine of them wrote (2026-08-31)
+
+The wardrobe audit, applied to the whole harness. 192 broad handlers answering with a bare
+default across 67 files — classified by what the try-block actually DOES rather than
+instrumented wholesale, because 192 edits of noise is how a real signal gets ignored.
+
+- **Nine of them wrote**, which is the one class nothing downstream can detect: a write
+  that failed and a write that worked are the same event to every reader. Eight are fixed
+  and each says what it loses — the avatar seed marker (lost, and the next boot seeds the
+  set again over a wardrobe that already has it), the backup's "never leave a .part
+  behind" promise, the `SP_DUMP_PROMPT` diagnostic (a diagnostic that fails silently is
+  worse than none), the presence day ledger, a decision row, the `by` stamp on a research
+  receipt, her narrative snapshot, and the SEM law witness. The ninth is exempt with a
+  written reason: an error goodbye to an SSE socket whose client has already gone.
+- **Twelve of the reads were not ordinary either.** The author arm/reset pair that decides
+  whether a stored fact is filed as hers or his was silent at both ends; the capture lane
+  dropped facts without saying so; three optional toolsets could vanish from her turn with
+  nothing explaining why she could no longer do something; and the "why she did not speak"
+  ledger could fail to record, leaving a silence with no reason attached.
+- `G-STORE-WRITES` grows the census that holds it: **no swallowed handler anywhere under
+  `harness/` may contain a write**, and allow-list entries must carry a reason.
+- One found by a gate, not by me: the backup cleanup's failure can land above the line
+  that names the file it cleans up, so the old handler had been eating an
+  UnboundLocalError — a cleanup that could never run looked like one that always did.
+
 ## 0.8.10 — twenty-two quiet failures in the wardrobe (2026-08-31)
 
 An audit of every `except Exception: pass` in the wardrobe, after three days in which the
