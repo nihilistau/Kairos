@@ -39,6 +39,8 @@ from harness.store_io import replace_atomic
 from harness.roleplay import ladder as L
 from harness.roleplay.scenarios import SCENARIOS, Scenario, by_id, deck, suggest
 
+from harness.loud import swallowed as _swallowed
+
 log = logging.getLogger(__name__)
 
 # He is asking to play. Deliberately narrow: she must not flip into character because he
@@ -146,7 +148,8 @@ def _load(session: str):
                      beats=int(d.get("beats") or 0),
                      hooks_fired=[int(i) for i in (d.get("hooks_fired") or [])],
                      opened=bool(d.get("opened")))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(log, "_load", _swx, lane="roleplay")
         return None
 
 

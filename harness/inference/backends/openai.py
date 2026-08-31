@@ -31,6 +31,8 @@ from typing import Any, Callable, Dict, Generator, List, Optional
 from harness.inference.inference_config import InferenceConfig
 from harness.inference.backends import caps_for
 
+from harness.loud import swallowed as _swallowed
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_BASE_URL = "http://127.0.0.1:1234"
@@ -47,7 +49,8 @@ def _api_key() -> str:
     try:
         with open(p, encoding="utf-8") as f:
             return f.read().strip()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_api_key", _swx, lane="inference")
         return ""
 
 
@@ -154,8 +157,8 @@ class OpenAIClient:
                     self._open.pop(chat_id, None)
                 try:
                     r.close()
-                except Exception:
-                    pass
+                except Exception as _swx:
+                    _swallowed(logger, "chat_stream", _swx, lane="inference")
         except Exception as exc:
             logger.error("[OpenAIClient] stream failed (operation=chat): %s", exc)
             if on_event:
@@ -218,7 +221,8 @@ class OpenAIClient:
             rows = sorted(d.get("data") or [], key=lambda x: x.get("index", 0))
             out = [row["embedding"] for row in rows]
             return out if len(out) == len(texts) else []
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "embed", _swx, lane="inference")
             return []
 
     def abort(self, chat_id: int) -> bool:
@@ -230,8 +234,8 @@ class OpenAIClient:
             return False
         try:
             r.close()
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(logger, "abort", _swx, lane="inference")
         return True
 
     def metrics(self) -> Dict[str, Any]:
@@ -242,7 +246,8 @@ class OpenAIClient:
         try:
             with self._req("/v1/models", timeout=5) as r:
                 return r.status == 200
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "health", _swx, lane="inference")
             return False
 
     def backend_counts(self) -> Dict[str, Any]:

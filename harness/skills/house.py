@@ -20,6 +20,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 
 def set_light(what: str, on: Optional[bool] = None, colour: str = "",
               brightness: Optional[int] = None) -> Dict[str, Any]:
@@ -71,5 +75,6 @@ def house_tools() -> list:
         return [ToolSpec.from_callable(set_light),
                 ToolSpec.from_callable(set_fan),
                 ToolSpec.from_callable(what_i_can_reach)]
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "house_tools", _swx, lane="skills")
         return []

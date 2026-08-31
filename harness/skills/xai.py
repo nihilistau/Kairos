@@ -32,6 +32,10 @@ import urllib.error
 import urllib.request
 from typing import Any, Dict, List, Optional
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 BASE = "https://api.x.ai/v1"
 
 IMAGE_MODEL = os.environ.get("SP_XAI_IMAGE_MODEL", "grok-imagine-image-2.0")
@@ -48,8 +52,8 @@ def image_model() -> str:
         c = _tune.chosen("xai.image_model")
         if c:
             return str(c)
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "image_model", _swx, lane="skills")
     return IMAGE_MODEL
 
 
@@ -60,8 +64,8 @@ def video_model() -> str:
         c = _tune.chosen("xai.video_model")
         if c:
             return str(c)
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "video_model", _swx, lane="skills")
     return VIDEO_MODEL
 
 
@@ -77,7 +81,8 @@ def api_key() -> str:
     try:
         with open(p, encoding="utf-8") as f:
             return f.read().strip()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "api_key", _swx, lane="skills")
         return ""
 
 
@@ -136,7 +141,8 @@ def _get(path: str, timeout: float = 60.0) -> Optional[dict]:
                                      headers={"Authorization": "Bearer " + k})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8", "replace"))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_get", _swx, lane="skills")
         return None
 
 
@@ -215,8 +221,8 @@ def image(prompt: str, aspect_ratio: str = "1:1", resolution: str = "1k",
             try:
                 out.append(base64.b64decode(b64))
                 continue
-            except Exception:
-                pass
+            except Exception as _swx:
+                _swallowed(_swlog, "image", _swx, lane="skills")
         if row.get("url"):
             blob = _fetch(row["url"])
             if blob:
@@ -264,7 +270,8 @@ def reference_file_id(path: str) -> str:
     import hashlib
     try:
         raw = open(path, "rb").read()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "reference_file_id", _swx, lane="skills")
         return ""
     h = hashlib.sha1(raw).hexdigest()
     fid = _REF_CACHE.get(h, "")
@@ -347,7 +354,8 @@ def upload_image(path: str, timeout: float = 120.0) -> str:
     the one place urllib needs help; no new dependency for one endpoint."""
     try:
         raw = open(path, "rb").read()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "upload_image", _swx, lane="skills")
         return ""
     k = api_key()
     if not k or not raw:
@@ -366,5 +374,6 @@ def upload_image(path: str, timeout: float = 120.0) -> str:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             d = json.loads(r.read().decode("utf-8", "replace"))
         return str(d.get("id") or d.get("file_id") or "")
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "upload_image", _swx, lane="skills")
         return ""

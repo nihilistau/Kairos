@@ -44,6 +44,10 @@ import sys
 import threading
 from typing import Any, Dict, Optional
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _ENABLED = os.environ.get("SP_MCP_POOL", "1") != "0"
 _CALL_TIMEOUT = float(os.environ.get("SP_MCP_CALL_TIMEOUT", "60"))
 
@@ -103,8 +107,8 @@ async def _open(spec: Dict[str, Any]):
 async def _shut(client) -> None:
     try:
         await client.__aexit__(None, None, None)
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "_shut", _swx, lane="mcp_server")
 
 
 def _get_session(server: str, spec: Dict[str, Any]):
@@ -121,8 +125,8 @@ def _get_session(server: str, spec: Dict[str, Any]):
     if old is not None:                       # raced; close the loser
         try:
             _submit(_shut(old["client"]), timeout=10)
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(_swlog, "_get_session", _swx, lane="mcp_server")
     _stats["opened"] += 1
     return client
 
@@ -136,8 +140,8 @@ def drop(server: str) -> None:
     _stats["closed"] += 1
     try:
         _submit(_shut(s["client"]), timeout=10)
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "drop", _swx, lane="mcp_server")
 
 
 def call_tool(server: str, spec: Dict[str, Any], name: str,

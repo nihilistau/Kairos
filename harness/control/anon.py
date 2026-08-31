@@ -43,6 +43,10 @@ import threading
 import time
 from typing import Dict, List
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 # ── THE DOORS ─────────────────────────────────────────────────────────────────────────
 # Every id here is a place that writes a record of the conversation to disk. The phrase is
 # what the room says in the receipt, so it is plural and countable ("6 memories"), not a
@@ -194,8 +198,8 @@ def enter(who: str = "him") -> Dict[str, object]:
         try:
             from harness.control import spine as _spine
             _spine.persist_receipts()
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(_swlog, "enter", _swx, lane="control")
         _ON = True
         _SINCE = time.time()
         _HELD.clear()
@@ -229,8 +233,8 @@ def leave() -> Dict[str, object]:
         try:
             from harness.control import spine as _spine
             _spine.drop_unpersisted()      # the receipts the hold declined, never flushed later
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(_swlog, "leave", _swx, lane="control")
         return out
 
 
@@ -246,8 +250,8 @@ def _drop_shadow() -> None:
     try:
         from harness.personality import persona_file as _pf
         _pf._shadow_clear()
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "_drop_shadow", _swx, lane="control")
 
 
 def state() -> Dict[str, object]:

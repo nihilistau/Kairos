@@ -32,6 +32,10 @@ def _resolve_root(root=None) -> Path:
 # doctrine — she does not paraphrase who she is. G-MEMCLASS convicts any new copy.
 from harness.skills import memclass as _mc
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _CLASS_DELIVERY = _mc.delivery_map()
 
 
@@ -158,7 +162,8 @@ def self_block_lines(root=None, max_facts: int = 20,
         # this block at all (speaker filter below), so his testimony can silence
         # nothing of hers here. Gate: G-SELF-MODEL §4d, mutant-killed.
         rows = [r for r in M.live_rows(testimony=True) if r.get("speaker") == "self"]
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "self_block_lines", _swx, lane="personality")
         return ""
     if not rows:
         return ""

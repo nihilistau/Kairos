@@ -17,6 +17,10 @@ from typing import Optional
 
 from harness.store_io import replace_atomic
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _HERE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _CACHE: dict = {}
 
@@ -35,7 +39,8 @@ def _load_bm() -> dict:
     try:
         with open(_bm_path(), encoding="utf-8") as f:
             return json.load(f)
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_load_bm", _swx, lane="skills")
         return {}
 
 
@@ -212,7 +217,8 @@ def about_so_far() -> str:
         s = read_long(text[max(0, b["pos"] - 6000):b["pos"]],
                       question="what has happened so far, in one line", max_words=30)
         return " ".join((s or "").split())[:160]
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "about_so_far", _swx, lane="skills")
         return ""
 
 

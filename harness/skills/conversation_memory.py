@@ -29,6 +29,10 @@ _THIS = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(_THIS, "..", "..", "tools")))
 import okf_mem as ok  # noqa: E402
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _HARNESS_ROOT = os.path.abspath(os.path.join(_THIS, "..", ".."))
 CONV_ROOT = os.environ.get("SP_CONV_OKF_ROOT", os.path.join(_HARNESS_ROOT, "memory-okf-conv"))
 CAPS_ROOT = os.environ.get("SP_CAPS_OKF_ROOT", os.path.join(_HARNESS_ROOT, "memory-okf-caps"))
@@ -106,8 +110,8 @@ def _chat(prompt: str, client=None, max_tokens: int = 160) -> str:
                                 max_tokens=max_tokens)
                 if out:
                     return out
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(_swlog, "_chat", _swx, lane="skills")
     from harness.inference.client import get_client
     client = client or get_client()
     if hasattr(client, "oneshot"):
@@ -197,8 +201,8 @@ def store_conversation(messages: List[dict], summary: Optional[str] = None, clie
         from harness.control import anon as _anon
         if _anon.holds("conversation.store"):
             return None
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "store_conversation", _swx, lane="skills")
     if summary is None:
         summary = summarize_conversation(messages, client=client) or t[:160]
     addr = ok.addr_of(t)

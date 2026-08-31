@@ -74,6 +74,10 @@ import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 # The profile default (profiles/*.toml `pmax`), used when serve.py's env is absent —
 # a gate, a test or an import outside the served stack.
 PMAX_DEFAULT = 12096
@@ -145,7 +149,8 @@ def _pmax_from_daemon_log() -> Optional[int]:
             blob = f.read().decode("utf-8", "replace")
         hits = re.findall(r"\(Pmax=(\d+)\)", blob)
         return int(hits[-1]) if hits else None
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_pmax_from_daemon_log", _swx, lane="inference")
         return None
 
 

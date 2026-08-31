@@ -102,7 +102,8 @@ def _knob_set(name: str):
     try:
         from harness.tuning import registry as _tune
         return _tune._load().get(name)
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_knob_set", _swx, lane="server")
         return None
 
 
@@ -214,8 +215,8 @@ def _agent_text(body: Dict[str, Any]) -> str:
         from harness.kairos import scheduler as _ks_u
         _ks_u.on_user_turn(_session_of(body))
         _ks_u.note_user_turn(True)      # his turn is in flight HERE too (2026-08-22); released in _finish_openai_turn
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_agent_text", _swx, lane="server")
     # SHE IS TOLD ON THIS MOUTH TOO (2026-08-29 audit): the anon staple was
     # native-only — the writers held on this path while she promised to remember.
     # Same sentence, same placement (the last user turn), same source.
@@ -228,8 +229,8 @@ def _agent_text(body: Dict[str, Any]) -> str:
                     msgs[_i] = dict(msgs[_i])
                     msgs[_i]["content"] = msgs[_i].get("content", "") + "\n\n" + _ano
                     break
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_agent_text", _swx, lane="server")
     _offer = _roleplay_pre_turn(body, msgs)
     if _offer:
         # A SCENARIO OFFER IS STILL A TURN (2026-08-24 audit, B2). This return used to
@@ -314,8 +315,8 @@ def _settle_turn(human_text: str, reply_text: str, *, record: bool = True,
         try:
             from harness.kairos import scheduler as _ks_f
             _ks_f.note_user_turn(False)
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(logger, "_settle_turn", _swx, lane="server")
     # ── SYNTHETIC QUARANTINES THE MEMORY LANES TOO (2026-08-30) ─────────────────────
     # `synthetic` marked the DAY TRANSCRIPT and nothing else, so a driver that declared
     # itself synthetic still minted FACTS — and the capture lane attributes them to HIM.
@@ -480,8 +481,8 @@ def _arm_turn(msgs: list) -> str:
         from harness.skills import memory as M
         M.set_question(human)
         M.set_author("user")
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_arm_turn", _swx, lane="server")
 
     # ── THE ATTENTION LEDGER: HE WAS HERE (2026-07-14) ──────────────────────────────────
     # The observation receipt for the NON-event. silences() used to measure "days since he last
@@ -725,8 +726,8 @@ def _lane_lines(lines: list, lane_get, early_exit: int, timeout_s: float = 1.5) 
             if float(h.get("score", 0.0) or 0.0) >= 0.30:
                 out.append("  - from your past conversations, %s: %s"
                            % (h.get("day", "?"), str(h.get("text", ""))[:300]))
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_lane_lines", _swx, lane="server")
     return out
 
 
@@ -740,7 +741,8 @@ def _start_lane(user_text: str, looks_q: bool):
         if not _cl.available():
             return None
         return _arc.search_async(user_text, k=4)
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_start_lane", _swx, lane="server")
         return None
 
 
@@ -836,8 +838,8 @@ def _do_restart(full: bool) -> None:
         if _sd.is_shutting_down() or _sd.ladder_running():
             logger.warning("[system] restart refused — a shutdown is in force")
             return
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_do_restart", _swx, lane="server")
     prof = _system_profile()
     if not prof:
         return
@@ -864,8 +866,8 @@ def _avatar_rung_and_ceiling():
     try:
         from harness.tuning import registry as tune
         ceiling = int(tune.get("roleplay.max_heat"))
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_avatar_rung_and_ceiling", _swx, lane="server")
     try:
         from harness.roleplay import engine as rp
         # OFF MEANS OFF DOWNSTREAM TOO (2026-08-03). `roleplay.enabled` gated the
@@ -877,8 +879,8 @@ def _avatar_rung_and_ceiling():
             sc = rp.active(_room_session())
             if sc is not None:
                 rung = int(sc.heat.level)
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_avatar_rung_and_ceiling", _swx, lane="server")
     return rung, ceiling
 
 
@@ -1200,7 +1202,8 @@ def _roleplay_on() -> bool:
     try:
         from harness.tuning import registry as tune
         return bool(tune.get("roleplay.enabled"))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_roleplay_on", _swx, lane="server")
         return False
 
 
@@ -1885,8 +1888,8 @@ def _persona_set(text: str) -> Dict[str, Any]:
         try:
             from harness.skills.memory import remember
             remember("The operator edited Kairos's persona.", source="operator")
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(logger, "_persona_set", _swx, lane="server")
         return {"ok": True, "bytes": len(text)}
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
@@ -2100,8 +2103,8 @@ def _append_day_turn(user_text: str, final: str,
                 _marks.append({"kind": "wear", "value": _m.strip()})
             for _m in _SHOW.findall(final):
                 _marks.append({"kind": "show", "value": _m.strip()})
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(logger, "_append_day_turn", _swx, lane="server")
         _amark = {"marks": _marks[:8]} if _marks else {}
         # HER ACTS SURVIVE THE SAME WAY (2026-08-30, his report: "chips still vanish on
         # refresh — only ◆warm ❧soft show"). Marks come from her TEXT and were already
@@ -2634,8 +2637,8 @@ def run_consolidation(force: bool = False) -> Dict[str, Any]:
                # matching one would cut history that fits (audit B12)
             from harness.inference import context as _ctx_rs
             _ctx_rs.reset_sticky()
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(logger, "run_consolidation", _swx, lane="server")
         if os.environ.get("SP_GATEWAY_PREWARM") == "1":
             _WARM.clear()
             _prewarm()
@@ -2683,7 +2686,8 @@ def _quiet_for(seconds: float) -> bool:
         if last <= 0.0:
             return True
         return (time.monotonic() - last) >= seconds
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_quiet_for", _swx, lane="server")
         return True
 
 
@@ -2921,8 +2925,8 @@ def _narrative_json() -> Dict[str, Any]:
         kept, cur_id = collapse_history(rows, out.get("current") or "")
         out["current_id"] = cur_id
         out["history"] = kept[:60]
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_narrative_json", _swx, lane="server")
     return out
 
 
@@ -2987,8 +2991,8 @@ def _room_pulse() -> Dict[str, Any]:
                 os.environ.get("SP_RECALL_REGISTRY", "")) or ".",
                 "consolidate.json"), encoding="utf-8") as f:
             day_state = json.load(f)
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_room_pulse", _swx, lane="server")
     out["clock"] = {"hour": lt.tm_hour, "minute": lt.tm_min,
                     "boundary_hour": hour if hour >= 0 else None,
                     "next_boundary_in_s": round(nxt - now) if nxt else None,
@@ -3054,8 +3058,8 @@ def _room_pulse() -> Dict[str, Any]:
         last = (a.get("last") or {})
         pres["ambient_last"] = last.get("seen") or last.get("error")
         pres["ambient_last_at"] = last.get("iso")
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_room_pulse", _swx, lane="server")
     out["presence"] = pres
 
     try:
@@ -3063,8 +3067,8 @@ def _room_pulse() -> Dict[str, Any]:
         b = _bk.status()
         out["backup"] = {"count": b.get("count"), "next_in_s": b.get("next_in_s"),
                          "newest": b.get("newest")}
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_room_pulse", _swx, lane="server")
     return out
 
 
@@ -3222,8 +3226,8 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
         try:
             if len(_acts) < 24:
                 _acts.append(ev)
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(logger, "_act", _swx, lane="server")
 
     _img = body.get("image_b64") or ""
     if _img:
@@ -3294,8 +3298,8 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
                 _, state = parse_persona(f.read())
             if state:
                 yield ("data: " + json.dumps({"persona": state}) + "\n\n").encode()
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(logger, "_act", _swx, lane="server")
 
     # The agent's on_tool callback fires on a worker thread; funnel tool events through a queue
     # so they interleave with the streamed answer tokens on the SSE wire.
@@ -3704,8 +3708,8 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
     try:
         from harness.kairos import scheduler as _ks0
         _ks0.on_user_turn(_session_of(body))
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_native_chat_sse_body", _swx, lane="server")
 
     reply_parts: list = []
 
@@ -4088,8 +4092,8 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
             try:
                 if _pend["buf"]:
                     _say("", flush=True)
-            except Exception:
-                pass
+            except Exception as _swx:
+                _swallowed(logger, "_run", _swx, lane="server")
             # A TYPED EVENT, NEVER A DELTA (2026-08-29 audit): the wordless case two
             # screens up already learned this — a `delta` concatenates into her
             # `content`, rides back as history, and after a bounce can become the
@@ -4101,8 +4105,8 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
                 unsub()
             try:
                 unsub_wear()
-            except Exception:
-                pass
+            except Exception as _swx:
+                _swallowed(logger, "_run", _swx, lane="server")
             # the debts are paid HERE, on every exit of the thread — before the
             # sentinel, so the typed events it queues still reach a live client
             try:
@@ -4189,8 +4193,8 @@ def _await_warm(timeout: float = 900.0) -> bool:
         if not _sup("warm"):
             _WARM.set()
             return True
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_await_warm", _swx, lane="server")
     logger.info("[gateway] turn is WAITING for the load-time prefill (no racing the cache)")
     return _WARM.wait(timeout)
 
@@ -4226,8 +4230,8 @@ def _prewarm() -> None:
                 from harness.inference import context as _ctxp
                 logger.info("[gateway] system prefix ~%d tokens (est) of pmax %d",
                             _ctxp.prefix_tokens(system_content), _ctxp.pmax())
-            except Exception:
-                pass
+            except Exception as _swx:
+                _swallowed(logger, "_go", _swx, lane="server")
             msgs = [{"role": "system", "content": system_content},
                     {"role": "user", "content": "hi"}]
             # The preamble KV is the thing whose DETAIL matters (persona, hardware,
@@ -4313,7 +4317,8 @@ def _run_stdlib(host: str, port: int) -> None:
         try:
             from urllib.parse import urlparse
             host = (urlparse(origin).hostname or "").lower()
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "_origin_ok", _swx, lane="server")
             return False
         return host in ("127.0.0.1", "localhost", "::1")
 
@@ -4690,8 +4695,8 @@ def _run_stdlib(host: str, port: int) -> None:
                         try:   # same rule as the day boundary (audit B12)
                             from harness.inference import context as _ctx_rs2
                             _ctx_rs2.reset_sticky()
-                        except Exception:
-                            pass
+                        except Exception as _swx:
+                            _swallowed(logger, "_dispatch_post", _swx, lane="server")
                         _t0_r = _t_r.time()
                         if os.environ.get("SP_GATEWAY_PREWARM") == "1":
                             _WARM.clear()
@@ -4763,8 +4768,8 @@ def _run_stdlib(host: str, port: int) -> None:
                 self.wfile.write(payload)
                 try:
                     self.wfile.flush()
-                except Exception:
-                    pass
+                except Exception as _swx:
+                    _swallowed(logger, "_dispatch_post", _swx, lane="server")
 
                 def _say_goodnight():
                     """Her last word, if one was asked for. Reuses the unprompted lane so
@@ -5058,8 +5063,8 @@ def _run_stdlib(host: str, port: int) -> None:
                         from harness.kairos import scheduler as _ks_v
                         _ks_v.on_user_turn(_session_of(body))
                         _ks_v.note_user_turn(True)   # released by _settle_turn below
-                    except Exception:
-                        pass
+                    except Exception as _swx:
+                        _swallowed(logger, "_say_goodnight", _swx, lane="server")
                     for chunk in voice_turn(body, transcript):
                         self.wfile.write(chunk); self.wfile.flush()
                 except Exception as exc:
@@ -5067,7 +5072,8 @@ def _run_stdlib(host: str, port: int) -> None:
                         self.wfile.write(("data: " + json.dumps(
                             {"error": f"voice: {exc}"}) + "\n\ndata: [DONE]\n\n").encode())
                         self.wfile.flush()
-                    except Exception:
+                    except Exception as _swx:
+                        _swallowed(logger, "_say_goodnight", _swx, lane="server")
                         pass                     # the settle below matters more than the goodbye
                 finally:
                     # voice_turn appends her final reply to the session transcript
@@ -5082,8 +5088,8 @@ def _run_stdlib(host: str, port: int) -> None:
                                 and transcript[-1].get("role") == "assistant"
                                 and transcript[-2].get("content") == "[voice message]"):
                             _v_fin = transcript[-1].get("content", "")
-                    except Exception:
-                        pass
+                    except Exception as _swx:
+                        _swallowed(logger, "_say_goodnight", _swx, lane="server")
                     _settle_turn("[voice message]", _v_fin, capture=False,
                                  latch=_v_latch)
                     _sd_turn_end()
@@ -5204,8 +5210,8 @@ def _run_stdlib(host: str, port: int) -> None:
                 self.end_headers(); self.wfile.write(payload)
                 try:
                     self.wfile.flush()
-                except Exception:
-                    pass
+                except Exception as _swx:
+                    _swallowed(logger, "_dispatch_post", _swx, lane="server")
                 # ONLY NOW. The socket has the answer; it is safe to stop the process.
                 if res.get("ok"):
                     _do_restart(full)
@@ -6050,8 +6056,8 @@ def _run_stdlib(host: str, port: int) -> None:
         try:
             from harness.sidecar import archive as _arc
             _arc.warm()
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(logger, "_serve_stall_watch", _swx, lane="server")
     except Exception as exc:
         logger.warning("[gateway] kairos ticker not started: %s", exc)
     # THE ROOM, ON A TIMER. Started unconditionally; the thread itself re-reads

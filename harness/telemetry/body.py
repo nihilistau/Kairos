@@ -30,6 +30,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from harness.telemetry import store
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 # How old a sample may be before it stops meaning anything about NOW. Each is roughly "how
 # long would a person in the room believe this without re-checking".
 FRESH_S = {
@@ -245,7 +249,8 @@ def _seconds_since_he_spoke():
         if last <= 0.0:
             return None
         return max(0.0, _t.monotonic() - last)
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_seconds_since_he_spoke", _swx, lane="telemetry")
         return None
 # ── WHEN HE FELL ASLEEP IS A BAND, NOT A MINUTE (2026-08-27) ─────────────────────────
 # A run has to last this long before it is sleep rather than a still half-hour on the

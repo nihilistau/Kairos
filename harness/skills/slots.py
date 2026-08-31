@@ -37,6 +37,10 @@ import os
 import threading
 import time
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 MODEL_TAG = "oneshot-greedy-v1"
 _LOCK = threading.RLock()
 _CACHE = {"key": None, "same": None, "seen": None}
@@ -86,7 +90,8 @@ def linked(addr_a: str, addr_b: str) -> bool:
             return False
         same, _ = _load()
         return frozenset((addr_a, addr_b)) in same
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "linked", _swx, lane="skills")
         return False
 
 
@@ -211,7 +216,8 @@ def ask_oracle(text_a: str, text_b: str):
         if word.startswith("no"):
             return "different"
         return None
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "ask_oracle", _swx, lane="skills")
         return None
 
 

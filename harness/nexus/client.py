@@ -27,6 +27,8 @@ from typing import Any, Dict, List, Optional
 
 from harness.nexus.embedding_service import get_embedding_service
 
+from harness.loud import swallowed as _swallowed
+
 logger = logging.getLogger(__name__)
 
 
@@ -158,7 +160,8 @@ class NexusClient:
                 self._http.post(f"{self.base_url}/qa",
                                 json={"question": question, "answer": answer, "category": category})
                 return qa_id
-            except Exception:
+            except Exception as _swx:
+                _swallowed(logger, "add_qa", _swx, lane="nexus")
                 return None
         return self._store.add_qa(qa_id, question, answer, category)  # type: ignore[union-attr]
 
@@ -167,7 +170,8 @@ class NexusClient:
             try:
                 return self._http.get(f"{self.base_url}/qa",
                                       params={"q": question, "limit": limit}).json().get("results", [])
-            except Exception:
+            except Exception as _swx:
+                _swallowed(logger, "find_qa", _swx, lane="nexus")
                 return []
         return self._store.find_qa(question, limit)  # type: ignore[union-attr]
 

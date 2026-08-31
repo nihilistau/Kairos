@@ -68,8 +68,8 @@ def current() -> str:
         p = _path()
         if p and os.path.exists(p):
             return open(p, encoding="utf-8").read().strip()
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_logger, "current", _swx, lane="skills")
     return ""
 
 
@@ -227,14 +227,15 @@ def secrets(days: int = 30, limit: int = 12) -> list:
             try:
                 if days and _lc._age_days(r.get("ts") or "") > days:
                     continue
-            except Exception:
-                pass
+            except Exception as _swx:
+                _swallowed(_logger, "secrets", _swx, lane="skills")
             t = " ".join(str(r.get("claim") or r.get("text") or "").split())
             if t:
                 out.append(t)
             if len(out) >= limit:
                 break
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_logger, "secrets", _swx, lane="skills")
         return []
     return out
 
@@ -411,7 +412,8 @@ def _days_ago(iso: str) -> float:
     from harness.skills import lifecycle as _lc
     try:
         return _lc._age_days(iso or "")
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_logger, "_days_ago", _swx, lane="skills")
         return 0.0
 
 
@@ -475,8 +477,8 @@ def weekly_chapter(ask=None) -> dict:
         try:
             from harness.inference.stream_processor import strip_control_surfaces
             text = strip_control_surfaces(text)
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(_logger, "weekly_chapter", _swx, lane="skills")
         text = _plain(text)
         if len(text.split()) < 8:
             return {"written": False, "why": "the model returned nothing usable"}
@@ -552,7 +554,8 @@ def note_own(text: str, kind: str = "solo") -> dict:
         _k = " ".join(t.split()).lower()[:160]
         if any(" ".join((r or "").split()).lower()[:160] == _k for r in _recent):
             return {"written": False, "why": "already written in the last two days"}
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_logger, "note_own", _swx, lane="skills")
         pass                      # a broken dedupe must never cost her the note
     try:
         full = _tier_full()
@@ -587,7 +590,8 @@ def own_time(days: int = 2) -> list:
             if "mem_kind: own_time" not in body:
                 continue
             out.append((os.path.getmtime(fp), body.split("---", 2)[-1].strip()))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_logger, "own_time", _swx, lane="skills")
         return []
     out.sort(reverse=True)
 
@@ -692,6 +696,6 @@ def read_journal(days: int = 7) -> str:
                                                                 (w.get("text") or "").strip())
                                       for w in weeks)
                     + (os.linesep * 2) + body)
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_logger, "read_journal", _swx, lane="skills")
     return body or f"[nothing written in the last {days} days]"

@@ -43,6 +43,8 @@ logger = logging.getLogger(__name__)
 
 from harness.loud import swallowed as _swallowed  # noqa: E402
 
+from harness.loud import swallowed as _swallowed
+
 try:  # httpx is the preferred transport; degrade gracefully if absent
     import httpx
 except Exception:  # pragma: no cover - import guard
@@ -215,7 +217,8 @@ class SPDaemonClient:
             logger.info("[DAEMON-CALL] %s | msgs=%d chars=%d last=%s",
                         _who, len(body.get("messages") or []), _chars,
                         (body.get("messages") or [{}])[-1].get("role", "?"))
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "chat_stream", _swx, lane="inference")
             pass                       # instrumentation must never break a turn
 
         # ── SP_DUMP_PROMPT (2026-08-24): the exact message list, per call ────────────
@@ -450,7 +453,8 @@ class SPDaemonClient:
             return {}
         try:
             return self._client.get(f"{self.base_url}/v1/debug/backend_counts").json()
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "backend_counts", _swx, lane="inference")
             return {}
 
     # ---- daemon-wide event stream (LM-B2 SSE telemetry sink) -------------

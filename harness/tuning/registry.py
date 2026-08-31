@@ -29,6 +29,10 @@ from typing import Any, Optional
 
 from harness.store_io import read_bytes_retry, replace_atomic
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # ── SP_TUNING_FILE (2026-08-24) ───────────────────────────────────────────────────────
 # This was a bare constant with no override, so it was the ONE store a gate could not be
@@ -860,8 +864,8 @@ def tune_or_env(key: str, env_key: str, default):
         v = chosen(key)
         if v is not None:
             return v
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "tune_or_env", _swx, lane="tuning")
     return os.environ.get(env_key, default)
 
 

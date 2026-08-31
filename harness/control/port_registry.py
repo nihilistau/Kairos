@@ -11,6 +11,10 @@ from __future__ import annotations
 
 from typing import Dict
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _DEFAULT_PORTS: Dict[str, int] = {
     # Harness services
     "gateway": 8800,        # OpenAI-compatible SSE gateway (harness.server)
@@ -31,8 +35,8 @@ def get_port(target: str) -> int:
         override = get_config().get(f"ports.{target}")
         if override:
             return int(override)
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "get_port", _swx, lane="control")
     return _DEFAULT_PORTS.get(target, 0)
 
 

@@ -23,6 +23,10 @@ import numpy as np
 
 from harness.voice import dsp, ear, native
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 VOICE_PH = 258881          # the gemma-4 audio placeholder (KAI-3 constant)
 VAD_RMS = float(os.environ.get("SP_VOICE_VAD_RMS", "0.010"))
 MAX_SECONDS = 30
@@ -100,8 +104,8 @@ def voice_turn(body: Dict[str, Any], transcript: list) -> Iterator[bytes]:
         _an = _anon_v.note()
         if _an:
             instr = instr + "\n\n" + _an
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "voice_turn", _swx, lane="voice")
     turn = list(transcript)
     turn.append({"role": "user", "content": instr})
     transcript.append({"role": "user", "content": "[voice message]"})

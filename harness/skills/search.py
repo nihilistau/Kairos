@@ -28,6 +28,10 @@ import urllib.parse
 import urllib.request
 from typing import List, Optional
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/120 Safari/537.36")
 
@@ -252,7 +256,8 @@ class WikipediaSearcher(Searcher):
             with urllib.request.urlopen(req, timeout=15) as r:
                 obj = json.loads(r.read().decode("utf-8", "replace"))
             return (obj.get("extract") or "").strip()
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "summary", _swx, lane="skills")
             return ""
 
 
@@ -283,13 +288,15 @@ class XaiSearcher(Searcher):
         try:
             from harness.skills import xai as _x
             return _x.available()
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "available", _swx, lane="skills")
             return False
 
     def search(self, query, n=5):
         try:
             from harness.skills import xai as _x
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "search", _swx, lane="skills")
             return []
         # THE RESPONSES DOOR, not chat/completions: live_search there answers 410
         # "deprecated — switch to the Agent Tools API". web_search on /v1/responses
@@ -317,7 +324,8 @@ class XaiSearcher(Searcher):
                                 "url": r["url"],
                                 "snippet": str(r.get("snippet") or "")[:300]})
             return out
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "search", _swx, lane="skills")
             return []
 
 
@@ -378,7 +386,8 @@ def random_article() -> dict:
     one backend here that needs no key, and 'random' is not a thing a search engine does."""
     try:
         return WikipediaSearcher().random_page()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "random_article", _swx, lane="skills")
         return {}
 
 
@@ -424,8 +433,8 @@ def search_web(query: str, n: int = 5) -> list:
                     top["extract"] = extract[:700]
                     hits = [top] + [h for h in hits
                                     if (h.get("url") or "") != top["url"]][:max(1, n - 1)]
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(_swlog, "search_web", _swx, lane="skills")
     return hits
 
 

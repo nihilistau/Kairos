@@ -33,6 +33,10 @@ import time
 import calendar
 from typing import Iterable, Optional
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 USER_PREFIX = "The user said: "
 
 # ── SPEAKER ────────────────────────────────────────────────────────────────────
@@ -1054,7 +1058,8 @@ def _age_days(iso: str, now: Optional[float] = None) -> float:
         return 0.0
     try:
         t = calendar.timegm(time.strptime(iso, "%Y-%m-%dT%H:%M:%SZ"))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_age_days", _swx, lane="skills")
         return 0.0
     now = now if now is not None else time.time()
     return max(0.0, (now - t) / 86400.0)

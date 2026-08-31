@@ -29,6 +29,10 @@ import threading
 import time
 from typing import Any, Dict, Iterable, List, Optional
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _LOCK = threading.Lock()
 
@@ -122,7 +126,8 @@ def parse_iso(at: str) -> float:
         if len(at) > 20 and at[19] == ".":
             ms = float(at[20:23]) / 1000.0
         return base + ms
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "parse_iso", _swx, lane="telemetry")
         return 0.0
 
 

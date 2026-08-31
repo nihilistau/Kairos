@@ -35,6 +35,10 @@ from harness.games import chess as CH
 from harness.games import holdem as HE
 from harness.games import words as WD
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 KINDS = ("chess", "wordle", "holdem")
 
 _LOCK = threading.RLock()
@@ -102,7 +106,8 @@ def load(mid: str) -> Optional[dict]:
         try:
             with open(p, "r", encoding="utf-8") as f:
                 m = json.load(f)
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "load", _swx, lane="games")
             return None
         m["_mtime"] = stamp
         _CACHE[mid] = m

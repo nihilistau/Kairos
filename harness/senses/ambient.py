@@ -40,6 +40,8 @@ import logging
 import time
 from typing import Optional
 
+from harness.loud import swallowed as _swallowed
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 LOG = os.environ.get("SP_AMBIENT_LOG",
                      os.path.join(_ROOT, "var", "senses", "ambient.jsonl"))
@@ -81,7 +83,8 @@ def enabled() -> bool:
         v = tune.get("senses.ambient")
         if v is not None and not bool(v):
             return False
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logging.getLogger(__name__), "enabled", _swx, lane="senses")
         pass                       # a knob that cannot be read never arms anything
     return True
 
@@ -104,8 +107,8 @@ def quiet_s() -> float:
         c = tune.chosen("senses.ambient_quiet_s")
         if c is not None:
             return max(60.0, min(1800.0, float(c)))
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logging.getLogger(__name__), "quiet_s", _swx, lane="senses")
     try:
         v = float(os.environ.get("SP_AMBIENT_QUIET_S", "300"))
     except ValueError:
@@ -128,8 +131,8 @@ def _on_boot_ok() -> bool:
         c = tune.chosen("senses.ambient_on_boot")
         if c is not None:
             return bool(c)
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logging.getLogger(__name__), "_on_boot_ok", _swx, lane="senses")
     return os.environ.get("SP_AMBIENT_ON_BOOT", "0") == "1"
 
 
@@ -159,21 +162,21 @@ def _activity() -> str:
             ago = time.monotonic() - last
             if ago < quiet_s():
                 return "the conversation was active %.0fs ago" % ago
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logging.getLogger(__name__), "_activity", _swx, lane="senses")
     try:
         from harness.control import shutdown as _sd
         with _sd._LOCK:
             if _sd._IN_FLIGHT > 0:
                 return "a generation is in flight"
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logging.getLogger(__name__), "_activity", _swx, lane="senses")
     try:
         from harness.inference.client import get_client
         if float(get_client().metrics().get("tokens_per_sec", 0.0)) > 1.0:
             return "the daemon is streaming"
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logging.getLogger(__name__), "_activity", _swx, lane="senses")
     return ""
 
 
@@ -256,7 +259,8 @@ def _last_row() -> dict:
     try:
         rows = recent(1)
         return rows[-1] if rows else {}
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_last_row", _swx, lane="senses")
         return {}
 
 

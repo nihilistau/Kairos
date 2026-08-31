@@ -94,6 +94,10 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 from harness.skills.lifecycle import topic_of
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 LAYOUT_VERSION = "sig-v1"
 SIG_LEN = 14
 SAT = 255                      # every cell is a u8
@@ -394,7 +398,8 @@ def find_subsumed(new_fact: str, speaker: str, rows: Iterable[dict],
     def _attr(t, spk):
         try:
             return attribute_key(t, spk)
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "_attr", _swx, lane="skills")
             return None
 
     st = status or STATUS_OBSERVED

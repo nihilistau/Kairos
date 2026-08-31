@@ -27,6 +27,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
+from harness.loud import swallowed as _swallowed
+
 logger = logging.getLogger(__name__)
 
 # ADR-008: the RECEIPT RING — every spine decision this process makes, observable.
@@ -439,7 +441,8 @@ def stock_verifiers() -> Dict[str, Callable[[Decision, str], bool]]:
         try:
             from pathlib import Path
             _, state = parse_persona(Path(_persona_path()).read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "vf_persona", _swx, lane="control")
             return False
         reply = _split_crammed(dec.payload.get("reply", ""))
         moods = _MOOD.findall(reply)

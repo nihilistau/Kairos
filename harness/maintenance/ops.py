@@ -23,6 +23,10 @@ from harness.store_io import replace_atomic
 from harness.skills import lifecycle as lc
 from harness.skills import verdict as V
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 
 def _reg() -> str:
     return os.environ.get("SP_RECALL_REGISTRY", "")
@@ -48,8 +52,8 @@ def _rows() -> list[dict]:
             if ln:
                 try:
                     out.append(json.loads(ln))
-                except Exception:
-                    pass
+                except Exception as _swx:
+                    _swallowed(_swlog, "_rows", _swx, lane="maintenance")
     return out
 
 
@@ -704,8 +708,8 @@ def relabel(name: str, speaker: str = None, mem_class: str = None,
         try:
             from harness.skills import semindex as _sem_rl
             _sem_rl.mint(changed["text"], hit.get("ts", ""))
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(_swlog, "relabel", _swx, lane="maintenance")
     return {"ok": True, "name": name, "changed": changed, "was": before, "text": text[:160],
             "stats": stats()}
 
@@ -760,7 +764,8 @@ def fold_into_chapters() -> dict[str, Any]:
         import calendar as _cal
         try:
             return (now - _cal.timegm(_t.strptime((ts or "")[:19], "%Y-%m-%dT%H:%M:%S"))) / 86400.0
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "_age_days", _swx, lane="maintenance")
             return -1.0                    # unparseable age folds nothing
 
     with _reg_lock():

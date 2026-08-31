@@ -19,6 +19,10 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 
 @dataclass
 class FrameworkEvent:
@@ -84,8 +88,8 @@ class SessionNode:
         for cb in list(self._subscribers):
             try:
                 cb(event_type, payload or {})
-            except Exception:
-                pass
+            except Exception as _swx:
+                _swallowed(_swlog, "emit", _swx, lane="toolcore")
 
     def subscribe(self, cb: Callable[[str, Dict[str, Any]], None]) -> None:
         self._subscribers.append(cb)
@@ -140,8 +144,8 @@ class MCPFramework:
         for cb in list(self._handlers.get(event_type, [])):
             try:
                 cb(evt)
-            except Exception:
-                pass
+            except Exception as _swx:
+                _swallowed(_swlog, "emit_event", _swx, lane="toolcore")
         return evt
 
     def tick(self) -> int:

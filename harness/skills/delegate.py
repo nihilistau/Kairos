@@ -100,6 +100,8 @@ import subprocess
 import time
 from typing import Callable, Dict, List, Optional, Tuple
 
+from harness.loud import swallowed as _swallowed
+
 logger = logging.getLogger(__name__)
 
 GROK = os.environ.get("SP_GROK_BIN") or os.path.join(
@@ -284,7 +286,8 @@ def _changed_paths(wt: str, base: str = "HEAD") -> List[str]:
     try:
         out = subprocess.run(["git", "-C", wt, "status", "--porcelain"],
                              capture_output=True, text=True, timeout=120).stdout
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_changed_paths", _swx, lane="skills")
         return []
     paths = []
     for line in out.splitlines():
@@ -302,7 +305,8 @@ def _stop_reason(stdout: str) -> str:
     returncode of 0 and well-formed JSON, with nothing done."""
     try:
         return str(json.loads(stdout or "{}").get("stopReason", ""))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_stop_reason", _swx, lane="skills")
         return ""
 
 

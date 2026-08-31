@@ -26,6 +26,10 @@ from typing import Callable, List, Optional
 
 import numpy as np
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _TIMEOUT = 60
 
 
@@ -57,7 +61,8 @@ def _token_embed(texts: List[str]) -> Optional[List[np.ndarray]]:
             n[n == 0] = 1.0
             out.append(m / n)
         return out if len(out) == len(texts) else None
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_token_embed", _swx, lane="sidecar")
         return None
 
 

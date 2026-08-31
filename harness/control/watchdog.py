@@ -43,6 +43,8 @@ import threading
 import time
 from typing import Callable, Optional
 
+from harness.loud import swallowed as _swallowed
+
 logger = logging.getLogger(__name__)
 
 # The knobs are read EVERY BEAT, never cached — the same rule the ambient eye and the
@@ -92,8 +94,8 @@ def _recall_persisted() -> None:
         _state["last_restart_at"] = float(d.get("last_restart_at") or 0.0)
         _state["restarts"] = int(d.get("restarts") or 0)
         _state["last_reason"] = str(d.get("last_reason") or "")
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_recall_persisted", _swx, lane="control")
 
 
 def _persist() -> None:
@@ -196,8 +198,8 @@ def _should_restart() -> str:
         from harness.inference.backends import supports as _sup
         if not _sup("restart"):
             return ""
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(logger, "_should_restart", _swx, lane="control")
     if not _daemon_alive():
         with _LOCK:
             if not _state["down_since"]:
@@ -262,8 +264,8 @@ def _restart(reason: str, restart_fn: Callable[[bool], None]) -> None:
             try:
                 from harness.control import shutdown as _sd2
                 _sd2.resume()
-            except Exception:
-                pass
+            except Exception as _swx:
+                _swallowed(logger, "_restart", _swx, lane="control")
 
 
 def _held_by_shutdown() -> bool:

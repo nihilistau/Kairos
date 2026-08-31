@@ -14,6 +14,10 @@ import time
 import urllib.request
 from typing import List, Optional
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _TIMEOUT_EMBED = 60
 _TIMEOUT_CHAT = 120
 
@@ -47,7 +51,8 @@ def _api_key() -> str:
     try:
         with open(p, encoding="utf-8") as f:
             return f.read().strip()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_api_key", _swx, lane="sidecar")
         return ""
 
 
@@ -62,7 +67,8 @@ def _post(url: str, body: dict, timeout: int, auth: bool = False) -> Optional[di
                                      headers=headers)
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8", "replace"))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_post", _swx, lane="sidecar")
         return None
 
 
@@ -76,7 +82,8 @@ def _get(url: str, timeout: int = 5, auth: bool = False) -> Optional[dict]:
         req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8", "replace"))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_get", _swx, lane="sidecar")
         return None
 
 
@@ -122,7 +129,8 @@ def embed(texts: List[str]) -> List[List[float]]:
     try:
         rows = sorted(d["data"], key=lambda r: r.get("index", 0))
         return [r["embedding"] for r in rows]
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "embed", _swx, lane="sidecar")
         return []
 
 
@@ -138,7 +146,8 @@ def chat(messages: List[dict], max_tokens: int = 256, temperature: float = 0.0,
         return ""
     try:
         return (d["choices"][0]["message"]["content"] or "").strip()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "chat", _swx, lane="sidecar")
         return ""
 
 
@@ -165,7 +174,8 @@ def chat_json(messages: List[dict], keys: List[str], max_tokens: int = 256,
         return None
     try:
         d = json.loads(t[i:j + 1])
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "chat_json", _swx, lane="sidecar")
         return None
     if not isinstance(d, dict) or any(k not in d for k in keys):
         return None

@@ -15,6 +15,10 @@ import threading
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _DEFAULTS: Dict[str, Any] = {
     "inference": {
         "daemon_url": "http://127.0.0.1:3000",
@@ -70,8 +74,8 @@ def _load() -> Config:
             with p.open(encoding="utf-8") as fh:
                 loaded = yaml.safe_load(fh) or {}
             data = _merge(data, loaded)
-        except Exception:
-            pass
+        except Exception as _swx:
+            _swallowed(_swlog, "_load", _swx, lane="harness")
     return Config(data)
 
 

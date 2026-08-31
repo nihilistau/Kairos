@@ -23,6 +23,10 @@ from typing import Optional
 
 import numpy as np
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 # Default webcam index. `AIRHUG 02` is the built-in on this box; DroidCam sits
 # alongside it, so the index is a knob rather than a constant.
 CAM_INDEX = int(os.environ.get("SP_CAM_INDEX", "0"))
@@ -36,7 +40,8 @@ class CaptureError(RuntimeError):
 def _try(mod: str):
     try:
         return __import__(mod)
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_try", _swx, lane="senses")
         return None
 
 
@@ -82,7 +87,8 @@ def screenshot() -> np.ndarray:
             from PIL import ImageGrab
             im = ImageGrab.grab()
             return np.asarray(im.convert("RGB"), dtype=np.uint8)
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "screenshot", _swx, lane="senses")
             pass                                  # fall through to PowerShell
     tmp = os.path.join(tempfile.gettempdir(), "sp_shot.png")
     ps = (

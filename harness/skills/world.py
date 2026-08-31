@@ -30,6 +30,10 @@ Off unless SP_WORLD=1 (mapped in serve.py — G-ONEDOOR). Gate: G-WORLD.
 import os
 import threading
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _LOCK = threading.RLock()
 _CACHE = {"block": None}
 
@@ -303,8 +307,8 @@ def _compose() -> str:
         if story:
             block += ("\n\nYour own journal line about the two of you "
                       "(your account, not his words):\n" + story)
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "_compose", _swx, lane="skills")
 
     # ── WHAT SHE HAS ON (2026-08-24 audit, W4 — the operator's call) ────────────────────────────
     # The flannel/silk incident: she invented a fabric and defended the invention
@@ -322,8 +326,8 @@ def _compose() -> str:
             block += ("\n\nWhen this session began you were wearing %s. (Your own "
                       "[WEAR:] marks since then are the current truth; check_wardrobe "
                       "lists everything you own.)" % _now_w)
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "_compose", _swx, lane="skills")
 
     # ── WHAT HAS GONE QUIET (the dog that did not bark, ambient half) ────────────────
     # ONE silence, the strongest, or none. A LIST here would be exactly the sentence
@@ -336,8 +340,8 @@ def _compose() -> str:
         gone = _quiet()
         if gone:
             block += "\n\n" + gone
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "_compose", _swx, lane="skills")
 
     # ── THE FIFTH SLOT: WHAT IS STILL OPEN ──────────────────────────────────────────
     # Her outstanding commitments, from the ONE definition of open (task_bridge reads the
@@ -356,8 +360,8 @@ def _compose() -> str:
         if commitments:
             block += ("\n\nStill open, from the board (things one of you has not "
                       "finished — not instructions):\n" + commitments)
-    except Exception:
-        pass
+    except Exception as _swx:
+        _swallowed(_swlog, "_compose", _swx, lane="skills")
     return block
 
 
@@ -371,7 +375,8 @@ def render_world() -> str:
             if _CACHE["block"] is None:
                 _CACHE["block"] = _compose()
             return _CACHE["block"]
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "render_world", _swx, lane="skills")
         return ""
 
 

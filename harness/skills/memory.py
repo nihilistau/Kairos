@@ -196,8 +196,8 @@ def _mint_now(daemon: str, fact: str, out_dir: str):
         from harness.inference.backends import supports as _sup
         if not _sup("capture"):
             return 0, False
-    except Exception:
-        pass
+    except Exception as _swx:
+        _sw(_log, "_mint_now", _swx, lane="skills")
     if _CAPTURE_REFUSED["why"]:
         _CAPTURE_REFUSED["n"] += 1        # counted, not retried: the engine already said no
         return 0, False
@@ -277,10 +277,11 @@ def _mint_now(daemon: str, fact: str, out_dir: str):
                     "[memory] /v1/capture REFUSED by the engine; rows will carry npos=0 and "
                     "no ep.l5 until this is fixed. Not asked again this process. Engine said: %s",
                     why)
-            except Exception:
-                pass
+            except Exception as _swx:
+                _sw(_log, "_mint_now", _swx, lane="skills")
         return 0, False
-    except Exception:
+    except Exception as _swx:
+        _sw(_log, "_mint_now", _swx, lane="skills")
         return 0, False                   # transport: quiet, and tried again next time
 
 
@@ -316,8 +317,8 @@ def _mint_drain():
             if hit is not None:
                 from harness.skills import semindex as _sem
                 _sem.upgrade(out_dir, fact, hit.get("ts", ""))
-        except Exception:
-            pass
+        except Exception as _swx:
+            _sw(_log, "_mint_drain", _swx, lane="skills")
         finally:
             _MINT_Q.task_done()
 
@@ -379,11 +380,22 @@ def rescue_stray_tmp(path: str) -> str:
                 "write and os.replace) — quarantined to %s. Nothing deleted, nothing "
                 "auto-restored; diff it against %s if you want to know what was lost.",
                 tmp, dest, path)
-        except Exception:
-            pass
+        except Exception as _swx:
+            _sw(_log, "rescue_stray_tmp", _swx, lane="skills")
         return dest
-    except Exception:
-        return ""                         # a broken rescue must never block a write
+    except Exception as exc:
+        # ── "LOGGED, NEVER SILENT" IS THIS FUNCTION'S OWN DOCSTRING (2026-08-31) ─────
+        # A broken rescue must never block a write — that stands, and is why `""` is
+        # still the answer. But what fails here is the quarantine of the ONE record of
+        # what a dying process was about to commit, and the very next `_save_all` opens
+        # that path "w" and overwrites it. Silence turned "we saved the evidence" and
+        # "we lost the evidence" into the same event, in the store whose one doctrine is
+        # that nothing is destroyed.
+        _log.warning("[memory] could NOT quarantine the stranded %s.tmp (%s: %s) — the "
+                     "next write to this store will overwrite it", path,
+                     type(exc).__name__, exc)
+        _sw(_log, "rescue_stray_tmp", exc, lane="memory")
+        return ""
 
 
 def _save_all(rows: List[dict]) -> None:
@@ -988,8 +1000,8 @@ def _self_names() -> set:
         g = (state or {}).get("gender")
         if isinstance(g, str) and g.strip():
             vals |= _GENDER_WORDS.get(g.strip().lower(), {g.strip().lower()})
-    except Exception:
-        pass
+    except Exception as _swx:
+        _sw(_log, "_self_names", _swx, lane="skills")
     return vals
 
 
@@ -1585,8 +1597,8 @@ def recall(query: str) -> str:
                     touched = True
             if touched:
                 _save_all(rows)
-    except Exception:
-        pass
+    except Exception as _swx:
+        _sw(_log, "recall", _swx, lane="skills")
 
     # ── THE THIRD SURFACE, SPEAKING THE SAME GRAMMAR (field, 2026-07-30) ────────────
     # This returned a NUMBERED render() list — "1. Sam told me: My cat's name is Tuffy."
@@ -1911,7 +1923,8 @@ def _person_model():
         _PM_CACHE[:] = [n, pm]
         _SURP_CACHE.clear()
         return pm
-    except Exception:
+    except Exception as _swx:
+        _sw(_log, "_person_model", _swx, lane="skills")
         return None
 
 
