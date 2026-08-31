@@ -125,7 +125,16 @@ for fn in sorted(os.listdir(os.path.join(ROOT, "harness", "kairos"))):
                 continue                      # a small guard around one lookup
             checked += 1
             audible = any(
-                (isinstance(n, ast.Name) and n.id in ("swallowed", "_sw"))
+                # ── THE ALIAS IS NOT THE BEHAVIOUR (2026-08-31) ──────────────────
+                # This listed two spellings, and the tree-wide adoption imports the
+                # helper as `_swallowed` in 87 files — so an audible handler read as a
+                # silent one because of the name it was imported under. Same shape as
+                # G-SUGGEST grading `w.id` when the row variable was renamed: a gate
+                # that pins a spelling goes red on correct code and teaches its reader
+                # to ignore it. Any local alias of loud.swallowed counts.
+                (isinstance(n, ast.Name)
+                 and (n.id in ("swallowed", "_sw", "_swallowed")
+                      or n.id.endswith("swallowed")))
                 or (isinstance(n, ast.Attribute)
                     and n.attr in ("warning", "error", "exception", "info"))
                 for n in ast.walk(h))

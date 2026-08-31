@@ -84,7 +84,8 @@ def _mark(sid: str, laid: int) -> None:
         try:
             with open(_marker_path(), encoding="utf-8") as f:
                 d = json.load(f) or {}
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "_mark", _swx, lane="control")
             d = {}
         sets = [str(x) for x in (d.get("sets") or [])]
         if sid not in sets:
@@ -183,7 +184,8 @@ def seed() -> Dict[str, Any]:
                     os.makedirs(os.path.dirname(d), exist_ok=True)
                     shutil.copy2(os.path.join(base, fn), d)
                     laid += 1
-                except Exception:
+                except Exception as _swx:
+                    _swallowed(logger, "seed", _swx, lane="control")
                     skipped += 1
 
         # ── THE GESTURE ROWS ────────────────────────────────────────────────────────
@@ -203,7 +205,8 @@ def seed() -> Dict[str, Any]:
                         for r in add:
                             f.write(json.dumps(r, ensure_ascii=False) + "\n")
                     added = len(add)
-                except Exception:
+                except Exception as _swx:
+                    _swallowed(logger, "seed", _swx, lane="control")
                     added = 0
         _mark(sid, laid)
         return {"ok": True, "seeded": True, "set": sid,

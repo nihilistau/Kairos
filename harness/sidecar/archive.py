@@ -88,7 +88,8 @@ def _tier_full() -> str:
     try:
         from harness.skills.narrative import _tier_full as _tf
         return _tf()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_tier_full", _swx, lane="sidecar")
         return os.path.join(_ROOT, "memory-okf-personality", "full")
 
 
@@ -125,7 +126,8 @@ def _chunk_md(path: str) -> List[Dict]:
     try:
         day = time.strftime("%Y-%m-%d", time.gmtime(int(m.group(1)))) if m else \
             time.strftime("%Y-%m-%d", time.gmtime(os.path.getmtime(path)))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_chunk_md", _swx, lane="sidecar")
         day = _day_of(path)
     tag = "her journal: " if kind == "narrative" else "her own time: "
     return [{"day": day, "source": os.path.basename(path), "turns": [0, 1],
@@ -146,7 +148,8 @@ def _chunk_file(path: str) -> List[Dict]:
                     continue
                 try:
                     r = json.loads(line)
-                except Exception:
+                except Exception as _swx:
+                    _swallowed(_swlog, "_chunk_file", _swx, lane="sidecar")
                     continue
                 role = r.get("role", "?")
                 text = (r.get("content") or "").strip()
@@ -277,7 +280,8 @@ def _all_key(paths: List[str]) -> tuple:
     for p in paths:
         try:
             out.append((p, os.stat(p).st_mtime_ns))
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "_all_key", _swx, lane="sidecar")
             out.append((p, 0))
     return tuple(out)
 
@@ -305,7 +309,8 @@ def _load_all() -> Optional[Dict]:
             with open(meta_p, encoding="utf-8") as f:
                 lines = f.read().splitlines()
             rows = [json.loads(x) for x in lines[1:]]
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "_load_all", _swx, lane="sidecar")
             continue
         if len(rows) != v.shape[0]:
             continue
@@ -410,7 +415,8 @@ def warm() -> None:
     def _run():
         try:
             _WARM["built"] = build_index()
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "_run", _swx, lane="sidecar")
             _WARM["built"] = {}
         _WARM["at"] = time.time()
         _LAST_REFRESH[0] = time.monotonic()
@@ -439,7 +445,8 @@ def search_async(query: str, k: int = 4):
     def _run():
         try:
             box["hits"] = search(query, k=k)
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "_run", _swx, lane="sidecar")
             box["hits"] = []
 
     t = threading.Thread(target=_run, name="aux-lane", daemon=True)

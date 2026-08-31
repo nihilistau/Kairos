@@ -58,6 +58,9 @@ from harness.personality.persona_file import parse_persona, write_state
 from harness.inference.stream_processor import _loose_name as _lname  # noqa: E402
 from harness.inference.stream_processor import _loose_name_strict as _lstrict  # noqa: E402
 
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 
 # `[...]` OR `<...>` — she uses both wrappers; live: `<TRAIT:+playful>`.
 _MOOD = re.compile(r"[\[<]\s*(?:%s)\s*[:\-]([^\]>]+)[\]>]" % _lname("MOOD"), re.I)
@@ -434,7 +437,8 @@ def apply_personality_tags(reply: str, persona_path: str = "",
         if changed:
             write_state(path, state)
         result_state = {k: state.get(k, "") for k in ("voice", "mood", "traits")}
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "apply_personality_tags", _swx, lane="personality")
         result_state = {}
     # Imported here, not at module scope, to keep this module light (same reason the
     # interceptor base is imported lazily below).

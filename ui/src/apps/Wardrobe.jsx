@@ -20,14 +20,33 @@ export default function Wardrobe() {
   const w = usePoll(api.wardrobe, 4000)
   const [busy, setBusy] = useState('')
   const [ask, setAsk] = useState('')
+  const [err, setErr] = useState('')            // a write that did not land, said out loud
   const d = w.data
   if (w.error) return <div className="wr-empty">wardrobe unreachable</div>
   if (!d || !d.ok) return <div className="wr-empty">reading the wardrobe…</div>
 
-  const set = async (body) => {
-    setBusy(JSON.stringify(body))
-    try { await api.wardrobeSet({ ...body, by: 'him' }); w.refresh() } finally { setBusy('') }
+  /* ── EIGHT DOORS, AND ONLY ONE OF THEM CHECKED (2026-08-31, second pass) ───────────
+     The closet learned to read `{ok: false}` this morning and the other seven did not:
+     put-it-on-her, dismiss, accept, make-it-now, make-everything and both ask boxes all
+     awaited the answer and threw it away. `wardrobeSet` is the one he presses most, and
+     it is the same "a write that failed looks exactly like one that worked" the whole
+     day was about — the panel just polls four seconds later and shows the old truth.
+     One writer now, so a door added next week gets this for free. */
+  const write = async (fn, busyKey) => {
+    setBusy(busyKey)
+    try {
+      const r = await fn()
+      setErr(r && r.ok === false ? (r.error || 'the wardrobe did not take that') : '')
+      w.refresh()
+      return r
+    } catch (e) {
+      setErr(String((e && e.message) || e))
+      throw e
+    } finally { setBusy('') }
   }
+
+  const set = (body) => write(() => api.wardrobeSet({ ...body, by: 'him' }),
+                              JSON.stringify(body))
   // (the t0..t3 `order` array and the tier_words fallback left 2026-08-24, audit R4:
   // the tiers were renamed 2026-08-23 and are not a ladder any more; a stale ordering
   // constant nothing used was a landmine for whoever wired it up next)
@@ -46,6 +65,8 @@ export default function Wardrobe() {
             .slice(0, 8).map(t => <span key={t} className="wr-chip wr-trait">{t}</span>)}
         </div>
       ) : null}
+
+      {err ? <div className="wr-empty">that did not take — {err}</div> : null}
 
       <div className="wr-now">
         {/* NAME WHAT SHE IS ACTUALLY WEARING. This panel got it right and the portrait
@@ -130,9 +151,7 @@ export default function Wardrobe() {
                 <button className="wr-gen wr-dismiss" title="take it off the list (kept in history)"
                         disabled={!!busy}
                         onClick={async () => {
-                          setBusy('x' + q.id)
-                          try { await api.wardrobeDismiss(q.id); w.refresh() }
-                          finally { setBusy('') }
+                          await write(() => api.wardrobeDismiss(q.id), 'x' + q.id)
                         }}>✕</button>
                 {q.stage === 'suggested' ? (
                   /* ACCEPT IS THE ONLY DOOR (2026-08-27). Not "make it now": accepting and
@@ -143,27 +162,21 @@ export default function Wardrobe() {
                   <button className="wr-gen wr-accept" disabled={!!busy}
                           title="put it in the queue as a want — nothing is generated yet"
                           onClick={async () => {
-                            setBusy('a' + q.id)
-                            try { await api.wardrobeAccept(q.id); w.refresh() }
-                            finally { setBusy('') }
+                            await write(() => api.wardrobeAccept(q.id), 'a' + q.id)
                           }}>accept</button>
                 ) : q.stage !== 'refused' ? (
                   /* GENERATE NOW (2026-08-21): one click, this want, via the API —
                      the day-boundary wait is a fallback, not the plan. */
                   <button className="wr-gen" disabled={!!busy || d.genstatus?.running}
                           onClick={async () => {
-                            setBusy(q.id)
-                            try { await api.wardrobeGenerate(q.id); w.refresh() }
-                            finally { setBusy('') }
+                            await write(() => api.wardrobeGenerate(q.id), q.id)
                           }}>make it now</button>
                 ) : null}
               </div>
             ))}
             <button className="wr-gen wr-gen-all" disabled={!!busy || d.genstatus?.running}
                     onClick={async () => {
-                      setBusy('all')
-                      try { await api.wardrobeGenerate('') ; w.refresh() }
-                      finally { setBusy('') }
+                      await write(() => api.wardrobeGenerate(''), 'all')
                     }}>make everything she is waiting on</button>
             {d.genstatus?.running ? (
               <span className="wr-half"> generating {d.genstatus.what}… (takes minutes; this page keeps up)</span>
@@ -185,16 +198,14 @@ export default function Wardrobe() {
                value={ask} onChange={e => setAsk(e.target.value)}
                onKeyDown={async e => {
                  if (e.key === 'Enter' && ask.trim()) {
-                   setBusy('ask')
-                   try { await api.wardrobeWant(ask.trim()); setAsk(''); w.refresh() }
-                   finally { setBusy('') }
+                   const r = await write(() => api.wardrobeWant(ask.trim()), 'ask')
+                   if (!(r && r.ok === false)) setAsk('')   // keep his words on a refusal
                  }
                }} />
         <button className="wr-gen" disabled={!ask.trim() || !!busy}
                 onClick={async () => {
-                  setBusy('ask')
-                  try { await api.wardrobeWant(ask.trim()); setAsk(''); w.refresh() }
-                  finally { setBusy('') }
+                  const r = await write(() => api.wardrobeWant(ask.trim()), 'ask')
+                  if (!(r && r.ok === false)) setAsk('')     // keep his words on a refusal
                 }}>queue it</button>
       </div>
 

@@ -118,7 +118,8 @@ def listing() -> List[dict]:
     out = []
     try:
         names = sorted(os.listdir(games_dir()))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "listing", _swx, lane="games")
         return out
     for n in names:
         if not n.endswith(".json"):
@@ -129,7 +130,8 @@ def listing() -> List[dict]:
             out.append({"id": m.get("id"), "kind": m.get("kind"),
                         "over": bool(m.get("over")), "result": m.get("result"),
                         "moves": len(m.get("history") or []), "started": m.get("started")})
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "listing", _swx, lane="games")
             continue
     return out
 

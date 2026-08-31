@@ -59,7 +59,8 @@ def _load():
     try:
         st = os.stat(p) if p and os.path.exists(p) else None
         key = (p, st.st_mtime_ns, st.st_size) if st else (p, None, None)
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_load", _swx, lane="skills")
         key = (p, None, None)
     with _LOCK:
         if _CACHE["key"] == key and _CACHE["same"] is not None:
@@ -77,7 +78,8 @@ def _load():
                         seen.add(pair)
                         if r.get("verdict") == "same":
                             same.add(pair)
-                    except Exception:
+                    except Exception as _swx:
+                        _swallowed(_swlog, "_load", _swx, lane="skills")
                         continue
         _CACHE.update(key=key, same=same, seen=seen)
         return same, seen

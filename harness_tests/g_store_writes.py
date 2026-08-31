@@ -288,6 +288,10 @@ print("\n6. AND NOTHING UNDER harness/ FAILS WITHOUT A NAME")
 # So the rule is now the whole tree: a broad handler may still answer with a default,
 # but it may not do it ANONYMOUSLY. 172 sites across 64 files, mechanically, plus the
 # nine writes and twelve read sites done by hand before it.
+# ITS OWN PATTERN, because §5's `_BROAD` deliberately matches BOTH shapes (a bound
+# handler that swallows a write still loses the write). This leg is about the binding, so
+# it must match the handlers that do NOT have one.
+_UNBOUND = re.compile(r"^(\s*)except\s+(Exception|BaseException)?\s*:\s*$")
 _unbound = []
 for _here, _dirs, _files in os.walk(os.path.join(ROOT, "harness")):
     _dirs[:] = [d for d in _dirs if d != "__pycache__"]
@@ -298,12 +302,20 @@ for _here, _dirs, _files in os.walk(os.path.join(ROOT, "harness")):
         _rel = os.path.relpath(_fp, ROOT).replace("\\", "/")
         _body = io.open(_fp, encoding="utf-8", errors="replace").read().splitlines()
         for _i, _ln in enumerate(_body):
-            if not _BROAD.match(_ln):
+            if not _UNBOUND.match(_ln):
                 continue
-            _nxt = _body[_i + 1].strip() if _i + 1 < len(_body) else ""
-            if _BARE.match(_nxt):
-                _unbound.append("%s:%d" % (_rel, _i + 1))
-check("no broad handler answers with a bare default anonymously",
+            # ── THE RULE THAT NEEDS NO LIST (2026-08-31, from an outside audit) ──────
+            # This matched `_BARE` — a closed list of literal bodies — while its sentence
+            # said "nothing fails without a name". 134 handlers answered with an
+            # assignment, a `continue` or `return <name>` and were green under it: the
+            # same shape as the `` that hid forty `return ""` this afternoon, one layer
+            # up, found by someone reading the gate rather than the code.
+            #
+            # An `except Exception:` with NO BINDING cannot say what failed, whatever it
+            # does next. So the check is the binding, and the body is none of its
+            # business.
+            _unbound.append("%s:%d" % (_rel, _i + 1))
+check("no broad handler under harness/ is unbound — it cannot report what it caught",
       not _unbound, _unbound[:8] + (["...+%d more" % (len(_unbound) - 8)]
                                     if len(_unbound) > 8 else []))
 # ...and the rule is worth nothing if the helper it points at is not the shared one.

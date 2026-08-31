@@ -481,13 +481,15 @@ def _calls_from_code(code: str) -> List[tuple]:
         for a in node.args:
             try:
                 args.append(ast.literal_eval(a))
-            except Exception:
+            except Exception as _swx:
+                _swallowed(logger, "_calls_from_code", _swx, lane="toolcore")
                 args.append(None)
         kwargs = {}
         for kw in node.keywords:
             try:
                 kwargs[kw.arg] = ast.literal_eval(kw.value)
-            except Exception:
+            except Exception as _swx:
+                _swallowed(logger, "_calls_from_code", _swx, lane="toolcore")
                 kwargs[kw.arg] = None
         calls.append((name, args, kwargs))
     return calls
@@ -628,7 +630,8 @@ def run_with_tools(
         try:
             from harness.agent import voice_coda as _coda
             _suffix = _coda()
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "run_with_tools", _swx, lane="toolcore")
             _suffix = ""
         sys_content, tool_index = build_tool_system(tools, extra_tools or [],
                                                     system_prefix=system_prefix,
@@ -645,7 +648,8 @@ def run_with_tools(
         try:
             from harness.tuning import registry as _tn
             max_seconds = float(_tn.get("agent.tool_budget_s"))
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "run_with_tools", _swx, lane="toolcore")
             max_seconds = TOOL_BUDGET_FALLBACK_S
     import time as _time
     _loop_started = _time.time()

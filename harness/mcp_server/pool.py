@@ -180,7 +180,8 @@ def list_tools(server: str, spec: Dict[str, Any]) -> list:
         client = _get_session(server, spec)
         try:
             return _submit(_do(client), timeout=30)
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "_do", _swx, lane="mcp_server")
             drop(server)
             if attempt == 2:
                 raise

@@ -71,7 +71,8 @@ def _backend() -> str:
         from harness.tuning import registry as _tr
         b = str(_tr.get("sight.backend", "engine") or "engine")
         return b if b in ("engine", "aux_vl", "openai") else "engine"
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_backend", _swx, lane="skills")
         return "engine"
 
 
@@ -92,7 +93,8 @@ def _describe(img, question: str, detail: int | None = None) -> str:
     try:
         from harness.inference.backends import supports as _sup
         _frames_ok = _sup("inject_frames")
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_describe", _swx, lane="skills")
         _frames_ok = True
     backend = _backend()
     if backend == "aux_vl":
@@ -142,7 +144,8 @@ def _describe(img, question: str, detail: int | None = None) -> str:
                 break
             try:
                 d = json.loads(p)
-            except Exception:
+            except Exception as _swx:
+                _swallowed(_swlog, "_describe", _swx, lane="skills")
                 continue
             if "delta" in d:
                 out.append(d["delta"])

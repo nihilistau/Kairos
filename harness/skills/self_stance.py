@@ -11,6 +11,10 @@ from __future__ import annotations
 
 import re
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 _TAG = re.compile(r"\[[A-Za-z_]+\s*:[^\]]*\]")       # [MOOD: x] [voice: soft] [WEAR: y] ...
 _BEAT = re.compile(r"\[[a-z][a-z -]{0,23}\]")         # [chuckle] [breath] [long pause]
 _ANGLE = re.compile(r"</?[a-z][a-z0-9_-]{0,23}/?>")   # <whisper> </breath> <heart_symbol/>
@@ -60,7 +64,8 @@ def plain(text: str) -> str:
         from harness.inference.stream_processor import (strip_control_surfaces,
                                                         strip_leaked_analysis, strip_tags)
         t = strip_leaked_analysis(strip_tags(strip_control_surfaces(t)))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "plain", _swx, lane="skills")
         t = _TAG.sub(" ", t)
     t = _BEAT.sub(" ", t)
     t = _ANGLE.sub(" ", t)

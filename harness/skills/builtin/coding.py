@@ -17,6 +17,10 @@ from typing import Optional
 
 from harness.skills.skill import skill, SkillCategory
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 
 def _root() -> Path:
     return Path(os.environ.get("HARNESS_WORKSPACE", os.getcwd())).resolve()
@@ -80,7 +84,8 @@ def search(pattern: str, glob: str = "") -> str:
                 for i, line in enumerate(f.read_text(errors="ignore").splitlines(), 1):
                     if rx.search(line):
                         hits.append(f"{f.relative_to(root)}:{i}:{line}")
-            except Exception:
+            except Exception as _swx:
+                _swallowed(_swlog, "search", _swx, lane="skills")
                 continue
     return "\n".join(hits[:500]) or "(no matches)"
 

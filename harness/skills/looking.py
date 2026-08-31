@@ -283,7 +283,8 @@ def list_looks(n: int = 40) -> list:
                         continue
                     try:
                         rec = json.loads(ln)
-                    except Exception:
+                    except Exception as _swx:
+                        _swallowed(logger, "list_looks", _swx, lane="skills")
                         continue
                     # research() also writes r_*.json, which is the fuller receipt.
                     # The jsonl copy is the audit that a look happened; the window
@@ -302,7 +303,8 @@ def list_looks(n: int = 40) -> list:
             try:
                 with open(p, encoding="utf-8", errors="replace") as f:
                     rec = json.load(f)
-            except Exception:
+            except Exception as _swx:
+                _swallowed(logger, "list_looks", _swx, lane="skills")
                 continue
             rows.append({
                 "kind": "research",

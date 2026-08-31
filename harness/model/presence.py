@@ -87,7 +87,8 @@ def _load() -> Dict[str, int]:
                 try:
                     r = json.loads(ln)
                     out[r["day"]] = int(r.get("turns", 0))
-                except Exception:
+                except Exception as _swx:
+                    _swallowed(logger, "_load", _swx, lane="model")
                     continue
     except Exception as _swx:
         _swallowed(logger, "_load", _swx, lane="model")

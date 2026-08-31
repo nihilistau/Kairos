@@ -121,7 +121,8 @@ class NexusClient:
             try:
                 import httpx
                 self._http = httpx.Client(timeout=30.0)
-            except Exception:
+            except Exception as _swx:
+                _swallowed(logger, "__init__", _swx, lane="nexus")
                 logger.warning("[NexusClient] httpx missing; falling back to embedded store")
                 self.base_url = ""
         if not self.base_url:

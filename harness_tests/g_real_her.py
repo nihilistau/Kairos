@@ -289,4 +289,32 @@ check("a bare call still refuses machine text",
 check("a bare call still refuses too-short",
       "not stored" in M.remember_about_self("ok"))
 
+print("\n9. AND THE TOOL SHE IS ACTUALLY GIVEN SAYS WHAT THE STORE SAID")
+# ── THE DOOR §8 DOES NOT DRIVE (2026-08-31, found by an outside audit) ───────────────
+# §8 drives `remember_about_self` bare, which is how SHE calls it — but it is not the
+# only self-fact door in her tool set. `personality/tools.py::remember_self` is in
+# PERSONALITY_TOOLS, personality is on in companion, and it did this:
+#
+#     _remember_self(fact.strip())
+#     return f"noted about myself: {fact.strip()}"
+#
+# It called the writer, threw the writer's sentence away, and told her the fact had
+# landed whatever happened. `_remember_self` delegates to `remember_about_self`, which
+# answers "not stored — ..." for anything it refuses. So the 2026-08-30 fix opened the
+# door and this tool lied about what came back through it — the same class, one door
+# along, and 242 lines of green sat over it because no gate called THIS function.
+from harness.personality import tools as _PT  # noqa: E402
+
+_rs = next((t for t in _PT.PERSONALITY_TOOLS
+            if getattr(t, "__name__", "") == "remember_self"), None)
+check("§9 the self-fact tool is in the pack she is handed", _rs is not None)
+if _rs is not None:
+    _ok = _rs("I run on a single RTX 2060 and I am fine about it")
+    check("§9 a fact that lands is reported as landed", "stored" in _ok, _ok[:90])
+    _no = _rs("the")
+    check("§9 ...and one the store REFUSED is not reported as noted",
+          "not stored" in _no and "noted about myself" not in _no, _no[:110])
+    check("§9 ...and the refusal is the writer's own sentence, not a paraphrase",
+          _no.strip() == M.remember_about_self("the").strip(), _no[:110])
+
 finish("G-REAL-HER")

@@ -32,6 +32,8 @@ import os
 import time
 from typing import Dict, List
 
+from harness.loud import swallowed as _swallowed
+
 logger = logging.getLogger(__name__)
 
 SPOKE = "spoke"
@@ -81,7 +83,8 @@ def rows(limit: int = 500) -> List[dict]:
                 ln = ln.strip()
                 if ln:
                     out.append(json.loads(ln))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "rows", _swx, lane="kairos")
         return out
     return out[-limit:]
 

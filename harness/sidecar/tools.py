@@ -13,6 +13,10 @@ from __future__ import annotations
 
 from harness.sidecar import archive, client
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 
 def deep_recall(query: str) -> str:
     """Search EVERY past conversation for a moment or fact (beyond active memory).
@@ -47,7 +51,8 @@ def deep_recall(query: str) -> str:
     def _mask(t: str) -> str:
         try:
             from harness.skills.lifecycle import _SECRET, _SECRET_POSS
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "_mask", _swx, lane="sidecar")
             return t
         import re as _re
         parts = _re.split(r"(?<=[.!?\n])", t)

@@ -113,7 +113,24 @@ def remember_self(statement: str, mem_class: str = "self-fact", root=None) -> st
     try:
         from harness.skills.memory import remember_about_self
         return remember_about_self(statement)
-    except Exception:
+    except Exception as exc:
+        # ── THE FALLBACK IS THE STORE NOBODY READS (2026-08-31) ─────────────────────
+        # This function exists because two tools wrote to two stores and only the one
+        # nobody read was reachable from here (see the docstring). The fallback writes
+        # to exactly that store — silently — so an import error here does not lose the
+        # fact, it hides it somewhere her prefix never looks. Kept, because losing it
+        # would be worse, and said out loud because "stored" and "stored where you will
+        # never see it" are different facts.
+        import logging as _lg
+        _l = _lg.getLogger(__name__)
+        _l.warning("[self-model] the registry door would not open (%s: %s) — %r is going "
+                   "to the legacy self-model store, which her prefix does not read",
+                   type(exc).__name__, exc, statement[:60])
+        try:
+            from harness.loud import swallowed as _sw
+            _sw(_l, "remember_self fallback", exc, lane="self-model")
+        except Exception as _swx:
+            _lg.getLogger(__name__).debug("loud unavailable: %s", _swx)
         return SelfModelStore(root).remember_self(statement, mem_class)
 
 

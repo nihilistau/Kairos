@@ -233,7 +233,8 @@ def seed(session: str, reply_text: str, generate, force: bool = False) -> bool:
     try:
         if not force and not bool(tune.get("kairos.seed_on_boot")):
             own_time_only = True
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "seed", _swx, lane="kairos")
         own_time_only = True    # an unreadable knob keeps the quiet default
     with _LOCK:
         if session in _LAST:
@@ -293,7 +294,8 @@ def _presence(key: str, default, cast):
     try:
         v = tune.get(key)
         return cast(v) if v is not None and v != "" else default
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_presence", _swx, lane="kairos")
         return default
 
 
@@ -649,7 +651,8 @@ def _reflect_insight(res: dict) -> Optional[dict]:
     # spelling of it here would be the next row to drift.
     try:
         rows = _M.live_rows()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_reflect_insight", _swx, lane="kairos")
         rows = []
 
     def _covered(t: str) -> bool:
@@ -677,7 +680,8 @@ def _reflect_insight(res: dict) -> Optional[dict]:
     # there is no constant of mine sitting under a measurement.
     try:
         ceiling = pm.vocabulary_ceiling(float(tune.get("reflect.speak_pct")))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_reflect_insight", _swx, lane="kairos")
         ceiling = 8.0
 
     admitted = []
@@ -691,7 +695,8 @@ def _reflect_insight(res: dict) -> Optional[dict]:
             continue
         try:
             g = pm.groundedness(t)
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "_covered", _swx, lane="kairos")
             g = 0.0
         if g > ceiling:
             logger.info("[kairos] kept it to herself — further from his words than he "
@@ -783,7 +788,8 @@ def _marks_in(text: str) -> frozenset:
     try:
         from harness.personality.interceptor import marks_present
         return marks_present(text or "")
-    except Exception:
+    except Exception as _swx:
+        _swallowed(logger, "_marks_in", _swx, lane="kairos")
         return frozenset()
 
 
@@ -900,18 +906,21 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
             _cue = str(tune.get("presence.cue") or "").strip()
             try:
                 _book = _lib.in_hand()
-            except Exception:
+            except Exception as _swx:
+                _swallowed(logger, "_attempt", _swx, lane="kairos")
                 _book = None
             _passage, _title = None, ""
             if _mode in ("narration", "lucid") and _book and not _book.get("done"):
                 try:
                     _rc = float(tune.get("presence.read_chance"))
-                except Exception:
+                except Exception as _swx:
+                    _swallowed(logger, "_attempt", _swx, lane="kairos")
                     _rc = 0.35
                 if random.random() < _rc:
                     try:
                         _passage = _lib.next_passage(int(tune.get("presence.read_chunk_chars") or 700)) or None
-                    except Exception:
+                    except Exception as _swx:
+                        _swallowed(logger, "_attempt", _swx, lane="kairos")
                         _passage = None
                     _title = _book["title"]
             if not _cue:
@@ -927,19 +936,22 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
                 try:
                     from harness.skills import narrative as _nar
                     _own = _nar.own_time(1)
-                except Exception:
+                except Exception as _swx:
+                    _swallowed(logger, "_attempt", _swx, lane="kairos")
                     _own = []
                 _about = ""
                 if _book:
                     try:
                         _about = _lib.about_so_far()
-                    except Exception:
+                    except Exception as _swx:
+                        _swallowed(logger, "_attempt", _swx, lane="kairos")
                         _about = ""
                 _cue = _pm.assemble_cue(mood=_mood, own_time=_own,
                                         book=({"title": _book["title"], "about": _about} if _book else None))
             try:
                 _len = int(tune.get("presence.len_%s" % _mode) or 0)
-            except Exception:
+            except Exception as _swx:
+                _swallowed(logger, "_attempt", _swx, lane="kairos")
                 _len = 0
             _mode_sampling = dict(_pm.SAMPLING[_mode])
             _mode_max = (_len or int(_mode_sampling.pop("max_tokens", 140))) + (60 if _passage else 0)
@@ -1343,7 +1355,8 @@ def tick_once(now: Optional[float] = None) -> None:
         age = now - float(_PENDING_INSIGHT.get("_at") or 0.0)
         try:
             shelf = float(tune.get("reflect.cooldown_s"))
-        except Exception:
+        except Exception as _swx:
+            _swallowed(logger, "tick_once", _swx, lane="kairos")
             shelf = 1800.0
         if age > shelf:
             logger.info("[kairos] a held thought went stale unspoken (%.0fs): %r",
@@ -1477,7 +1490,8 @@ def start_ticker(period_s: Optional[float] = None) -> None:
             try:
                 from harness.tuning import registry as tune
                 v = float(tune.get("kairos.tick_s"))
-            except Exception:
+            except Exception as _swx:
+                _swallowed(logger, "_period", _swx, lane="kairos")
                 v = 15.0
             # A floor, because a zero or negative period is a busy-loop that starves the
             # GPU thread this scheduler exists to stay out of the way of.
@@ -1578,7 +1592,8 @@ def reload_undelivered() -> dict:
                     continue
                 try:
                     rows.append(json.loads(ln))
-                except Exception:
+                except Exception as _swx:
+                    _swallowed(logger, "reload_undelivered", _swx, lane="kairos")
                     rows.append({"why": "malformed"})   # counted lines; never a crash
         start = 0
         for r in rows:

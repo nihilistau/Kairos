@@ -133,8 +133,15 @@ def remember_self(fact: str) -> str:
 
     (For a feeling or an opinion, prefer remember_about_self — that is your memory. This is
     the self-MODEL: what you are, not what you like.)"""
-    _remember_self(fact.strip())
-    return f"noted about myself: {fact.strip()}"
+    # ── THE WRITER'S SENTENCE IS THE ANSWER (2026-08-31) ────────────────────────────
+    # This called the store and threw its reply away, then told her "noted about
+    # myself: ..." whatever happened. `_remember_self` delegates to
+    # `remember_about_self`, which can and does answer "not stored — ...". So the tool
+    # she is actually given could tell her a fact about herself had landed when the
+    # store had just refused it — the same shape as 2026-08-30 ("she could not store her
+    # own feelings"), one door along: that fix opened the door, this one lied about it.
+    said = _remember_self(fact.strip())
+    return said if isinstance(said, str) and said.strip() else         f"noted about myself: {fact.strip()}"
 
 
 # the tool set (for run_with_tools advertising / the SkillAwareness pack)

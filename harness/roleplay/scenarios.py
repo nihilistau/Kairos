@@ -24,6 +24,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import logging
+from harness.loud import swallowed as _swallowed
+_swlog = logging.getLogger(__name__)
+
 
 @dataclass
 class Scenario:
@@ -265,7 +269,8 @@ def authored() -> list[Scenario]:
     out: list[Scenario] = []
     try:
         names = sorted(n for n in _os.listdir(d) if n.endswith(".json"))
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "authored", _swx, lane="roleplay")
         return out
     for n in names:
         sc = _from_json(_os.path.join(d, n))

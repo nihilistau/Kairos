@@ -248,7 +248,8 @@ def load(models=KNOWN_MODELS) -> dict:
                 continue
             try:
                 r = json.loads(ln)
-            except Exception:
+            except Exception as _swx:
+                _swallowed(_swlog, "load", _swx, lane="skills")
                 continue
             if r.get("model") not in models:
                 continue
@@ -284,7 +285,8 @@ def mint(fact: str, ts: str, out_dir: str = None) -> bool:
             vec, model = hash_embed(fact), MODEL_HASH
         _append({"addr": addr_of(fact), "ts": ts or "", "model": model, "vec": vec})
         return True
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "mint", _swx, lane="skills")
         _DROPPED += 1
         return False
 
@@ -302,7 +304,8 @@ def upgrade(out_dir: str, fact: str, ts: str) -> bool:
             return False
         _append({"addr": addr_of(fact), "ts": ts or "", "model": MODEL_L5, "vec": vec})
         return True
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "upgrade", _swx, lane="skills")
         _DROPPED += 1
         return False
 
@@ -319,7 +322,8 @@ def load_cached(models=KNOWN_MODELS) -> dict:
     try:
         st = os.stat(p) if p and os.path.exists(p) else None
         key = (p, st.st_mtime_ns, st.st_size) if st else (p, None, None)
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "load_cached", _swx, lane="skills")
         key = (p, None, None)
     with _LOCK:
         if _CACHE["key"] == key and _CACHE["idx"] is not None:
@@ -411,7 +415,8 @@ def query_embed(query: str):
     try:
         from harness.inference.backends import supports as _sup
         _has_l5 = _sup("embed")
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "query_embed", _swx, lane="skills")
         _has_l5 = True
     if not _has_l5:
         return hash_embed(query), MODEL_HASH
@@ -427,7 +432,8 @@ def query_embed(query: str):
             if len(vec) == _L5_DIM and all(math.isfinite(v) for v in vec):
                 return [round(float(v), 6) for v in vec], MODEL_L5
             _EMBED_DOWN_UNTIL = _time.monotonic() + _EMBED_HOLDOFF
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_swlog, "query_embed", _swx, lane="skills")
             _EMBED_DOWN_UNTIL = _time.monotonic() + _EMBED_HOLDOFF
     return hash_embed(query), MODEL_HASH
 
@@ -517,7 +523,8 @@ def backfill_aux(registry_rows, batch: int = 32) -> dict:
                     continue
                 try:
                     r = json.loads(line)
-                except Exception:
+                except Exception as _swx:
+                    _swallowed(_swlog, "backfill_aux", _swx, lane="skills")
                     continue
                 if r.get("model") == MODEL_AUX:
                     have.add((r.get("addr"), r.get("ts") or ""))

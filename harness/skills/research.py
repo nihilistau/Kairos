@@ -325,7 +325,8 @@ def _pick_backend() -> Researcher:
         from harness.tuning import registry as _t
         v = _t.chosen("research.backend")        # override-only; env is the default
         name = str(v or "").strip().lower()
-    except Exception:
+    except Exception as _swx:
+        _swallowed(_swlog, "_pick_backend", _swx, lane="skills")
         name = ""
     if not name:
         name = (os.environ.get("SP_RESEARCH_BACKEND") or "xai").strip().lower()

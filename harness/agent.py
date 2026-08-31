@@ -202,7 +202,8 @@ def load_agent_system() -> str:
                 sr = render_state(state)
                 if sr:
                     parts.append(sr)
-            except Exception:
+            except Exception as _swx:
+                _swallowed(_agent_log, "load_agent_system", _swx, lane="harness")
                 parts = [txt]
             try:
                 from harness.personality.self_model import render_self_model, SELF_TIER
@@ -213,7 +214,8 @@ def load_agent_system() -> str:
                     from harness.tuning import registry as _tr
                     _b = int(_tr.get("memory.self_budget", 2400) or 0)
                     _share = float(_tr.get("memory.self_share", 0.5) or 0.0)
-                except Exception:
+                except Exception as _swx:
+                    _swallowed(_agent_log, "load_agent_system", _swx, lane="harness")
                     _b, _share = 2400, 0.5
                 _rest = sum(len(p or "") for p in parts)
                 sm = render_self_model(root, budget_chars=max(0, min(_b, int(_share * max(_rest, 1)))))
@@ -792,7 +794,8 @@ def _arm_self_repeat_ban(cfg, messages: List[dict]) -> None:
         try:
             from harness.inference.stream_processor import strip_for_record
             return strip_for_record(t or "")
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_agent_log, "_words_only", _swx, lane="harness")
             return t or ""
 
     prev = _words_only(assistants[-1] if assistants else "")
@@ -1169,7 +1172,8 @@ def agent_chat_stream(
         try:
             from harness.tuning import registry as _tn
             max_seconds = float(_tn.get("agent.tool_budget_s"))
-        except Exception:
+        except Exception as _swx:
+            _swallowed(_agent_log, "agent_chat_stream", _swx, lane="harness")
             from harness.toolcore.tools import TOOL_BUDGET_FALLBACK_S
             max_seconds = TOOL_BUDGET_FALLBACK_S   # one constant, both loops (audit S4)
     _loop_started = _time.time()
