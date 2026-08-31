@@ -27,7 +27,7 @@ import threading
 from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
 
-from harness.store_io import replace_atomic
+from harness.store_io import read_bytes_retry, replace_atomic
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # ── SP_TUNING_FILE (2026-08-24) ───────────────────────────────────────────────────────
@@ -802,11 +802,17 @@ def _load() -> dict:
     global _CACHE
     with _LOCK:
         if _CACHE is None:
+            # AND IT IS CACHED FOREVER, which is why the read has to be right (2026-08-31).
+            # `except: _CACHE = {}` meant one unlucky first read — the instant `set_many`
+            # or `reset` renames over the file — was remembered as "every knob is at its
+            # default" for the life of the process, and the next `set_many` would write
+            # that back. A store that cannot be read is not a store full of defaults.
+            blob = read_bytes_retry(STORE)
             try:
-                with open(STORE, encoding="utf-8") as f:
-                    _CACHE = json.load(f)
-            except Exception:
-                _CACHE = {}
+                _CACHE = json.loads(blob.decode("utf-8")) if blob else {}
+            except ValueError:
+                _CACHE = {}       # genuinely corrupt content is a different thing, and
+                #                   defaults are the only honest answer to it
         return dict(_CACHE)
 
 
@@ -905,12 +911,24 @@ def set_many(updates: dict) -> dict:
 
 
 def reset(key: str) -> None:
+    """Drop one override. SAME WRITE AS `set_many` (2026-08-31).
+
+    Its twin thirty lines up has written tmp + rename since it was written; this one
+    truncated STORE in place, so putting a knob back to its default left her live
+    tuning file momentarily empty — and `_load()` answers `{}` on a bad parse, which
+    reads as "every knob is at its default". Two writers of one file, one atomic and
+    one not, is the shape §0 is about: the invariant held on the path nobody was
+    looking at, and not on the other one.
+    """
     global _CACHE
     with _LOCK:
         cur = _load()
         cur.pop(key, None)
-        with open(STORE, "w", encoding="utf-8") as f:
+        os.makedirs(os.path.dirname(STORE), exist_ok=True)
+        tmp = STORE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(cur, f, indent=2, sort_keys=True)
+        replace_atomic(tmp, STORE)
         _CACHE = cur
 
 

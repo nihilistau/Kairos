@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.8.8 — an unreadable store is not an empty one (2026-08-31)
+
+The tail of 0.8.7, and the more dangerous half.
+
+- **Two store writers still truncated the live file.** `wardrobe._write_wants` — the
+  rewrite every want, fulfil, dismiss and hide passes through — and `tuning.reset()`
+  opened the real path with `"w"` instead of renaming a tmp over it, so the file sat at
+  zero bytes for a moment on every one. `reset()`'s own twin thirty lines above it had
+  been atomic since the day it was written: one file, two writers, the rule held on one
+  of them. Both are tmp + rename now.
+- **And atomicity alone moved the failure rather than removing it.** With the writer
+  fixed and three pollers reading, readers still saw an EMPTY want list: `open()` on the
+  destination can be refused for the instant a rename lands, and the reader caught every
+  exception and answered `[]`. That is the dangerous answer, because every writer there
+  is read-modify-write over that same reader — one transient empty read followed by a
+  write does not lose a moment, it truncates the list. `store_io.read_bytes_retry` now
+  splits what a bare `except` flattened: **absent is `None` at once; present-but-
+  unreadable is retried and then RAISED, never silently empty.** The tuning store had the
+  same swallow with a longer fuse — it caches, so one unlucky first read was remembered
+  as "every knob is at its default" for the life of the process.
+- `G-STORE-WRITES` grows to 12: forty rewrites with no torn read, both writers
+  structurally renaming a tmp, both helpers raising rather than giving up quietly. It
+  also stopped grading the wrong function — its structural check sliced the helper body
+  with "the last retry loop in the file", so adding a second one silently repointed it.
+  It slices by name.
+
 ## 0.8.7 — the writes that were being thrown away (2026-08-31)
 
 Six days of upstream work, cut after a live bug that had been eating panel edits on

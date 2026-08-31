@@ -64,13 +64,25 @@ check("...with a budget measured in seconds, not milliseconds",
 # THE LAST ATTEMPT IS OUTSIDE THE LOOP ON PURPOSE: a helper that swallowed the final
 # PermissionError would turn "your edit did not save" into "your edit saved", which is
 # strictly worse than the bug it replaces.
-_tail = _src.rsplit("for w in waits:", 1)[-1]
-_tail_code = [l.split("#")[0].rstrip() for l in _tail.splitlines()]
-_tail_code = [l for l in _tail_code if l.strip()]
+def _tail_of(fn_name, end_marker, src=_src):
+    """The body of one helper, comments stripped — SLICED BY NAME, because the file has
+    two retry loops now and `rsplit("for w in waits:")` silently graded the other one."""
+    blk = src[src.index("def %s(" % fn_name):]
+    blk = blk[:blk.index(end_marker)] if end_marker in blk else blk
+    lines = [l.split("#")[0].rstrip() for l in blk.rsplit("for w in waits:", 1)[-1].splitlines()]
+    return blk, [l for l in lines if l.strip()]
+
+
+_blk, _tail_code = _tail_of("replace_atomic", "def read_bytes_retry")
 check("the last attempt is unguarded, so a spent budget RAISES",
-      "except PermissionError:" in _tail
+      "except PermissionError:" in _blk
       and _tail_code[-1].strip() == "os.replace(tmp, dst)",
       _tail_code[-1:])
+# THE READ HELPER, same rule and for a sharper reason: a read that gives up quietly
+# answers "empty", and empty is what a read-modify-write writes back.
+_rblk, _rtail = _tail_of("read_bytes_retry", "\n\ndef ")
+check("the read helper raises too — an unreadable store is never answered as empty",
+      "return None" in _rblk and _rtail[-1].strip() == "return f.read()", _rtail[-2:])
 
 print("\n2. THE CENSUS — every store writer under harness/ goes through it")
 # CODE ONLY. Half a dozen of these files have a COMMENT that names os.replace to explain
@@ -142,5 +154,63 @@ check("ten writes, ten landed, with three pollers reading throughout",
 check("...and the last one is what is on disk",
       json.load(io.open(_p, encoding="utf-8")).get("n") == 9,
       json.load(io.open(_p, encoding="utf-8")))
+
+print("\n4. A REWRITE NEVER TRUNCATES THE LIVE FILE")
+# THE OTHER HALF OF THE SAME LESSON (2026-08-31, his call: "do those two as well").
+# `replace_atomic` protects a rename; it does nothing for a writer that opens the REAL
+# path with "w". Two did. `wardrobe._write_wants` is the rewrite every want, fulfil,
+# dismiss and hide passes through — the file sat at zero bytes for a moment on each one,
+# and `wants()` swallows a bad read and answers `[]`, which is indistinguishable from a
+# woman who owns nothing. `tuning.reset()` truncated her live knobs the same way while
+# `set_many()` thirty lines above it had been atomic since it was written: one file, two
+# writers, the invariant held on one of them (§0).
+#
+# Asserted the only way that means anything: read the file from other threads WHILE it is
+# rewritten, and demand that no reader ever saw fewer rows than were put there.
+from harness.control import wardrobe as WD  # noqa: E402
+
+_rows = [{"id": "w%03d" % i, "want": "a probe garment %d" % i, "kind": "look"}
+         for i in range(1, 41)]
+WD._write_wants(_rows)
+_seen_short, _reads = [], [0]
+_stop2 = threading.Event()
+
+
+def _reader():
+    # A POLLER, like §3 and like the gateway: it opens, parses, CLOSES, and comes back.
+    # A reader that never lets go is not a reader this repo has, and no rename can beat
+    # one — the honest note about that lives in harness/store_io.py rather than in an
+    # assertion nothing could ever pass.
+    while not _stop2.is_set():
+        n = len(WD._wants_raw())
+        _reads[0] += 1
+        if n != len(_rows):
+            _seen_short.append(n)
+        time.sleep(0.001)
+
+
+_rt = [threading.Thread(target=_reader, daemon=True) for _ in range(3)]
+for _t in _rt:
+    _t.start()
+for _ in range(40):
+    WD._write_wants(_rows)
+_stop2.set()
+for _t in _rt:
+    _t.join(timeout=5)
+check("forty rewrites, and no reader ever saw a torn want list",
+      not _seen_short, "short reads: %s of %d" % (sorted(set(_seen_short))[:6], _reads[0]))
+check("...and the readers were actually looking (>= 100 reads)",
+      _reads[0] >= 100, _reads[0])
+# STRUCTURAL, for the pair by name — the behavioural leg above can only fail on a machine
+# where the threads happen to interleave, and "no reader saw it torn" is also what a gate
+# that never scheduled a reader would report.
+for _rel, _fn, _end in (("harness/control/wardrobe.py", "def _write_wants(", "def character("),
+                        ("harness/tuning/registry.py", "def reset(", "def schema(")):
+    _b = io.open(os.path.join(ROOT, _rel), encoding="utf-8", errors="replace").read()
+    _blk = _b[_b.index(_fn):_b.index(_end)]
+    _blk_code = "\n".join(l for l in _blk.splitlines() if not l.lstrip().startswith("#"))
+    check("%-34s writes a tmp and renames it" % _rel.split("/")[-1],
+          "replace_atomic(" in _blk_code and '.tmp' in _blk_code,
+          [l.strip() for l in _blk_code.splitlines() if "open(" in l])
 
 finish("G-STORE-WRITES")
