@@ -35,6 +35,7 @@ store instead (import_clip) — a thing she puts on his screen.
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 import shutil
@@ -44,6 +45,9 @@ from typing import Any, Dict, List, Optional
 
 from harness.control import avatar as AV
 from harness.control import wardrobe as WD
+from harness.loud import swallowed as _swallowed
+
+logger = logging.getLogger(__name__)
 
 CATEGORIES = WD.CATEGORIES
 INBOX = "inbox"
@@ -211,8 +215,14 @@ def _take_off_if_on(aid: str) -> None:
                               if t != aid and _offered_outfit(t)), None)
             if _fallback:
                 WD.choose(outfit=_fallback, by="him")
-        except Exception:
-            pass
+        except Exception as exc:
+            # THE ONE INCONSISTENCY THIS FUNCTION EXISTS TO PREVENT is a portrait wearing
+            # something that is no longer offered. Swallowing here leaves exactly that,
+            # and the panel will have already said the hide worked.
+            logger.warning("[catalog] hid %r but could not take it off her (%s: %s) — she "
+                           "is still wearing something that is no longer offered",
+                           aid, type(exc).__name__, exc)
+            _swallowed(logger, "_take_off_if_on", exc, lane="catalog")
 
 
 def _offered_outfit(t: str) -> bool:
@@ -225,8 +235,16 @@ def _ffmpeg(args: List[str], timeout: int = 600) -> bool:
     try:
         r = subprocess.run(["ffmpeg", "-v", "error", "-y"] + args,
                            capture_output=True, text=True, timeout=timeout)
+        if r.returncode:
+            # `-v error` means stderr is the REASON and nothing else. Throwing it away
+            # left "the import did not work" with no way to find out why.
+            logger.warning("[catalog] ffmpeg rc=%s: %s", r.returncode,
+                           (r.stderr or r.stdout or "")[-300:])
         return r.returncode == 0
-    except Exception:
+    except Exception as exc:
+        logger.warning("[catalog] ffmpeg did not run (%s: %s) — is it on PATH?",
+                       type(exc).__name__, exc)
+        _swallowed(logger, "_ffmpeg", exc, lane="catalog")
         return False
 
 
@@ -240,7 +258,13 @@ def _pingpong(path: str) -> bool:
     try:
         from tools import avatar_gen as G
         return bool(G.pingpong(path))
-    except Exception:
+    except Exception as exc:
+        # A silent False here means the clip ships un-looped and nobody knows the seam
+        # was never made — the import is meant to be indistinguishable from a generation.
+        logger.warning("[catalog] could not make %r seamless (%s: %s) — it will play "
+                       "with a visible cut", os.path.basename(path),
+                       type(exc).__name__, exc)
+        _swallowed(logger, "_pingpong", exc, lane="catalog")
         return False
 
 
