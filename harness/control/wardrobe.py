@@ -44,7 +44,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from harness.control import avatar as AV
-from harness.store_io import replace_atomic
+from harness.store_io import read_bytes_retry, replace_atomic
 
 # ── WHAT EACH TIER ACTUALLY IS, IN WORDS ──────────────────────────────────────────────
 # Keyed to avatar.TIERS so there is one tier vocabulary, not two. `wearing` is the honest
@@ -1411,15 +1411,29 @@ def _wants_raw(state: str = "") -> List[Dict[str, Any]]:
     must never feed a writer. Writers read RAW; the display filter lives in `wants()`
     at the edge. G-WARDROBE-WORDS holds the door: a write after a hide must preserve
     the hidden row, by name."""
-    out: List[Dict[str, Any]] = []
-    try:
-        with open(_wants_path(), encoding="utf-8") as f:
-            for ln in f:
-                ln = ln.strip()
-                if ln:
-                    out.append(json.loads(ln))
-    except Exception:
+    # ── AND AN UNREADABLE STORE IS NOT AN EMPTY ONE (2026-08-31) ────────────────────
+    # This caught everything and answered `[]`. Every writer above is read-modify-write
+    # over THIS function and `_write_wants` rewrites the whole file, so one transient
+    # `[]` — the instant a rename lands, a share violation, a locked file — becomes a
+    # TRUNCATED want list rather than a lost moment. Measured after making the writer
+    # atomic: three pollers still saw an empty list, because atomicity fixed the bytes
+    # and left the reader's swallow in place.
+    #
+    # `read_bytes_retry` splits the two states a bare except flattens: absent is None
+    # (an empty store is a real thing), present-but-unreadable is retried and then
+    # RAISED. A raise reaches a route that answers `{ok: false}`; a silent `[]` reaches
+    # a writer.
+    blob = read_bytes_retry(_wants_path())
+    if blob is None:
         return []
+    out: List[Dict[str, Any]] = []
+    for ln in blob.decode("utf-8", "replace").splitlines():
+        ln = ln.strip()
+        if ln:
+            try:
+                out.append(json.loads(ln))
+            except ValueError:
+                continue          # one bad line is not the whole list (it never was)
     return [w for w in out if not state or w.get("state") == state]
 
 
@@ -1438,10 +1452,25 @@ def wants(state: str = "") -> List[Dict[str, Any]]:
 
 
 def _write_wants(rows: List[Dict[str, Any]]) -> None:
+    """Rewrite the want list. TMP + RENAME, because this TRUNCATES (2026-08-31).
+
+    Every writer in this file reads the whole list, edits it and hands it back here, so
+    the file spends a moment at zero bytes on every want, every fulfil, every hide. A
+    reader landing in that moment gets an empty wardrobe — `wants()` swallows the
+    exception and answers `[]`, so she owns nothing, nothing is offered, nothing is
+    hidden, and the next write persists whatever that read decided. Nothing about that
+    failure announces itself.
+
+    Ten of her rows have already died in this file once (see `_wants_raw`), by a
+    different route to the same place: a truncating rewrite meeting a read that was not
+    the whole truth. This is the other half of that lesson, and it is one rename.
+    """
     os.makedirs(os.path.dirname(_wants_path()), exist_ok=True)
-    with open(_wants_path(), "w", encoding="utf-8") as f:
+    tmp = _wants_path() + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         for r in rows:
             f.write(json.dumps(r) + "\n")
+    replace_atomic(tmp, _wants_path())
 
 
 def character() -> str:

@@ -65,3 +65,35 @@ def replace_atomic(tmp: str, dst: str, waits=_WAITS) -> None:
         except PermissionError:
             time.sleep(w)
     os.replace(tmp, dst)          # the last attempt raises for the caller to handle
+
+
+# ── AND THE READ SIDE, WHICH IS THE HALF THAT CAN DESTROY SOMETHING (2026-08-31) ──────
+# Making the writers atomic moved the failure rather than removing it. MEASURED: with
+# `_write_wants` doing tmp+rename and three pollers reading, readers still saw an EMPTY
+# want list — because `open()` on the destination can be refused for the instant the
+# rename lands, and `_wants_raw` caught the exception and answered `[]`.
+#
+# An empty answer to "what does she own" is not a small error here. Every writer in
+# wardrobe.py is read-modify-write over that same reader: a transient `[]` read followed
+# by a write does not lose the moment, it TRUNCATES THE FILE. That is the shape that
+# already killed ten of her rows once by a different route (wardrobe.py::_wants_raw).
+#
+# So a store read distinguishes the two things a bare `except` flattens:
+#   absent  -> None, immediately. An empty store is a real state.
+#   present but unreadable right now -> retried, then RAISED. Never silently empty.
+def read_bytes_retry(path: str, waits=_WAITS):
+    """The bytes of a store, or None if it genuinely is not there.
+
+    Raises if the file exists and could not be read within the budget — because the
+    caller writing back what it thinks it read is the failure this exists to prevent.
+    """
+    for w in waits:
+        try:
+            with open(path, "rb") as f:
+                return f.read()
+        except FileNotFoundError:
+            return None           # os.replace is atomic: the destination never blinks out
+        except OSError:
+            time.sleep(w)
+    with open(path, "rb") as f:   # the last attempt raises for the caller to handle
+        return f.read()
