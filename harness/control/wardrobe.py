@@ -1842,6 +1842,31 @@ def note_worn(what: str, kind: str = "look", by: str = "her") -> None:
     # here: this is the one function every path that dresses her passes through — the
     # [WEAR:] mark, her wear() tool, and his panel. Three callers each remembering to
     # stamp it is three chances for one of them not to.
+    # ── LOGGED, NOT SWALLOWED (2026-08-31, his call) ─────────────────────────────────
+    # Both halves were `except Exception: pass`, and the first one decides whether a
+    # garment stops being NEW. A failed stamp meant she wore the thing and it stayed on
+    # the "just arrived" shelf — which is the same wrong he reported about retire, one
+    # door along, and it would have looked exactly as much like nothing happening.
+    #
+    # THE HANDLER STAYS BROAD AND THE VOLUME CHANGES (harness/loud.py, and the "LOGGED,
+    # NOT SWALLOWED" note further down this file). This is on `choose()`'s path — every
+    # way she is dressed, hers and his — and the wearing itself has already succeeded by
+    # the time we get here, so raising would cost a real act to save a bookkeeping line.
+    # But NameError and its family are our code being wrong, they never fix themselves,
+    # and they must not read as "nothing happened".
+    #
+    # TWO BLOCKS, because they fail for different reasons and one is not evidence about
+    # the other: the stamp is a read-modify-write over the want list, the log is an
+    # append. Sharing one handler meant a failed stamp also skipped the wear log, and the
+    # log is what `favourites()` ranks over.
+    #
+    # IT IS ALSO SELF-HEALING, and that is worth knowing before anyone escalates this:
+    # the stamp is attempted on EVERY wear and only applies where `worn_at` is unset, so
+    # the next time she puts the thing on it lands. One warning is a bad minute, not a
+    # lost fact.
+    import logging as _lg
+    from harness.loud import swallowed as _sw
+    _log = _lg.getLogger(__name__)
     try:
         rows = _wants_raw()
         hit = next((r for r in rows if r.get("id") == what and not r.get("worn_at")), None)
@@ -1849,16 +1874,25 @@ def note_worn(what: str, kind: str = "look", by: str = "her") -> None:
             hit["worn_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             hit["worn_by"] = by
             _write_wants(rows)
-    except Exception:
-        pass
+    except Exception as exc:
+        # NAMED WITH ITS CONSEQUENCE. "note_worn failed" sends the next reader to this
+        # function; "it will still read as new" sends them to the shelf he is looking at.
+        _log.warning("[wardrobe] %r was worn but the worn_at stamp did not land (%s: %s)"
+                     " — it will still read as NEW until the next time it goes on",
+                     what, type(exc).__name__, exc)
+        _sw(_log, "note_worn stamp", exc, lane="wardrobe")
     try:
         os.makedirs(os.path.dirname(_worn_path()), exist_ok=True)
         with open(_worn_path(), "a", encoding="utf-8") as f:
             f.write(json.dumps({"what": what, "kind": kind, "by": by,
                                 "at": time.strftime("%Y-%m-%dT%H:%M:%SZ",
                                                     time.gmtime())}) + "\n")
-    except Exception:
-        pass
+    except Exception as exc:
+        # The wear log is what favourites() ranks over: a dropped line is a preference
+        # of hers quietly not counted.
+        _log.warning("[wardrobe] the wear log did not take %r (%s: %s) — favourites()"
+                     " is ranking over one fewer wearing", what, type(exc).__name__, exc)
+        _sw(_log, "note_worn wear log", exc, lane="wardrobe")
 
 
 def worn_log(limit: int = 400) -> List[Dict[str, Any]]:

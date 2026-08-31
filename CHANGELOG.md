@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.9 — a failed stamp is not a quiet one (2026-08-31)
+
+- **Wearing something could silently fail to mark it as worn.** `note_worn` writes the
+  `worn_at` stamp — the thing that takes a garment off the just-arrived shelf — and both
+  halves of it were `except Exception: pass`. A failed write meant the item was worn and
+  still read as NEW, with nothing anywhere saying why. It still does not raise (it is on
+  the path every dressing takes, and the wearing has already happened by then), but the
+  volume changes: the world at debug, programming errors at warning, and one plain
+  warning that names the CONSEQUENCE rather than the function — *"it will still read as
+  NEW until the next time it goes on"*. Self-healing: the stamp is retried on every wear.
+- The two halves are split, because they fail for different reasons: the stamp is a
+  read-modify-write over the want list, the wear log is an append, and sharing one
+  handler meant a failed stamp also dropped the wearing that `favourites()` ranks over.
+
 ## 0.8.8 — an unreadable store is not an empty one (2026-08-31)
 
 The tail of 0.8.7, and the more dangerous half.
