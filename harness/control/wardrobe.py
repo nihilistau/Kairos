@@ -49,7 +49,8 @@ from harness.loud import swallowed as _swallowed
 from harness.store_io import read_bytes_retry, replace_atomic
 
 # ── ONE LOGGER, BECAUSE THE SWALLOWS ARE THE POINT (2026-08-31) ──────────────────────
-# This file had eighteen `except Exception: pass` handlers and no module logger, so the
+# This file had TWENTY-TWO broad handlers answering with a bare default (ten of them a
+# plain `pass`) and no module logger, so the
 # only way a wardrobe failure could reach anyone was by them noticing the clothes were
 # wrong. `harness/loud.py` is the rule the rest of the repo uses: the world at debug
 # (a store mid-write, a file not there yet), our own bugs at warning, and where a

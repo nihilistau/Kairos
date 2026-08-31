@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.10 — eighteen quiet failures in the wardrobe (2026-08-31)
+## 0.8.10 — twenty-two quiet failures in the wardrobe (2026-08-31)
 
 An audit of every `except Exception: pass` in the wardrobe, after three days in which the
 answer to "why did nothing happen" was always "nothing said".
