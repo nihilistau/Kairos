@@ -418,8 +418,19 @@ def apply_personality_tags(reply: str, persona_path: str = "",
                 shows = _SHOW.findall(reply)
                 if shows:
                     _show_by_words(_WD, shows[-1].strip())
-            except Exception:
-                pass                   # a wardrobe that will not move must not eat a reply
+            except Exception as exc:
+                # A wardrobe that will not move must not eat a reply — that rule stands,
+                # and it is why this stays broad. But since 2026-08-31 `choose()` RAISES
+                # when the state write does not land, so this is the one place a failed
+                # dressing can still be eaten, and it must say so. Her mark asked for a
+                # change the room will not show; silence here is the shape of the whole
+                # bug this week.
+                logging.getLogger(__name__).warning(
+                    "[wear] her mark did not reach the wardrobe (%s: %s) — the reply "
+                    "stands, the clothes did not change", type(exc).__name__, exc)
+                from harness.loud import swallowed as _sw
+                _sw(logging.getLogger(__name__), "apply_personality_tags/acts", exc,
+                    lane="wear")
         if changed:
             write_state(path, state)
         result_state = {k: state.get(k, "") for k in ("voice", "mood", "traits")}

@@ -36,6 +36,7 @@ operator's own hand; `import_clip` copies them in and writes a row.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -44,7 +45,16 @@ import time
 from typing import Any, Dict, List, Optional
 
 from harness.control import avatar as AV
+from harness.loud import swallowed as _swallowed
 from harness.store_io import read_bytes_retry, replace_atomic
+
+# ── ONE LOGGER, BECAUSE THE SWALLOWS ARE THE POINT (2026-08-31) ──────────────────────
+# This file had eighteen `except Exception: pass` handlers and no module logger, so the
+# only way a wardrobe failure could reach anyone was by them noticing the clothes were
+# wrong. `harness/loud.py` is the rule the rest of the repo uses: the world at debug
+# (a store mid-write, a file not there yet), our own bugs at warning, and where a
+# swallow decides something a person can SEE, a warning that names what they will see.
+logger = logging.getLogger(__name__)
 
 # ── WHAT EACH TIER ACTUALLY IS, IN WORDS ──────────────────────────────────────────────
 # Keyed to avatar.TIERS so there is one tier vocabulary, not two. `wearing` is the honest
@@ -183,22 +193,65 @@ def _made_in(row, default: str = "") -> str:
 
 
 # ── HER CHOICE, WHICH HAS TO SURVIVE THE NIGHT ────────────────────────────────────────
+_DRESSED_IN_NOTHING = {"outfit": AV.DEFAULT_OUTFIT, "clip": "", "look": "",
+                       "by": "default", "at": ""}
+
+
+def _read_state() -> Dict[str, Any]:
+    """The state file, or the default set. Raises only if the file is THERE and will not
+    be read.
+
+    ── AN UNREADABLE STATE IS NOT AN EMPTY ONE, FOR A WRITER (2026-08-31) ────────────
+    `current()`'s contract is that it never raises, and for a READER that is right: the
+    room asking what she has on can answer "the default" and be no worse than a beat
+    late. `choose()` is not a reader. It does `st = current()`, edits one field and
+    writes the whole dict back — so one unreadable read makes the NEXT write erase the
+    look and the clip she had on. The same read-modify-write shape that truncated the
+    want list, on the file that says what she is wearing.
+
+    ── AND CORRUPT IS NOT UNREADABLE (2026-08-31, G-WARDROBE caught it) ──────────────
+    The first cut raised on a JSON error too, which G-WARDROBE's corrupt-state leg found
+    in one run: `{{{` on disk meant `choose()` raised FOREVER, and she could never be
+    dressed again until a person edited the file. Corrupt content is permanent, and a
+    permanent refusal is worse than the wrong it prevents — nothing recovers it, whereas
+    starting from the default set costs one look and the very next write repairs the
+    file. So it is the same three-way split `store_io` documents: absent is a real
+    state, unreadable is retried and then RAISED, corrupt is defaults SAID OUT LOUD.
+    """
+    blob = read_bytes_retry(_state_path())
+    if blob is None:
+        return dict(_DRESSED_IN_NOTHING)      # nothing written yet is a real state
+    try:
+        d = json.loads(blob.decode("utf-8"))
+        if not isinstance(d, dict):
+            raise ValueError("wardrobe state is %s, not an object" % type(d).__name__)
+    except Exception as exc:
+        logger.warning("[wardrobe] the state file will not parse (%s: %s) — she reads as "
+                       "wearing the default set, and the next change will overwrite it",
+                       type(exc).__name__, exc)
+        _swallowed(logger, "_read_state parse", exc, lane="wardrobe")
+        return dict(_DRESSED_IN_NOTHING)
+    # NORMALISE ON THE WAY OUT. A state file written before the rename says
+    # "tier"; every caller would otherwise have to know both spellings, which
+    # is how two names for one thing survive a rename in the first place.
+    if "outfit" not in d and "tier" in d:
+        d["outfit"] = d.pop("tier")
+    return d
+
+
 def current() -> Dict[str, Any]:
     """What she has chosen. Never raises; an unreadable file means she has chosen
-    nothing, which is a legitimate state and not an error."""
+    nothing, which is a legitimate state and not an error — but it SAYS SO now, because
+    "she is in the default" and "I could not read what she is in" look identical in a
+    room and are not the same fact."""
     try:
-        with open(_state_path(), encoding="utf-8") as f:
-            d = json.load(f)
-        if isinstance(d, dict):
-            # NORMALISE ON THE WAY OUT. A state file written before the rename says
-            # "tier"; every caller would otherwise have to know both spellings, which
-            # is how two names for one thing survive a rename in the first place.
-            if "outfit" not in d and "tier" in d:
-                d["outfit"] = d.pop("tier")
-            return d
-    except Exception:
-        pass
-    return {"outfit": AV.DEFAULT_OUTFIT, "clip": "", "look": "", "by": "default", "at": ""}
+        return _read_state()
+    except Exception as exc:
+        logger.warning("[wardrobe] could not read what she is wearing (%s: %s) — the room "
+                       "will show the default set, which may not be what she has on",
+                       type(exc).__name__, exc)
+        _swallowed(logger, "current", exc, lane="wardrobe")
+        return dict(_DRESSED_IN_NOTHING)
 
 
 # ── SHE CHANGED AND THE ROOM DID NOT SAY SO (2026-08-24, he caught it) ───────────────
@@ -232,8 +285,12 @@ def _emit_wear(ev: dict) -> None:
     for fn in fns:
         try:
             fn(dict(ev))
-        except Exception:
-            pass                      # a listener must never cost her the change
+        except Exception as exc:
+            # A listener must never cost her the change — but a listener that has been
+            # throwing since a refactor is a chip that never updates again, and that is
+            # indistinguishable from her never changing.
+            _swallowed(logger, "wear listener %r" % getattr(fn, "__name__", fn),
+                       exc, lane="wardrobe")
 
 
 # ── AFFINITY LIVES DOWN THE FILE, AND IT ALREADY DID (2026-08-25) ─────────────────
@@ -260,7 +317,10 @@ def choose(outfit: str = "", clip: str = "", look: str = None, by: str = "her",
     currently will not show — not that her choice was silently rewritten to something
     she did not make. `resolve()` clamps, and `describe()` says so out loud.
     """
-    st = current()
+    # THE RAISING READER, because the next four lines edit this dict and write the whole
+    # thing back (see `_read_state`). `current()` swallows for the room's sake; a writer
+    # that swallows loses the look she had on.
+    st = _read_state()
     outfit = outfit or tier          # legacy kwarg: callers still passing tier=
     if outfit:
         outfit = AV.canon(outfit)     # an old t0..t3 from anywhere is a rename
@@ -273,12 +333,22 @@ def choose(outfit: str = "", clip: str = "", look: str = None, by: str = "her",
         st["look"] = look
     st["by"] = by
     st["at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    try:
-        os.makedirs(os.path.dirname(_state_path()), exist_ok=True)
-        with open(_state_path(), "w", encoding="utf-8") as f:
-            json.dump(st, f, indent=1)
-    except Exception:
-        pass
+    # ── A DRESSING THAT DID NOT PERSIST IS A LIE THE WHOLE ROOM TELLS (2026-08-31) ──
+    # This was `except Exception: pass`, on a plain truncating write to the file the
+    # room, her prompt and the portrait all read. A failed write left her dressed in
+    # memory and nothing else — the chip said one thing, the next request said another,
+    # and nobody was told. It is also the exact file a live reader can make unwritable
+    # on Windows, which is how this whole day started.
+    #
+    # Atomic, retried, and it RAISES. Every caller reports it: her `wear` tool and the
+    # `[WEAR:]` mark answer with the failure, and the panel route answers `{ok: false}`.
+    # A wardrobe that will not move must not eat a reply — but it must not claim to have
+    # moved either.
+    os.makedirs(os.path.dirname(_state_path()), exist_ok=True)
+    _tmp = _state_path() + ".tmp"
+    with open(_tmp, "w", encoding="utf-8") as f:
+        json.dump(st, f, indent=1)
+    replace_atomic(_tmp, _state_path())
     # ...AND THE ROOM IS TOLD HERE, BY THE WRITER, for the same reason (2026-08-24).
     # The label rather than the id: `w016` means nothing on a chip, and `label` is what
     # she is called everywhere else she is shown.
@@ -289,8 +359,12 @@ def choose(outfit: str = "", clip: str = "", look: str = None, by: str = "her",
         _emit_wear({"outfit": _outfit_of(st), "look": st.get("look") or "",
                     "label": _lbl or _outfit_of(st), "clip": st.get("clip") or "",
                     "by": by})
-    except Exception:
-        pass
+    except Exception as exc:
+        # SHE CHANGED AND THE ROOM DID NOT SAY SO is the bug this whole block exists for
+        # (2026-08-24). Swallowing the announcement silently re-created it.
+        logger.warning("[wardrobe] she changed into %r and the room was not told (%s: %s)",
+                       st.get("look") or _outfit_of(st), type(exc).__name__, exc)
+        _swallowed(logger, "choose/emit", exc, lane="wardrobe")
 
     # THE WEARING IS LOGGED HERE, BY THE WRITER, not by each caller.
     #
@@ -356,10 +430,22 @@ def overlay() -> Dict[str, Dict[str, Any]]:
         return {}
     if _OVERLAY_CACHE.get("stamp") == stamp:
         return _OVERLAY_CACHE.get("rows") or {}
+    # ── AND AN UNREADABLE OVERLAY IS NOT AN EMPTY ONE (2026-08-31) ──────────────────
+    # `except Exception: return {}` here says "he has edited nothing" — which un-hides
+    # every garment he hid and puts every retired one back on offer, for her tools, the
+    # matcher, the portrait and the panel at once. That is the failure he reported,
+    # arriving by the one door that was built to prevent it. Present-but-unreadable is
+    # retried and then RAISED; genuinely corrupt JSON is the one case where `{}` is the
+    # only answer available, and it is said out loud rather than assumed.
+    blob = read_bytes_retry(p)
+    if blob is None:
+        return {}
     try:
-        with open(p, encoding="utf-8") as f:
-            d = json.load(f)
-    except Exception:
+        d = json.loads(blob.decode("utf-8"))
+    except Exception as exc:
+        logger.warning("[wardrobe] catalog.json will not parse (%s: %s) — every hidden or "
+                       "retired asset is on offer until it does", type(exc).__name__, exc)
+        _swallowed(logger, "overlay parse", exc, lane="wardrobe")
         return {}
     d = d if isinstance(d, dict) else {}
     _OVERLAY_CACHE["rows"], _OVERLAY_CACHE["stamp"] = d, stamp
@@ -469,7 +555,13 @@ def clips(all: bool = False) -> List[Dict[str, Any]]:
         # the offer filter, so a hidden clip is hidden for every reader at once.
         out = [_apply_overlay(r, "moment") for r in out]
         return out if all else [r for r in out if _offered(r)]
-    except Exception:
+    except Exception as exc:
+        # AN EMPTY LIST IS AN ANSWER, and it is the wrong one. "she has no moments" is
+        # what the panel, describe() and show_him() all render from this.
+        logger.warning("[wardrobe] the clip index would not read (%s: %s) — she will be "
+                       "told she has no moments to put on your screen",
+                       type(exc).__name__, exc)
+        _swallowed(logger, "clips", exc, lane="wardrobe")
         return []
 
 
@@ -645,7 +737,10 @@ def _face_now() -> str:
     """Which of the seven she is wearing — her mood picks it, exactly as the room does."""
     try:
         return AV.MOOD_FACE.get((her_state().get("mood") or "").strip().lower(), "calm")
-    except Exception:
+    except Exception as exc:
+        # "calm" is a fine answer to "she has no mood set"; it is a wrong one to a
+        # TypeError. her_state() already warns for the world, so this only classifies.
+        _swallowed(logger, "_face_now", exc, lane="wardrobe")
         return "calm"
 
 
@@ -659,7 +754,14 @@ def cell_words(face: str, outfit: str) -> str:
     try:
         with open(os.path.join(root(), "cells.json"), encoding="utf-8") as f:
             return (json.load(f) or {}).get("%s/%s" % (face, outfit), "") or ""
-    except Exception:
+    except FileNotFoundError:
+        return ""                     # 17 of the 28 are undescribed; absent is normal
+    except Exception as exc:
+        # A parse error blanks all 28 at once, which reads as "nobody has described any
+        # of these" — the state this file exists to move away from.
+        logger.warning("[wardrobe] cells.json did not parse (%s: %s) — every cell "
+                       "description is missing until it does", type(exc).__name__, exc)
+        _swallowed(logger, "cell_words", exc, lane="wardrobe")
         return ""
 
 
@@ -710,8 +812,8 @@ def describe() -> str:
             _fav = "You reach for %s more than anything else" % _lbl
             _fav += (" — and he said of it: %r." % (_pr[-1].get("said") or "")
                      if _pr and (_pr[-1].get("said") or "").strip() else ".")
-    except Exception:
-        pass
+    except Exception as exc:
+        _swallowed(logger, "describe/favourite", exc, lane="wardrobe")
     lines = ["You are wearing: %s" % now["words"],
              "  (%s)" % now["about"]]
     if now.get("generic"):
@@ -837,8 +939,13 @@ def describe() -> str:
         from harness.control import catalog as _cat
         lines.append("")
         lines.append(_cat.for_her())
-    except Exception:
-        pass
+    except Exception as exc:
+        # HIS REPORT WAS "she often says she cannot see clothes that she has", and this
+        # block is the grouped account that answers it. Losing it silently puts her back
+        # exactly where that complaint came from.
+        logger.warning("[wardrobe] the by-kind account is missing from what she reads "
+                       "(%s: %s)", type(exc).__name__, exc)
+        _swallowed(logger, "describe/for_her", exc, lane="wardrobe")
     return "\n".join(lines)
 
 
@@ -875,8 +982,9 @@ def search(want: str, limit: int = 12) -> List[Dict[str, Any]]:
     try:
         r = resolve()
         on_id = r.get("look") or r.get("shown") or ""
-    except Exception:
-        on_id = ""
+    except Exception as exc:
+        on_id = ""                    # only the "on you" marker; the answer still stands
+        _swallowed(logger, "search/resolve", exc, lane="wardrobe")
     def _hay(row):
         return " ".join([str(row.get("label") or ""), str(row.get("title") or ""),
                          " ".join(str(t) for t in (row.get("tags") or ())),
@@ -906,8 +1014,12 @@ def search(want: str, limit: int = 12) -> List[Dict[str, Any]]:
     try:
         _add([x for x in looks() if x.get("have")], "look")
         _add([x for x in clips() if x.get("have")], "clip")
-    except Exception:
-        pass
+    except Exception as exc:
+        # search_wardrobe EXISTS because she could not see what she owned. A swallow here
+        # answers "you do not own anything like that" about a wardrobe it never read.
+        logger.warning("[wardrobe] search could not read her things (%s: %s) — she will "
+                       "be told she owns nothing like it", type(exc).__name__, exc)
+        _swallowed(logger, "search/add", exc, lane="wardrobe")
     _strict = list(out)
     # the four standard outfits answer to their spoken words too — same whole-word law
     try:
@@ -922,15 +1034,15 @@ def search(want: str, limit: int = 12) -> List[Dict[str, Any]]:
                 seen.add(t)
                 out.append({"id": t, "kind": "outfit",
                             "label": words_for.get("wearing", t), "on": t == on_id})
-    except Exception:
-        pass
+    except Exception as exc:
+        _swallowed(logger, "search/outfits", exc, lane="wardrobe")
     # NOTHING EXACT? Try any single word before answering "you own nothing like that".
     if not out and words:
         try:
             _add([x for x in looks() if x.get("have")], "look", loose=True)
             _add([x for x in clips() if x.get("have")], "clip", loose=True)
-        except Exception:
-            pass
+        except Exception as exc:
+            _swallowed(logger, "search/loose", exc, lane="wardrobe")
     return out[:max(1, limit)]
 
 
@@ -970,7 +1082,12 @@ def her_state() -> Dict[str, str]:
         with open(p, encoding="utf-8") as f:
             _, st = parse_persona(f.read())
         return {k: st.get(k, "") for k in ("mood", "voice", "traits")}
-    except Exception:
+    except FileNotFoundError:
+        return {}                     # no persona file here: a real state (a fresh tree)
+    except Exception as exc:
+        logger.warning("[wardrobe] could not read her mood and voice (%s: %s) — the "
+                       "panel will show her with none", type(exc).__name__, exc)
+        _swallowed(logger, "her_state", exc, lane="wardrobe")
         return {}
 
 
@@ -1348,8 +1465,9 @@ def suggest_from_mark(raw: str, by: str = "her", made_in: str = "") -> Dict[str,
             _n = next((r for r in rows if r.get("id") == near["id"]), None)
             if _n and read_mark(str(_n.get("want") or ""))[1]:
                 near = {}
-    except Exception:
+    except Exception as exc:
         near = {}
+        _swallowed(logger, "suggest/near", exc, lane="wardrobe")
     nums = [int(m.group(1)) for r in rows
             for m in [re.match(r"w(\d+)$", str(r.get("id") or ""))] if m]
     wid = "w%03d" % ((max(nums) if nums else 0) + 1)
@@ -1479,7 +1597,14 @@ def character() -> str:
     try:
         with open(os.path.join(root(), "character.txt"), encoding="utf-8") as f:
             return f.read().strip()
-    except Exception:
+    except Exception as exc:
+        # THIS FUNCTION'S OWN DOCSTRING says what an empty answer costs: "without it a
+        # new look is a new woman". Every prompt composed while this is silently "" is a
+        # generation of somebody else, and the pictures come back looking like it.
+        logger.warning("[wardrobe] character.txt did not read (%s: %s) — anything "
+                       "generated now is anchored to NOTHING and will not be her",
+                       type(exc).__name__, exc)
+        _swallowed(logger, "character", exc, lane="wardrobe")
         return ""
 
 
@@ -1597,8 +1722,11 @@ def request(want: str, made_in: str = AV.DEFAULT_OUTFIT, by: str = "her",
     try:
         from harness.inference.stream_processor import strip_for_record as _sfr
         _clean = _sfr(want).strip()
-    except Exception:
+    except Exception as exc:
         _clean = want
+        # An ImportError here silently turns off mark-stripping on the want path, which
+        # is the guard the branch below depends on. loud.py grades that as ours.
+        _swallowed(logger, "request/strip", exc, lane="wardrobe")
     if not _clean or (_clean.startswith("[") and _clean.endswith("]")
                       and "]" not in _clean[1:-1]):
         # ── REFUSED, BUT NOT THROWN AWAY (2026-08-27) ───────────────────────────────
@@ -1612,8 +1740,14 @@ def request(want: str, made_in: str = AV.DEFAULT_OUTFIT, by: str = "her",
         _s = {}
         try:
             _s = suggest_from_mark(want, by=by, made_in=made_in) or {}
-        except Exception:
+        except Exception as exc:
             _s = {}
+            # The whole point of the suggestion path is that HER PROSE IS KEPT when she
+            # reaches for a verb that does not exist. Losing it here loses the only
+            # record of what she was trying to do.
+            logger.warning("[wardrobe] could not keep what she reached for (%s: %s): %r",
+                           type(exc).__name__, exc, want[:60])
+            _swallowed(logger, "suggest_from_mark", exc, lane="wardrobe")
         err = ("that reads as a control mark rather than something to wear "
                "(%s) — say it in words" % want[:60])
         if _s.get("id") and not _s.get("dup"):
@@ -1720,7 +1854,16 @@ def _scan_dir() -> Dict[str, Dict[str, str]]:
             stem, _, ext = fn.rpartition(".")
             if stem and ext in ("png", "webm"):
                 out.setdefault(stem, {})["still" if ext == "png" else "loop"] = fn
-    except Exception:
+    except FileNotFoundError:
+        return out                    # no looks/ yet: a real state, and a quiet one
+    except Exception as exc:
+        # "THE FOLDER IS THE TRUTH" (this function's own docstring), so a folder that
+        # will not list is a wardrobe with nothing in it — every look she owns drops out
+        # of looks(), describe() and the panel at once.
+        logger.warning("[wardrobe] could not list her looks folder (%s: %s) — %d of her "
+                       "garments will read as not owned", type(exc).__name__, exc,
+                       len(out))
+        _swallowed(logger, "_scan_dir", exc, lane="wardrobe")
         return out
     return out
 
@@ -1903,7 +2046,13 @@ def worn_log(limit: int = 400) -> List[Dict[str, Any]]:
                 ln = ln.strip()
                 if ln:
                     out.append(json.loads(ln))
-    except Exception:
+    except FileNotFoundError:
+        return out                    # nothing worn yet
+    except Exception as exc:
+        logger.warning("[wardrobe] the wear log stopped reading at %d rows (%s: %s) — "
+                       "favourites is ranking over a partial history",
+                       len(out), type(exc).__name__, exc)
+        _swallowed(logger, "worn_log", exc, lane="wardrobe")
         return out
     return out[-limit:]
 
@@ -1931,8 +2080,13 @@ def praise(what: str, said: str, by: str = "him") -> Dict[str, Any]:
                                 "said": said,
                                 "at": time.strftime("%Y-%m-%dT%H:%M:%SZ",
                                                     time.gmtime())}) + "\n")
-    except Exception:
-        pass
+    except Exception as exc:
+        # "HIS WORD OUTRANKS THE COUNT" — the note above this section. What he said is
+        # the one row here that cannot be reconstructed from anything else, and this
+        # answered {"ok": True} while dropping it.
+        logger.warning("[wardrobe] his words about %r were NOT kept (%s: %s): %r",
+                       what, type(exc).__name__, exc, said[:80])
+        _swallowed(logger, "praise", exc, lane="wardrobe")
     return {"ok": True, "on": what, "said": said}
 
 

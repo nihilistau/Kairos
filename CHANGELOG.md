@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.8.10 — eighteen quiet failures in the wardrobe (2026-08-31)
+
+An audit of every `except Exception: pass` in the wardrobe, after three days in which the
+answer to "why did nothing happen" was always "nothing said".
+
+- **Three of them decided something you can see.** `choose()` wrote her state through a
+  swallow, so a refused write left her dressed in memory only — the chip said one thing
+  and the next read said another. `current()` answered an unreadable state as "she has
+  chosen nothing", and `choose()` read-modify-wrote over that, erasing the look and clip
+  she had on. And `overlay()` answered an unreadable catalog as "you have edited
+  nothing", which un-hides every garment you hid and puts every retired one back on
+  offer. All three now follow the same three-way rule: **absent is a real state,
+  unreadable is retried and then raised, corrupt is defaults said out loud.**
+- **The rest are logged rather than silent**, and where a swallow decides something
+  visible the warning names what YOU will see rather than which function failed — "she
+  will be told she has no moments to put on your screen", "N of her garments will read as
+  not owned", "she will be told she owns nothing like it", "anything generated now is
+  anchored to nothing and will not be her". `praise()` was dropping your words verbatim
+  while answering `{"ok": true}`; they are the one row in that store that cannot be
+  reconstructed.
+- `G-WARDROBE-WORDS` grows a swallow audit: the three are driven by making the write, the
+  read and the overlay fail, plus a census — no `except Exception:` in `wardrobe.py` or
+  `catalog.py` may answer with a bare default without binding the exception.
+
 ## 0.8.9 — a failed stamp is not a quiet one (2026-08-31)
 
 - **Wearing something could silently fail to mark it as worn.** `note_worn` writes the
