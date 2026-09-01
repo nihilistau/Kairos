@@ -1,5 +1,65 @@
 # Changelog
 
+## 0.8.16 — memory becomes a package, and its `__init__.py` is the one door (2026-09-02)
+
+`harness/skills/memory.py` was 2273 lines. It is `harness/skills/memory/`, eight modules with
+one door, and **no behaviour changed** — every moved block is byte-identical to the reviewed
+one. If you import it, nothing changes for you: `from harness.skills.memory import remember`
+and `import harness.skills.memory as M` resolve exactly as before, private names included.
+
+**Why the shape.** The doctrine is *"one door, and the readers go through it"* (AGENTS.md §0).
+Inside a single file that is a **convention** — it holds because everything is adjacent, and it
+stops holding the moment somebody adds a second walker three hundred lines away. That is this
+file's own history: `search_memories_ranked()` did not filter retired rows while
+`search_memories_ranked_rows()`, *the next function in the file*, did, so the search tool
+served tombstones from two toolsets. A package makes the door a module boundary.
+
+    __init__.py  969   the DOORS and nothing else — remember, remember_about_self, forget,
+                       recall, list_memories, provenance, search_memories, memory_stats
+    rank.py      759   the recall seam, the evidence floor, the selection
+    mint.py      263   the capture queue and its one worker
+    health.py    161   registry hygiene: one computation, two projections
+    present.py   110   what a row may SAY — the secret rule and the render that applies it
+    store.py     101   the registry file and the read-modify-write lock over it
+    words.py     100   the lexical floor, applied identically to both sides of a comparison
+    authorship.py 87   who is speaking, and what they asked
+
+**Two rules come with it, and they are the useful part if you are working in there.** The
+façade re-exports; it does not implement twice. And you import the **package**, never a
+sibling — reaching a sibling directly makes the second door the package exists to prevent.
+The new `G-MEMORY-PACKAGE` holds both, from a census built out of the tree's own usage with the
+AST rather than a name list kept in the gate.
+
+**And one rule that cost more to learn than the split did:** *import the module, never the
+name, when the name can be rebound.* A test that installs a mutant is rebinding a name, and a
+by-name import **snapshots** — so if one caller binds the name and another reaches the module,
+patching the owner reaches one and misses the other, and the mutant grades a subset while
+printing a complete-looking pass. It happened here twice: once loudly, and once where a
+lost-write gate went green **with every read-modify-write lock deleted**, because the sluggish
+`_load` it installs to open the race was no longer the `_load` the doors called. Measured, then
+fixed, then re-verified in both directions. `G-MEMORY-PACKAGE` now derives the set of
+mutant-patched names from what the tests actually patch, so it constrains the next extraction
+without anyone remembering to update a list.
+
+**Three tests were found to be grading nothing on the way**, and only one was caused by the
+split. Worth knowing, because each is a shape rather than an incident:
+
+- One read `M.get_author()` behind `hasattr(M, "get_author")`. There is no `get_author` and
+  never was — the reader is `current_author()` — so the guard was always False, the expression
+  was always the literal `True`, and a check reading *"the lane was restored after her turn"*
+  had proved nothing since the day it was written. **An optional-name guard makes a typo
+  permanent and silent.**
+- The lost-write one above, which the split caused and the split's own new test caught.
+- One required the model to call `count_memories`, while the toolset it is handed is
+  `[remember, remember_about_self, recall, list_memories, forget]`. Five tools given, a sixth
+  demanded; asked *"how many facts do you have?"* she calls `list_memories`, which answers the
+  question, and the test failed. That is §0's fourth row — *the guard tested for a class the
+  producer could not emit* — living in a test instead of in the code, and it survived because
+  it only runs against a live model. Its expectation is derived from the toolset now: write,
+  read back through a tool **actually handed over**, and call nothing that was not.
+
+    offline suite 138 green / 1 skip / 0 red, in this tree
+
 ## 0.8.15 — the gateway becomes four modules (2026-09-01)
 
 `harness/server/app.py` was 6180 lines. It is 4976, and the three things that came out of it

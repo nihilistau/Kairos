@@ -8,16 +8,32 @@ status: LIVE — THE operational truth for memory; read before touching harness/
 
 This is the map of the memory system: where the state lives, what every field means, every
 door in and every door out, and the traps that have already bitten someone. If you are about
-to touch anything under `harness/skills/memory.py`, `harness/skills/lifecycle.py`,
+to touch anything under `harness/skills/memory/`, `harness/skills/lifecycle.py`,
 `harness/skills/notes.py`, `harness/model/presence.py`, `harness/model/person.py`,
 `harness/control/spine.py`, `harness/kairos/scheduler.py`, or the daemon's `routes.rs` memory
 code, read this first. Then read the docstrings in `harness/skills/lifecycle.py` and
-`harness/skills/memory.py` themselves — they carry the incident history for almost every rule
+`harness/skills/memory/` themselves — they carry the incident history for almost every rule
 below, in more detail than this file repeats.
 
 The one sentence that explains most of the bugs in this system: **an invariant enforced in
 one of two paths is enforced in neither, because the unguarded path is the one that runs.**
 See the TRAPS section for the receipts.
+
+> **`harness/skills/memory` is a PACKAGE (2026-09-01), and its `__init__.py` is the one
+> door.** It was one 2273-line file, and two outside reviews named it — beside
+> `harness/server/app.py` — as where the sentence above keeps coming true. The doctrine's
+> answer has always been *one door, and the readers go through it*; in one file that was a
+> **convention**, held up by the fact that everything happened to be adjacent. It is a module
+> boundary now. Two consequences for anyone working in there:
+>
+> * **The façade re-exports; it does not implement twice.** If a sibling owns a name, the
+>   name is imported. A second implementation of a memory rule is the bug class itself, and
+>   this is the most expensive place in the tree to put one.
+> * **Import the package, never a sibling.** `from harness.skills.memory import remember` and
+>   `import harness.skills.memory as M` both keep working exactly as before — 113 import
+>   sites, 84 of them reaching private names dynamically through `M.<name>`, and none of them
+>   had to change. Reaching a sibling directly (`from harness.skills.memory.store import …`)
+>   makes a second door, which is the thing the package exists to prevent.
 
 > **On the `file.py:123` references below (2026-08-19):** most are stale by hundreds of
 > lines — the code moved, the doc did not, and a reference table where no reference
@@ -29,7 +45,7 @@ See the TRAPS section for the receipts.
 
 | Store | Path | Format | Owner module |
 |---|---|---|---|
-| Fact registry | `var/memory/registry.jsonl` (path from `SP_RECALL_REGISTRY`, set in the live profile — `profiles/companion.toml` — and mapped to env by `serve.py`) | JSONL, one episode/fact per line | `harness/skills/memory.py`, `harness/skills/lifecycle.py` |
+| Fact registry | `var/memory/registry.jsonl` (path from `SP_RECALL_REGISTRY`, set in the live profile — `profiles/companion.toml` — and mapped to env by `serve.py`) | JSONL, one episode/fact per line | `harness/skills/memory/`, `harness/skills/lifecycle.py` |
 | Notes | `var/memory/notes.jsonl` | JSONL | `harness/skills/notes.py` |
 | Presence / attention ledger | `var/memory/presence.jsonl` | JSONL, one row per UTC day he was spoken to | `harness/model/presence.py` |
 | MEM-OKF knowledge stores | `memory-okf/` (LUT.md tier-0, `sum/` tier-1, `full/` tier-2, content-addressed), plus `memory-okf-self/`, `memory-okf-personality/`, `memory-okf-telemetry/` | Markdown + frontmatter, content-addressed by `sha256(body)[:16]` or C2 signature | `tools/okf_mem.py` |
@@ -42,7 +58,7 @@ this checkout has 86 rows: `fact` 58, `preference` 12, `identity` 8, `relationsh
 TRAP 1.
 
 The registry is rewritten atomically: write to `registry.jsonl.tmp`, then `os.replace()` onto
-the real path (`harness/skills/memory.py:55-65`, `_save_all`). Same pattern in `notes.py:76-83`
+the real path (`harness/skills/memory::_save_all`). Same pattern in `notes.py::_write_all`
 and `presence.py:88-100`. A half-written memory file is worse than a stale one — never write
 the live path directly except via an atomic rewrite or a single `open(..., "a")` append.
 
@@ -152,7 +168,7 @@ Other fields:
 > [`docs/ANON-MODE.md`](ANON-MODE.md); G-ANON is the proof.
 
 
-### 1. `harness/skills/memory.py:remember()` — the authoritative door
+### 1. `harness/skills/memory::remember()` — the authoritative door
 
 In order (`memory.py:97-263`):
 
@@ -712,7 +728,7 @@ points at a throwaway registry before running them against a real store, since t
 
 ## If you change this, run these
 
-Before merging any change to `harness/skills/memory.py`, `harness/skills/lifecycle.py`,
+Before merging any change to `harness/skills/memory/`, `harness/skills/lifecycle.py`,
 `harness/skills/notes.py`, `harness/model/presence.py`, `harness/model/person.py`,
 `harness/control/spine.py` (the recall/memory deciders), `harness/kairos/scheduler.py`, or the
 daemon's memory code in `routes.rs`/`recall.rs`:

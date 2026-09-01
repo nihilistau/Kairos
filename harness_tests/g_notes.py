@@ -64,7 +64,9 @@ def main() -> int:
     # neither" — this plants the crash leftover BEFORE the first board write, so the
     # first real _write_all below must quarantine it instead of open(tmp,"w")-ing over
     # the only record of what a dying process was about to commit. Checked after the
-    # first add. Mutant: drop rescue_stray_tmp() from notes._write_all and the
+    # first add (from harness.store_io, which owns tmp+replace — it lived in
+    # harness.skills.memory until 2026-09-01). Mutant: drop rescue_stray_tmp() from
+    # notes._write_all and the
     # quarantine check goes red by name.
     _stranded = N._store() + ".tmp"
     os.makedirs(os.path.dirname(_stranded), exist_ok=True)

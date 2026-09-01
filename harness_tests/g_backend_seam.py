@@ -164,8 +164,12 @@ check("/v1/start and the restart door refuse an external engine politely",
       "external engine" in app and '"restart" not in (_engine_info()' in app)
 check("the in-flight hooks feed the turn meter (one writer, two readers)",
       app.count("_tm.start()") == 1 and app.count("_tm.end()") == 1)
-for path, needle in (("harness/skills/memory.py", '_sup("capture")'),
-                     ("harness/skills/semindex.py", '_sup("embed")'),
+# `harness/skills/memory` is a PACKAGE (2026-09-01), so it is read as one — a
+# `_sup("capture")` that moves to a sibling still satisfies the claim, which is what
+# this leg means. The rest are single files and stay single files.
+check("memory degrades by supports()",
+      '_sup("capture")' in _srcmod.pkg("harness", "skills", "memory"))
+for path, needle in (("harness/skills/semindex.py", '_sup("embed")'),
                      ("harness/skills/sight.py", '_sup("inject_frames")'),
                      ("harness/voice/service.py", '"inject_frames" not in'),
                      ("harness/control/watchdog.py", '_sup("restart")')):

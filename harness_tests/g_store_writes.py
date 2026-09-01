@@ -53,7 +53,8 @@ from _gate import check, finish, sandbox as _sandbox, utf8_stdout  # noqa: E402
 utf8_stdout()
 _SB = _sandbox(os.path.basename(__file__))
 
-from harness.store_io import replace_atomic, _WAITS  # noqa: E402
+from harness.store_io import read_bytes_retry, replace_atomic, _WAITS  # noqa: E402
+import _src as _srcmod  # noqa: E402
 
 print("1. THE HELPER IS A RETRY WITH A BUDGET, AND IT STILL RAISES")
 _src = io.open(os.path.join(ROOT, "harness", "store_io.py"),
@@ -64,23 +65,34 @@ check("...with a budget measured in seconds, not milliseconds",
 # THE LAST ATTEMPT IS OUTSIDE THE LOOP ON PURPOSE: a helper that swallowed the final
 # PermissionError would turn "your edit did not save" into "your edit saved", which is
 # strictly worse than the bug it replaces.
-def _tail_of(fn_name, end_marker, src=_src):
-    """The body of one helper, comments stripped — SLICED BY NAME, because the file has
-    two retry loops now and `rsplit("for w in waits:")` silently graded the other one."""
-    blk = src[src.index("def %s(" % fn_name):]
-    blk = blk[:blk.index(end_marker)] if end_marker in blk else blk
+def _tail_of(fn):
+    """The body of one helper, comments stripped.
+
+    ── ASKED OF THE OBJECT, NOT OF THE FILE (2026-09-01) ────────────────────────────
+    This used to slice `store_io.py`'s text between two markers, and the second marker for
+    the read helper was `"\\n\\ndef "` — fine while `read_bytes_retry` was the LAST
+    function in the file. `rescue_stray_tmp` moved in below it (out of `memory.py`, beside
+    the pattern it guards) and the slice ran on past the end of the function it meant to
+    grade, so the tail's last line became `_RESCUED: set = set()` and the leg went red
+    over a correct helper. A gate that convicts working code because a NEIGHBOUR appeared
+    is the src-trap, and `_src.body()` — `inspect.getsource` of the function itself — is
+    what this repo already decided to do about it (G-SRC-TRAP, `harness_tests/_src.py`).
+    An earlier note here still applies and is now structural: the file has two retry
+    loops, so the helper must be identified, never guessed at by pattern.
+    """
+    blk = _srcmod.body(fn)
     lines = [l.split("#")[0].rstrip() for l in blk.rsplit("for w in waits:", 1)[-1].splitlines()]
     return blk, [l for l in lines if l.strip()]
 
 
-_blk, _tail_code = _tail_of("replace_atomic", "def read_bytes_retry")
+_blk, _tail_code = _tail_of(replace_atomic)
 check("the last attempt is unguarded, so a spent budget RAISES",
       "except PermissionError:" in _blk
       and _tail_code[-1].strip() == "os.replace(tmp, dst)",
       _tail_code[-1:])
 # THE READ HELPER, same rule and for a sharper reason: a read that gives up quietly
 # answers "empty", and empty is what a read-modify-write writes back.
-_rblk, _rtail = _tail_of("read_bytes_retry", "\n\ndef ")
+_rblk, _rtail = _tail_of(read_bytes_retry)
 check("the read helper raises too — an unreadable store is never answered as empty",
       "return None" in _rblk and _rtail[-1].strip() == "return f.read()", _rtail[-2:])
 

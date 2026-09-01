@@ -626,7 +626,7 @@ def build_env(c: dict) -> dict:
         # THE DISK FLOOR. An episode is mean 11.1 MB / max 79.1 MB measured over her
         # real ones, so a live mint spends real disk. Below this many GB free the mint
         # yields and rows land with npos=0 (recall is text + semantic) rather than
-        # racing the registry write for the last block. harness/skills/memory.py.
+        # racing the registry write for the last block. harness/skills/memory/.
         "SP_CAPTURE_MIN_FREE_GB": str(mem.get("mint_min_free_gb", 2)),
         # WHERE EPISODES LIVE. An episode is ep.k + ep.v at full depth per position:
         # mean 11.1 MB, written once, read only on a deep recall. That belongs OFF the
