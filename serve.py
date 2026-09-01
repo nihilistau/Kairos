@@ -1504,6 +1504,55 @@ def main() -> int:
     # this repo a session before.
     daemon_only = "--daemon-only" in sys.argv
     external = (c.get("engine", {}).get("kind") or "sp") != "sp"
+    # ── A NATIVE PROFILE WITH NO BINARY REFUSES, LOUDLY (2026-09-02) ──────────────────
+    # The engine is its own public repo now (`kairos-engine`) and Kairos ships an `sp.toml`
+    # that selects it. So the ordinary way to reach this line is: somebody read the docs,
+    # ran `serve.py sp`, and has not built the daemon.
+    #
+    # WHAT MUST NOT HAPPEN is the shape this launcher already has rules about — "a knob the
+    # profile cannot reach is a knob that does not exist", and its sibling, a profile that
+    # quietly becomes a different stack. A missing `engine_exe` used to reach
+    # `os.path.basename()` and sail straight past: the daemon never started, nothing bound
+    # :3000, and the failure surfaced minutes later as a gateway that would not warm. That
+    # is the 2026-08-01 wrong-model outage with the model missing altogether.
+    #
+    # A profile names a MODEL and a BACKEND. If the backend it names is not on disk, the
+    # honest answer is to say so and stop, with the address of the thing to build.
+    # ── AND IT CHECKS THE WEIGHTS, NOT ONLY THE BINARY (2026-09-02) ──────────────────
+    # The first cut checked `engine_exe` alone. `sp.toml`'s path is RELATIVE to the Kairos
+    # root — `engine/tools/.../sp-daemon.exe` — because that is where an adopter clones the
+    # engine, and in THIS tree that path resolves to her real, built daemon. So the template
+    # profile sailed past the guard and `serve.py sp` went on to `stop()` the live stack and
+    # try to boot a daemon against `<path-to>/models/your-model.sp-model`.
+    #
+    # I did that, to her running stack, while testing the guard. A native profile needs a
+    # binary AND weights, so the guard asks for all three; a template fails on the model even
+    # where the binary happens to exist.
+    if not external and not daemon_only:
+        _p = c.get("paths") or {}
+        _exe = str(_p.get("engine_exe") or "")
+        _missing = [(_k2, str(_p.get(_k2) or "")) for _k2 in ("engine_exe", "model", "tokenizer")
+                    if str(_p.get(_k2) or "") and not os.path.exists(str(_p.get(_k2)))]
+        if _missing:
+            raise SystemExit("\n".join([
+                "serve.py: this profile's engine is the NATIVE daemon (kind = 'sp') and it is",
+                "  not ready — these paths do not exist:",
+            ] + [
+                "      %-11s %s" % (_k2 + ":", _v2) for _k2, _v2 in _missing
+            ] + [
+                "",
+                "  Build it, or use a profile with an OpenAI-compatible endpoint:",
+                "      python serve.py companion      <- LM Studio / llama-server / vLLM",
+                "",
+                "  The engine is a separate repository, and it is optional:",
+                "      git clone --recurse-submodules \\",
+                "          https://github.com/nihilistau/kairos-engine engine",
+                "      cd engine && build-wirecuda.bat",
+                "",
+                "  It goes at engine/ INSIDE this tree, not beside it: serve.py does",
+                "  `from engine.launch import launch_daemon`, which resolves from here.",
+                "  docs/BACKENDS.md has the table of what each backend can and cannot do.",
+            ]))
     if daemon_only and external:
         print("[kairos serve] --daemon-only: this profile's engine is EXTERNAL (%s) — "
               "there is no daemon to start; start the engine yourself."

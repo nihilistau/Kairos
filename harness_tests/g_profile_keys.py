@@ -94,7 +94,19 @@ for p in profiles:
 # ships one profile it is simply not that tree's business.
 _live = {a for a in INERT_ALLOWED
          if any(a in leaf_keys(tomllib.load(open(p, "rb"))) for p in profiles)}
-_orphans = sorted(INERT_ALLOWED - _live) if len(profiles) > 1 else []
+# ── "IS THIS THE SOURCE TREE?" IS NOT "HOW MANY PROFILES ARE THERE?" (2026-09-02) ────
+# This read `len(profiles) > 1`, using the profile COUNT as a proxy for being in the tree
+# that owns the engine profiles — true while the export shipped exactly one. Adding
+# `sp.toml` (the optional native-engine template) made the export ship two, the check
+# started running there, and it convicted `decode.mtp` — a key that is alive and well in
+# `companion.toml`, which does not ship. A red about drift, caused by no drift at all.
+#
+# The honest marker is the manifest directory: `kairos-export/` is how this tree makes the
+# export and it is excluded from it by construction, so its presence means "the profiles
+# the allowlist describes live here". A proxy that happened to correlate is worse than a
+# fact, and this is the fact.
+_is_source = os.path.isdir(os.path.join(ROOT, "kairos-export"))
+_orphans = sorted(INERT_ALLOWED - _live) if _is_source else []
 check("the allowlist only names keys that still exist (a row outliving its key is "
       "the drift in the other direction)", not _orphans, _orphans)
 

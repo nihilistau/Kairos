@@ -15,6 +15,37 @@ health / subscribe_events / last_kairos / kind / supports`):
 | `sp` (the default on every existing profile) | the Rust + CUDA **sp-daemon** — Kairos's own engine | `harness/inference/client.py::SPDaemonClient` |
 | `openai` (`profiles/companion.toml`) | any `/v1/chat/completions` server: LM Studio, `llama-server`, vLLM, a cloud | `harness/inference/backends/openai.py::OpenAIClient` |
 
+### Where the native engine comes from (2026-09-02)
+
+The `sp` backend is a **separate, optional repository** —
+[`kairos-engine`](https://github.com/nihilistau/kairos-engine) — and neither Kairos nor a
+clone of it contains the daemon. That is deliberate:
+
+* a Kairos clone that dragged in CUDA source would fetch a compiler farm it will not build,
+  still need a GGUF that cannot live in git, and read a README about LM Studio on :8810;
+* the export refuses it structurally — `kairos-export.toml` ships no `engine/` or `core/`,
+  and `g_kairos_scrub` FAILS if either is tracked in the public tree.
+
+**It goes at `engine/` INSIDE this tree, not beside it** — `serve.py` does
+`from engine.launch import launch_daemon`, which resolves from the Kairos root. The
+`.gitignore` already expects it there, and `g_kairos_scrub` checks TRACKED files, so a nested
+clone does not trip it.
+
+```bash
+cd Kairos
+git clone --recurse-submodules https://github.com/nihilistau/kairos-engine engine
+cd engine && build-wirecuda.bat && cd ..
+python serve.py sp
+```
+
+`profiles/sp.toml` ships with Kairos so that `serve.py sp` is a real command rather than
+"no such profile" — and when the binary is not there **it refuses and says so**, naming the
+repo and the build command. It does not fall through to the OpenAI path: a mistyped stack
+that silently becomes the other one has cost a session here before.
+
+**Pin a release.** Engine cuts are rarer than harness cuts, and a daemon from Tuesday beside
+a harness from Friday is three components that were each fine and were never tested together.
+
 `supports` is the honest capability set. Every seam that needs a daemon-only capability asks it and
 **degrades with a stated loss** — never fails, never pretends. `InferenceConfig.to_openai_chat` sends
 only the PORTABLE fields (`top_k` / `repeat_penalty` only under `dialect = "llamacpp"`); every SP-ONLY
