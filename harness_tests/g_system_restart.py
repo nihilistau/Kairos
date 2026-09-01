@@ -39,6 +39,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+import _src as _srcmod  # noqa: E402
 
 PASS = FAIL = 0
 
@@ -53,7 +54,7 @@ def check(name, cond, detail=""):
         print("  FAIL %s %s" % (name, detail))
 
 
-APP = io.open(os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read()
+APP = _srcmod.pkg("harness", "server")
 SRV = io.open(os.path.join(ROOT, "serve.py"), encoding="utf-8").read()
 
 print("1. the profile is known, not guessed")

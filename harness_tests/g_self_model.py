@@ -41,6 +41,7 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+import _src as _srcmod  # noqa: E402
 
 SB = os.path.join(tempfile.gettempdir(), "_g_self_model")
 shutil.rmtree(SB, ignore_errors=True)
@@ -203,7 +204,7 @@ check("the block is present in the composed prefix",
       "Things you know about yourself" in prefix, prefix[:120])
 check("...carrying the fact itself", "tin roof" in prefix)
 
-app = io.open(os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read()
+app = _srcmod.pkg("harness", "server")
 check("nothing else composes a rival self-model block",
       app.count("About yourself (self-model)") == 0)
 

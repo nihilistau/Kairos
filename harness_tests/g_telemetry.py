@@ -31,6 +31,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _src as _srcmod  # noqa: E402
 from _gate import check, finish, sandbox, utf8_stdout  # noqa: E402
 
 utf8_stdout()
@@ -230,7 +231,7 @@ check("...and reported, so the omission is visible",
 
 print("\n8. SHE IS ACTUALLY HANDED IT — THE TURN NOTE AND THE REASON")
 # THE TWO WRONG PLACES ARE BOTH ALREADY KNOWN, so this asserts the third.
-_app_src = open(os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read()
+_app_src = _srcmod.pkg("harness", "server")
 check("the note is a SYSTEM row, not a staple on his words",
       '"role": "system", "_tel": 1' in _app_src,
       "the wardrobe staple was measured out on 2026-08-19: she read a parenthetical on "
@@ -630,7 +631,7 @@ print("\n9. WHERE SHE LISTENS IS A DECISION, AND IT IS WRITTEN DOWN")
 # not made that decision. Loopback is the security model here — `_origin_ok` returns True
 # when there is no Origin header, so the origin check defends against a browser and nothing
 # else — and a default that quietly widened would hand them shell access over their LAN.
-_asrc = open(os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read()
+_asrc = _srcmod.pkg("harness", "server")
 check("the DEFAULT bind is still loopback, for everyone who has not decided",
       'os.environ.get("SP_GATEWAY_BIND") or "127.0.0.1"' in _asrc,
       "a widened default is shell access over somebody else's LAN")

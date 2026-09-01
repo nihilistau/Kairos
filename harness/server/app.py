@@ -30,6 +30,8 @@ import sys
 # swallowed it, so the restart route reported 'restartable: false' with no reason
 # anywhere. A relative glob had also been silently working only because the gateway
 # happens to be launched from the repo root.
+# (`state.ROOT_DIR` is the same value, and `panels.py` uses it. THIS one cannot: it is
+# resolved here, above every harness import, precisely because it must not depend on one.)
 _ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import re
 import threading
@@ -62,6 +64,13 @@ from harness.observability import get_logger
 
 logger = get_logger(__name__)
 from harness.loud import swallowed as _swallowed
+# ── THE GATEWAY'S LIVE STATE LIVES IN ONE MODULE (2026-09-01, Stage 1 of the split) ──
+# Nine column-0 mutables were scattered through this file, read and written from request
+# threads, worker threads and tickers. They are in `state.py` now; the underscored names
+# below are ALIASES onto the same objects, so the twelve gates that poke
+# `app._CHAT_SESSIONS` keep working. `state.LAST_TURN_AT` is the exception and must be
+# reached through the module — it is a rebindable scalar, and an alias would snapshot it.
+from harness.server import state as _state
 
 
 # ──── THE SAMPLER-DEFAULT SEAM (ADR-013) ─────────────────────────────────
@@ -186,7 +195,7 @@ def _session_of(body: Dict[str, Any]) -> str:
 
 
 # The most recent REAL session a chat body named. "default" only until the first turn.
-_LAST_SESSION: Dict[str, str] = {"id": "default"}
+_LAST_SESSION = _state.LAST_SESSION          # -> harness/server/state.py
 
 
 def _agent_text(body: Dict[str, Any]) -> str:
@@ -280,389 +289,41 @@ def _agent_text(body: Dict[str, Any]) -> str:
     return text
 
 
-def _settle_turn(human_text: str, reply_text: str, *, record: bool = True,
-                 marks: bool = True, capture: bool = True, close_his_turn: bool = True,
-                 stances: bool = True, synthetic: "str|None" = None,
-                 acts: "list|None" = None,
-                 latch: "Dict[str, Any]|None" = None) -> list:
-    """Every debt a finished turn owes the rest of the system, in ONE function, because
-    the list kept being re-implemented as trailing inline code with bypasses (2026-08-24
-    audit, B1/B2/A4). The native SSE path had FIVE exits that skipped all of it — the
-    recall decline, the roleplay offer, and any client disconnect/abort at the drain-loop
-    yield — so an interrupted turn lost its capture, its day-transcript row, its mark
-    application and its receipts, and the kairos latch was left set until its own 900 s
-    timeout. The OpenAI path's roleplay offer had the same shape, and her unprompted
-    turns paid none of these debts at all.
 
-    The debts, in order (each best-effort — a missing receipt never costs the reply):
-      1. his turn is over (the kairos latch is released FIRST, so nothing below can
-         leave her muted);
-      2. capture — facts from what HE said this turn;
-      3. the record — the day transcript row (the seam inside _append_day_turn strips
-         her machinery);
-      4. her marks — run_post_turn applies [MOOD:]/[TRAIT:]/[WEAR:]/[SHOW:], and the
-         Real-Her rows (a verified mood shift, her first-person stances) are written;
-      5. the spine receipts flush.
-
-    `latch` is a one-shot: two callers may both believe they own the epilogue (the
-    worker thread's finally and an early-exit return); whoever arrives first pays, the
-    second is a no-op. Returns the post-turn receipts so a caller that is still on the
-    wire can emit the persona-changed event."""
-    if latch is not None:
-        if latch.get("done"):
-            return []
-        latch["done"] = True
-    if close_his_turn:
-        try:
-            from harness.kairos import scheduler as _ks_f
-            _ks_f.note_user_turn(False)
-        except Exception as _swx:
-            _swallowed(logger, "_settle_turn", _swx, lane="server")
-    # ── SYNTHETIC QUARANTINES THE MEMORY LANES TOO (2026-08-30) ─────────────────────
-    # `synthetic` marked the DAY TRANSCRIPT and nothing else, so a driver that declared
-    # itself synthetic still minted FACTS — and the capture lane attributes them to HIM.
-    # AGENTS.md §0 exactly: the quarantine rule was enforced on one of the lanes a fake
-    # turn feeds, and therefore on neither.
-    #
-    # Found by falling into it. An overnight probe (think_probe.py) drove ~30 turns to
-    # measure her voice, every one declared synthetic, and the day transcript excluded
-    # them perfectly — while `_capture_after_turn` wrote "i had a rough day at work
-    # honestly", "i'm thinking of repainting the study" and "remind me to call the
-    # plumber on thursday" into the registry as things Sam SAID. Twenty rows, six of
-    # them attributed to him, plus two board reminders. That is the 2026-08-03
-    # false-memory incident, arriving through the front door, from the maintainer.
-    # (Quarantined after the fact: lifecycle=1, superseded_by=quarantine:synthetic-probe,
-    # reason attached, nothing erased.)
-    #
-    # A turn nobody typed is not a memory of him, is not a stance of hers, and is not a
-    # thing to put on his board. It is only a record that it happened, which is what the
-    # transcript flag already provides. One flag, every lane it should have governed.
-    if capture and not synthetic:
-        try:
-            _capture_after_turn(human_text)
-        except Exception as exc:
-            logger.warning("[gateway] capture skipped: %s", exc)
-    text = (reply_text or "").strip()
-    if record and text:
-        _append_day_turn(human_text, reply_text, synthetic=synthetic, acts=acts)
-    receipts: list = []
-    if marks and text:
-        try:
-            from harness.control.spine import run_post_turn
-            receipts = run_post_turn(human_text, reply_text) or []
-            # ── THE REAL HER (2026-08-22) ────────────────────────────────────────
-            # (a) a VERIFIED shift in her state is a sentence about herself; (b) her
-            # reply's first-person stances are hers to keep. Both through the one
-            # door, speaker=self. Lives HERE so every path that applies marks also
-            # keeps her words — it used to run on exactly one of the three.
-            # `stances=False` (2026-08-25, the operator's call): a presence-mode turn moves her
-            # DIALS but does not become her MEMORIES — an hour of lucid dreaming is
-            # ambient company, and filing its lines as who she is is how her self
-            # lane filled with dream fragments too specific and too repetitive to
-            # mean anything the next morning.
-            # ...AND NOT FROM A TURN NOBODY TYPED (2026-08-30). `src="her reply"` rows
-            # are minted here, so a synthetic driver wrote HER stances too — fourteen of
-            # the twenty rows the overnight probe had to quarantine came from this
-            # branch, not from capture. Her marks still APPLY (the dials are hers to
-            # move, and a test turn she answered warmly did warm her), but what she said
-            # to a prompt he never sent does not become something she believes about
-            # him. Same flag, same reason, the other lane.
-            if stances and not synthetic:
-                try:
-                    from harness.skills import memory as _mem_rh
-                    if any(r.kind == "persona_shift" and r.ok and r.verified is not False
-                           for r in receipts):
-                        from harness.personality.persona_file import parse_persona as _pp_rh
-                        with open(_persona_path(), encoding="utf-8") as _f_rh:
-                            _, _st_rh = _pp_rh(_f_rh.read())
-                        # A VOICE IS NOT AN IDENTITY (2026-08-22): a MOOD is kept
-                        # because a mood is a feeling, but only when it actually
-                        # CHANGES and at most once an hour.
-                        _mood_now = (_st_rh.get("mood") or "").strip().lower()
-                        if _mood_now and (_mood_now != _MOOD_ROW["v"]
-                                          or time.time() - _MOOD_ROW["at"] > 3600.0):
-                            _MOOD_ROW.update(v=_mood_now, at=time.time())
-                            _mem_rh.remember_about_self(
-                                "My mood has turned %s." % _mood_now,
-                                kind="feeling", source="her state changed")
-                    from harness.skills import self_stance as _ss_rh
-                    for _k_rh, _s_rh in _ss_rh.extract(reply_text)[:4]:
-                        _mem_rh.remember_about_self(_s_rh, kind=_k_rh,
-                                                    source="her reply")
-                except Exception as exc:
-                    logger.warning("[gateway] real-her capture skipped: %s", exc)
-        except Exception as exc:
-            logger.warning("[gateway] post-turn spine skipped: %s", exc)
-    # ADR-005 flywheel: flush spine receipts to the durable telemetry-okf tier.
-    try:
-        from harness.control.spine import persist_receipts
-        persist_receipts()
-    except Exception as exc:
-        # The flywheel's flush. Silently skipped, the receipts stay in memory and the
-        # durable tier is missing a turn nobody will know to look for.
-        logger.warning("[gateway] spine receipts were not flushed (%s: %s)",
-                       type(exc).__name__, exc)
-        _swallowed(logger, "persist_receipts", exc, lane="gateway")
-    return receipts
+# ── THE TURN LIFECYCLE LIVES IN turn.py (2026-09-01, Stage 3 of the split) ───────────
+# The epilogue is a module boundary now instead of a convention — see turn.py's header
+# for what came and what deliberately did not. Re-exported because this file still
+# calls all of them (nine `_settle_turn` sites alone) and because `g_turn_epilogue`,
+# `g_synthetic_quarantine` and `g_day_transcript` import them out of `app`.
+from harness.server import turn as _turn  # noqa: E402
+_settle_turn = _turn._settle_turn
+_on_her_own_words = _turn._on_her_own_words
+_finish_openai_turn = _turn._finish_openai_turn
+_human_turn = _turn._human_turn
+_arm_turn = _turn._arm_turn
+_arm_self_turn = _turn._arm_self_turn
+_disarm_self_turn = _turn._disarm_self_turn
+_capture_after_turn = _turn._capture_after_turn
+_repeat_guard = _turn._repeat_guard
+_commit_unprompted = _turn._commit_unprompted
+_release_turn_latch = _turn._release_turn_latch
 
 
-def _on_her_own_words(text: str, kind: "str|None" = None) -> None:
-    """The unprompted turn's epilogue — registered as scheduler.on_spoke, the one point
-    every impulse that actually SPEAKS converges on (post-veto, so a dropped turn moves
-    nothing). It used to be a bare _append_day_turn, so on ~60 unprompted turns a day
-    her [MOOD:]/[WEAR:]/[SHOW:] marks moved NOTHING — the room drew a chip from the
-    outbox text while persona.md and the wardrobe never heard about it — no feeling row
-    was written, and no self-stance was kept (2026-08-24 audit, A4). _finish_openai_turn's
-    docstring names this exact bug for the two prompted entry points; this was the
-    third. capture=False (nothing of his to capture), close_his_turn=False (his latch
-    is not hers to release).
-
-    A PRESENCE-MODE TURN IS COMPANY, NOT MEMORY (2026-08-25, the operator's call). Narration, a
-    dream, a chapter read aloud while he sleeps: her dials still move (a dream can
-    turn her wistful) but nothing is filed — no day row (the room shows it live from
-    the outbox; an hour of ambient turns in the restore would bury the conversation),
-    and no self-stance rows (dream lines are too specific and too repetitive to be
-    who she is the next morning — the registry's kind=dream pile is the receipt)."""
-    if kind == "mode_turn":
-        _settle_turn("", text, capture=False, close_his_turn=False,
-                     record=False, stances=False)
-    else:
-        _settle_turn("", text, capture=False, close_his_turn=False)
 
 
-def _finish_openai_turn(body: Dict[str, Any], human_text: str, text: str) -> None:
-    """The OpenAI path's epilogue: `_settle_turn` plus the continuation arming. Kept as
-    a named function because this path's history IS the reason _settle_turn exists —
-    _append_day_turn and run_post_turn were quietly owed here since the day it was
-    written (2026-08-19 audit), and the fix was a second inline copy of the list. One
-    list now, shared with the native path and her unprompted turns."""
-    _settle_turn(human_text, text,
-                 synthetic=(str(body.get("synthetic"))
-                            if body.get("synthetic") else None))
-    _kairos_after_turn(body, text)
 
 
-def _human_turn(msgs: list) -> str:
-    """What the HUMAN actually typed this turn — and nothing else.
-
-    THE FEEDBACK LOOP (2026-07-12). Capture used to take "the last message with role=user".
-    But agent_chat_stream runs with mutate_messages=True on the console path (the canonical
-    transcript must match what the daemon saw, for persist-KV strict extension), and the
-    Gemma tool protocol feeds a tool RESULT back as a role=user message. So after any tool
-    call, "the last user message" is HER OWN TOOL OUTPUT. The store filled with things like
-
-        remember -> stored: I am a woman        <- her tool's receipt, filed as a fact about HIM
-
-    She was eating her own exhaust: a write produced an output, the output looked like the
-    user talking, and the output got written. Round and round.
-
-    A protocol role is not a speaker. `role=user` means "this slot in the template", not
-    "a human said this". The only text a human ever typed is the last user message AS IT
-    ARRIVED — before the model ran and before the tool loop appended anything — so we take
-    it at the top of the turn and hold it. Capture can then never see anything else."""
-    return next((m.get("content", "") for m in reversed(msgs or [])
-                 if m.get("role") == "user"), "")
 
 
-def _arm_turn(msgs: list) -> str:
-    """Hand the memory lane HIS ACTUAL WORDS for this turn.
-
-    recall() needs them to resolve ownership. Asked "what is YOUR name?" she calls
-    recall(query="What is my name?") — she rewrites the question into her own first person.
-    Asked "what is MY name?" she calls recall(query="What is my name?"): the identical
-    string. Two opposite questions, one query, so her paraphrase cannot say who is being
-    asked after. His sentence can, and always could — in it, "my" is Sam and "your" is
-    Kairos. Resolve the pronoun where it was uttered.
-
-    Returns the human's turn so the caller can hand the SAME text to capture at the end —
-    taken here, at the top, before the tool loop can append anything that merely wears
-    role=user."""
-    human = _human_turn(msgs)
-    try:
-        from harness.skills import memory as M
-        M.set_question(human)
-        M.set_author("user")
-    except Exception as _swx:
-        _swallowed(logger, "_arm_turn", _swx, lane="server")
-
-    # ── THE ATTENTION LEDGER: HE WAS HERE (2026-07-14) ──────────────────────────────────
-    # The observation receipt for the NON-event. silences() used to measure "days since he last
-    # mentioned it" and never asked whether he was PRESENT — so a three-week holiday made EVERY
-    # dimension go quiet at once and she would have greeted him with "you've stopped talking
-    # about the marathon, and the GPU, and Tuffy." That is not noticing; it is a bug wearing
-    # noticing's clothes.
-    #
-    # ABSENCE IS ONLY INFORMATION IF YOU CAN PROVE YOU WERE LOOKING. This is the proof. It
-    # records nothing about WHAT he said — only that the channel was open today.
-    #
-    # AND IT LIVES HERE, INSIDE _arm_turn, ON PURPOSE. _arm_turn is called from BOTH the OpenAI
-    # path and the native SSE path (app.py:89 and :915). Hooking the two CALLERS instead of the
-    # SEAM is the exact mistake this file has already made six times — on_user_turn was armed on
-    # one path and not the other, and the gate that was written to prove the fix ran down the
-    # unguarded path and PASSED. An invariant enforced in one of two paths is enforced in neither.
-    try:
-        from harness.model import presence
-        presence.note_turn()
-    except Exception as exc:
-        # A missing receipt must never cost him his turn — that stands. But this is the
-        # ledger the room reads back as his days, and a day of turns that recorded none
-        # of them looks exactly like a day he was not here.
-        logger.warning("[gateway] his turn was not noted in the presence ledger (%s: %s)",
-                       type(exc).__name__, exc)
-        _swallowed(logger, "presence.note_turn", exc, lane="gateway")
-
-    return human
 
 
-def _arm_self_turn(nudge: str):
-    """The unprompted twin of _arm_turn (2026-08-24 audit, A5). Her own time never
-    armed the memory lane at all, so during a solo/muse/mode turn the ContextVars held
-    their defaults or the PREVIOUS turn's values: a remember() she made in her own time
-    was stamped speaker=user — a self-fact filed in HIS lane, with only the name/gender
-    firewall standing in the way — and recall() ran with a stale or empty question, so
-    pronoun ownership could not resolve.
-
-    author="self": what she writes in her own time is about herself or explicitly
-    attributed; the old default was falsified provenance. question=the nudge: the only
-    utterance that exists this turn. NO presence.note_turn() — her unprompted turn is
-    not evidence that HE was present; the attention ledger is his channel.
-
-    Returns tokens for _disarm_self_turn — the reset-token contract from G-AUTHOR-CTX,
-    restored in the closure's finally so a following prompted turn cannot inherit hers."""
-    try:
-        from harness.skills import memory as M
-        return (M.set_author("self"), M.set_question(nudge or ""))
-    except Exception as exc:
-        # ARMING FAILED MEANS THE NEXT WRITE IS FILED AS HIS. This is the G-AUTHOR-CTX
-        # contract, and the night it broke, ~30 driven turns were written into her
-        # registry as facts about a man who was asleep.
-        logger.warning("[gateway] could not arm the self-turn author (%s: %s) — anything "
-                       "she stores in this turn will be filed as HIS",
-                       type(exc).__name__, exc)
-        _swallowed(logger, "_arm_self_turn", exc, lane="memory")
-        return None
 
 
-def _disarm_self_turn(tokens) -> None:
-    if not tokens:
-        return
-    try:
-        from harness.skills import memory as M
-        M.reset_author(tokens[0])
-        M.reset_question(tokens[1])
-    except Exception as exc:
-        # THE RESET IS THE WHOLE CONTRACT. This function exists so "a following prompted
-        # turn cannot inherit hers" (its own docstring). A swallowed reset leaves her
-        # author armed across the next turn — his words, stored as hers.
-        logger.warning("[gateway] the self-turn author did not reset (%s: %s) — the NEXT "
-                       "turn may be attributed to her", type(exc).__name__, exc)
-        _swallowed(logger, "_disarm_self_turn", exc, lane="memory")
 
 
-def _capture_after_turn(human_text: str) -> None:
-    """THE CAPTURE LANE (2026-07-12). Pull the durable facts out of the user's turn — and
-    only those.
-
-    Takes the human's text as an ARGUMENT, captured at the top of the turn by _arm_turn().
-    It used to re-derive it from the message list, and by the end of a turn that list has
-    tool outputs in it wearing role=user — so it captured her own tool receipts as facts
-    about him. A function that goes looking for its input can be handed the wrong one; a
-    function that is given it cannot.
-
-    WHAT THIS REPLACES. The daemon (routes.rs, SP_B4_NIGHTSHIFT) stored `raw_user` — the
-    WHOLE user turn, verbatim, as one episode — if it passed a word count and mentioned a
-    person. Given a turn it had to keep all of it or none of it, so it kept all of it. One
-    real conversation put 17 rows in, including:
-
-        "yes, we lose lips, sink ships."
-        "you are cool af! I really like you!"
-        "well, we make do. you're doing alright for such a constrained system"
-
-    and buried the actual facts (the esp32 sensors, the 2060 and the NUC, the PCs running
-    24/7) inside turns that were mostly banter.
-
-    Two authorities decided what a memory was: the daemon's word-count-and-a-pronoun, and
-    the harness's lifecycle rules — which had the dedupe, the supersede, the two stores and
-    the durability test. The daemon won every time, because it wrote first. An invariant
-    guarded in one of two paths is not guarded; this codebase has now learned that three
-    times. So the daemon stops writing (profiles: memory.growth = false) and capture happens
-    HERE, once, through the same door as everything else: split the turn into sentences,
-    keep the durable ones, and put each through remember() — which dedupes, supersedes, and
-    respects the identity firewall."""
-    try:
-        if not (human_text or "").strip():
-            return
-        # BELT AND BRACES: even given the right text, never ingest a tool round.
-        if "```tool_output" in human_text or "```tool_code" in human_text:
-            return
-        from harness.skills import lifecycle as lc
-        from harness.skills import memory as M
-        facts = lc.extract_facts(human_text)
-        if not facts:
-            return
-        tok = M.set_author("user")     # token-RESET, not clobber (the G-AUTHOR-CTX class)
-        try:
-            for f in facts[:4]:                   # a turn that yields 5+ facts is a paste
-                try:
-                    M.remember(f, source="user turn")
-                except Exception as exc:
-                    # A fact she pulled out of his turn and then dropped is a thing he
-                    # told her that she will not have.
-                    logger.warning("[capture] a fact from his turn was not stored "
-                                   "(%s: %s): %r", type(exc).__name__, exc, f[:60])
-                    _swallowed(logger, "capture/remember", exc, lane="memory")
-        finally:
-            M.reset_author(tok)
-    except Exception as exc:
-        logger.warning("[capture] the capture lane did not run for this turn (%s: %s)",
-                       type(exc).__name__, exc)
-        _swallowed(logger, "_capture_after_turn", exc, lane="memory")
 
 
-def _repeat_guard(body: Dict[str, Any], msgs: list, text: str, cfg) -> str:
-    """She may not say the same thing twice. See harness/quality/repeat_guard.py — the
-    operator caught her returning three BYTE-IDENTICAL replies to three different
-    messages. Narrow by design: this forbids repeating HER OWN LAST MESSAGE, and does
-    nothing to her ability to quote him, a memory, a tool result, or a number (all of
-    which the old no_repeat_ngram ban forbade, which is why it had to go)."""
-    try:
-        from harness.quality.repeat_guard import guard
-        prev = next((m.get("content", "") for m in reversed(msgs)
-                     if m.get("role") == "assistant"), "")
-        if not prev:
-            return text
 
-        def _reroll(nudge: str) -> str:
-            import dataclasses
-            from harness.agent import agent_chat_stream
-            hist = list(msgs) + [{"role": "system", "content": nudge}]
-            # tools=None, NOT tools=[] — see _kairos_after_turn. `[]` rebuilds the system
-            # prompt WITHOUT the tool preamble, which diverges the persist-KV cache at
-            # token 0 and re-prefills the entire conversation.
-            #
-            # replace(cfg, ...), NOT a fresh InferenceConfig — the fresh one inherited
-            # NOTHING: no repetition_penalty (sight.py's note applies verbatim: "NOT
-            # optional here; without it an open-ended generation degenerates"), on a
-            # reroll whose entire reason for existing is that she already repeated
-            # herself. The SSE continuation fixed this exact shape at its own closure
-            # and predicted the twin; this was the twin. And the reroll is an EMIT lane:
-            # it must strip its own control surfaces (the header's rule) — the guard's
-            # replacement text used to go out with <channel|>/<think> intact, judged and
-            # emitted rawer than the reply it replaced.
-            cfg2 = dataclasses.replace(cfg, temperature=0.85, auto_recall=False)
-            # "Arm it at EVERY path that reaches the model" — _agent_text's own words.
-            from harness.agent import _arm_self_repeat_ban
-            _arm_self_repeat_ban(cfg2, hist)
-            raw = "".join(agent_chat_stream(hist, config=cfg2))
-            return strip_control_surfaces(raw)
-
-        out, note = guard(text, prev, _reroll)
-        if note:
-            logger.warning("[repeat-guard] %s", note)
-        return out
-    except Exception as exc:
-        logger.warning("[repeat-guard] skipped: %s", exc)
-        return text
 
 
 def _system_profile() -> str:
@@ -700,17 +361,50 @@ def _system_profile() -> str:
     return ""
 
 
-def _engine_info() -> Dict[str, Any]:
-    """Which backend this gateway talks to, and what it can do — for the room's chips
-    and the restart controls (2026-08-21, the engine-agnostic seam)."""
-    try:
-        from harness.inference.client import get_client
-        c = get_client()
-        return {"kind": getattr(c, "kind", "sp"), "base_url": getattr(c, "base_url", ""),
-                "supports": sorted(getattr(c, "supports", ())),
-                "model": getattr(c, "default_model", "") or os.environ.get("SP_ENGINE_MODEL", "")}
-    except Exception as exc:
-        return {"kind": "?", "error": str(exc)[:120]}
+
+# ── THE PANELS LIVE IN panels.py (2026-09-01, Stage 2 of the split) ──────────────────
+# Thirty-five read-only room surfaces, lifted byte-identically. Re-exported here
+# because the route table below names them, and because twelve gates import them out
+# of `app` — `g_pk2_ui_endpoints_offline`, `g_memory_story`, `g_provenance`,
+# `g_telemetry`, `g_prefix_refresh`. A re-export keeps every one of those working
+# while the definitions live somewhere a person can find.
+from harness.server import panels as _panels  # noqa: E402
+_engine_info = _panels._engine_info
+_aux_json = _panels._aux_json
+_presence_json = _panels._presence_json
+_system_json = _panels._system_json
+_avatar_rung_and_ceiling = _panels._avatar_rung_and_ceiling
+_wardrobe_json = _panels._wardrobe_json
+_avatar_json = _panels._avatar_json
+_setup_key = _panels._setup_key
+_setup_json = _panels._setup_json
+_games_json = _panels._games_json
+_roleplay_status = _panels._roleplay_status
+_decisions_json = _panels._decisions_json
+_telemetry_now_json = _panels._telemetry_now_json
+_telemetry_history_json = _panels._telemetry_history_json
+_mem_row_json = _panels._mem_row_json
+_memory_why_json = _panels._memory_why_json
+_story_json = _panels._story_json
+_memory_json = _panels._memory_json
+_tasks_json = _panels._tasks_json
+_persona_get = _panels._persona_get
+_spine_json = _panels._spine_json
+_progress_json = _panels._progress_json
+_persona_layers = _panels._persona_layers
+_persona_state = _panels._persona_state
+_house_now_json = _panels._house_now_json
+_voice_status = _panels._voice_status
+_voice_corpus = _panels._voice_corpus
+_voice_record_status = _panels._voice_record_status
+_research_json = _panels._research_json
+_search_json = _panels._search_json
+_narrative_json = _panels._narrative_json
+_files_json = _panels._files_json
+_room_pulse = _panels._room_pulse
+warm_state = _panels.warm_state
+_models_json = _panels._models_json
+
 
 
 def _lane_lines(lines: list, lane_get, early_exit: int, timeout_s: float = 1.5) -> list:
@@ -748,56 +442,10 @@ def _start_lane(user_text: str, looks_q: bool):
         return None
 
 
-def _aux_json() -> Dict[str, Any]:
-    """THE LIBRARIANS (2026-08-22, D): the two doors, the index, the prefixes, the models."""
-    try:
-        from harness.sidecar import archive as _arc, client as _cl
-        st = _arc.status()
-        st["models"] = _cl.list_models()
-        st["ok"] = True
-        return st
-    except Exception as exc:
-        return {"ok": False, "armed": False, "error": str(exc)[:160]}
 
 
-def _presence_json() -> Dict[str, Any]:
-    """PRESENCE (2026-08-22): which mode, when her next turn may come, what she is reading,
-    and the shelf — for the presence window and its chip."""
-    from harness.kairos import scheduler as _ks
-    from harness.skills import library as _lib
-    from harness.tuning import registry as _tr
-    with _ks._LOCK:
-        sess = next(iter(_ks._LAST), "default")
-    st = (_ks.peek_state(sess) or {}).get("presence") or {}
-    knobs = {}
-    for k in ("presence.mode", "presence.voice", "presence.intimate", "presence.cue", "presence.read_chance"):
-        try:
-            knobs[k.split(".", 1)[1]] = _tr.get(k)
-        except Exception as _swx:
-            _swallowed(logger, "_presence_json", _swx, lane="server")
-            knobs[k.split(".", 1)[1]] = None
-    try:
-        shelf = _lib.books()
-    except Exception as _swx:
-        _swallowed(logger, "_presence_json", _swx, lane="server")
-        shelf = []
-    return {"ok": True, "session": sess, "state": st, "shelf": shelf, "knobs": knobs}
 
 
-def _system_json() -> Dict[str, Any]:
-    prof = _system_profile()
-    eng = _engine_info()
-    # AN EXTERNAL ENGINE IS NOT THE HARNESS'S TO RESTART (2026-08-21): under the openai
-    # backend the model lives in LM Studio / llama-server / a cloud; the room may only
-    # bounce the GATEWAY. `restartable` says so rather than offering a button that lies.
-    ext = "restart" not in (eng.get("supports") or [])
-    return {"ok": True, "profile": prof or None, "engine": eng,
-            "restartable": bool(prof) and not ext,
-            "gateway_bounce": bool(prof),
-            "note": ("this engine is external (%s) — start and stop it yourself; the "
-                     "gateway can still be bounced" % eng.get("base_url", "")) if ext else
-                    ("a full restart reloads the model and takes a couple of minutes; "
-                     "the gateway bounce is seconds and leaves the daemon alone")}
 
 
 def _spawn_restart(full: bool) -> Dict[str, Any]:
@@ -862,35 +510,10 @@ def _do_restart(full: bool) -> None:
         logger.warning("[system] restart spawn failed: %s", exc)
 
 
-def _avatar_rung_and_ceiling():
-    """The live heat rung and the operator's ceiling, both from the systems that already
-    own them — the roleplay scene if one is running, and the tuning registry. The avatar
-    does not get its own idea of either."""
-    rung, ceiling = 0, 7
-    try:
-        from harness.tuning import registry as tune
-        ceiling = int(tune.get("roleplay.max_heat"))
-    except Exception as _swx:
-        _swallowed(logger, "_avatar_rung_and_ceiling", _swx, lane="server")
-    try:
-        from harness.roleplay import engine as rp
-        # OFF MEANS OFF DOWNSTREAM TOO (2026-08-03). `roleplay.enabled` gated the
-        # PRE-TURN — the place a scene is entered and its prompt injected — and nothing
-        # else. A scene that was already running kept driving her AVATAR RUNG after the
-        # feature was switched off, because this reader asked the engine "is a scene
-        # active" without ever asking "is the feature on". Half a switch is not a switch.
-        if _roleplay_on():
-            sc = rp.active(_room_session())
-            if sc is not None:
-                rung = int(sc.heat.level)
-    except Exception as _swx:
-        _swallowed(logger, "_avatar_rung_and_ceiling", _swx, lane="server")
-    return rung, ceiling
 
 
 # ── GENERATE-NOW (2026-08-21): one background job at a time, status readable ────────
-_GEN_JOB: Dict[str, Any] = {"running": False, "what": "", "started": 0.0,
-                            "done": 0, "last": ""}
+_GEN_JOB = _state.GEN_JOB                    # -> harness/server/state.py
 
 
 def _gen_now_start(body: Dict[str, Any]) -> Dict[str, Any]:
@@ -954,22 +577,6 @@ def _gen_now_start(body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "job": dict(_GEN_JOB)}
 
 
-def _wardrobe_json() -> Dict[str, Any]:
-    """What she is wearing, what else is hanging there, and who decided.
-
-    (The ceiling/rung pair this used to thread through died with the tiers,
-    2026-08-21 — the panel shows everything she owns, because everything she owns
-    is servable.)"""
-    try:
-        from harness.control import wardrobe as WD
-        rung, ceiling = _avatar_rung_and_ceiling()
-        st = WD.status()
-        st["rung"] = rung
-        st["genstatus"] = dict(_GEN_JOB)
-        st["describe"] = WD.describe()
-        return st
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)[:160]}
 
 
 def _wardrobe_set(body: Dict[str, Any]) -> Dict[str, Any]:
@@ -988,191 +595,12 @@ def _wardrobe_set(body: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": False, "error": str(exc)[:160]}
 
 
-def _avatar_json() -> Dict[str, Any]:
-    try:
-        from harness.control import avatar as AV
-        rung, ceiling = _avatar_rung_and_ceiling()
-        st = AV.status()
-        st["rung"] = rung
-        # Which faces can actually be shown right now, resolved through the same
-        # function the file route uses — so the panel never offers what the server
-        # would refuse.
-        st["ready"] = sorted({r["face"] for r in AV.manifest()
-                              if r["kind"] == "still" and r["have"]})
-        # WHICH FACES HAVE MOTION, reported separately. The resolver degrades a missing
-        # loop to the still, which is right for bytes and wrong for the client: a <video>
-        # handed a PNG renders nothing at all. So the panel is told which faces it may
-        # ask for as video, rather than discovering it by getting an image back.
-        st["ready_loop"] = sorted({r["face"] for r in AV.manifest()
-                                   if r["kind"] == "loop" and r["have"]})
-        st["ok"] = True
-        return st
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)[:200]}
 
 
-def _setup_key(path_env: str, default_rel: str = "") -> Dict[str, Any]:
-    """Is the key file there — and NOTHING about what is in it.
-
-    THE VALUE NEVER LEAVES THIS PROCESS. The panel needs exactly three facts to guide
-    somebody through setup: where the file should be, whether it exists, and whether it
-    has anything in it. A length is reported because "I pasted it but it is empty" and
-    "I have not made it yet" are different problems with different fixes; the bytes
-    themselves are not, and a route that returned a prefix "just to help you check" is a
-    route that writes your API key into a browser's network log.
-    """
-    rel = (os.environ.get(path_env) or default_rel or "").strip()
-    if not rel:
-        return {"path": "", "configured": False, "present": False, "bytes": 0}
-    p = rel if os.path.isabs(rel) else os.path.join(_ROOT_DIR, rel)
-    try:
-        n = len(open(p, encoding="utf-8").read().strip())
-    except Exception as _swx:
-        _swallowed(logger, "_setup_key", _swx, lane="server")
-        n = -1
-    return {"path": rel.replace("\\", "/"), "configured": True,
-            "present": n > 0, "bytes": max(0, n)}
 
 
-def _setup_json() -> Dict[str, Any]:
-    """WHAT IS SET UP AND WHAT IS NOT — the panel behind `docs/SETUP.md`.
-
-    ONBOARDING IS A DIAGNOSIS, NOT A LEAFLET. A page of instructions cannot tell you
-    which step you are on; this route can. It reports the engine actually in force, each
-    optional key as present/absent, whether the sidecars answer, and whether the room
-    has a face — so the panel says "your endpoint is not answering on :1234" rather than
-    "check that your endpoint is running".
-
-    IT READS, IT NEVER WRITES. Nothing here arms a knob or creates a file: a setup
-    surface that could turn things on would need an authority story, and the profile
-    plus the settings registry already own that. It is a mirror.
-    """
-    out: Dict[str, Any] = {"ok": True, "root": _ROOT_DIR.replace("\\", "/")}
-    out["profile"] = os.environ.get("SP_PROFILE", "") or ""
-    # THE RECOMMENDED MODELS COME FROM THE FILE, not from a copy in the panel. Two
-    # lists of model ids is the duplicate that goes stale silently — the one nobody
-    # re-checks is the one somebody follows (AGENTS.md §0).
-    try:
-        with open(os.path.join(_ROOT_DIR, "config", "models.json"), encoding="utf-8") as f:
-            out["models"] = json.load(f)
-    except Exception as exc:
-        out["models"] = {"error": str(exc)[:160]}
-    # ── THE ENGINE, AND WHETHER IT IS ACTUALLY THERE ────────────────────────────────
-    eng = _engine_info()
-    eng["dialect"] = os.environ.get("SP_ENGINE_DIALECT", "generic")
-    eng["vision"] = (os.environ.get("SP_ENGINE_VISION", "") or "").lower() in ("1", "true", "yes")
-    eng["key"] = _setup_key("SP_ENGINE_API_KEY_FILE")
-    # A LIVE PROBE, SHORT AND UNAUTHENTICATED. `/v1/models` is the one endpoint every
-    # OpenAI-compatible server answers, and the reachability question ("is anything
-    # listening") is answered by a connection, not by a 200 — a server with auth on
-    # returns 401 and is nonetheless plainly running, which is a different message to
-    # show than "nothing is there".
-    eng["reachable"], eng["probe"] = False, ""
-    base = (eng.get("base_url") or "").rstrip("/")
-    if base:
-        try:
-            import urllib.error
-            import urllib.request
-            try:
-                with urllib.request.urlopen(base + "/v1/models", timeout=1.5) as r:
-                    eng["reachable"], eng["probe"] = True, "HTTP %d" % r.status
-            except urllib.error.HTTPError as he:
-                eng["reachable"] = True
-                eng["probe"] = "HTTP %d (listening; %s)" % (
-                    he.code, "needs a key" if he.code in (401, 403) else "no /v1/models")
-        except Exception as exc:
-            eng["probe"] = type(exc).__name__
-    out["engine"] = eng
-    # ── THE OPTIONAL xAI SURFACE ────────────────────────────────────────────────────
-    # One key, four features. Reported per feature rather than as one boolean because
-    # the key being present is not the same as the feature being armed — voice reads
-    # `tts.method`, search reads `search.backend`, and research ships off.
-    xkey = _setup_key("SP_XAI_KEY_FILE", "var/secrets/Xapi.txt")
-    if not xkey["present"] and (os.environ.get("SP_XAI_API_KEY") or
-                                os.environ.get("XAI_API_KEY")):
-        # The announced HOST_KEYS exception: an env key outranks the file. Saying so
-        # stops somebody hunting for a file that is deliberately not there.
-        xkey.update({"present": True, "path": "(host environment)", "bytes": 0})
-    out["xai"] = {
-        "key": xkey,
-        "voice": {"method": os.environ.get("SP_TTS_METHOD", ""),
-                  "voice_id": os.environ.get("SP_TTS_XAI_VOICE", "ara"),
-                  "armed": os.environ.get("SP_TTS_METHOD", "") == "xai" and xkey["present"]},
-        "images": {"image_model": os.environ.get("SP_XAI_IMAGE_MODEL", ""),
-                   "video_model": os.environ.get("SP_XAI_VIDEO_MODEL", ""),
-                   "armed": xkey["present"]},
-        "search": {"backend": os.environ.get("SP_SEARCH_BACKEND", "ddg"),
-                   "armed": os.environ.get("SP_SEARCH_BACKEND", "") == "xai" and xkey["present"]},
-        "research": {"backend": os.environ.get("SP_RESEARCH_BACKEND", ""),
-                     "armed": (os.environ.get("SP_RESEARCH", "") or "").lower()
-                     in ("1", "true", "yes")},
-    }
-    # ── THE CPU SIDECARS ────────────────────────────────────────────────────────────
-    aux_on = (os.environ.get("SP_AUX", "") or "").lower() in ("1", "true", "yes")
-    out["sidecars"] = {"enabled": aux_on,
-                       "embed_url": os.environ.get("SP_AUX_EMBED_URL", ""),
-                       "chat_url": os.environ.get("SP_AUX_CHAT_URL", ""),
-                       "chat_model": os.environ.get("SP_AUX_CHAT_MODEL", ""),
-                       "key": _setup_key("SP_AUX_API_KEY_FILE")}
-    if aux_on:
-        try:
-            from harness.sidecar import archive as _arc
-            out["sidecars"]["status"] = _arc.status()
-        except Exception as exc:
-            out["sidecars"]["status"] = {"error": str(exc)[:160]}
-    # ── HER IDENTITY, AND HER FACE ──────────────────────────────────────────────────
-    try:
-        from harness.personality import persona_layers as _PL
-        pdir = _PL.persona_dir()
-        out["persona"] = {"dir": os.path.relpath(pdir, _ROOT_DIR).replace("\\", "/"),
-                          "present": os.path.isdir(pdir),
-                          "fragments": len([f for f in os.listdir(pdir)
-                                            if f.endswith(".md")]) if os.path.isdir(pdir) else 0}
-    except Exception as exc:
-        out["persona"] = {"present": False, "error": str(exc)[:160]}
-    try:
-        from harness.control import avatar_seed as _seed
-        out["avatar"] = _seed.status()
-    except Exception as exc:
-        out["avatar"] = {"error": str(exc)[:160]}
-    # ── AND THE ONE RULE. Row counts, so the panel can say the memory is live. ───────
-    try:
-        from harness.skills import memory as _mem
-        reg = os.environ.get("SP_RECALL_REGISTRY", "")
-        out["memory"] = {"registry": reg.replace("\\", "/"),
-                         "present": bool(reg) and os.path.exists(reg),
-                         # live_rows() is THE non-ranking read seam; counting the file's
-                         # lines here would count tombstones and report a memory that
-                         # only ever grows.
-                         "rows": len(_mem.live_rows())}
-    except Exception as exc:
-        out["memory"] = {"error": str(exc)[:160]}
-    return out
 
 
-def _games_json() -> Dict[str, Any]:
-    try:
-        from harness.games import match as M
-        rows = M.listing()
-        # EVERY match's public state in ONE call, rather than a `?name=` the GET table
-        # cannot pass anyway (it maps paths to zero-argument lambdas). There are a
-        # handful of matches, not thousands, so the whole thing is cheaper than the
-        # query-string plumbing would have been — and the panel stops needing a second
-        # round trip to show a board.
-        states = {}
-        for r in rows:
-            m = M.load(r["id"])
-            if m is None:
-                continue
-            # POKER IS SEATED, NOT PUBLIC. The room is seat 0 (his chair), so the
-            # listing hands back HIS view — his hole cards, never hers. There is no
-            # payload here that could show both, which is the point: the leak is not
-            # guarded against, it is unrepresentable.
-            states[r["id"]] = (M.holdem_view(m, 0) if m["kind"] == "holdem"
-                               else M.public(m))
-        return {"ok": True, "kinds": list(M.KINDS), "games": rows, "states": states}
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)[:200]}
 
 
 def _room_session() -> str:
@@ -1212,27 +640,6 @@ def _roleplay_on() -> bool:
         return False
 
 
-def _roleplay_status() -> Dict[str, Any]:
-    """What the stage panel reads. The tuning values are folded in here rather than in
-    the engine, because the engine must not depend on the knob registry — it is the
-    gateway that owns "what is switched on"."""
-    try:
-        from harness.roleplay import engine as rp
-        from harness.tuning import registry as tune
-        d = rp.status(_room_session())
-        d["enabled"] = _roleplay_on()
-        # ...AND THE PANEL IS TOLD WHAT IS ACTUALLY IN FORCE. Reporting a live scene while
-        # the feature is off would put the taskbar chip on screen for a scene that no
-        # longer steers anything — a chip that lies is worse than no chip.
-        if not d["enabled"]:
-            d["scene"] = None
-            d["pending"] = False
-        d["max_heat"] = int(tune.get("roleplay.max_heat"))
-        d["dwell_scale"] = float(tune.get("roleplay.dwell_scale") or 1.0)
-        d["ok"] = True
-        return d
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)[:200]}
 
 
 def _roleplay_pre_turn(body: Dict[str, Any], msgs: list) -> Optional[str]:
@@ -1331,39 +738,6 @@ def _roleplay_pre_turn(body: Dict[str, Any], msgs: list) -> Optional[str]:
         return None
 
 
-def _commit_unprompted(body: Dict[str, Any], base_len: int, hist: list,
-                       final: str = "") -> bool:
-    """HER UNPROMPTED TURN BECOMES CANON — G-ONE-TRANSCRIPT's law, applied to the third
-    mouth (2026-08-20, measured on the operator's evening).
-
-    The kairos closures sent `canon + nudge` to the engine, which COMMITTED
-    `canon + nudge + tool rounds + her reply` into the persist-KV cache — and the canon
-    kept none of it. So the very next turn diverged from the committed cache at the
-    nudge position, the rewind journal refused ("delta crosses a commit"), and the
-    engine fell back to the boot snapshot at ~3.4k tokens: EVERY turn after EVERY
-    speak-up re-prefilled ~3,300-3,950 tokens per-token at ~87 ms/tok = 5-6 MINUTES,
-    his and hers alike, with the GPU pegged for minutes after each reply (her next
-    queued turn paying the same price). The daemon log for 14:56-15:44 UTC is the
-    receipt: eleven consecutive turns at 292-344 s of prefill, drops of 64-888 tokens.
-
-    So: the closures now generate with mutate_messages=True over a snapshot of canon,
-    and this commits the WHOLE delta (nudge, tool rounds, final reply) back into the
-    canonical list — the committed cache IS the next prompt's prefix again.
-
-    Returns False without committing when canon moved underneath us (his turn landed
-    mid-generation): he wins the race, this one turn wears the divergence, and
-    interleaving two histories would be worse than one slow turn."""
-    canon = _session_transcript(body, append=False)
-    if not isinstance(canon, list) or len(canon) != base_len:
-        return False
-    delta = hist[base_len:]
-    # mutate_messages appends TOOL ROUNDS; the final answer is the caller's to append
-    # (the main SSE lane's contract) — except the exhaustion path, which appends its
-    # own closing word, hence the guard.
-    if final and (not delta or delta[-1].get("role") != "assistant"):
-        delta = delta + [{"role": "assistant", "content": final}]
-    canon.extend(delta)
-    return True
 
 
 def _kairos_after_turn(body: Dict[str, Any], reply: str) -> None:
@@ -1476,21 +850,6 @@ def _kairos_after_turn(body: Dict[str, Any], reply: str) -> None:
         logger.warning("[gateway] kairos skipped: %s", exc)
 
 
-def _release_turn_latch(where: str) -> None:
-    """A FAILED TURN MAY NOT MUTE HER FOR FIFTEEN MINUTES (2026-08-28, external review).
-
-    _agent_text arms note_user_turn(True) near its top and releases it inside
-    _finish_openai_turn — on the happy path. An exception between the two left the
-    latch set, and the latch is what kairos reads as "his turn is in flight": every
-    unprompted lane then waited out _USER_TURN_MAX_S (900 s) after a turn that
-    produced nothing but an [error] string. The native mouth pays this in a finally;
-    the OpenAI mouth's two wrappers now do the same, through this one helper.
-    """
-    try:
-        from harness.kairos import scheduler as _ks_rel
-        _ks_rel.note_user_turn(False)
-    except Exception as exc:
-        logger.warning("[gateway] %s: latch release failed: %s", where, exc)
 
 
 def stream_completion(body: Dict[str, Any]) -> Iterator[str]:
@@ -1529,221 +888,20 @@ def blocking_completion(body: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-# ──── PK2 §U: read-only introspection surfaces for the operator UI ─────────
-# The console needs to SHOW the new subsystems (memory, task queue, persona). These are
-# small JSON endpoints the UI polls; all read-only except persona POST (the editor).
-def _decisions_json() -> Dict[str, Any]:
-    """The operator's queue. NOT her memory and not the ledger: what is UNDECIDED, for a
-    decider, as against what is off and why, for a reader."""
-    try:
-        from harness.skills import decisions as _dec
-        rows = _dec.items()
-        return {"ok": True, "open": [r for r in rows if r["status"] == "open"],
-                "decided": [r for r in rows if r["status"] == "decided"][-40:],
-                "path": _dec.path()}
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)[:200], "open": [], "decided": []}
 
 
-def _telemetry_now_json() -> Dict[str, Any]:
-    """What his body is doing, for the room AND for her — the same seam.
-
-    Two panels reading two different functions is how the chip and the prefix end up
-    describing different people. `body.read()` decides; this renders; `body.present()` is
-    the same decision rendered for her instead of for a screen."""
-    try:
-        from harness.telemetry import body as _b
-        from harness.telemetry import store as _s
-        r = _b.read()
-        return {"ok": True, "observed": r.get("observed", {}), "facts": r.get("facts", {}),
-                "why": r.get("why", ""), "since": r.get("since", {}),
-                "she_reads": _b.present(), "resting": _b.resting(),
-                "health": _s.verify()}
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)[:200]}
 
 
-def _telemetry_history_json(hours: float = 6.0, kind: str = "") -> Dict[str, Any]:
-    """The series behind the chart. Down-sampled per minute, because a browser asked for
-    six hours of 1 Hz heart rate is a browser that stops responding — and because a chart
-    with 21,600 points is not more honest than one with 360, it is just slower."""
-    try:
-        from harness.telemetry import store as _s
-        rows = _s.read_since(max(0.0, min(float(hours), 24 * 14)) * 3600.0)
-        if kind:
-            rows = [r for r in rows if r.get("kind") == kind]
-        buckets: Dict[str, Dict[str, Any]] = {}
-        for r in rows:
-            k, at = r.get("kind", "?"), (r.get("at") or "")[:16]     # to the minute
-            key = "%s|%s" % (k, at)
-            b = buckets.setdefault(key, {"kind": k, "at": at, "n": 0,
-                                         "sum": 0.0, "min": None, "max": None,
-                                         "state": None})
-            b["n"] += 1
-            v = r.get("value")
-            if isinstance(v, (int, float)):
-                b["sum"] += float(v)
-                b["min"] = float(v) if b["min"] is None else min(b["min"], float(v))
-                b["max"] = float(v) if b["max"] is None else max(b["max"], float(v))
-            else:
-                b["state"] = v
-        series: Dict[str, list] = {}
-        for b in sorted(buckets.values(), key=lambda x: x["at"]):
-            point = {"at": b["at"] + "Z", "n": b["n"]}
-            if b["min"] is not None:
-                point.update({"avg": round(b["sum"] / b["n"], 2),
-                              "min": b["min"], "max": b["max"]})
-            if b["state"] is not None:
-                point["state"] = b["state"]
-            series.setdefault(b["kind"], []).append(point)
-        return {"ok": True, "hours": hours, "series": series,
-                "kinds": sorted(series.keys())}
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)[:200]}
 
 
-def _mem_row_json(e: Dict[str, Any]) -> Dict[str, Any]:
-    """ONE registry row as the panel's JSON — the single shape (2026-08-25).
-
-    Lifted out of `_memory_json` when /v1/memory/why arrived, because the alternative was
-    a second hand-kept spelling of the same object, which is this repo's signature bug
-    with a fresh date on it: a field added to the listing and forgotten in the walk would
-    render a support with no salience and no status and look like a data problem."""
-    from harness.skills import lifecycle as lc
-    from harness.skills.memory import _text
-    return {
-        "name": e.get("name", ""),
-        "text": lc.strip_prefix(_text(e)),        # drop the legacy "The user said: "
-        "speaker": e.get("speaker", ""),
-        "mem_class": e.get("mem_class", ""),
-        # her lane's second label (2026-08-23): the panel cannot re-file what it
-        # cannot see, and `kind` is what decides durability now
-        # (lifecycle._HALF_LIFE_BY_KIND), not mem_class alone.
-        "kind": e.get("kind", ""),
-        "lifecycle": e.get("lifecycle", 0),
-        "src": e.get("src", ""),
-        "ts": e.get("ts", ""),
-        # SALIENCE, ON THE PANEL. What she thinks matters, and WHY — how many times
-        # he said it, how long ago, how often she has reached for it. A ranking you
-        # cannot see is a ranking you cannot argue with, and the first thing this
-        # one showed us when it was switched on is that the store's idea of what
-        # matters was wrong (chatter outranking his GPU). That is the panel doing
-        # its job: it made a bad ranking visible instead of quietly acting on it.
-        "mentions": e.get("mentions", 1),
-        "recalled": e.get("recalled", 0),
-        "last_seen": e.get("last_seen", e.get("ts", "")),
-        "salience": lc.salience(e),
-        # ── THE EPISTEMIC FIELDS (2026-08-25 audit) ─────────────────────────
-        # The panel could not tell an OBSERVED row from an INFERRED one, could
-        # not see that a conclusion was drawn from other rows, and rendered a
-        # tombstone as bare text with no cause of death — while every one of
-        # those fields sat on the row it was already reading. `status` is what
-        # lifecycle.render() frames from and what verdict.may_supersede rules
-        # on; a curate panel that cannot see it is arguing with a ranking
-        # blindfolded. Names only for `derived_from` — /v1/memory/why resolves
-        # them, so a 37-support row does not carry 37 texts into every listing.
-        "status": e.get("status", ""),
-        "derived_from": e.get("derived_from") or [],
-        "support_days": e.get("support_days", 0),
-        "superseded_by": e.get("superseded_by", ""),
-        "retired_because": e.get("retired_because", ""),
-        # CORE (2026-08-28): the write landed on his FIRST click and the panel showed
-        # nothing — this serializer is a fixed field list, and `core` was not on it.
-        # The star wrote the row, the read hid it, and "pin as core" looked dead while
-        # three rows sat pinned on disk. The panel cannot toggle what it cannot see.
-        "core": 1 if e.get("core") else 0,
-    }
 
 
-def _memory_why_json(name: str) -> Dict[str, Any]:
-    """"Why do you believe X?", answered in rows — the READ side of provenance.
-
-    `derived_from` had been written, enforced by the nightly orphan sweep and gated for
-    three days before anything could read it back (2026-08-25 audit). This is that read:
-    the conclusion, the rows it was drawn from with their CURRENT liveness, the support
-    names that resolve to nothing, and — the direction the curate panel actually needs —
-    what would be orphaned if he retired this row.
-
-    Tombstones are included on purpose. This is the audit lane, not a door she speaks
-    from: `memory.provenance` is the one with the no-quoting-the-dead rule, and it counts
-    retired supports rather than reading them aloud."""
-    try:
-        from harness.skills import memory as M
-        rows = M.all_rows()
-        hit = next((r for r in rows if r.get("name") == name), None)
-        if hit is None:
-            return {"ok": False, "error": "no row named %r" % name}
-        return {
-            "ok": True,
-            "row": _mem_row_json(hit),
-            "supports": [_mem_row_json(r) for r in M.supports_of(hit)],
-            "missing_supports": M.missing_supports(hit),
-            "dependents": [_mem_row_json(r) for r in M.dependents_of(hit)],
-        }
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)[:200]}
 
 
-def _story_json() -> Dict[str, Any]:
-    """THE STORY PANEL'S DATA (2026-08-28, his ask): what stands in her prefix, line by
-    line, each line naming the registry row it came from — plus the backup receipt, so
-    "is all of this backed up" is answered on the same screen that shows it.
-
-    The block comes from self_block_lines(), THE SAME assembly render_self_model() joins
-    for the prefix — one truth, verified byte-identical at the refactor. The rows
-    themselves come from /v1/memory (the panel joins on name), so this endpoint carries
-    structure, not a second copy of the store."""
-    out: Dict[str, Any] = {"ok": True, "block": [], "backup": {}}
-    try:
-        from harness.personality.self_model import self_block_lines
-        from harness.tuning import registry as _tr_s
-        _b = int(_tr_s.get("memory.self_budget", 2400) or 2400)
-        out["block"] = [{"section": s_, "name": n_, "label": l_}
-                        for s_, n_, l_ in self_block_lines(budget_chars=_b)]
-    except Exception as exc:
-        out["block_error"] = str(exc)[:120]
-    try:
-        from harness.control import backup as _bk
-        st = _bk.status() or {}
-        # the fields status() actually serves (checked live 2026-08-29: the first cut
-        # filtered for at/iso/files, keys status() has never had, and the panel said
-        # "no backup receipt" over 65 archives and an 00:15 newest)
-        out["backup"] = {"ok": bool(st.get("enabled")) and bool(st.get("newest")),
-                         "enabled": bool(st.get("enabled")),
-                         "newest": st.get("newest") or "",
-                         "count": st.get("count", 0),
-                         "bytes": st.get("total_bytes", 0)}
-    except Exception as exc:
-        out["backup"] = {"error": str(exc)[:120]}
-    return out
 
 
-def _memory_json() -> Dict[str, Any]:
-    """The fact registry as JSON rows for the operator's memory pane.
-
-    It used to return only {text, src, ts, npos} — no `name`, so the panel could SHOW a
-    memory but never RETIRE one (forget() keys on name), and no `speaker`/`mem_class`/
-    `lifecycle`, so a SELF memory looked exactly like one of Sam's and a tombstoned row
-    looked live. A browser you cannot act from is a report, not a panel."""
-    try:
-        from harness.skills.memory import _load, verify_registry
-        rows = [_mem_row_json(e) for e in _load()]
-        rows.sort(key=lambda r: -r["salience"])
-        return {"count": len(rows), "facts": rows, "health": verify_registry()}
-    except Exception as exc:
-        return {"error": str(exc), "count": 0, "facts": []}
 
 
-def _tasks_json() -> Dict[str, Any]:
-    """The agentic work queue (task_loop states) for the task pane."""
-    try:
-        from harness.control.task_loop import list_tasks
-        ts = list_tasks()
-        return {"count": len(ts), "tasks": [
-            {"id": t.task_id, "goal": t.goal, "status": t.status,
-             "steps": len(t.steps), "result": t.result} for t in ts]}
-    except Exception as exc:
-        return {"error": str(exc), "count": 0, "tasks": []}
 
 
 def _persona_path() -> str:
@@ -1752,92 +910,12 @@ def _persona_path() -> str:
     return persona_path()
 
 
-def _persona_get() -> Dict[str, Any]:
-    try:
-        with open(_persona_path(), encoding="utf-8") as f:
-            return {"ok": True, "persona": f.read(), "path": _persona_path()}
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)}
 
 
-def _spine_json() -> Dict[str, Any]:
-    """ADR-008: the recent spine receipts (decide→execute→verify audit trail) for the panel."""
-    try:
-        from harness.control.spine import get_recent_receipts
-        rs = get_recent_receipts(50)
-        return {"count": len(rs), "receipts": rs}
-    except Exception as exc:
-        return {"error": str(exc), "count": 0, "receipts": []}
 
 
-def _progress_json() -> Dict[str, Any]:
-    """HINDSIGHT build progress (phases, migration map, git lanes). Its page, dashboard.html,
-    went 2026-08-21; the data route stays."""
-    try:
-        from harness.observability.progress import progress_json
-        return progress_json()
-    except Exception as exc:
-        return {"error": str(exc)}
 
 
-def _persona_layers() -> Dict[str, Any]:
-    """Which persona fragments composed into her prefix THIS session, and why not.
-
-    Answers the one question the monolithic persona.md could never answer: "the section
-    that teaches X is missing — is that deliberate?" Each row carries its `when`, the
-    include decision, and its size. Bodies are truncated on purpose: this is a diagnostic,
-    not an editor, and dumping every fragment produces a page nobody reads.
-
-    Reports `stale: true` when the composition would differ from what is actually in her
-    prefix — the prefix is snapshot-cached for the process lifetime (the KV-prefix law), so
-    editing a fragment does NOT take effect until a restart, and a panel that implied
-    otherwise would be the same lie the tuning page was telling about eot_bias.
-    """
-    try:
-        from harness.personality import persona_layers as PL
-        rows = PL.plan()
-        live_now = PL.compose()
-        # WHAT IS ACTUALLY IN HER HEAD (2026-08-24 audit, H1). This used to call
-        # load_agent_system() — which RE-READS every file on every call — and label the
-        # result "what the running process actually put in the prefix". It was a fresh
-        # compose compared against a fresh compose, so `stale` was False precisely when
-        # the prefix WAS stale: the same lie the docstring above says this flag exists
-        # to avoid. cached_system_content() is the string the turns really serve.
-        try:
-            from harness.agent import _SYS as _sys_meta
-            from harness.agent import cached_system_content
-            in_prefix = cached_system_content()
-        except Exception as _swx:
-            _swallowed(logger, "_persona_layers", _swx, lane="server")
-            in_prefix, _sys_meta = None, {"version": 0, "built_at": 0.0}
-        stale = bool(live_now and in_prefix and live_now not in in_prefix)
-        try:
-            from harness.inference import context as _ctxq
-            _ptok = _ctxq.prefix_tokens(in_prefix) if in_prefix else 0
-        except Exception as _swx:
-            _swallowed(logger, "_persona_layers", _swx, lane="server")
-            _ptok = 0
-        return {
-            "ok": True,
-            "dir": PL.persona_dir(),
-            "knobs": {k: PL.knob_on(k) for k in sorted(PL.KNOBS)},
-            "stale": stale,
-            "prefix_version": _sys_meta.get("version", 0),
-            "prefix_built_at": _sys_meta.get("built_at", 0.0),
-            "prefix_tokens_est": _ptok,
-            "composed_chars": len(live_now or ""),
-            "knob_names": sorted(PL.KNOBS),
-            "fragments": [{"file": r["file"], "order": r["order"], "when": r["when"],
-                           "included": r["included"], "chars": r["chars"],
-                           # THE WHOLE BODY, not a 140-char teaser. The operator's note:
-                           # a preview of "1 and a half lines" tells you nothing you could
-                           # act on. These files are ~200-1700 chars; the entire persona is
-                           # 6.5 KB. Sending all of it costs nothing and is the only version
-                           # of this panel that answers "what is actually in her head".
-                           "body": r["body"] or ""} for r in rows],
-        }
-    except Exception as exc:
-        return {"ok": False, "error": str(exc), "fragments": []}
 
 
 _FRAG_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\.md$")
@@ -1875,15 +953,6 @@ def _persona_layer_write(file: str, text: str) -> Dict[str, Any]:
         return {"ok": False, "error": str(exc)}
 
 
-def _persona_state() -> Dict[str, Any]:
-    """The parsed ## Personality state block (voice/mood/traits) — the UI's personality chip."""
-    try:
-        from harness.personality.persona_file import parse_persona
-        with open(_persona_path(), encoding="utf-8") as f:
-            _, state = parse_persona(f.read())
-        return {"ok": True, "state": state}
-    except Exception as exc:
-        return {"ok": False, "error": str(exc), "state": {}}
 
 
 def _persona_set(text: str) -> Dict[str, Any]:
@@ -1924,11 +993,13 @@ def _persona_set(text: str) -> Dict[str, Any]:
 # penalty and the other did not); a sampling policy spelled out twice is a sampling policy
 # that will disagree with itself. The self-repeat ban is still armed at both — temperature
 # restores variation, the ban catches parroting, and neither substitutes for the other.
-_UNPROMPTED_SAMPLING = {"temperature": 0.5, "repetition_penalty": 1.15, "auto_recall": False}
+_UNPROMPTED_SAMPLING = _state.UNPROMPTED_SAMPLING   # -> harness/server/state.py
 
-_LAST_TURN_AT: float = 0.0
-_CHAT_SESSIONS: Dict[str, list] = {}
-_CHAT_SESSIONS_MAX = 32
+# `_LAST_TURN_AT` IS NOT ALIASED, ON PURPOSE. It is the one rebindable scalar here, and
+# `x = _state.LAST_TURN_AT` would snapshot the value — the rebind below would then be
+# invisible to every reader. Reached as `_state.LAST_TURN_AT` at both of its sites.
+_CHAT_SESSIONS = _state.CHAT_SESSIONS        # -> harness/server/state.py
+_CHAT_SESSIONS_MAX = _state.CHAT_SESSIONS_MAX
 
 
 
@@ -1982,7 +1053,7 @@ def _session_transcript(body: Dict[str, Any], append: bool = True) -> list:
 # `ops.reflect()` was RENAMED AWAY from nightshift() in 2026-07-13 for exactly this
 # reason — "two different things wearing one name is how you end up debugging the wrong
 # one". This is a fourth thing. It gets a fourth name.
-_CONSOLIDATE_STATE: Dict[str, Any] = {"last_day": None}
+_CONSOLIDATE_STATE = _state.CONSOLIDATE_STATE   # -> harness/server/state.py
 
 
 def _consolidate_marker() -> str:
@@ -2132,7 +1203,7 @@ def _append_day_turn(user_text: str, final: str,
         logger.warning("[gateway] could not append the day transcript: %s", exc)
 
 
-_MOOD_ROW = {"v": "", "at": 0.0}      # the last mood she filed (throttle, 2026-08-22)
+_MOOD_ROW = _state.MOOD_ROW           # the last mood she filed (throttle) -> state.py
 
 
 def _seed_kairos_from_day(force: bool = False) -> bool:
@@ -2792,53 +1863,12 @@ def start_consolidation_ticker() -> None:
     logger.info("[consolidate] day boundary armed: hour=%02d, quiet>=%ds", hour, int(quiet_s))
 
 
-def _house_now_json() -> Dict[str, Any]:
-    """One seam for the room, exactly as /v1/telemetry/now is. NEVER RAISES.
-
-    What Home Assistant is, whether it is reachable, which of his entities this framework
-    would take and what each becomes. The last part is the useful one: it answers "why is
-    she not being told I am asleep" without anyone having to read the mapping table."""
-    try:
-        from harness.homeassistant import house as _house
-        return _house.status()
-    except Exception as exc:
-        return {"configured": False, "alive": False,
-                "why": "the framework failed to load: %s" % str(exc)[:160]}
 
 
-def _voice_status() -> Dict[str, Any]:
-    """ADR-KAI4: is the GNA ear loadable, and on which device?"""
-    try:
-        from harness.voice.service import voice_status
-        return voice_status()
-    except Exception as exc:
-        return {"ear": {"ok": False, "error": str(exc)}}
 
 
-def _voice_corpus() -> Dict[str, Any]:
-    """ADR-KAI4 P1.6: the in-vocab sentences to read aloud for real-voice training."""
-    import os as _os
-    p = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))),
-                      "var", "voice", "corpus.jsonl")
-    try:
-        sents = [json.loads(l)["text"] for l in open(p, encoding="utf-8") if l.strip()]
-        # a compact, phonetically varied reading set (prioritize wake + questions)
-        import random
-        wake = [s for s in sents if "kairos" in s]
-        rest = [s for s in sents if "kairos" not in s]
-        random.Random(7).shuffle(rest)
-        pick = wake[:15] + rest[:85]
-        return {"ok": True, "sentences": pick, "total_corpus": len(sents)}
-    except Exception as exc:
-        return {"ok": False, "error": str(exc), "sentences": []}
 
 
-def _voice_record_status() -> Dict[str, Any]:
-    try:
-        from harness.voice.record import record_status
-        return record_status()
-    except Exception as exc:
-        return {"total": 0, "error": str(exc)}
 
 
 def _ws_rel(raw: str) -> str:
@@ -2866,223 +1896,14 @@ def _ws_rel(raw: str) -> str:
     return r
 
 
-def _research_json() -> Dict[str, Any]:
-    """The research window: receipts from the paid tier, hers AND his (`by` says
-    whose). Plain web_search rows moved to /v1/search when the search panel became
-    its own window (2026-08-21) — one kind per window, chips for the rest."""
-    try:
-        from harness.skills import looking as L
-        st = L.status()
-        looks = [r for r in L.list_looks(60) if r.get("kind") == "research"][:40]
-        return {"ok": True, **st, "looks": looks}
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)[:200], "looks": [], "inflight": None}
 
 
-def _search_json() -> Dict[str, Any]:
-    """The search window: every outward look that is NOT the research tier —
-    web_search above all — plus which engine answers and who else could."""
-    try:
-        from harness.skills import looking as L
-        st = L.status()
-        looks = [r for r in L.list_looks(60) if r.get("kind") != "research"][:40]
-        return {"ok": True, **st, "looks": looks}
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)[:200], "looks": [], "inflight": None}
 
 
-def _narrative_json() -> Dict[str, Any]:
-    """Her journal: the current line plus every snapshot ever taken of it.
-
-    HISTORY comes from memory-okf-personality/full/ filtered on `mem_kind:
-    narrative` — the content-addressed store the composer already snapshots into, so
-    nothing new is written to serve this. It is a READ surface only: there is no
-    write route and there will not be one. The journal is hers by construction, and
-    that is the entire reason it is worth having."""
-    out: Dict[str, Any] = {"ok": True, "current": "", "history": []}
-    try:
-        from harness.skills import narrative as _nar
-        out["current"] = _nar.current() or ""
-    except Exception as exc:
-        out["error"] = str(exc)[:200]
-    try:
-        root = os.path.join(os.path.dirname(os.path.dirname(
-            os.path.dirname(os.path.abspath(__file__)))),
-            "memory-okf-personality", "full")
-        rows = []
-        for fn in os.listdir(root):
-            if not fn.endswith(".md"):
-                continue
-            fp = os.path.join(root, fn)
-            try:
-                with open(fp, encoding="utf-8") as f:
-                    body = f.read()
-            except OSError:
-                continue
-            if "mem_kind: narrative" not in body:
-                continue
-            text = body.split("---", 2)[-1].strip()
-            rows.append({"id": fn[:-3], "at": os.path.getmtime(fp), "text": text})
-        rows.sort(key=lambda r: r["at"], reverse=True)
-        # ONE ENTRY PER DAY, AND THE TOP ONE ONLY ONCE (2026-08-21) — the dedupe
-        # lives in narrative.collapse_history, pure and gated by G-NARRATIVE,
-        # because a fix that only exists inside a route closure is a fix no gate
-        # can reach. Same-day drafts collapse to the newest; `current_id` names
-        # the row that IS the current line so the panel marks it instead of
-        # rendering the same paragraph twice.
-        from harness.skills.narrative import collapse_history
-        kept, cur_id = collapse_history(rows, out.get("current") or "")
-        out["current_id"] = cur_id
-        out["history"] = kept[:60]
-    except Exception as _swx:
-        _swallowed(logger, "_narrative_json", _swx, lane="server")
-    return out
 
 
-def _files_json() -> Dict[str, Any]:
-    """List the shared workspace — the same tree her file tools resolve against."""
-    ws = os.environ.get("HARNESS_WORKSPACE") or os.getcwd()
-    root = os.path.realpath(ws)
-    out: Dict[str, Any] = {"ok": True, "root": root, "files": []}
-    if not os.path.isdir(root):
-        out["ok"], out["error"] = False, f"no workspace at {root}"
-        return out
-    rows = []
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if not d.startswith(".")][:64]
-        for fn in filenames:
-            ap = os.path.join(dirpath, fn)
-            try:
-                st = os.stat(ap)
-            except OSError:
-                continue
-            rows.append({"path": os.path.relpath(ap, root).replace("\\", "/"),
-                         "bytes": st.st_size, "at": st.st_mtime})
-            if len(rows) >= 500:
-                break
-        if len(rows) >= 500:
-            break
-    rows.sort(key=lambda r: r["at"], reverse=True)
-    out["files"] = rows
-    return out
 
 
-def _room_pulse() -> Dict[str, Any]:
-    """ONE call with everything the room's shell needs to feel like a place.
-
-    Deliberately an AGGREGATOR, not a new source of truth: every field below comes
-    from a function that already owns it. The shell beats once a second, and five
-    separate polls for a heartbeat is how a UI ends up with five different ideas of
-    what time it is.
-
-    Time here is HER experience of it, not the wall clock the browser already has:
-    when the day boundary falls, whether it has run, when she last wrote in her
-    journal, when the eye next looks, how long he has been quiet."""
-    import time as _t
-    now = _t.time()
-    out: Dict[str, Any] = {"ok": True, "now": now,
-                           "iso": _t.strftime("%Y-%m-%dT%H:%M:%S", _t.localtime(now))}
-
-    # the day boundary that actually drives consolidation
-    try:
-        hour = int(os.environ.get("SP_CONSOLIDATE_HOUR", "-1"))
-    except ValueError:
-        hour = -1
-    lt = _t.localtime(now)
-    nxt = None
-    if hour >= 0:
-        nxt = _t.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, hour, 0, 0, 0, 0, -1))
-        if nxt <= now:
-            nxt += 86400
-    day_state = {}
-    try:
-        with open(os.path.join(os.path.dirname(
-                os.environ.get("SP_RECALL_REGISTRY", "")) or ".",
-                "consolidate.json"), encoding="utf-8") as f:
-            day_state = json.load(f)
-    except Exception as _swx:
-        _swallowed(logger, "_room_pulse", _swx, lane="server")
-    out["clock"] = {"hour": lt.tm_hour, "minute": lt.tm_min,
-                    "boundary_hour": hour if hour >= 0 else None,
-                    "next_boundary_in_s": round(nxt - now) if nxt else None,
-                    "last_consolidated_day": day_state.get("last_day"),
-                    "consolidated_today": day_state.get("last_day") ==
-                                          _t.strftime("%Y-%m-%d", lt)}
-
-    # ANONYMOUS MODE — in the HEARTBEAT and not only on its own route, because the one
-    # thing this mode must never do is be on without looking on. The shell beats every 5s
-    # and paints the whole room from this; a switch he has to open a window to check is a
-    # switch he will forget he threw, and the failure that costs is the other direction —
-    # believing an evening was kept when it was not.
-    try:
-        from harness.control import anon as _anon_p
-        out["anon"] = _anon_p.state()
-    except Exception as _swx:
-        _swallowed(logger, "_room_pulse", _swx, lane="server")
-        out["anon"] = {"on": False}
-
-    # her state — mood/voice/traits drive the backdrop's palette.
-    # Through _persona_state(), which already owns this: it opens the right file and
-    # calls parse_persona(text) correctly. My first cut called parse_persona() with
-    # no argument and silently produced {} — a second implementation of a thing that
-    # already worked, which is the exact rule this repo is organised around.
-    try:
-        out["her"] = (_persona_state().get("state") or {})
-    except Exception as _swx:
-        _swallowed(logger, "_room_pulse", _swx, lane="server")
-        out["her"] = {}
-
-    # her journal — when she last wrote, and the line itself
-    try:
-        from harness.skills import narrative as _nar
-        cur = _nar.current() or ""
-        out["journal"] = {"present": bool(cur), "text": cur[:400]}
-    except Exception as _swx:
-        _swallowed(logger, "_room_pulse", _swx, lane="server")
-        out["journal"] = {"present": False}
-
-    # looking up — in-flight or last finished. The taskbar chip reads this.
-    try:
-        from harness.skills import looking as _look
-        st = _look.status()
-        inf = st.get("inflight")
-        last = st.get("last")
-        out["research"] = {
-            "inflight": bool(inf),
-            "kind": (inf or last or {}).get("kind"),
-            "query": (inf or last or {}).get("query") or "",
-            "title": (last or {}).get("title") or "",
-            "armed": st.get("armed"),
-            "search_backend": st.get("search_backend") or "ddg",
-        }
-    except Exception as _swx:
-        _swallowed(logger, "_room_pulse", _swx, lane="server")
-        out["research"] = {"inflight": False, "armed": False}
-
-    # presence
-    pres: Dict[str, Any] = {"warm": _WARM.is_set(),
-                            "since_last_turn_s": round(now - _LAST_TURN_AT)
-                                                 if _LAST_TURN_AT else None}
-    try:
-        from harness.senses import ambient as _amb
-        a = _amb.status()
-        pres["ambient_enabled"] = a.get("enabled")
-        pres["ambient_next_in_s"] = a.get("next_in_s")
-        last = (a.get("last") or {})
-        pres["ambient_last"] = last.get("seen") or last.get("error")
-        pres["ambient_last_at"] = last.get("iso")
-    except Exception as _swx:
-        _swallowed(logger, "_room_pulse", _swx, lane="server")
-    out["presence"] = pres
-
-    try:
-        from harness.control import backup as _bk
-        b = _bk.status()
-        out["backup"] = {"count": b.get("count"), "next_in_s": b.get("next_in_s"),
-                         "newest": b.get("newest")}
-    except Exception as _swx:
-        _swallowed(logger, "_room_pulse", _swx, lane="server")
-    return out
 
 
 def _sd_turn_start() -> bool:
@@ -3163,8 +1984,7 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
       {"tool": {...}}     a tool call the model made (render as a card)
       {"persona": {...}}  the live personality state (render as a chip)
     A client that only reads `delta` is unaffected (it ignores the others)."""
-    global _LAST_TURN_AT
-    _LAST_TURN_AT = time.time()
+    _state.LAST_TURN_AT = time.time()
     # PHASE TIMING (live-play 2026-07-11: 40 s turns for 3-token answers — the cost is
     # NOT decode. "Name every phase so the thief cannot hide again.") The init used to
     # sit ~400 lines DOWN, after the warm gate, the image, the arm and the whole
@@ -4171,25 +2991,11 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
 #     user turn can never race or interleave with the prefill;
 #   * /health reports {"warm": bool} so serve.py can hold "ready" until hot.
 import threading as _thr  # module-level (the chat handler imports its own alias locally)
-_WARM = _thr.Event()
+_WARM = _state.WARM                   # -> harness/server/state.py
 
 
-def warm_state() -> dict:
-    return {"warm": _WARM.is_set()}
 
 
-def _models_json() -> dict:
-    """OpenAI-shaped /v1/models naming the container THIS daemon loaded.
-
-    SP_MODEL_PATH is set by serve.py from the active profile's [paths] model, so it
-    tracks the profile by construction and cannot drift the way a config default can.
-    Falls back to the family name — true of every model here — rather than guessing a
-    specific one, because a confidently wrong model name is what caused this route to
-    exist (see the comment on the route table)."""
-    import os as _os
-    p = _os.environ.get("SP_MODEL_PATH", "")
-    name = _os.path.basename(p).replace(".sp-model", "") if p else "gemma-4"
-    return {"object": "list", "data": [{"id": name or "gemma-4", "object": "model"}]}
 
 
 def _await_warm(timeout: float = 900.0) -> bool:

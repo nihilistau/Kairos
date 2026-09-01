@@ -29,6 +29,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _src as _srcmod  # noqa: E402
 from _gate import check, finish, sandbox, utf8_stdout  # noqa: E402
 
 utf8_stdout()
@@ -259,10 +260,18 @@ check("...and the row still LANDS either way, stamped on arrival",
       len([r for r in _rows if r.get("kind") == "sleep_confidence"]) == 3, len(_rows))
 
 # THE DEVICE DOOR MUST NOT REACH IT.
-_app = io.open(os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read()
-_seg = _app[_app.find("/v1/telemetry/ingest"):][:4000]
+_app = _srcmod.pkg("harness", "server")
+# ── A SLICE OFF find() IS AN ABSENCE CHECK OVER THE WRONG BYTES (2026-09-01) ─────────
+# `find()` returns -1 when the route is not there, so `_app[-1:][:4000]` was the LAST
+# character of the gateway and "measured_at" was reliably absent from it. The check
+# passed for free the moment the ingest route moved or was renamed. An absence is only
+# evidence if you can prove you were looking in the right place.
+_at = _app.find("/v1/telemetry/ingest")
+check("the ingest route is where this looks for it", _at >= 0,
+      "the /v1/telemetry/ingest door is not in harness/server/ — this section graded nothing")
+_seg = _app[_at:][:4000] if _at >= 0 else ""
 check("nothing arriving over the HTTP door can pass a clock of its own",
-      "measured_at" not in _seg,
+      _at >= 0 and "measured_at" not in _seg,
       "a watch in a drawer for a week comes back confidently wrong")
 
 class _FakeClient:

@@ -40,6 +40,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+import _src as _srcmod  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -56,8 +57,7 @@ def check(name, cond, detail=""):
         print("  FAIL %s   %s" % (name, detail))
 
 
-APP = os.path.join(ROOT, "harness", "server", "app.py")
-src = open(APP, encoding="utf-8", errors="replace").read()
+src = _srcmod.pkg("harness", "server")
 lines = src.splitlines()
 
 print("1. THE CONTINUATION READS CANON, NOT THE CLIENT'S ECHO")

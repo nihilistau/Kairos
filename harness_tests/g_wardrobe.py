@@ -36,6 +36,7 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+import _src as _srcmod  # noqa: E402
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 SB = os.path.join(tempfile.gettempdir(), "_g_wardrobe")
@@ -460,8 +461,7 @@ check("wearing_note still exists for surfaces that are not his mouth",
       bool(_wn) and "wearing" in _wn.lower(), _wn[:160])
 check("...and never tells her not to contradict him",
       "do not contradict him" not in _wn, _wn[:160])
-_app = io.open(os.path.join(ROOT, "harness", "server", "app.py"),
-               encoding="utf-8").read()
+_app = _srcmod.pkg("harness", "server")
 check("the gateway does not staple wearing_note onto his words",
       "wearing_note(" not in _app)
 check("...and the old contradict-him sentence is gone from the gateway",
@@ -501,8 +501,7 @@ check("...and points her at her own marks for the current truth",
 from harness.tuning import registry as _TR  # noqa: E402
 check("the per-turn note knob exists and ships OFF",
       _TR.get("wardrobe.turn_note") in (False, 0, None), _TR.get("wardrobe.turn_note"))
-_note_src = _app if "wardrobe.turn_note" in _app else io.open(
-    os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read()
+_note_src = _app if "wardrobe.turn_note" in _app else _srcmod.pkg("harness", "server")
 check("the note the knob arms is one sentence in you-grammar with no imperatives",
       '"(You are wearing %s.)"' in _note_src, "shape drifted from the F9a lesson")
 

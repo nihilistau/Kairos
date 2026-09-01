@@ -52,6 +52,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+import _src as _srcmod  # noqa: E402
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 PASS = FAIL = 0
@@ -268,8 +269,7 @@ def lane(text, n):
     return "".join(out)
 
 
-app = io.open(os.path.join(ROOT, "harness", "server", "app.py"),
-              encoding="utf-8", errors="replace").read()
+app = _srcmod.pkg("harness", "server")
 check("the speech lane does NOT strip her marks — the room draws chips from them",
       "strip_tags(strip_control_surfaces(raw))" not in app)
 check("...and no room-facing path strips them either",

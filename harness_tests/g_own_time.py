@@ -65,6 +65,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+import _src as _srcmod  # noqa: E402
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 PASS = FAIL = 0
@@ -221,8 +222,7 @@ check("...and did_the_thing is asked separately in the scheduler",
       sch.index("solo_did_the_thing") < sch.index("solo_worth_saying(text)"))
 
 print("\n6. THE GENERATOR REPORTS HER HANDS")
-app = io.open(os.path.join(ROOT, "harness", "server", "app.py"),
-              encoding="utf-8", errors="replace").read()
+app = _srcmod.pkg("harness", "server")
 check("_generate takes a `called` sink", 'def _generate(nudge: str, called:' in app)
 check("...wired to the tool-loop callback", "on_tool=_note" in app)
 check("...and appends every name", "called.append(name)" in app)

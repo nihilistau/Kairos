@@ -42,6 +42,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _src as _srcmod  # noqa: E402
 from _gate import check, finish, sandbox as _sandbox, utf8_stdout  # noqa: E402
 
 utf8_stdout()
@@ -53,8 +54,7 @@ _sandbox(os.path.basename(__file__))
 from harness.server import app as A  # noqa: E402
 from harness.skills import memory as M  # noqa: E402
 
-SRC = open(os.path.join(ROOT, "harness", "server", "app.py"),
-           encoding="utf-8", errors="replace").read()
+SRC = _srcmod.pkg("harness", "server")
 
 print("\n1. A SYNTHETIC TURN MINTS NO FACT ABOUT HIM")
 _before = len(M.live_rows())

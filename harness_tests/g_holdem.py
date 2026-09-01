@@ -34,6 +34,7 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+import _src as _srcmod  # noqa: E402
 
 SB = os.path.join(tempfile.gettempdir(), "_g_holdem")
 shutil.rmtree(SB, ignore_errors=True)
@@ -242,7 +243,7 @@ os.environ["SP_GAMES"] = "1"
 check("...and is three tools when armed", len(PK.poker_tools()) == 3)
 
 print("\n11. THE PANEL ASKS FOR A SEAT AND GETS ONLY THAT SEAT")
-app = io.open(os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read()
+app = _srcmod.pkg("harness", "server")
 check("/v1/games routes poker through holdem_view(m, 0)", "holdem_view(m, 0)" in app)
 ui = io.open(os.path.join(ROOT, "ui", "src", "apps", "Games.jsx"), encoding="utf-8").read()
 # A UI that hides cards it possesses is one refactor away from showing them. The panel

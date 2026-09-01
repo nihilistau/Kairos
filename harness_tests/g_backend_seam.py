@@ -21,6 +21,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _src as _srcmod  # noqa: E402
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 from _gate import check, finish, utf8_stdout  # noqa: E402
 
@@ -156,7 +157,7 @@ check("SP_ENGINE_MARGIN_APPROX=1 reads a `length` finish as cut off (margin 0.0)
       cl3.last_kairos and cl3.last_kairos.get("eot_margin") == 0.0
       and cl3.last_kairos.get("finish_reason") == "length", cl3.last_kairos)
 os.environ.pop("SP_ENGINE_MARGIN_APPROX", None)
-app = open(os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read()
+app = _srcmod.pkg("harness", "server")
 check("the warm gate short-circuits when the backend has no warm",
       '_sup("warm")' in app and "_WARM.set()" in app)
 check("/v1/start and the restart door refuse an external engine politely",

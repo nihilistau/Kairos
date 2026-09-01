@@ -27,6 +27,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+import _src as _srcmod  # noqa: E402
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 from harness.inference.stream_processor import strip_control_surfaces as S  # noqa: E402
@@ -120,7 +121,7 @@ print(NL + "3. A MARKER SPLIT ACROSS TWO CHUNKS IS STILL A MARKER")
 # — the marker intact, with a second whole reply behind it. This leg is the STREAM, not
 # the function: it feeds the text in pieces, at every split point, the way the wire does.
 import io as _io  # noqa: E402
-_SRC = _io.open(os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read()
+_SRC = _srcmod.pkg("harness", "server")
 # 2026-08-19: the seam moved DOWN a level — _say now calls speech_delta (the whole
 # hold+strip kernel, one implementation in stream_processor) rather than assembling
 # hold_partial_marker + strip itself. The assertion follows the seam: what must hold

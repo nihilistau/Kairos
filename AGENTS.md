@@ -110,7 +110,8 @@ giving up quietly (`G-STORE-WRITES`).
 
 | Where | What |
 |---|---|
-| `harness/` | everything that runs: the gateway (`server/app.py`), the turn lifecycle, memory and recall (`skills/memory.py`), the idle clock (`kairos/`), the wardrobe and her state (`control/`), the backends (`inference/`), the tools (`toolcore/`, `skills/`) |
+| `harness/` | everything that runs: memory and recall (`skills/memory.py`), the idle clock (`kairos/`), the wardrobe and her state (`control/`), the backends (`inference/`), the tools (`toolcore/`, `skills/`) |
+| `harness/server/` | **the gateway, in four modules.** `app.py` is the HTTP surface and the day boundary; `turn.py` is the turn lifecycle — `_settle_turn` is the one list of debts every turn owes, latched so that two callers who both believe they own the epilogue pay it once; `panels.py` is the room's read-only windows; `state.py` is the live state they share (reached as `state.X`, never imported by name). Split out of one 6000-line file in 2026-09-01 — read `turn.py`'s header first if you are changing what a turn does |
 | `ui/` | THE ROOM — the React/Vite desktop: chat, the dock, every panel. Built into `console/room/`; `ui/README.md` has the framework |
 | `console/` | the committed room build the gateway serves. Do not hand-edit it — rebuild from `ui/` and let `G-ROOM-BUNDLE` prove they agree |
 | `profiles/` | one TOML per stack. `companion.toml` is the public default: `[engine].kind = "openai"`, gateway on :8810 |

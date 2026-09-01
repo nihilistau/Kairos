@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.8.15 — the gateway becomes four modules (2026-09-01)
+
+`harness/server/app.py` was 6180 lines. It is 4976, and the three things that came out of it
+are the three things it was hardest to reason about.
+
+- **`server/turn.py` — the turn lifecycle.** `_settle_turn` is the one list of debts a
+  finished turn owes: the latch released, facts captured from what you said, the day row
+  written, her marks applied, the receipts flushed. It exists because that list had been
+  re-implemented as trailing inline code with five bypasses, so an interrupted turn paid
+  none of it. It is a module boundary now instead of a convention, and the gate asserts
+  that as **identity** — one object, nine callers — plus the property those callers rely
+  on: two owners, one payment.
+- **`server/panels.py` — the room's read-only windows.** ~35 producers, each `() -> dict`
+  and almost all documented NEVER RAISES, because a panel that throws takes the window with
+  it. Which is exactly why a broken one is quiet, so the new `G-PANELS-SERVE` **calls** every
+  one of them and treats `{ok: false}` as a failure, then asks the live gateway for every
+  route `ui/src/api.js` names.
+- **`server/state.py` — what the gateway knows right now.** The warm gate, the canonical
+  per-session transcripts, the generate-now job, the last-turn clock. Reach it as `state.X`
+  and never `from state import X`: `LAST_TURN_AT` is rebindable and an import would snapshot
+  it. **None of it is locked**, which gathering it made legible rather than fixed — see
+  AGENTS.md §4.
+
+**Everything moved byte-identically**, asserted by the extractor: a moved function whose
+text changed is one that has to be re-reviewed, and 1200 lines of re-review is where the
+next twin gets born.
+
+**The first commit moved no code at all.** 42 read sites across 39 gates opened app.py as a
+FILE and asserted on its text — and when a function leaves a file, `.index()` fails loudly
+but `X not in src` goes **green**, and an AST walk for functions matching a marker grades
+nothing at all. So `harness_tests/_src.py` is now the one door for reading source: the
+package for an absence or a count, `inspect.getsource` for an ordering, a file only for
+things that really are one file. `G-SRC-TRAP` holds it, and also holds the cheaper rule
+that caught two shipped reds this week: **a gate may not read a source path that does not
+exist.**
+
+Two bugs the split produced, and how each was caught: a module missing an import its
+functions relied on (found by CALLING them, not reading them), and a second one on a path no
+gate drives at all (found by a new static check that resolves every global name each gateway
+module loads). Both are the same shape — moving a function strands whatever it used from the
+old module's top-level imports.
+
 ## 0.8.14 — this tree gets its own orientation, a POSIX launcher, and CI (2026-09-01)
 
 Everything here is about making the framework runnable by someone who is not its author.

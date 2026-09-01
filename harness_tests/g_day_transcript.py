@@ -48,6 +48,7 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _src as _srcmod  # noqa: E402
 # ── A RED FOR THE CONSOLE ENCODING, NOT FOR THE SUBJECT (2026-08-31) ──────────────────
 # §10's heading quotes his report, and his report contains "◆". On a cp1252 console the
 # print itself raises UnicodeEncodeError, the gate dies mid-run at exit 1, and the sweep
@@ -105,7 +106,7 @@ print("\n3. no session_id is required — the ROOM's path")
 # nothing for it; the durable write must not depend on that bookkeeping.
 check("_CHAT_SESSIONS is empty and the day is still four turns long",
       not A._CHAT_SESSIONS and len(A._longest_transcript()) == 4)
-src = io.open(os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read()
+src = _srcmod.pkg("harness", "server")
 # The claim is structural, so assert the structure and not a proxy for it: the durable
 # writer takes no session of any kind, so no client's optional bookkeeping can gate it.
 _sig = src[src.index("def _append_day_turn("):]
@@ -175,8 +176,17 @@ print("\n5. HIS WORDS, not the message list he never sent")
 # the turn, and _settle_turn is the one caller of _append_day_turn on this path. The
 # claim is unchanged: the turn is written from HIS words, bound before the recall,
 # silence and anon notes are stapled onto the message list.
-bind = src.index("_human = _arm_turn(msgs)")
-call = src.find("_settle_turn(_human, final_text")
+# ── AN ORDERING IS A CLAIM ABOUT ONE FUNCTION (2026-09-01) ─────────────────────────
+# These were byte offsets into app.py. That works only while the bind and the settle
+# live in the same file, and the turn lifecycle is being extracted to a sibling module:
+# across two files the comparison is not wrong, it is MEANINGLESS — and worse, `bind <
+# call` over concatenated package text can be satisfied by pure file order. So the
+# question is asked of the handler OBJECT, whose source is the only text where "before"
+# means what this check means by it. `inspect.getsource`, the read eight other gates
+# already use.
+_handler = _srcmod.body(A._native_chat_sse_body)
+bind = _handler.index("_human = _arm_turn(msgs)")
+call = _handler.find("_settle_turn(_human, final_text")
 # find(), not index(): a call site that stopped passing his words must read as a FAIL
 # with a name on it, not as a traceback halfway down the gate.
 check("the turn is written from his words", call > 0,
@@ -186,8 +196,9 @@ check("...and the epilogue's day write passes them through verbatim",
       "_append_day_turn(human_text, reply_text, synthetic=synthetic, acts=acts)" in src)
 for marker, what in (("Quietly, you also remember", "the recall note"),
                      ("note_for_question(user_text)", "the silence note")):
-    at = src.index(marker)
-    check("%s is stapled onto msgs AFTER the operator's words were taken" % what, at > bind)
+    at = _handler.find(marker)
+    check("%s is stapled onto msgs AFTER the operator's words were taken" % what,
+          at > bind, "%r is not in the handler at all" % marker if at < 0 else at)
 check("the helper takes a string, so a mutated msgs cannot reach it",
       "def _append_day_turn(user_text: str, final: str," in src)
 

@@ -52,6 +52,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+import _src as _srcmod  # noqa: E402
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 PASS = FAIL = 0
@@ -83,7 +84,7 @@ for verb, fn in (("add", "noteAdd"), ("edit", "noteUpdate"),
 check("`done` is its own control, separate from retire",
       "done: !n.done" in board)
 check("...and it is reversible on the page", "'not done'" in board)
-routes = src("harness", "server", "app.py")
+routes = _srcmod.pkg("harness", "server")
 for r in ("/v1/notes/add", "/v1/notes/update", "/v1/notes/remove", "/v1/notes/restore"):
     check("the gateway serves %s" % r, ('p == "%s"' % r) in routes)
 
