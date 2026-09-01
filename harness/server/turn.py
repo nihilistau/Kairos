@@ -217,12 +217,28 @@ def _on_her_own_words(text: str, kind: "str|None" = None) -> None:
     turn her wistful) but nothing is filed — no day row (the room shows it live from
     the outbox; an hour of ambient turns in the restore would bury the conversation),
     and no self-stance rows (dream lines are too specific and too repetitive to be
-    who she is the next morning — the registry's kind=dream pile is the receipt)."""
+    who she is the next morning — the registry's kind=dream pile is the receipt).
+
+    AND A DRIVEN TURN'S CONTINUATION IS STILL DRIVEN (2026-09-02). This passed no
+    `synthetic` at all, while `_finish_openai_turn` two functions down passes it and the
+    native path passes it — the §0 shape exactly, and the unguarded path is the one that
+    ran. Found by driving a real continuation on the live stack to check tonight's margin
+    fix: the probe declared itself synthetic, rows 159-162 of the day transcript carry the
+    mark, and row 163 — her continuation — did not. The scheduler had also filed it as a
+    real `spoke_up` memory (`ep_tool_1788302245156`, since quarantined). A continuation is
+    part of the turn it continues; if that turn was driven, so is this.
+
+    The reason comes from the ContextVar rather than a new parameter because `on_spoke` is
+    called by the SCHEDULER, which has no `body` — the scheduler arms it around the whole
+    unprompted turn (`scheduler._arm`) and every debt in `_settle_turn` then sees it.
+    """
+    from harness.skills.memory import synthetic_reason
+    _syn = synthetic_reason() or None
     if kind == "mode_turn":
         _settle_turn("", text, capture=False, close_his_turn=False,
-                     record=False, stances=False)
+                     record=False, stances=False, synthetic=_syn)
     else:
-        _settle_turn("", text, capture=False, close_his_turn=False)
+        _settle_turn("", text, capture=False, close_his_turn=False, synthetic=_syn)
 
 
 def _finish_openai_turn(body: Dict[str, Any], human_text: str, text: str) -> None:
