@@ -171,10 +171,21 @@ class OpenAIClient:
         # NO MARGIN HERE, and the harness is told so rather than handed a number: kairos
         # decides with eot_margin=None (CONTINUE/EXPAND dark). SP_ENGINE_MARGIN_APPROX=1
         # lets a `length` finish read as "cut off" — crude, no magnitude, opt-in.
-        margin = None
-        if _env("SP_ENGINE_MARGIN_APPROX", "0") == "1" and finish == "length":
-            margin = 0.0
-        resp.kairos = {"eot_margin": margin, "finish_reason": finish, "source": "openai"}
+        #
+        # IT SAYS SO AS A FLAG, NOT AS A NUMBER (fixed 2026-09-02). This used to set
+        # eot_margin = 0.0 and mean "cut off" by it. It never fired: CONTINUE wants
+        # `margin < cfg.continue_margin`, which the model calibration puts at -18.50, and
+        # 0.0 is nowhere near it — it sits ABOVE the finished-turn threshold, so the knob
+        # read as "she finished comfortably" and the lane stayed exactly as dark as with
+        # no margin at all. Driven, not read: G-CONTINUATION-MARGIN §2.
+        #
+        # The bug was the layering. Only the POLICY knows where its own threshold is, and
+        # a backend that fabricates a number has to guess it. So the backend states the
+        # fact it actually has — the endpoint stopped on `length` — and the scheduler,
+        # which holds cfg, turns that into a margin.
+        approx = _env("SP_ENGINE_MARGIN_APPROX", "0") == "1" and finish == "length"
+        resp.kairos = {"eot_margin": None, "finish_reason": finish, "source": "openai",
+                       "approx_cutoff": approx}
         self.last_kairos = resp.kairos
         if on_event:
             on_event(StreamEvent("message.end", chat_id=chat_id, is_done=True))

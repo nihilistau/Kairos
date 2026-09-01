@@ -148,13 +148,27 @@ check("subscribe_events is empty, not an error", list(cl.subscribe_events()) == 
 print("\n4. THE DEGRADATIONS ARE DECIDED BY supports(), AND KAIROS STILL DECIDES")
 check("supports() reads the current backend",
       supports("oneshot") and not supports("eot_margin") and not supports("capture"))
-src_i = open(os.path.join(ROOT, "harness", "kairos", "impulse.py"), encoding="utf-8").read()
-check("impulse.decide takes eot_margin=None (CONTINUE dark, the rest alive)",
-      "eot_margin: Optional[float]" in src_i or "eot_margin=None" in src_i)
+# DRIVEN, NOT GREPPED (2026-09-02). This asserted `"eot_margin=None" in src_i` — a src-trap
+# that says a keyword exists, not that the policy survives it. Call it.
+from harness.kairos import impulse as _imp  # noqa: E402
+_now = __import__("time").monotonic()
+_st = _imp.TurnState(); _st.last_spoke_at = _now - 3600.0; _st.last_user_at = _now - 20.0
+_st.last_conv_at = _now - 20.0
+_dark = _imp.decide(cfg=_imp.KairosConfig(enabled=True), state=_st, now=_now,
+                    reply_text="I was in the middle of saying", eot_margin=None, due_notes=[])
+check("impulse.decide SURVIVES eot_margin=None (CONTINUE dark, it does not raise)",
+      _dark.action != _imp.CONTINUE and _dark.action != _imp.EXPAND, _dark.reason)
+
 os.environ["SP_ENGINE_MARGIN_APPROX"] = "1"; C._CLIENT = None; cl3 = C.get_client()
 cl3.chat(messages=[{"role": "user", "content": "hi"}], config=InferenceConfig(max_tokens=4))
-check("SP_ENGINE_MARGIN_APPROX=1 reads a `length` finish as cut off (margin 0.0)",
-      cl3.last_kairos and cl3.last_kairos.get("eot_margin") == 0.0
+# THIS LEG USED TO PIN THE DEFECT (fixed 2026-09-02). It asserted `eot_margin == 0.0` — the
+# value the backend invented for "cut off" — and 0.0 is ABOVE `cfg.continue_margin` (-18.50),
+# so the knob it was guarding had never once opened the lane. A gate can hold a bug in place
+# as firmly as it holds a fix. The backend now reports the FACT it has and the scheduler,
+# which is the only thing that knows the threshold, does the arithmetic: G-CONTINUATION-MARGIN.
+check("SP_ENGINE_MARGIN_APPROX=1 flags a `length` finish rather than inventing a margin",
+      cl3.last_kairos and cl3.last_kairos.get("eot_margin") is None
+      and cl3.last_kairos.get("approx_cutoff") is True
       and cl3.last_kairos.get("finish_reason") == "length", cl3.last_kairos)
 os.environ.pop("SP_ENGINE_MARGIN_APPROX", None)
 app = _srcmod.pkg("harness", "server")

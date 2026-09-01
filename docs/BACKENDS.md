@@ -65,7 +65,7 @@ field is dropped and the drop is logged once.
 
 | capability | sp-daemon | openai backend |
 |---|---|---|
-| `eot_margin` — the raw stop-vs-continue logit gap | drives kairos CONTINUE / EXPAND | `None` → CONTINUE/EXPAND dark; REMIND / SOLO / MUSE / CHECK_IN live. Opt-in `SP_ENGINE_MARGIN_APPROX=1`: a `length` finish reads as cut off (crude, no magnitude) |
+| `eot_margin` — the raw stop-vs-continue logit gap | drives kairos CONTINUE / EXPAND | `None` → CONTINUE/EXPAND dark; REMIND / SOLO / MUSE / CHECK_IN live. Opt-in `SP_ENGINE_MARGIN_APPROX=1`: the backend FLAGS a `length` finish and the scheduler turns it into a margin one step below the threshold — crude, no magnitude, so it earns the longest continuation delay. **It set `0.0` until 2026-09-02 and therefore never fired at all** (0.0 is above `continue_margin` = -18.50): G-CONTINUATION-MARGIN |
 | byte-exact decoding, `eot_bias`, `raw_logits`, `auto_recall`, `replay`, `single_entry`, `tool_names`, `prompt_tokens` | yes | dropped (no wire field); the knobs are tagged `engine="sp"` and the room shows the chip |
 | residual vision frames (`inject_frames`) | sight through her own vision tower | `SP_ENGINE_VISION=1` → an `image_url` content part (multimodal endpoints only), else "sight is not available on this engine" |
 | residual audio frames — voice-in | the native ear | off; `voice/service.py` says so as a reply. `[engine].asr_url` is reserved for ASR-then-text |
