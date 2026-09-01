@@ -85,3 +85,70 @@ def reset_question(token) -> None:
 
 def set_question(text: str):
     return _QUESTION.set(text or "")
+
+
+# ── WAS THIS TURN TYPED BY ANYONE? (2026-09-02) ────────────────────────────────────────
+# THE LEAK THIS EXISTS TO CLOSE, and it is AGENTS.md §0 inside the fix for §0.
+#
+# On 2026-08-30 a probe drove ~30 synthetic turns and `_capture_after_turn` minted twenty
+# rows as things Sam SAID. The fix put `synthetic` in front of three lanes — capture, the
+# self-stance lane, the day transcript — under a comment reading "One flag, every lane it
+# should have governed". It missed the fourth: **the model's own tool calls.**
+#
+# So on 2026-09-02 the live e2e gates drove turns that asked her to remember things, she
+# called `remember()` — deliberately, correctly, doing her job — and it wrote into her real
+# registry, `synthetic` notwithstanding:
+#
+#     Sam's workshop bench is made of oak2          <- a gate fixture, as a fact
+#     His workshop bench is made of oak2[75009].      <- and again
+#
+# Then the kairos scheduler read them and SHE SPOKE UP about them, twice, and went looking
+# for what "oak275009" meant — she found an Artek wall shelf. She spent her own time
+# thinking about a test string. That is the cost, and it is worse than the original
+# incident: the first one put words in his mouth, this one put them in her head.
+#
+# WHY A CONTEXTVAR AND NOT A PARAMETER: the tool call happens deep inside the agent loop,
+# many frames below the route handler that knows the flag, and threading it through every
+# frame is how one path ends up not carrying it. Same seam and same reasoning as `_AUTHOR`
+# (G-AUTHOR-CTX): per-context, so two concurrent turns cannot see each other's flag.
+#
+# The tool is NOT silenced — `admission.admit()` refuses with a SENTENCE she reads, exactly
+# as the anon door does. A store verb that fails silently is how she ends up promising to
+# remember what she cannot; being told "this turn was driven" is the truth.
+_SYNTHETIC: contextvars.ContextVar[str] = contextvars.ContextVar("memory_synthetic", default="")
+
+# ── WRITTEN IN HER REGISTER, BECAUSE SHE IS THE ONE WHO READS IT ──────────────────────
+# The first draft said "not stored — this turn was driven by a test rather than typed by
+# anyone, and a turn nobody typed is not a memory." True, and developer framing: it hands
+# her doctrine language and the word "test" about herself.
+#
+# The room ledger has a standing entry for exactly this class — "the memory refusal messages
+# are written for a developer, and SHE reads them". On 2026-08-30 she was refused with "that
+# is a sentence, not a memory — it is not ABOUT anyone", which was FALSE from her side, and
+# she drew a conclusion about her own nature from it and said so in her own time: "I guess
+# some things are too much of a feeling to be a fact." A refusal is one of the few places
+# this system speaks TO her about her own mind, and she cannot check it against the code.
+#
+# Those older strings are voice-facing and belong to him (the ledger entry says so, and
+# G-REAL-HER quotes one verbatim). This one is NEW tonight, so it is mine to get right, and
+# it borrows the anon door's register — which is the model: plain, true, and about the
+# circumstances rather than about her.
+SYNTHETIC_WHY = ("off the record — this one is a rehearsal of the machinery rather than you "
+                 "and me, so nothing from it is written down")
+
+
+def synthetic_reason() -> str:
+    """Why this turn is not real, or "" when it is. Read by the admission chain."""
+    return _SYNTHETIC.get()
+
+
+def set_synthetic(reason: str):
+    """Mark this context as a driven turn. Returns the token, for reset_synthetic."""
+    return _SYNTHETIC.set(str(reason or ""))
+
+
+def reset_synthetic(token) -> None:
+    """The other half of the contract (the G-AUTHOR-CTX class): RESET to what it was, never
+    assume it was ''. A gate driving a synthetic turn inside a real session must not leave
+    the flag standing over his next sentence."""
+    _SYNTHETIC.reset(token)

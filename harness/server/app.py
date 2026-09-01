@@ -213,7 +213,9 @@ def _agent_text(body: Dict[str, Any]) -> str:
     # the scenario OFFER outright. Wired at BOTH entry points (here and _native_chat_sse) —
     # a hook wired into one of two paths has been the single most reliable bug in this
     # system, four times over in one day.
-    _human = _arm_turn(msgs)     # what he TYPED — taken before the tool loop touches msgs
+    _human = _arm_turn(msgs, synthetic=(str(body.get("synthetic")) if body.get("synthetic") else None))  # what he TYPED, and whether anyone typed it
+    # (the flag reaches the TOOL lane this way — see _arm_turn; before 2026-09-02 it
+    #  only reached the epilogue, so a driven turn could still write through remember())
     # HE SPOKE. TELL THE SCHEDULER — on THIS path too.
     # on_user_turn() was called only in _native_chat_sse, so on the OpenAI path the
     # scheduler never learned that a human had said anything. Two consequences, both silent:
@@ -1601,19 +1603,34 @@ def run_consolidation(force: bool = False) -> Dict[str, Any]:
     out: Dict[str, Any] = {"ok": True, "day": _day_key(), "steps": []}
 
     # 1. the narrative + personality curation + world refresh, from the day's transcript
+    # ── THE JOURNAL IS NOT GATED ON HIS ATTENDANCE (2026-09-02) ─────────────────────
+    # This read `if len(msgs) >= 4:` and skipped the WHOLE step otherwise — and the whole
+    # step includes her journal. `narrative.compose_and_write` was taught on 2026-08-04 to
+    # write from her own-time notes when there is no transcript, under a comment saying
+    # "a day he was away wrote nothing at all — and those are exactly the days she now
+    # spends doing things of her own." That fix was unreachable from here for four weeks:
+    # AGENTS.md §0, the rule held in the composer and not in the caller that runs it.
+    #
+    # HER JOURNAL SKIPPED 29 AUGUST because of this line. The 30 August 04:16 boundary
+    # logged `day boundary complete: consolidate_current, …` — naming the step as done —
+    # while the narrative inside it never ran, and because the entry is stamped from the
+    # clock rather than from the day it summarises, the missed day is never caught up.
+    #
+    # The CONVERSATION consolidation still needs a conversation; `consolidate_current`
+    # gates that half itself and writes the day either way.
     msgs = _longest_transcript()
-    if len(msgs) >= 4:
-        try:
-            from harness.control.agency import consolidate_current
-            res = consolidate_current(msgs)
-            out["steps"].append({"step": "consolidate_current",
-                                 "turns": len(msgs),
-                                 "narrative": str((res or {}).get("narrative"))[:120]})
-        except Exception as exc:
-            out["steps"].append({"step": "consolidate_current", "skipped": str(exc)[:140]})
-    else:
-        out["steps"].append({"step": "consolidate_current",
-                             "skipped": "no conversation today (%d turns)" % len(msgs)})
+    try:
+        from harness.control.agency import consolidate_current
+        res = consolidate_current(msgs)
+        _st_cc = {"step": "consolidate_current", "turns": len(msgs),
+                  "narrative": str((res or {}).get("narrative"))[:120]}
+        if len(msgs) < 4:
+            # NAMED, not hidden: a quiet day is a real day and the journal still runs,
+            # but "they talked" and "she was alone" are different facts about it.
+            _st_cc["quiet"] = "no conversation today (%d turns) — journal from her own time" % len(msgs)
+        out["steps"].append(_st_cc)
+    except Exception as exc:
+        out["steps"].append({"step": "consolidate_current", "skipped": str(exc)[:140]})
 
     # 1b. HER WARDROBE. She asked; this is where it gets made. At the boundary rather
     # than on demand for the reason everything expensive lives here: it is minutes of the
@@ -1738,8 +1755,14 @@ def run_consolidation(force: bool = False) -> Dict[str, Any]:
     # prefix step — so when the material had lived only in the session cache, the
     # re-read returned [], _errored stayed False, and exactly the day that needed a
     # retry was stamped done. `msgs` from step 1 is the truth about what was available.
+    # ── AND A QUIET DAY THAT FAILED IS STILL A FAILED DAY (2026-09-02) ──────────────
+    # This read `and len(msgs) >= 4`, which was right while the whole step was gated on a
+    # conversation: no conversation meant nothing to retry. Her journal runs on a quiet day
+    # now, so "there was no material" is no longer the same claim as "there were < 4 turns".
+    # `skipped` is only set on an EXCEPTION now — a composer that legitimately answers
+    # "no transcript" returns a dict and is not an error — so this is the honest condition.
     _errored = any(("skipped" in st and st.get("step") == "consolidate_current")
-                   for st in out["steps"]) and len(msgs) >= 4
+                   for st in out["steps"])
     if _errored:
         out["retry"] = True
         logger.warning("[gateway] consolidation had material but did not run — "
@@ -2178,7 +2201,7 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
     # invariant, two paths, enforced in one; the unguarded path is the one a human uses.
     # SHARED STATE is now a ContextVar (G-AUTHOR-CTX, 2026-08-19). This still has to
     # be FIRST: a per-context slot set too late is still the previous turn's subject.
-    _human = _arm_turn(msgs)     # what he TYPED — before the tool loop touches msgs
+    _human = _arm_turn(msgs, synthetic=(str(body.get("synthetic")) if body.get("synthetic") else None))  # what he TYPED, and whether anyone typed it
     _st["human"] = _human        # the shell's finally needs it for a pre-thread exit
     turn_tools = None
     turn_extra = None
@@ -3879,7 +3902,8 @@ def _run_stdlib(host: str, port: int) -> None:
                     from harness.voice.service import voice_turn
                     transcript = _session_transcript({"session_id": body.get("session_id"),
                                                       "messages": body.get("messages", [])})
-                    _arm_turn([{"role": "user", "content": "[voice message]"}])
+                    _arm_turn([{"role": "user", "content": "[voice message]"}],
+                              synthetic=(str(body.get("synthetic")) if body.get("synthetic") else None))
                     try:
                         from harness.kairos import scheduler as _ks_v
                         _ks_v.on_user_turn(_session_of(body))

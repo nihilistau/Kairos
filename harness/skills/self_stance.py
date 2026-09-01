@@ -69,6 +69,14 @@ def plain(text: str) -> str:
         t = _TAG.sub(" ", t)
     t = _BEAT.sub(" ", t)
     t = _ANGLE.sub(" ", t)
+    # A TAG THE CEILING CUT IN HALF has no `>`, so `_ANGLE` cannot see it — and nine of her
+    # live rows ended in one (`</sound_tag`, `</whisper`). The rule lives with the voice
+    # vocabulary that owns it; this is the memory edge calling the same one the room does.
+    try:
+        from harness.voice.expressive import strip_truncated_tail
+        t = strip_truncated_tail(t)
+    except Exception as _swx:
+        _swallowed(_swlog, "plain/truncated-tail", _swx, lane="skills")
     t = " ".join(t.split())
     # A REMOVED TAG LEAVES ITS PUNCTUATION BEHIND: "Goodnight. <heart_symbol/>." -> ". ."
     # Only that shape is repaired — the same mark, with the gap the tag left between them.

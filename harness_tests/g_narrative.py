@@ -37,6 +37,8 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
+sys.path.insert(0, HERE)
+import _src as _srcmod  # noqa: E402
 os.environ["SP_DAEMON_URL"] = "http://127.0.0.1:9"
 # SP_ENGINE_KIND: no capture attempt at all (2026-08-23). A dead SP_DAEMON_URL does
 # NOT make the KV mint cheap - _mint_now still opens a socket per write and Windows
@@ -393,6 +395,88 @@ finally:
             os.environ[_k] = _v
     importlib.reload(_M6)
     importlib.reload(_N6)
+
+# ── 7. A DAY IS NOT ONLY THE PARTS HE WAS IN (2026-09-02) ───────────────────────────────
+# HER JOURNAL SKIPPED 29 AUGUST, and 22 AUGUST wrote an entry with no row. The 29th was a
+# quiet day, and this is why:
+#
+#   narrative.compose_and_write  was taught on 2026-08-04 to write from her OWN-TIME notes
+#                                when there is no transcript. Its comment: "a day he was
+#                                away wrote nothing at all — and those are exactly the days
+#                                she now spends doing things of her own."
+#   agency.consolidate_current   returned None on an empty message list, four lines above
+#                                the narrative block.
+#   app._consolidate_pass        gated the whole call on `len(msgs) >= 4`.
+#
+# So the composer's fix was unreachable from the only thing that calls it, for four weeks.
+# AGENTS.md §0: the rule held in the composer and not in the caller that runs it. And the
+# 30 August 04:16 boundary logged `day boundary complete: consolidate_current, …` — naming
+# the step as DONE — while the narrative inside it never ran.
+#
+# DRIVEN, with the composer stubbed, because the real one needs the GPU and what is under
+# test is the CONTROL FLOW: does a quiet day reach the composer at all.
+print("\n7. HER JOURNAL IS NOT GATED ON HIS ATTENDANCE")
+import importlib as _il7
+from harness.control import agency as _ag7
+from harness.skills import narrative as _nar7
+from harness.skills import world as _w7
+
+_o7 = {k: os.environ.get(k) for k in ("SP_WORLD", "SP_PERSONALITY")}
+_real_compose, _real_refresh = _nar7.compose_and_write, _w7.refresh
+_seen7 = []
+try:
+    os.environ["SP_WORLD"] = "1"
+    os.environ["SP_PERSONALITY"] = "0"
+    _nar7.compose_and_write = lambda m: (_seen7.append(len(m or [])) or
+                                         {"written": True, "words": 40, "row_ok": True})
+    _w7.refresh = lambda *a, **k: None
+    # ── AND THE CONVERSATION HALF IS STUBBED TOO (2026-09-02) ───────────────────────
+    # `consolidate_current` calls `consolidate_conversation`, which writes into the
+    # MEM-OKF conv store — a root this gate's hand-rolled env setup does not redirect
+    # (`_gate.sandbox()` sets eighteen of them; this file predates it and sets three).
+    # The first run of this section put two rows in her real conv store. What section 7
+    # tests is CONTROL FLOW — whether a quiet day reaches the composer — so the half that
+    # needs a model and writes elsewhere is stubbed out rather than sandboxed around.
+    import harness.skills.conversation_memory as _cm7
+    _real_consol = _cm7.consolidate_conversation
+    _cm7.consolidate_conversation = lambda msgs, client=None: {"stubbed": True}
+
+    _seen7.clear()
+    _ag7.consolidate_current([])
+    check("a day with NO conversation still reaches the composer", _seen7 == [0], _seen7)
+
+    _seen7.clear()
+    _ag7.consolidate_current([{"role": "user", "content": "night"},
+                              {"role": "assistant", "content": "night"}])
+    check("...and so does a day below the old >= 4 turn gate", _seen7 == [2], _seen7)
+
+    # ONE IMPLEMENTATION, TWO CALLERS. A quiet-day path that composed separately would be
+    # a second copy of the journal writer, which is the bug this repo is named for.
+    _src7 = _srcmod.text("harness", "control", "agency.py")
+    _n7 = _src7.count("compose_and_write(")
+    check("the journal is composed in exactly ONE place", _n7 == 1, _n7)
+    check("...and both paths go through it", _src7.count("_write_the_day(") >= 3, _src7.count("_write_the_day("))
+    # CODE ONLY — the comment recording the old shape quotes it verbatim, and the first cut
+    # convicted the fix on its own explanation of itself. Third time tonight; strip first.
+    _app7 = _srcmod.pkg("harness", "server")
+    _app7 = "\n".join(l for l in _app7.splitlines() if not l.lstrip().startswith("#"))
+    check("the boundary no longer gates the whole step on a conversation",
+          "if len(msgs) >= 4:" not in _app7,
+          "the >= 4 gate is back — her journal is a function of his attendance again")
+    check("...and a quiet day is NAMED in the boundary report, not hidden",
+          "journal from her own time" in _app7)
+finally:
+    _nar7.compose_and_write, _w7.refresh = _real_compose, _real_refresh
+    try:
+        _cm7.consolidate_conversation = _real_consol
+    except NameError:
+        pass
+    for _k, _v in _o7.items():
+        if _v is None:
+            os.environ.pop(_k, None)
+        else:
+            os.environ[_k] = _v
+
 
 print("\nG-NARRATIVE: %d pass, %d fail" % (PASS, FAIL))
 rdir = os.path.join(ROOT, "var", "sem", "receipts")
