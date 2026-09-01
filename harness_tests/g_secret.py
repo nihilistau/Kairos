@@ -182,7 +182,7 @@ check("classify() can emit private-secret (it could not, and that was the bug)",
 # it, recall() presented it, search_memories returned its raw text with a match score,
 # provenance() quoted it. The guard held on the path that runs without her choosing it
 # and on none of the paths she chooses — AGENTS.md §0, in the subsystem whose closed
-# trap is the §0 table's last row. The rule now lives in memory.secret_withheld(), one
+# trap is the §0 table's last row. The rule now lives in memory/present.py, one
 # function, consumed by every door; this section walks all four with a secret minted
 # through remember() (never hand-built — §0 of this file's own doctrine).
 print("\n5. the withholding holds at every TOOL door (the decider was one of five)")
@@ -214,10 +214,25 @@ check("...and the innocent row is untouched by the secret rule",
 # THE IN-GATE MUTANT: every door must CONSULT the rule, not coincidentally hide the row.
 # With secret_withheld forced False each door must LEAK — proving the guard is the one
 # load-bearing thing between the row and the reply, per door, by name. (The offline
-# mutant procedure — break memory.secret_withheld itself, run this file, watch the four
+# mutant procedure — break present.secret_withheld itself, run this file, watch the four
 # doors above go red by name, restore — was performed when this section landed.)
-_orig_sw = M.secret_withheld
-M.secret_withheld = lambda row, query="": False
+#
+# ── THE MUTANT PATCHES THE OWNER, NOT THE ALIAS (2026-09-01) ────────────────────────
+# This used to set `M.secret_withheld`, which worked for as long as the door and the
+# implementation were the same module. `harness/skills/memory` is a package now and the rule
+# lives in `memory/present.py`, so patching the FAÇADE's re-exported name rebinds an alias
+# that nothing calls — and every door below stays honest, which reads as four red mutants
+# claiming the guard is not load-bearing. Loud, and therefore the good outcome; what had to
+# be avoided is the other half of it, where SOME doors resolve through the alias and some
+# through the module, and the mutant grades a subset while looking complete.
+#
+# So: patch the OWNER, and require every door to see it. `M.present` is the submodule
+# reached through the package — not a second import of it, which G-MEMORY-PACKAGE §3
+# forbids. That gate's §6 holds the other half: no member of the package may bind a
+# gate-rebound name BY NAME, because a by-name binding snapshots and this mutant would go
+# quiet over whichever door held the snapshot.
+_orig_sw = M.present.secret_withheld
+M.present.secret_withheld = lambda row, query="": False
 try:
     for door, out in [
         ("list_memories", M.list_memories()),
@@ -228,7 +243,7 @@ try:
         check("MUTANT %-16s leaks with the guard lifted (the guard is load-bearing)" % door,
               "8812" in out, out[:90])
 finally:
-    M.secret_withheld = _orig_sw
+    M.present.secret_withheld = _orig_sw
 
 print("\n6. THE FIFTH DOOR: forget() DOES NOT READ A SECRET BACK AT ITS FUNERAL")
 # (2026-08-28, external review.) Four tool doors withheld a private-secret's text; the

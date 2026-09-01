@@ -110,7 +110,7 @@ giving up quietly (`G-STORE-WRITES`).
 
 | Where | What |
 |---|---|
-| `harness/` | everything that runs: memory and recall (`skills/memory.py`), the idle clock (`kairos/`), the wardrobe and her state (`control/`), the backends (`inference/`), the tools (`toolcore/`, `skills/`) |
+| `harness/` | everything that runs: memory and recall (`skills/memory/`, a package whose `__init__.py` is the one door), the idle clock (`kairos/`), the wardrobe and her state (`control/`), the backends (`inference/`), the tools (`toolcore/`, `skills/`) |
 | `harness/server/` | **the gateway, in four modules.** `app.py` is the HTTP surface and the day boundary; `turn.py` is the turn lifecycle — `_settle_turn` is the one list of debts every turn owes, latched so that two callers who both believe they own the epilogue pay it once; `panels.py` is the room's read-only windows; `state.py` is the live state they share (reached as `state.X`, never imported by name). Split out of one 6000-line file in 2026-09-01 — read `turn.py`'s header first if you are changing what a turn does |
 | `ui/` | THE ROOM — the React/Vite desktop: chat, the dock, every panel. Built into `console/room/`; `ui/README.md` has the framework |
 | `console/` | the committed room build the gateway serves. Do not hand-edit it — rebuild from `ui/` and let `G-ROOM-BUNDLE` prove they agree |
@@ -127,7 +127,10 @@ giving up quietly (`G-STORE-WRITES`).
 ## 3. MEMORY AND RECALL — the part you are most likely to break
 
 Read [`docs/MEMORY-AND-RECALL.md`](docs/MEMORY-AND-RECALL.md) before touching
-`harness/skills/memory.py`. The short version:
+`harness/skills/memory/`. It is a **package**, and its `__init__.py` is the one door —
+the doctrine's "one door, and the readers go through it" made structural rather than held
+up by everything happening to live in one 2273-line file. Anything added there re-exports;
+it does not implement twice. The short version:
 
 - **One writer.** `remember()` is the door. Retirement goes through the same lifecycle that
   every other write does, so an inference cannot quietly supersede an observation.

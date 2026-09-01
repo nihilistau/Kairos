@@ -93,7 +93,13 @@ def _write_all(rows: list[dict]) -> None:
         # neither). A crash between the write below and os.replace leaves a complete
         # candidate store beside this one; open(tmp, "w") would silently overwrite it.
         # Quarantined aside, once per path per process, never deleted, never restored.
-        from harness.skills.memory import rescue_stray_tmp
+        # ── FROM THE MODULE THAT OWNS IT (2026-09-01) ──────────────────────────────
+        # This used to import the guard out of `harness.skills.memory`, which is where
+        # it happened to be written; it belongs beside `replace_atomic`, which is what
+        # it guards. The note above about "one implementation, both lanes" is exactly
+        # why the address had to change: two writers reaching into a third module for a
+        # store-io primitive is the coupling, not the doctrine.
+        from harness.store_io import rescue_stray_tmp
         rescue_stray_tmp(p)
         tmp = p + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:

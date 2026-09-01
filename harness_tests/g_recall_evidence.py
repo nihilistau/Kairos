@@ -272,11 +272,16 @@ with open(_regp, "w", encoding="utf-8") as _f:
     for _r in _rows5:
         _f.write(_json.dumps(_r, ensure_ascii=False) + "\n")
 _seen5 = {}
-_real5 = M._select
-M._select = lambda q, sc, k, t, m=None: (_seen5.__setitem__("days", [
+# AT THE OWNER (2026-09-02): `_select` is `memory/rank.py`'s and
+# `search_memories_ranked_rows` — the door driven two lines below — is in that same
+# module, so it resolves rank.py's global. Patching the façade's re-exported alias
+# would be INERT and `_seen5` would stay empty, which reads as a pass on a check about
+# what is in the candidate pool. G-MEMORY-PACKAGE §5.
+_real5 = M.rank._select
+M.rank._select = lambda q, sc, k, t, m=None: (_seen5.__setitem__("days", [
     (e.get("ts") or "")[:10] for _s, e in sc]) or _real5(q, sc, k, t, m))
 M.search_memories_ranked_rows("what have you been up to?", k=3)
-M._select = _real5
+M.rank._select = _real5
 _days5 = _seen5.get("days", [])
 check("an elder (>30 days) sits in route two's candidate pool",
       any(d.startswith("2026-07") for d in _days5), _days5)
@@ -383,7 +388,7 @@ class Cap(logging.Handler):
 
 M._log.addHandler(Cap())
 M._log.setLevel(logging.DEBUG)
-_real_load = M._load
+_real_load = M.store._load
 Cap.rows[:] = []
 try:
     M._IDF_CACHE[:] = []
@@ -391,10 +396,13 @@ try:
     def _boom(*_a, **_k):
         raise NameError("name 'math' is not defined")
 
-    M._load = _boom
+    # At the OWNER (2026-09-01): `_load` is `memory/store.py`'s and every door calls
+    # `_store._load()`, so patching the façade's alias would be inert and this section
+    # would prove nothing. G-MEMORY-PACKAGE §5.
+    M.store._load = _boom
     idf3, floor3 = M._idf_table()
 finally:
-    M._load = _real_load
+    M.store._load = _real_load
     M._IDF_CACHE[:] = []
 check("a broken table still returns, so recall does not die with it",
       idf3 == {} and floor3 == 0.0, (idf3, floor3))

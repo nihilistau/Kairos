@@ -164,34 +164,53 @@ check("the GPU fact (written on the user turn) is speaker=user",
 print("\n3. the type is the seam — a str assignment cannot come back")
 
 
-def _ctxvar_ok(path, name):
-    src = open(path, encoding="utf-8").read()
-    tree = ast.parse(src)
-    assigned = None
-    globals_hit = []
-    for n in ast.walk(tree):
-        if isinstance(n, ast.Assign):
-            for t in n.targets:
-                if isinstance(t, ast.Name) and t.id == name:
-                    assigned = n.value
-        if isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name) and n.target.id == name:
-            assigned = n.value
-        if isinstance(n, ast.Global) and name in n.names:
-            globals_hit.append(n.lineno)
+def _ctxvar_ok(paths, name):
+    """Is `name` a ContextVar, assigned exactly once, with no `global` for it?
+
+    ── ASKED OF A SUBJECT THAT MAY BE SEVERAL FILES (2026-09-01) ────────────────────
+    This took ONE path, because `harness/skills/memory.py` was one file. It is a package
+    now (`memory/__init__.py` plus siblings), so the subject is a LIST of files and the
+    question is asked across all of them at once. That is not a workaround — it is the
+    stronger form. `_AUTHOR` being a ContextVar in the file this gate happened to open
+    says nothing if a sibling defines a second one; **exactly one assignment across the
+    whole subject** is what "the type is the seam" actually needs, and the count is now
+    part of the answer. A `global` anywhere in the package still convicts.
+    """
+    if isinstance(paths, str):
+        paths = [paths]
+    assigned, globals_hit, where = None, [], []
+    for path in paths:
+        tree = ast.parse(open(path, encoding="utf-8").read())
+        for n in ast.walk(tree):
+            hit = False
+            if isinstance(n, ast.Assign):
+                for t in n.targets:
+                    if isinstance(t, ast.Name) and t.id == name:
+                        assigned, hit = n.value, True
+            if isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name) and n.target.id == name:
+                assigned, hit = n.value, True
+            if hit:
+                where.append("%s:%d" % (os.path.basename(path), n.lineno))
+            if isinstance(n, ast.Global) and name in n.names:
+                globals_hit.append("%s:%d" % (os.path.basename(path), n.lineno))
     if assigned is None:
-        return False, "no assignment of %s" % name
+        return False, "no assignment of %s in %s" % (name, [os.path.basename(p) for p in paths])
+    if len(where) != 1:
+        return False, "%s is assigned %d times (%s) — one owner, or the two-copies bug" % (
+            name, len(where), where)
     # ContextVar("...", default=...)
     if not (isinstance(assigned, ast.Call)
             and isinstance(assigned.func, ast.Attribute)
             and assigned.func.attr == "ContextVar"):
         return False, "assigned to %s, not ContextVar" % ast.dump(assigned, include_attributes=False)
     if globals_hit:
-        return False, "global %s at lines %s" % (name, globals_hit)
+        return False, "global %s at %s" % (name, globals_hit)
     return True, ""
 
 
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-mem_p = os.path.join(root, "harness", "skills", "memory.py")
+_mem_d = os.path.join(root, "harness", "skills", "memory")
+mem_p = [os.path.join(_mem_d, f) for f in sorted(os.listdir(_mem_d)) if f.endswith(".py")]
 notes_p = os.path.join(root, "harness", "skills", "notes.py")
 ok, why = _ctxvar_ok(mem_p, "_AUTHOR")
 check("memory._AUTHOR is a ContextVar (not a str, no global)", ok, why)

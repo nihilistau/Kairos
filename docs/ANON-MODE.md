@@ -55,7 +55,7 @@ evening sitting in the registry is worse than no mode at all.
 
 | door | what it holds | where |
 |---|---|---|
-| `memory.row` | every fact, hers and his — and with it the episode mint and the semantic index that hang off the write | `skills/memory.py::remember` |
+| `memory.row` | every fact, hers and his — and with it the episode mint and the semantic index that hang off the write | `skills/memory::remember` |
 | `transcript.day` | the day's turns, verbatim — and therefore tomorrow's consolidation of tonight | `server/app.py::_append_day_turn` |
 | `journal.own` | her own-time notes | `skills/narrative.py::note_own` |
 | `journal.night` | the composed nightly paragraph — held **before** the model call, not after | `skills/narrative.py::compose_and_write` |

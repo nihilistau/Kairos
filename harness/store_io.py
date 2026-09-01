@@ -39,6 +39,7 @@ A write that quietly gives up is the bug this was written to end.
 """
 from __future__ import annotations
 
+import logging
 import os
 import time
 
@@ -97,3 +98,58 @@ def read_bytes_retry(path: str, waits=_WAITS):
             time.sleep(w)
     with open(path, "rb") as f:   # the last attempt raises for the caller to handle
         return f.read()
+
+
+# ── A STRANDED .tmp IS EVIDENCE, NOT LITTER ───────────────────────────────────────────
+# (2026-08-24 audit H4, rehomed here 2026-09-01.) `tmp + replace` means a crash between
+# the write and the rename leaves `<store>.tmp` on disk — a COMPLETE candidate store that
+# never became the store. The next writer opens that same path "w" and silently overwrites
+# it: the only record of what the dying process was about to commit, gone, from stores
+# whose doctrine is that nothing is destroyed.
+#
+# IT LIVES HERE NOW, and that is the whole point of moving it. It was in
+# `harness/skills/memory.py`, and `harness/skills/notes.py::_write_all` imported it back
+# out — its comment saying "ONE implementation, both tmp+replace writers, or the doctrine
+# holds in one of two lanes and thus neither". Correct instinct, wrong address: this is not
+# a memory concern, it is a **tmp+replace** concern, and `replace_atomic` is right here.
+# Two writers reaching into a third module for a store-io primitive was the coupling; the
+# module that owns the pattern owns the guard.
+#
+# Once per path per process (`_RESCUED`): a crash kills the process, so the next stranding
+# can only be met by a fresh one. Never deleted, never auto-restored — restoring would
+# resurrect a rewrite whose context is unknowable. The operator can diff it at leisure.
+_RESCUED: set = set()
+
+
+def rescue_stray_tmp(path: str) -> str:
+    """Quarantine a stranded `path + '.tmp'` (crash leftover). Returns the quarantine
+    filename, or '' when there was nothing to rescue. Logged, never silent."""
+    if not path or path in _RESCUED:
+        return ""
+    _RESCUED.add(path)
+    tmp = path + ".tmp"
+    log = logging.getLogger(__name__)
+    try:
+        if not os.path.exists(tmp):
+            return ""
+        dest = "%s.stranded-%s" % (tmp, time.strftime("%Y%m%d-%H%M%S", time.gmtime()))
+        replace_atomic(tmp, dest)
+        log.warning("[store-io] stranded %s found beside its store (a crash between the "
+                    "tmp write and the rename) — quarantined to %s. Nothing deleted, "
+                    "nothing auto-restored; diff it against %s if you want to know what "
+                    "was lost.", tmp, dest, path)
+        return dest
+    except Exception as exc:
+        # "LOGGED, NEVER SILENT" IS THIS FUNCTION'S OWN DOCSTRING. A broken rescue must
+        # never block a write — which is why `""` is still the answer — but what failed is
+        # the quarantine of the one record of what a dying process was about to commit,
+        # and the very next write opens that path "w".
+        log.warning("[store-io] could NOT quarantine the stranded %s.tmp (%s: %s) — the "
+                    "next write to this store will overwrite it", path,
+                    type(exc).__name__, exc)
+        try:
+            from harness.loud import swallowed as _sw
+            _sw(log, "rescue_stray_tmp", exc, lane="store-io")
+        except Exception as _swx:
+            log.debug("loud unavailable: %s", _swx)
+        return ""

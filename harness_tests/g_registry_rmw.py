@@ -47,7 +47,18 @@ os.environ["SP_ENGINE_KIND"] = "openai"         # no capture socket per write (g
 
 from harness.skills import memory as M          # noqa: E402
 
-_ORIG_LOAD = M._load
+# ── PATCHED AT THE OWNER, NOT AT THE FAÇADE (2026-09-01) ────────────────────────────
+# This whole gate works by making `_load` SLUGGISH so the read-modify-write window stays
+# open long enough for a second thread to land inside it. `harness/skills/memory` is a
+# package now and `_load` lives in `memory/store.py`, which every door calls as
+# `_store._load()`. Patching the façade's re-exported `M._load` rebinds an alias nothing
+# calls — so the sluggish load never runs, the race never opens, and every check below
+# reads GREEN because "the concurrent fact survived" is trivially true when nothing was
+# concurrent. MEASURED: with all four RMW locks deleted from `__init__`, that version of
+# this gate still printed 6/6. A silent green over the exact bug it exists to catch.
+# G-MEMORY-PACKAGE §5 holds it now — a mutant on a sibling-owned name must patch the
+# owner, and the set of such names is derived from what the gates actually rebind.
+_ORIG_LOAD = M.store._load
 _MAIN = threading.main_thread()
 _ARM = {"on": False, "skip": 0, "started": None, "release": None}
 
@@ -67,7 +78,7 @@ def _sluggish_load(path: str = ""):
                                                  # the worker lands inside the window
 
 
-M._load = _sluggish_load
+M.store._load = _sluggish_load
 
 
 def race(op, concurrent_fact: str, skip: int = 0) -> None:
@@ -124,5 +135,5 @@ check("recall: ...and the lookup was still counted (into recalled, never mention
       any("telescope" in (r.get("text") or "") and int(r.get("recalled", 0) or 0) >= 1
           for r in _ORIG_LOAD()))
 
-M._load = _ORIG_LOAD
+M.store._load = _ORIG_LOAD
 finish("G-REGISTRY-RMW")

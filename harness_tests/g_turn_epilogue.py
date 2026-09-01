@@ -181,8 +181,16 @@ row = next((json.loads(x) for x in open(os.environ["SP_RECALL_REGISTRY"],
 check("§3 a remember() in her own time is speaker=self (audit A5)",
       row is not None and row.get("speaker") == "self",
       "row: %r" % (row,))
+# ── THIS LEG HAD NEVER RUN (2026-09-01, found by G-MEMORY-PACKAGE's census) ────────
+# It read `M.get_author()` behind `hasattr(M, "get_author")`. There is no
+# `get_author` in memory and there never was — the read seam is `current_author()`
+# (G-AUTHOR-CTX names it). So the guard was always False, the expression was always
+# the literal `True`, and a check whose sentence says "the lane was restored" proved
+# nothing for as long as it has existed. GATE-INDEX keeps a section for this class.
+# Found because the memory façade census resolves every `M.<name>` in the tree and
+# this one did not resolve.
 check("§3 the lane was restored after her turn (context tokens reset)",
-      M.get_author() == "user" if hasattr(M, "get_author") else True)
+      M.current_author() == "user", M.current_author())
 
 # ── §4 THE on_spoke CONVERGENCE POINT applies her marks (audit A4) ─────────────────
 app._on_her_own_words("The rain kept me company for an hour. [MOOD:wistful]")

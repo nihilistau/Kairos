@@ -110,24 +110,38 @@ for fn in GATES:
 check("the scan found source paths to check", _looked >= 40, _looked)
 check("no gate names a source path that is not here", not _missing, _missing[:6])
 
-print("\n3. THE GATEWAY IS READ AS A PACKAGE, NOT AS ONE FILE")
-# The migration, held. `harness/server/app.py` is being split; a gate that re-pins the
-# file would be green over whatever moved out of it, which is the whole failure above.
-_pinned = []
-for fn in GATES:
-    if fn in ("g_src_trap.py",          # this gate names the path in order to forbid it
-              "g_store_writes.py"):     # keys its allow-list by path: a declaration
-        continue
-    src = _text(fn)
-    # PROSE IS NOT A READ. Two gates explain the old shape in a docstring — `g_asked` in
-    # the note recording why its walk changed, `g_byteexact` in its own history. A check
-    # that cannot tell a path from a sentence about a path is the comments-are-not-code
-    # lesson arriving as its own violation.
-    code = "\n".join(l for l in src.splitlines() if not l.lstrip().startswith("#"))
-    code = re.sub(r'"""[\s\S]*?"""', "", code)
-    if re.search(r'"server"\s*,\s*"app\.py"|harness/server/app\.py', code):
-        _pinned.append(fn)
-check("no gate reads harness/server/app.py as a file", not _pinned, _pinned)
+print("\n3. THE TWO SPLIT SUBJECTS ARE READ AS PACKAGES, NOT AS ONE FILE")
+# The migration, held. `harness/server/app.py` was split and `harness/skills/memory.py` is
+# being split; a gate that re-pins either file would be green over whatever moved out of
+# it, which is the whole failure above.
+#
+# ── AND FOR MEMORY THE PIN IS NOW A LIE OUTRIGHT (2026-09-01) ───────────────────────
+# `harness/skills/memory.py` does not exist any more — it is `memory/__init__.py`, a
+# package whose `__init__` IS the façade, so "one door" is structural instead of a
+# convention held up by everything being in one file. A gate naming the old path does not
+# go quietly green there; §2 catches it as a path that is not here. This leg is what stops
+# it being RE-created: the next author reaching for `memory.py` gets told the unit is
+# `_src.pkg("harness", "skills", "memory")` before the siblings arrive underneath it.
+_SUBJECTS = ((r'"server"\s*,\s*"app\.py"|harness/server/app\.py', "harness/server/app.py"),
+             (r'"skills"\s*,\s*"memory\.py"|harness/skills/memory\.py',
+              "harness/skills/memory.py"))
+for _rx, _label in _SUBJECTS:
+    _pinned = []
+    for fn in GATES:
+        if fn in ("g_src_trap.py",          # this gate names the paths in order to forbid them
+                  "g_store_writes.py"):     # keys its allow-list by path: a declaration
+            continue
+        src = _text(fn)
+        # PROSE IS NOT A READ. Several gates explain the old shape in a docstring or a
+        # comment — `g_asked` in the note recording why its walk changed, `g_byteexact` in
+        # its own history, `g_store_writes` in the note about where the tmp guard went. A
+        # check that cannot tell a path from a sentence about a path is the
+        # comments-are-not-code lesson arriving as its own violation.
+        code = "\n".join(l for l in src.splitlines() if not l.lstrip().startswith("#"))
+        code = re.sub(r'"""[\s\S]*?"""', "", code)
+        if re.search(_rx, code):
+            _pinned.append(fn)
+    check("no gate reads %s as a file" % _label, not _pinned, _pinned)
 _users = [fn for fn in GATES if "_srcmod.pkg(" in _text(fn) or "_src.pkg(" in _text(fn)]
 check("...and the package reader is the one actually in use (>= 30 gates)",
       len(_users) >= 30, len(_users))
@@ -164,9 +178,20 @@ print("\n6. A SPLIT MAY NOT STRAND A NAME")
 #     Shipped, it would have been a NameError the first time she repeated herself.
 # So: resolve every global name each module in the gateway package LOADS, statically. No
 # model, no socket, no luck — this finds the stranded name on the path nobody runs.
+# ── AND OVER THE MEMORY PACKAGE TOO (2026-09-01) ────────────────────────────────────
+# `harness/skills/memory` is a package now, for the same reason and by the same procedure,
+# and it is the subject where a stranded name would be most expensive: a NameError inside
+# `remember()` is a fact she was told was stored. The walk was written for one package and
+# generalises for nothing — so it takes a list, before the siblings arrive rather than
+# after the first one strands something.
+_PACKAGES = (("harness", "server"), ("harness", "skills", "memory"))
+# FLAT, one module per iteration: nesting the package loop would have re-indented the
+# whole walk below, and a diff that moves eighty lines sideways is a diff nobody reads.
+_MODULES = [(_p, _n) for _p in _PACKAGES for _n in _srcmod.files(*_p)]
 _stranded = {}
-for _name in _srcmod.files("harness", "server"):
-    _tree = ast.parse(_srcmod.text("harness", "server", _name))
+for _pkg, _name in _MODULES:
+    _label = "/".join(_pkg[1:] + (_name,))
+    _tree = ast.parse(_srcmod.text(*(_pkg + (_name,))))
     _mod = set(dir(__builtins__) if isinstance(__builtins__, dict) else dir(__builtins__))
     _mod |= set(__builtins__.keys()) if isinstance(__builtins__, dict) else set()
     _mod |= {"__file__", "__name__", "__doc__", "__builtins__"}
@@ -226,10 +251,12 @@ for _name in _srcmod.files("harness", "server"):
         for _sub in ast.walk(_fn):
             if isinstance(_sub, ast.Name) and isinstance(_sub.ctx, ast.Load):
                 if _sub.id not in _loc and _sub.id not in _mod:
-                    _stranded.setdefault(_name, set()).add(_sub.id)
-check("the check read the gateway package", len(_srcmod.files("harness", "server")) >= 4,
-      _srcmod.files("harness", "server"))
-check("no module in harness/server/ loads a name it cannot resolve",
+                    _stranded.setdefault(_label, set()).add(_sub.id)
+check("the check read both packages",
+      len(_srcmod.files("harness", "server")) >= 4
+      and len(_srcmod.files("harness", "skills", "memory")) >= 1,
+      {"/".join(p[1:]): _srcmod.files(*p) for p in _PACKAGES})
+check("no module in the gateway or in memory loads a name it cannot resolve",
       not _stranded, {k: sorted(v) for k, v in _stranded.items()})
 
 finish("G-SRC-TRAP")
