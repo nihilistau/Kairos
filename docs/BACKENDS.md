@@ -46,6 +46,16 @@ that silently becomes the other one has cost a session here before.
 **Pin a release.** Engine cuts are rarer than harness cuts, and a daemon from Tuesday beside
 a harness from Friday is three components that were each fine and were never tested together.
 
+**And `kairos-engine` supersedes nothing.** It is a curated cut of the daemon source *this*
+stack runs — the companion family. The lattice family is separate and
+[`kairos-system-engine`](https://github.com/nihilistau/kairos-system-engine) is
+`STANDING`, holding work that is not here and is not a companion feature: SP-SWARM / DHT, the
+byte-exact exact-integer forward (`SP_BYTEEXACT`), the NTT / CRT kernels, the frozen L1 C ABI.
+The project's repo map is
+[`JOURNEY.md`](https://github.com/nihilistau/Position_Is_Arithmetic/blob/main/JOURNEY.md) and
+its rule 2 is *do not collapse the lattice family into a companion harness*; each tree carries
+a `STATUS.md` naming its class, read before its README.
+
 `supports` is the honest capability set. Every seam that needs a daemon-only capability asks it and
 **degrades with a stated loss** — never fails, never pretends. `InferenceConfig.to_openai_chat` sends
 only the PORTABLE fields (`top_k` / `repeat_penalty` only under `dialect = "llamacpp"`); every SP-ONLY
