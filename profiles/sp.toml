@@ -1,0 +1,131 @@
+# sp.toml — the OPTIONAL native engine profile. NOT the default.
+#
+#     python serve.py companion     <- the default: any OpenAI-compatible endpoint
+#     python serve.py sp            <- this: the native CUDA daemon
+#
+# ── THE ENGINE IS A SEPARATE REPOSITORY, AND OPTIONAL ────────────────────────────────
+# The Rust + CUDA daemon lives at github.com/nihilistau/kairos-engine. Kairos neither
+# contains nor requires it: `kairos-export.toml` ships no `engine/` or `core/`, and
+# `g_kairos_scrub` FAILS if either is tracked in the public tree — a clone that dragged in a
+# compiler farm still could not build it, still needs a GGUF that cannot live in git, and
+# reads a README about LM Studio on :8810.
+#
+# ── WHY THIS FILE IS TRACKED RATHER THAN AN EXPORT-ONLY OVERLAY ──────────────────────
+# It was going to be a public-only overlay, and `g_profile_door` refused that immediately:
+# it checks that every profile a DOC names exists in `profiles/`, and BACKENDS.md now says
+# `serve.py sp`. An overlay would have made that command real in the export and a lie here.
+#
+# Tracked, it is real in both — and in THIS tree its placeholder paths are what make
+# `serve.py`'s refusal exercisable. `serve.py sp` here starts nothing: it prints the repo,
+# the build command, and stops. It does NOT fall through to the OpenAI path, because a
+# mistyped stack that quietly becomes the other one has cost a session.
+#
+# ── AND IT IS DERIVED FROM companion.toml, DELIBERATELY ──────────────────────────────
+# Every section below except [engine], [paths] and [serve] is companion's, unchanged.
+# G-PROFILE-KEYS holds every key in this directory to a READER — "a profile key nothing
+# reads is a promise the file cannot keep" — and a hand-written second profile is a second
+# chance to invent a knob that does not exist. The first draft of this file did exactly
+# that, twice (`agent.name`, `memory.decide`), and the gate named both.
+#
+# THIS TREE'S REAL NATIVE PROFILE IS `companion.toml`, which names a built binary and real
+# weights and does not ship.
+
+[engine]
+kind = "sp"                           # the native Rust daemon, spawned by serve.py on :3000
+base_url = ""                         # unused when kind = "sp" — the daemon is spawned, not dialled
+model = ""                            # see [paths].model
+api_key_file = ""                     # none: the daemon is local and not authenticated
+dialect = "generic"
+vision = false                        # the CUDA path is text-only
+asr_url = ""
+
+[paths]
+# ── POINT THESE AT YOUR OWN BUILD AND YOUR OWN WEIGHTS ───────────────────────────────
+# `build-wirecuda.bat` writes to `target-wirecuda/`, deliberately NOT cargo's default
+# `target/`: the harness expects the `wire_cuda_backend` build specifically, and a default
+# build is a different binary with different features.
+#
+# PIN A RELEASE, not a floating main. Engine cuts are rarer than harness cuts, and a daemon
+# from Tuesday beside a harness from Friday is three components that were each fine and were
+# never tested together.
+# RELATIVE TO THE KAIROS ROOT, because that is where the engine goes: `serve.py` does
+# `from engine.launch import launch_daemon`, so the repo is cloned to `engine/` INSIDE
+# this tree rather than beside it. G-ENGINE-EXPORT asserts this path and the docs agree.
+engine_exe = 'engine/tools/sp_daemon/target-wirecuda/release/sp-daemon.exe'
+# WEIGHTS ARE IN NEITHER REPOSITORY. A GGUF does not belong in git; the engine's .gitignore
+# refuses `*.gguf` and `*.safetensors` so that stays true by accident as well as on purpose.
+model      = '<path-to>/models/your-model.sp-model'
+tokenizer  = '<path-to>/models/your-model.sp-tokenizer'
+var = "var"
+registry = "var/memory/registry.jsonl"   # the fact registry (relative; the door resolves it)
+spectest_head = ""
+llvm_bin = ""
+
+[serve]
+port = 3000                           # where the daemon answers
+gateway_port = 8810                   # beside hers (8800): two stacks, one box
+
+[kv]
+# engine-only knobs; present because the one door reads the same schema for every profile
+persist = false
+persist_b4 = false
+ring_w = 2048
+pmax = 4096
+
+[memory]
+recall_authority = "L5"
+growth = false                        # the daemon's writers — off, and refused at the door
+store_verb = false
+persist_growth = false
+classify = false
+policy = false
+qkey_mint = false
+qonly = true
+delivery = "plain"
+auto_recall_default = false
+attr_gate = true
+attr_tau = 0.5
+l5_tau = 0.30
+
+[agent]
+authority = "spine"
+prewarm = false                       # nothing to warm on a foreign endpoint
+# (`tool_budget_s` left 2026-08-24 — audit S3: serve.py never read it, so the value
+# was INERT and the real budget came from the tuning registry's agent.tool_budget_s
+# (400 s) the whole time. A profile key nothing reads is a promise the file cannot
+# keep — G-PROFILE-KEYS now holds every key in this directory to a reader.)
+spine_toolset = false
+spine_recall = true
+personality = true
+mcp_tools = true
+
+[decode]
+# (`temperature` / `max_tokens` / `repetition_penalty` left 2026-08-24 — audit S3:
+# serve.py maps none of them, so these read as this profile's dials and moved
+# NOTHING. The live decode defaults come from the tuning registry (var/tuning.json,
+# the settings panel) per turn. G-PROFILE-KEYS holds this section honest now.)
+no_repeat_ngram = 0
+eot_bias = 0.0                        # moot here (sp-only); kept so the schema matches
+
+[tts]
+method = "xai"                        # her voice via the xAI API when a key file is present; local otherwise
+xai_voice = "ara"
+speed = 1.0
+
+[senses]
+ambient = false                       # the hourly eye is an explicit choice per machine
+ambient_quiet_s = 300
+look_tokens = 512
+
+[research]
+enabled = false
+backend = "xai"
+
+[search]
+backend = "ddg"                       # free floor; xai when a key file is present
+
+[xai]
+key_file = "var/secrets/Xapi.txt"
+
+[aux]
+enabled = false

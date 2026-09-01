@@ -28,3 +28,10 @@ ui/node_modules/
 # mints nexus.db must not commit it — the source repo tracked its own for
 # three days after the rule was written.
 data/
+
+# THE OPTIONAL NATIVE ENGINE, if you clone it (docs/BACKENDS.md).
+# It goes HERE, at engine/, and not beside this tree: serve.py does
+# `from engine.launch import launch_daemon`, which resolves relative to the Kairos
+# root. A sibling clone refuses politely and then cannot proceed.
+# Its own repo tracks it; this tree must not.
+/engine/
