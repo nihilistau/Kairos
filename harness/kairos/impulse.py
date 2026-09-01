@@ -469,16 +469,34 @@ def _decide(
         if eot_margin < cfg.continue_margin:
             lo, hi = cfg.continue_delay
             # the more reluctantly she stopped, the faster she picks the thread back up
-            urgency = max(0.0, min(1.0, (cfg.continue_margin - eot_margin) / max(cfg.continue_margin, 1e-6)))
+            #
+            # NORMALISE BY THE THRESHOLD'S MAGNITUDE, NOT ITS VALUE (fixed 2026-09-02).
+            # This read `max(cfg.continue_margin, 1e-6)`, a guard written for a POSITIVE
+            # threshold — and this threshold has never been positive (-11.75 on the retired
+            # model, -18.50 on the model). So the denominator was ALWAYS 1e-6, the ratio was
+            # always astronomically over 1, urgency always clamped to 1.0, and the delay was
+            # always `lo`. The 1.5-4.0s gradient the line exists to compute had never once
+            # produced anything but 1.5s. Driven: G-CONTINUATION-MARGIN §3.
+            _span = max(abs(cfg.continue_margin), 1e-6)
+            urgency = max(0.0, min(1.0, (cfg.continue_margin - eot_margin) / _span))
             delay = hi - (hi - lo) * urgency
-            cut_off = eot_margin <= 0.0
+            # THE DEPTH IS THE THRESHOLD-RELATIVE ONE, not the sign (2026-09-02). This read
+            # `cut_off = eot_margin <= 0.0`, which inside a branch already gated on
+            # `eot_margin < cfg.continue_margin` — a threshold that has only ever been
+            # negative — was TRUE on every path. The "edge of a thought" alternative had
+            # never printed, so the log called every continuation a hard cut-off, including
+            # the ones a hair under the line. `urgency` is the honest reading now that it
+            # varies: 0 at the threshold, 1 a full threshold-width below it.
             return Impulse(
                 CONTINUE,
                 delay_s=delay,
                 score=float(eot_margin),
-                reason=("she was CUT OFF mid-thought (margin <= 0 — she never wanted to stop)"
-                        if cut_off else
-                        f"she stopped on the edge of a thought (margin {eot_margin:.2f} < {cfg.continue_margin})"),
+                reason=(f"she was CUT OFF mid-thought — she never wanted to stop "
+                        f"(margin {eot_margin:.2f}, {cfg.continue_margin - eot_margin:.2f} "
+                        f"below the line)"
+                        if urgency >= 0.5 else
+                        f"she stopped on the edge of a thought "
+                        f"(margin {eot_margin:.2f} < {cfg.continue_margin})"),
             )
         # ── EXPAND: she finished, and then thought of more. ──────────────────────
         # The band above a cut-off and below a confident ending. She is NOT resuming a

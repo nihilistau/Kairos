@@ -357,6 +357,18 @@ def on_reply(
     margin = None
     if kairos_payload:
         margin = kairos_payload.get("eot_margin")
+        # A FOREIGN ENDPOINT HAS NO LOGITS, so it cannot report the gap — but it can report
+        # that it stopped because it ran out of tokens, and that IS a cut-off. Under
+        # SP_ENGINE_MARGIN_APPROX=1 the openai backend flags it, and the translation happens
+        # HERE because this is the only place that holds cfg and therefore the only place
+        # that knows where the threshold is. The backend used to fabricate 0.0 and the lane
+        # never fired once (G-CONTINUATION-MARGIN §2).
+        #
+        # One below the threshold, deliberately: the flag carries no MAGNITUDE, so it earns
+        # the shallowest cut-off the policy recognises and the longest of the continuation
+        # delays. A guess should not also claim urgency.
+        if margin is None and kairos_payload.get("approx_cutoff"):
+            margin = float(cfg.continue_margin) - 1.0
 
     now = time.monotonic()
     due = _due_notes()
