@@ -208,6 +208,8 @@ def _ctxvar_ok(paths, name):
     return True, ""
 
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _src as _srcmod  # noqa: E402
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _mem_d = os.path.join(root, "harness", "skills", "memory")
 mem_p = [os.path.join(_mem_d, f) for f in sorted(os.listdir(_mem_d)) if f.endswith(".py")]
@@ -222,6 +224,56 @@ check("current_author / current_question are the read seam",
       callable(getattr(M, "current_author", None))
       and callable(getattr(M, "current_question", None))
       and callable(getattr(N, "current_author", None)))
+
+
+# ── 4. AND THE CONTEXT CROSSES INTO THE GENERATION THREAD (2026-09-02) ────────────────
+# THE DEFECT THIS EXISTS FOR, found live. `_arm_turn` runs in the REQUEST thread and sets
+# all three of these vars. The tool loop, recall and `remember()` run in a thread the SSE
+# handler spawns — and per PEP 567 a new `threading.Thread` starts with an EMPTY context,
+# so every one of them reverted to its default the moment generation began.
+#
+#   _AUTHOR    defaults to "user" — RIGHT BY LUCK on a user turn, which is why nobody saw it
+#   _QUESTION  defaults to ""     — not lucky: this is the 2026-07-12 defect `_arm_turn`'s
+#                                   own docstring exists to prevent, where ownership falls
+#                                   back to HER paraphrase and "what is YOUR name?" and
+#                                   "what is MY name?" arrive as one indistinguishable string
+#   _SYNTHETIC defaults to ""     — so a driven turn wrote into her real registry
+#
+# MEASURED on the running gateway: a turn declared synthetic stored "Sam's workshop bench
+# is made of oak999777." and no refusal reached the log. After the fix, the same turn stores
+# nothing and the log names the refusal.
+#
+# The fix is `contextvars.copy_context()` at the spawn and `ctx.run` as the target. This leg
+# proves the MECHANISM (a bare Thread loses it, a copied context keeps it) and then asserts
+# the gateway actually spawns the turn that way — the second half being the one that rots.
+print("\n4. the arm-time context reaches the thread that does the work")
+import contextvars as _cv4
+import threading as _th4
+
+_probe = _cv4.ContextVar("g_author_ctx_probe", default="DEFAULT")
+_probe.set("armed")
+_seen4 = {}
+_t = _th4.Thread(target=lambda: _seen4.__setitem__("bare", _probe.get()))
+_t.start(); _t.join()
+check("a BARE thread loses the arm-time context (this is the trap, not a bug in the test)",
+      _seen4.get("bare") == "DEFAULT", _seen4)
+_ctx = _cv4.copy_context()
+_t2 = _th4.Thread(target=_ctx.run, args=(lambda: _seen4.__setitem__("copied", _probe.get()),))
+_t2.start(); _t2.join()
+check("...and a copied context keeps it", _seen4.get("copied") == "armed", _seen4)
+
+# AND THE GATEWAY SPAWNS ITS TURN THAT WAY. Structural, because the alternative is driving a
+# whole SSE turn with a model attached; the mechanism above is what makes this line mean
+# something. Mutant: put `target=_run` back and this goes red.
+_app4 = _srcmod.pkg("harness", "server")
+_code4 = "\n".join(l for l in _app4.splitlines() if not l.lstrip().startswith("#"))
+check("the SSE turn thread runs inside the arm-time context",
+      "_turn_ctx = _contextvars.copy_context()" in _code4
+      and "target=_turn_ctx.run" in _code4,
+      "a bare Thread here silently reverts _AUTHOR, _QUESTION and _SYNTHETIC to defaults")
+check("...and no turn thread is spawned bare",
+      "_threading.Thread(target=_run" not in _code4,
+      "the generation thread must carry the turn's context")
 
 
 os.unlink(_reg)
