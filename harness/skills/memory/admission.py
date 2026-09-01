@@ -61,7 +61,8 @@ def admit(fact: str, *, kind: str = "", mem_class: str = "") -> "Admission":
     # THE ONE DOOR IS WHY THIS IS ONE LINE. Everything that ever enters this store comes
     # through remember() — the tool, _capture_after_turn, the consolidator, the reflector,
     # remember_about_self and therefore every self-narrative row, the episode mint and the
-    # semantic index that hang off the write below. Guarding HERE guards all of them,
+    # semantic index that hang off the write — which is `store.commit_row` now, not
+    # something "below" this line. Guarding HERE guards all of them,
     # including callers written after this line. Guarding callers instead is how you get a
     # mode that says "nothing was recorded" over an evening sitting in the registry.
     # It returns a SENTENCE, not a silent no-op: she reads this string, and a store verb
