@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.8.17 — remember() is a pipeline you can read in one screen (2026-09-02)
+
+`remember()` is the door every fact enters memory by — the tool, the per-turn capture, the
+consolidator, the reflector, `remember_about_self` and therefore every self-narrative row. It
+was 360 lines of interleaved policy. It is **46 lines of code**:
+
+    configured -> admit -> dedupe -> mint -> verdict -> row -> commit -> sidecar -> answer
+
+Four more modules under `harness/skills/memory/`, and the package is finished at eleven:
+
+- **`admission.py`** — what may enter, in what form, filed as what. The anon hold; the
+  imperative coming off the wrapper (*"Remember my GPU is an RTX 2060"* is a fact wearing an
+  imperative, and stored whole the verb becomes content); the AUTHOR picking the gate; the
+  identity firewall. Every refusal is a **sentence she reads**, and the writer returns it
+  verbatim — a store verb that fails quietly is how a companion ends up promising to remember
+  what it cannot.
+- **`dedupe.py`** — a repeat is not a duplicate, it is a second data point.
+- **`supersede.py`** — what a new row retires and by what authority. An inference may never
+  retire an observation; narrative accumulates.
+- **`store.commit_row`** — the row append and its tombstones, in the module that owns the
+  file. **The only row append in the tree**, and that is now checked rather than claimed.
+
+**Nothing changed behaviourally, and here is how that was established rather than asserted:** a
+19-scenario digest of every sentence `remember()` returns and every row it writes, captured
+before the first line moved and diffed after each stage. Identical every time. Two of those
+scenarios had to be fixed first because they were not exercising what they claimed — one
+"supersede" case did not supersede and one "paraphrase" case did not reinforce. A golden file
+whose golden-ness nobody checked is not a safety net.
+
+### `G-REMEMBER-PIPELINE` — the order is the invariant
+
+Every ordering in that pipeline is a bug if it reverses, and until now nothing enforced any of
+them:
+
+    admit before dedupe    a REFUSED fact must never reinforce a row
+    dedupe before mint     a repeat must not pay for an episode it already has
+    verdict before commit  the tombstones must exist before anything is put down
+    commit before sidecar  the semantic index is DERIVED; an entry for a row that failed
+                           to land points at nothing
+
+So the order is asserted as byte offsets inside the function's own source, each phase must be
+called exactly once, every refusal is driven through the door and required back word for word,
+and the admission chain is proved not to write by driving it and finding the store untouched.
+Eight mutants, each red by name. 28/28.
+
+### And a test that had stopped measuring anything
+
+`G-ADMISSION` exists because the registry once filled with ~375 rows of voice test corpus —
+*"The kind nurse painted the tall building as the sun went down"* — grammatical, declarative,
+and about nobody. It drove a real turn over HTTP and marked it `synthetic` so it would not
+pollute the transcript. Then the synthetic-quarantine fix landed, capture began (correctly)
+skipping synthetic turns, and **its "the impersonal sentence is refused" check began passing
+because nothing was captured at all** — vacuously, over a firehose that could have been wide
+open. It had been failing 1/5 for days without being noticed, because it was marked as a live
+test and the offline suite skipped it.
+
+A test whose subject is quarantined *for tests* is a test measuring the quarantine. It now
+drives the capture function directly against a sandboxed registry, it is **offline** so the
+suite runs it every time, and it has mutants in both directions: admit everything and it goes
+red naming the corpus row it swallowed; refuse everything and it goes red on exactly the leg
+that had gone vacuous.
+
+    offline suite 140 green / 1 skip / 0 red, in this tree
+
 ## 0.8.16 — memory becomes a package, and its `__init__.py` is the one door (2026-09-02)
 
 `harness/skills/memory.py` was 2273 lines. It is `harness/skills/memory/`, eight modules with

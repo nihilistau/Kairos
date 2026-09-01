@@ -110,7 +110,7 @@ giving up quietly (`G-STORE-WRITES`).
 
 | Where | What |
 |---|---|
-| `harness/` | everything that runs: memory and recall (`skills/memory/`, a package whose `__init__.py` is the one door), the idle clock (`kairos/`), the wardrobe and her state (`control/`), the backends (`inference/`), the tools (`toolcore/`, `skills/`) |
+| `harness/` | everything that runs: memory and recall (`skills/memory/` — eleven modules, one door; §3 has the map), the idle clock (`kairos/`), the wardrobe and her state (`control/`), the backends (`inference/`), the tools (`toolcore/`, `skills/`) |
 | `harness/server/` | **the gateway, in four modules.** `app.py` is the HTTP surface and the day boundary; `turn.py` is the turn lifecycle — `_settle_turn` is the one list of debts every turn owes, latched so that two callers who both believe they own the epilogue pay it once; `panels.py` is the room's read-only windows; `state.py` is the live state they share (reached as `state.X`, never imported by name). Split out of one 6000-line file in 2026-09-01 — read `turn.py`'s header first if you are changing what a turn does |
 | `ui/` | THE ROOM — the React/Vite desktop: chat, the dock, every panel. Built into `console/room/`; `ui/README.md` has the framework |
 | `console/` | the committed room build the gateway serves. Do not hand-edit it — rebuild from `ui/` and let `G-ROOM-BUNDLE` prove they agree |
@@ -127,10 +127,37 @@ giving up quietly (`G-STORE-WRITES`).
 ## 3. MEMORY AND RECALL — the part you are most likely to break
 
 Read [`docs/MEMORY-AND-RECALL.md`](docs/MEMORY-AND-RECALL.md) before touching
-`harness/skills/memory/`. It is a **package**, and its `__init__.py` is the one door —
-the doctrine's "one door, and the readers go through it" made structural rather than held
-up by everything happening to live in one 2273-line file. Anything added there re-exports;
-it does not implement twice. The short version:
+`harness/skills/memory/`. It is a **package of eleven modules with one door** — the doctrine's
+*"one door, and the readers go through it"* made structural rather than held up by everything
+happening to live in one 2273-line file.
+
+| module | what it owns |
+|---|---|
+| **`__init__.py`** | **the DOOR, and only doors** — `remember`, `remember_about_self`, `forget`, `recall`, `list_memories`, `provenance`, `search_memories`, `memory_stats`, and the row readers |
+| `admission.py` | what may enter, in what form, filed as what — the imperative coming off the wrapper, the author picking the gate, the identity firewall |
+| `dedupe.py` | a repeat is not a duplicate; it is a second data point |
+| `supersede.py` | what a new row retires, and by what authority |
+| `store.py` | the registry file, its lock, and `commit_row` — the only row append in the tree |
+| `rank.py` | the recall seam and everything that ranks |
+| `mint.py` · `present.py` · `health.py` · `words.py` · `authorship.py` | the capture queue; what a row may SAY; registry hygiene; the lexical floor; who is speaking |
+
+`remember()` is a **46-line pipeline** over those: admit → dedupe → mint → verdict → row →
+commit → sidecar. Every one of those orderings is a bug if it reverses (a refused fact must
+never reinforce a row; the derived index must never precede the row it points at), so
+`G-REMEMBER-PIPELINE` asserts the order by byte offsets inside `remember()`'s own source and
+requires each phase to be called exactly once.
+
+Three rules for working in there, all held by `G-MEMORY-PACKAGE`:
+
+1. **The façade re-exports; it does not implement twice.**
+2. **Import the package, never a sibling** — reaching a sibling directly makes the second door
+   the package exists to prevent.
+3. **Import the module, never the name, when the name can be rebound.** A test that installs a
+   mutant is rebinding a name, and a by-name import snapshots. Not theory: a lost-write test
+   here passed with *every* read-modify-write lock deleted, because the patch it installs had
+   become an alias nothing called.
+
+The short version of the doctrine itself:
 
 - **One writer.** `remember()` is the door. Retirement goes through the same lifecycle that
   every other write does, so an inference cannot quietly supersede an observation.

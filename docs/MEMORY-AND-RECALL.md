@@ -19,27 +19,57 @@ The one sentence that explains most of the bugs in this system: **an invariant e
 one of two paths is enforced in neither, because the unguarded path is the one that runs.**
 See the TRAPS section for the receipts.
 
-> **`harness/skills/memory` is a PACKAGE (2026-09-01), and its `__init__.py` is the one
-> door.** It was one 2273-line file, and two outside reviews named it — beside
-> `harness/server/app.py` — as where the sentence above keeps coming true. The doctrine's
-> answer has always been *one door, and the readers go through it*; in one file that was a
-> **convention**, held up by the fact that everything happened to be adjacent. It is a module
-> boundary now. Two consequences for anyone working in there:
->
-> * **The façade re-exports; it does not implement twice.** If a sibling owns a name, the
->   name is imported. A second implementation of a memory rule is the bug class itself, and
->   this is the most expensive place in the tree to put one.
-> * **Import the package, never a sibling.** `from harness.skills.memory import remember` and
->   `import harness.skills.memory as M` both keep working exactly as before — 113 import
->   sites, 84 of them reaching private names dynamically through `M.<name>`, and none of them
->   had to change. Reaching a sibling directly (`from harness.skills.memory.store import …`)
->   makes a second door, which is the thing the package exists to prevent.
+## The shape of `harness/skills/memory` — a package, and one door
 
-> **On the `file.py:123` references below (2026-08-19):** most are stale by hundreds of
-> lines — the code moved, the doc did not, and a reference table where no reference
-> resolves stops being a map. Trust the SYMBOL names (they are greppable and have held);
-> treat the line numbers as decoration until a mechanical re-pass replaces them. Row
-> counts and store statistics are snapshots of the day a section was written.
+It was one 2273-line file until 2026-09-01. Two outside reviews named it — beside
+`harness/server/app.py` — as where the sentence above keeps coming true. The doctrine's answer
+has always been *one door, and the readers go through it*; in one file that was a
+**convention**, held up by everything happening to be adjacent, and this file's own history is
+what happens when that stops holding: `search_memories_ranked()` served tombstones that
+`search_memories_ranked_rows()`, the next function in the file, filtered. It is a module
+boundary now.
+
+| module | what it owns |
+|---|---|
+| **`__init__.py`** | **THE DOOR, and only doors**: `remember`, `remember_about_self`, `forget`, `recall`, `list_memories`, `provenance`, `search_memories`, `count_memories`, `memory_stats`, and the six row readers (`live_rows`, `all_rows`, `supports_of`, `missing_supports`, `dependents_of`, `orphan_tombstones`) |
+| `admission.py` | **what may enter, in what form, filed as what** — the anon hold, `normalize_fact` taking the imperative off, the author picking the gate, the class/kind zeroed outside her lane, the identity firewall and `_self_names()`. Four of §0's six rows were born here |
+| `dedupe.py` | a repeat is not a duplicate — exact match, the refusal to re-admit a text the consolidator retired, the >=0.9/0.9 paraphrase. Under the registry lock, because it is a read-modify-write |
+| `supersede.py` | what a new row RETIRES and by what authority — `speaker`, `status` (observed vs inferred), `find_superseded`, and dominance as a proposer |
+| `store.py` | the registry FILE: `_reg_path`, `_load`, `_save_all`, `_REG_LOCK` / `registry_lock()`, and **`commit_row` — the only row append in the tree** |
+| `mint.py` | the KV capture queue and its one background worker; `eps_root`, `capture_status` |
+| `rank.py` | **the recall seam** — `search_memories_ranked_rows` and its projections, the question's owner (`_query_target`), the evidence floor (`_no_rare_word`, `_idf_table`), the selection (`_select`, `_target_and_rank`) and the three caches |
+| `present.py` | what a row may SAY — `secret_withheld`, `_present_row`, `attr_absent`, `DECLINE_MSG` |
+| `health.py` | registry hygiene: `_registry_health` is the ONE computation behind `verify_registry` (the tool) and `registry_status` (the panel) |
+| `words.py` | the lexical floor: `_STOP`, `_text`, `_depluralise`, `_toks`, `_overlap`, applied identically to both sides of every comparison |
+| `authorship.py` | who is speaking and what they asked — the `_AUTHOR` / `_QUESTION` ContextVars and their set/reset pairs |
+
+**Three rules come with the shape**, and `G-MEMORY-PACKAGE` holds all three from a census
+built out of the tree's own usage rather than a list kept in the gate:
+
+* **The façade re-exports; it does not implement twice.** If a sibling owns a name, the name
+  is imported. A second implementation of a memory rule is the bug class itself, and this is
+  the most expensive place in the tree to put one.
+* **Import the package, never a sibling.** `from harness.skills.memory import remember` and
+  `import harness.skills.memory as M` work exactly as before — 113 import sites, 84 of them
+  reaching private names dynamically through `M.<name>`, and none had to change. Reaching a
+  sibling directly makes a second door, which is what the package exists to prevent.
+* **Import the MODULE, never the name, when the name can be rebound.** A test that installs a
+  mutant is rebinding a name, and a by-name import snapshots — so `secret_withheld`, `_load`
+  and `_select` are called as `_present.…`, `_store.…`, `_rank.…` inside the package, and a
+  mutant patches the OWNER. Not theory: `G-REGISTRY-RMW` printed 6/6 with every
+  read-modify-write lock deleted, because its `M._load` patch had become an alias nothing
+  called. `mint._MINT_WORKER` is rebound by its own `global` and is deliberately not on the
+  door at all, for the same reason `LAST_TURN_AT` is not.
+
+> **On the `file.py:123` references below.** The 2026-08-19 note here said most were stale by
+> hundreds of lines and to treat them as decoration until a mechanical re-pass replaced them.
+> **That re-pass is done for memory (2026-09-02)**, and it had become urgent for a sharper
+> reason than staleness: `harness/skills/memory.py` no longer exists, so every one of its line
+> references was a wrong ADDRESS rather than a wrong offset. They now read
+> `memory/<module>::<symbol>` — checkable by grep instead of by counting lines, and stable
+> under the next move. References into `lifecycle.py`, `spine.py` and the engine are still
+> line-numbered and still decoration; trust the SYMBOL names. Row counts and store statistics
+> remain snapshots of the day a section was written.
 
 ## Stores
 
@@ -119,20 +149,20 @@ Other fields:
   (`routes.rs:2773`: `if ep.lifecycle != 0 { continue }`, unless `SP_RECALL_AUDIT=1`) and the
   Python harness (everywhere in this doc) key on this integer, not on `superseded_by`. A row
   that only carries `superseded_by` without `lifecycle=1` is invisible to the engine's filter
-  but still recalled by the harness — always stamp both (`memory.py:214-220`). Nothing is ever
+  but still recalled by the harness — always stamp both (`memory/store::commit_row`). Nothing is ever
   deleted from the registry; `lifecycle=1` is the only "gone" state.
 - **`mentions`** / **`first_seen`** / **`last_seen`** / **`recalled`** — reinforcement. A
   repeat is a second data point, not a duplicate: `remember()` used to reject an exact or
   near-paraphrase restatement outright (`"already in memory: {fact}"`) and threw the
-  measurement away. Now it reinforces (`memory.py:129-157`, `lifecycle.reinforce`,
+  measurement away. Now it reinforces (`memory/dedupe::check_repeat`, `lifecycle.reinforce`,
   `lifecycle.py:842-847`): `mentions += 1`, `last_seen = now`, `first_seen` preserved.
   `recalled` (her own lookups, `lifecycle.note_recalled`, `lifecycle.py:850-854`) is counted
   separately and **deliberately never feeds `mentions`** — a system marking its own homework.
   Conflating them creates a vicious loop: recalled → more salient → recalled more.
 - **`supersedes`** / **`superseded_by`** / **`superseded_at`** / **`forgotten_at`** — the audit
   trail. `supersedes` on the new row, `superseded_by`+`superseded_at` on the retired row(s)
-  (stamped together in `memory.py:244-253`); `forgotten_at` is `forget()`'s breadcrumb
-  (`memory.py:390-392`).
+  (stamped together in `memory/supersede::what_it_retires` + `lifecycle.stamp`); `forgotten_at` is `forget()`'s breadcrumb
+  (`memory::forget`).
 - **`mem_class`** — see TRAP 1. `relationship | identity | event | preference | fact |
   private-secret` from the live writer (`lifecycle.classify()`, `lifecycle.py:245-265`) —
   `private-secret` is checked FIRST, before the other five, and is producible as of
@@ -170,28 +200,37 @@ Other fields:
 
 ### 1. `harness/skills/memory::remember()` — the authoritative door
 
-In order (`memory.py:97-263`):
+**Since 2026-09-02 it is a pipeline of 46 lines of code**, and the phases are modules. That is
+the point of the split: this order used to be 360 lines of interleaved policy in which you
+could not see it, and every one of these orderings is a bug if it reverses.
+`G-REMEMBER-PIPELINE` asserts the order by byte offsets inside `remember()`'s own source, and
+asserts each phase is called exactly once.
 
-1. `is_memorable()` admission (`lifecycle.py:541-616`) — is this a durable, standing fact
-   about someone, split out of a whole turn if necessary. Rejects machine text (the store's
-   own tool receipts, `lifecycle.py:521-532`), instructions/meta ("why don't you try..."),
-   chatter, quoted speech, anaphora ("it's not my fault"), hypotheticals, and sentences whose
-   subject is "you" (that's a fact about *her*, not about him).
-2. The identity firewall, `admit_to_user_store()` (`lifecycle.py:669-689`) — HER identity
-   (name, gender, pronouns, read live from the persona via `_self_names()`,
-   `memory.py:284-311`) may not enter Sam's store. Refused at the door with the right door
-   named in the refusal.
-3. Dedupe → **REINFORCE**, not reject, on an exact or ≥0.9/0.9 token-overlap paraphrase match
-   (`memory.py:146-169`).
-4. Episode mint via the daemon (`POST /v1/capture`, `memory.py:170-187`) so the fact is
-   recall-able through the engine's own selection path, not just listable. Degrades
-   gracefully if the daemon is unreachable — the fact is still stored, just not minted.
-5. `speaker` assignment from `_AUTHOR` (`lifecycle.infer_speaker`), `status` assignment
-   (`STATUS_INFERRED` if `"reflection" in source` else `STATUS_OBSERVED`).
-6. `find_superseded()` (`lifecycle.py:314-371`) — same-slot, different-value rows get
-   tombstoned, **unless** the incoming claim is an inference and the row it would retire is
-   ground truth (`observed`/`confirmed`). An inference may never retire an observation.
-7. `lifecycle.stamp()` writes the full lane onto the row and it's appended.
+| # | phase | module | what it decides |
+|---|---|---|---|
+| 0 | configured | — | no `SP_RECALL_REGISTRY` gives `[no registry configured]` |
+| 1 | **admit** | `admission.py` | the anon hold; `normalize_fact` taking the imperative off **before any guard sees it**; the AUTHOR picking the gate (`is_narratable` for her, `is_memorable` for him); the class and kind zeroed outside her lane; the identity firewall. Answers with a REFUSAL SENTENCE or an admitted fact |
+| 2 | **dedupe** | `dedupe.py` | exact match reinforces; a text the consolidator retired is refused by name; a >=0.9/0.9 paraphrase reinforces. Under the lock. Also hands back `existing` |
+| 3 | **mint** | `mint.py` | queue the KV episode (`SP_CAPTURE_ASYNC`) or mint it inline. Degrades: an unreachable daemon means stored-but-not-minted, and she is told so in the answer |
+| 4 | **verdict** | `supersede.py` | `speaker` from `_AUTHOR`; `status` (`inferred` for reflection and consolidator, else `observed`); `find_superseded`; dominance as a proposer. **Narrative accumulates, and an inference may never retire an observation** |
+| 5 | row | `__init__.py` | the row dict, then `lifecycle.stamp()` writes the full provenance lane |
+| 6 | **commit** | `store.py` | `commit_row` re-reads under the lock, stamps the tombstones BY NAME, appends. **The only row append in the tree** |
+| 7 | sidecar | `semindex` | the derived semantic index. Never writes the registry, never blocks, never raises |
+| 8 | answer | `__init__.py` | `stored: …`, plus what it superseded and whether the episode minted |
+
+Two of those orderings are worth stating on their own, because nothing but the gate enforces
+them: **admit before dedupe**, or a refused fact could reinforce a row; and **commit before
+the sidecar**, because the index is derived and an entry for a row that failed to land points
+at nothing.
+
+The admission gate itself (step 1) is `lifecycle.is_memorable()` — is this a durable, standing
+fact about someone, split out of a whole turn if necessary. It rejects machine text (the
+store's own tool receipts), instructions and meta ("why don't you try..."), chatter, quoted
+speech, anaphora ("it's not my fault"), hypotheticals, and sentences whose subject is "you"
+(that is a fact about *her*, not about him). The firewall is
+`lifecycle.admit_to_user_store()`, and HER identity — name, gender, pronouns, read live from
+the persona via `admission._self_names()` — may not enter Sam's store; it is refused with
+the right door named in the refusal.
 
 This is the door that has the dedupe, the supersede machinery, the identity firewall, and the
 admission gate. Everything below bypasses some or all of it.
@@ -391,10 +430,10 @@ maintenance pass's.
 
 **The secret is withheld at ALL the tool doors, by one rule** (2026-08-24, audit A3;
 gate G-SECRET §5). `spine.recall_decider` — the automatic injection — has honoured
-`private-secret` since G-SECRET landed, and every OTHER read door in memory.py served
+`private-secret` since G-SECRET landed, and every OTHER read door in memory served
 the row verbatim: `list_memories` dumped it, `recall()` presented it, `search_memories`
 returned its raw text with a match score, `provenance()` quoted it. The rule lives in
-**`memory.secret_withheld(row, query)`** now, consumed by all four (the listing and
+**`memory/present.py::secret_withheld(row, query)`** now, consumed by all four (the listing and
 `search`/`provenance` through `_present_row()`, `recall()` directly): no question (a
 listing) → withheld; asked with the attribute ABSENT (`attr_absent`) → withheld, the
 fixed `SECRET_WITHHELD_NOTE` ("a private thing, held — ask me directly about it") in
@@ -403,11 +442,11 @@ is not made useless (the decider's own semantics, G-SECRET §3). The ranked seam
 deliberately NOT filtered — dropping the row there would make the decider's loud
 decline unreachable; the guard must fire, not evaporate.
 
-- **`recall()`** (`memory.py:546-594`) — the tool. Renders through `lifecycle.render()`,
+- **`recall()`** (`memory::recall`) — the tool. Renders through `lifecycle.render()`,
   ranks through `_target_and_rank()` (pronoun-scoped: "my" means him, "your" means her,
   resolved from his literal words via `_QUESTION`, not from her paraphrase — see
-  `memory.py:597-654`), and feeds `note_recalled()` for the top hits (never `mentions`).
-- **`search_memories()` / `search_memories_ranked()`** (`memory.py:507-543`) — a thin
+  `memory/rank::_target_and_rank`), and feeds `note_recalled()` for the top hits (never `mentions`).
+- **`search_memories()` / `search_memories_ranked()`** (`memory::search_memories` / `memory/rank::search_memories_ranked`) — a thin
   projection of the same seam. This used to be an independent copy of the tombstone filter;
   see TRAP 6 for why that mattered.
 - **`provenance()`** — reads `live_rows(testimony=True)`: "where did I learn X" must not
@@ -427,7 +466,7 @@ decline unreachable; the guard must fire, not evaporate.
   zero-inference `decline_recall` before the turn ever reaches the model; a `counterfact` row
   gets the "authoritative override" framing (see G-RECALL-PRECISION for why that framing must
   stay off by default).
-- **`forget()`** (`memory.py:347-394`) — writes tombstones (`lifecycle=1` + `forgotten_at` +
+- **`forget()`** (`memory::forget`) — writes tombstones (`lifecycle=1` + `forgotten_at` +
   `superseded_by="forget"`). See TRAP 6: this function hard-deleted the row for months.
 - **Engine-side recall** (`recall.rs` L5 selection, gated by `ep.lifecycle != 0` at
   `routes.rs:2773`) — authoritative only for **daemon-direct chat when the gateway is down**.
@@ -566,7 +605,7 @@ Gate: G-MEMORY-STORY (38 legs, eleven mutants red by name).
 
 - **`lifecycle.salience()`** (`lifecycle.py:808-839`) = `weight(mem_class) × log-scaled
   mentions × recency(half_life by class)`. A ranking *prior*, not an answer — it only breaks
-  ties among facts the query already matched (`memory.py:679-695`,
+  ties among facts the query already matched (`memory/rank::_select`,
   `0.22 * lc.salience(e)`). Half-life is per `mem_class`:
   `identity`/`preference`/`relationship` never decay (they're what
   he *is*), `fact` decays over a year, `event` decays in 3 days (a flight is worthless the day
@@ -673,20 +712,20 @@ all in this codebase:
   instead of the shared seam. Proven on the real code path: supersede a GPU fact
   cleanly (tombstone written correctly), and every subsequent turn's automatic recall still
   handed her the dead row, ranked *above* the truth, indistinguishable from the live one
-  (`memory.py:437-465`). Fixed by moving the filter into
+  (`memory/rank::search_memories_ranked_rows`). Fixed by moving the filter into
   `search_memories_ranked_rows()` itself, so a caller can no longer forget it — it now has to
   ask for the dead explicitly (`include_retired=True`).
 - **The twin.** Hours after that fix shipped, `search_memories_ranked()`
-  (`memory.py:507-534`) — directly below the fixed function, backing the live
+  (`memory/rank::search_memories_ranked`) — directly below the fixed function, backing the live
   `search_memories` tool — turned out to do the identical unfiltered `_load()` scan. Found by
   deliberately sweeping for the same *class* of bug instead of declaring victory on the one
-  instance (`memory.py:511-530`). Fixed the same way: made it a thin projection of the single
+  instance (`memory/rank::search_memories_ranked`). Fixed the same way: made it a thin projection of the single
   seam, so the twin can't exist to drift again.
 - **`forget()` hard-deleting under a tombstone architecture.** For months, the one function
   whose entire job is to retire a fact opened the registry in `"w"` mode and rewrote it
   *without* the victim row — the single doctrine this store has (nothing is ever destroyed)
   defeated by the one tool built to enforce it, and callable by the model itself mid-conversation
-  on a 0.3 bag-of-words match. See `memory.py:347-377` for the full incident writeup. Fixed:
+  on a 0.3 bag-of-words match. See `memory::forget` for the full incident writeup. Fixed:
   `forget()` now sets `lifecycle=1` + `forgotten_at` + `superseded_by="forget"` via
   `_save_all()`, same atomic-rewrite path as everything else, row count never shrinks.
 

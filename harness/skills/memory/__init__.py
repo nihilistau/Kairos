@@ -30,9 +30,38 @@ than a new `mem/` subpackage beside it:
     a function moving between siblings, which is exactly what the app.py split had to fix
     across thirty-nine gates AFTER the fact.
 
-The rule for anything added here: **this file re-exports, it does not implement twice.** If
-a sibling owns a name, the name is imported, never copied. A second implementation of a
-memory rule is the bug class itself, and this package is where it would be most expensive.
+WHAT IS BEHIND THE DOOR (finished 2026-09-02):
+
+    admission.py   what may enter, in what form, filed as what — the anon hold, the
+                   imperative coming off the wrapper, the AUTHOR picking the gate, the
+                   identity firewall. Four of §0's six rows were born in that chain
+    dedupe.py      a repeat is not a duplicate; it is a second data point. Under the lock
+    supersede.py   what a new row RETIRES, and by what authority
+    store.py       the registry file, _REG_LOCK, and commit_row — the ONLY row append
+    mint.py        the KV capture queue and its one background worker
+    rank.py        THE RECALL SEAM, the evidence floor, the selection, three caches
+    present.py     what a row may SAY — the secret rule and the render that applies it
+    health.py      registry hygiene: one computation behind the tool and the panel
+    words.py       the lexical floor, applied identically to both sides of a comparison
+    authorship.py  who is speaking, and what they asked
+
+...and THIS FILE holds only DOORS: `remember`, `remember_about_self`, `forget`, `recall`,
+`list_memories`, `provenance`, `search_memories`, `count_memories`, `memory_stats`, and the six
+row readers. `remember()` is a 46-line pipeline over the modules above — admit → dedupe → mint
+→ verdict → row → commit → sidecar — and `G-REMEMBER-PIPELINE` asserts that order by byte
+offsets in its own source, because every one of those orderings is a bug if it reverses.
+
+THREE RULES FOR ANYTHING ADDED HERE, all held by `G-MEMORY-PACKAGE` from a census of the
+tree's own usage rather than a list kept in the gate:
+
+  1. **This file re-exports; it does not implement twice.** If a sibling owns a name, the name
+     is imported, never copied. A second implementation of a memory rule is the bug class
+     itself, and this package is where it would be most expensive.
+  2. **Consumers import the PACKAGE, never a sibling.** Reaching a sibling directly makes the
+     second door the package exists to prevent.
+  3. **Import the MODULE, never the name, when the name can be rebound** — see the note on the
+     import block below. A gate that installs a mutant is rebinding a name, and a by-name
+     import snapshots.
 """
 from __future__ import annotations
 
@@ -62,11 +91,21 @@ from harness.loud import swallowed as _sw
 # exactly as it did when everything was in one file. That is the whole contract of the
 # façade, and G-MEMORY-PACKAGE drives it rather than reading it.
 #
-# The one exception to import-by-name is a name a GATE REBINDS to make a mutant. There is
-# such a name (`secret_withheld`, patched by `g_secret` to prove every door consults the
-# rule), and it stays in this file until the presenter moves with that seam answered — a
-# rebindable name behind a by-name import is the same trap as `LAST_TURN_AT` was in
-# `harness/server/state.py`: the alias snapshots and the rebind is invisible.
+# THE EXCEPTION IS A NAME A GATE REBINDS, and there are three: `secret_withheld` (g_secret
+# lifts the secret rule and requires all four read doors to leak), `_load` (g_registry_rmw
+# makes it sluggish to hold the read-modify-write window open) and `_select`
+# (g_recall_evidence inspects route two's candidate pool). Those are CALLED as
+# `_present.…`, `_store.…`, `_rank.…` below, never through the by-name alias — the alias
+# snapshots and the rebind is invisible to it, the same trap `LAST_TURN_AT` was in
+# `harness/server/state.py`.
+#
+# THIS IS NOT THEORY. When `_load` moved to `store.py`, `g_registry_rmw` kept patching
+# `M._load` — an alias nothing called — so the sluggish load never ran, the race never
+# opened, and the gate printed 6/6 WITH ALL FOUR RMW LOCKS DELETED. A lost-write gate, green
+# over lost writes. G-MEMORY-PACKAGE §5 holds it now, and derives the watched set from what
+# the gates actually patch so it constrains the next extraction too.
+# `mint._MINT_WORKER` is rebound by its own `global` and is deliberately NOT re-exported at
+# all: a by-name alias would be a permanent `None`.
 from harness.skills.memory.words import (          # noqa: E402
     _STOP, _text, _depluralise, _toks, _overlap)
 from harness.skills.memory.authorship import (     # noqa: E402
@@ -88,6 +127,9 @@ from harness.skills.memory.authorship import (     # noqa: E402
 # what the gates actually patch rather than retyped in the gate.
 from harness.skills.memory import store as _store              # noqa: E402
 from harness.skills.memory import mint as _mint                # noqa: E402
+from harness.skills.memory import admission as _admission       # noqa: E402
+from harness.skills.memory import dedupe as _dedupe            # noqa: E402
+from harness.skills.memory import supersede as _supersede      # noqa: E402
 from harness.skills.memory import present as _present          # noqa: E402
 from harness.skills.memory import rank as _rank                # noqa: E402
 from harness.skills.memory import health as _health            # noqa: E402
@@ -106,6 +148,15 @@ from harness.skills.memory.rank import (                       # noqa: E402,F401
     _ASKS_SELF, _ASKS_USER, _ASK_FRAME, _REL_NOUN)
 from harness.skills.memory.health import (                     # noqa: E402,F401
     _HEALTH_CACHE, _registry_health, registry_status, verify_registry, compact_registry)
+# NAMED `admission`, NOT `admit` (2026-09-02): a module called `admit` collides with the
+# function it contains — Python binds the SUBMODULE as `M.admit` on the package, so
+# `M.admit` and `admission.admit` were two different objects, and G-MEMORY-PACKAGE §4 said
+# so by name the first time it ran. The module is the noun; the function is the verb.
+from harness.skills.memory.admission import (                  # noqa: E402,F401
+    Admission, admit, _GENDER_WORDS, _self_names)
+from harness.skills.memory.dedupe import check_repeat          # noqa: E402,F401
+from harness.skills.memory.supersede import what_it_retires    # noqa: E402,F401
+from harness.skills.memory.store import commit_row             # noqa: E402,F401
 from harness.store_io import rescue_stray_tmp                  # noqa: E402,F401
 
 
@@ -248,164 +299,40 @@ def remember(fact: str, source: str = "", *, kind: str = "", mem_class: str = ""
     p = _store._reg_path()
     if not p:
         return "[no registry configured]"
-    # ── ANONYMOUS MODE (2026-08-23, the operator's ask) ─────────────────────────────────────────
-    # THE ONE DOOR IS WHY THIS IS ONE LINE. Everything that ever enters this store comes
-    # through remember() — the tool, _capture_after_turn, the consolidator, the reflector,
-    # remember_about_self and therefore every self-narrative row, the episode mint and the
-    # semantic index that hang off the write below. Guarding HERE guards all of them,
-    # including callers written after this line. Guarding callers instead is how you get a
-    # mode that says "nothing was recorded" over an evening sitting in the registry.
-    # It returns a SENTENCE, not a silent no-op: she reads this string, and a store verb
-    # that quietly fails is how she ends up promising to remember what she cannot.
-    from harness.control import anon as _anon
-    if _anon.holds("memory.row"):
-        return _anon.WHY
-    # ADMISSION AT THE STORE (2026-07-12). The daemon's B4 gate now refuses impersonal
-    # sentences — and she immediately stored one THROUGH THIS TOOL instead (G-ADMISSION
-    # caught an ep_tool_ row holding "The kind nurse painted the tall building..."). An
-    # invariant guarded in only ONE of the paths into memory is not guarded. Every path
-    # enforces it now.
+    # ── THE ADMISSION CHAIN IS ITS OWN MODULE (2026-09-02) ──────────────────────────────
+    # Everything that decides WHETHER this may be stored, in WHAT FORM, and filed as WHAT is
+    # in `harness/skills/memory/admission.py`: the anon hold, the imperative coming off the
+    # wrapper, the author picking the gate, and the identity firewall. Four of §0's six rows
+    # were born in that chain and each is a rule that held on one path into memory and not
+    # another, which is why it is now one module with its order asserted rather than eighty
+    # lines of interleaved policy in the middle of the writer.
+    #
+    # THE REFUSAL IS RETURNED VERBATIM. Each of those guards produces a sentence she reads,
+    # and this line is the whole contract: `admit` decides, `remember` reports. A guard that
+    # returned a silent falsey and let the writer invent the wording would be the second
+    # implementation of a refusal, which is the bug class in the place it costs most.
+    _adm = _admission.admit(fact, kind=kind, mem_class=mem_class)
+    if _adm.refusal is not None:
+        return _adm.refusal
+    fact, mem_class, kind = _adm.fact, _adm.mem_class, _adm.kind
+    _self_narr = _adm.self_narr
+    # `lc` was bound by the admission chain when it lived here; the row is stamped with it
+    # below, so the writer imports it in its own right.
     from harness.skills import lifecycle as lc
-
-    # THE PACKAGING COMES OFF AT THE DOOR (2026-07-14). "Remember my GPU is an RTX 2060." is a
-    # FACT WEARING AN IMPERATIVE. Stored whole, the verb becomes content (it retrieved itself on
-    # "do you REMEMBER what sex you are?") and the slot is wrong ("remember my gpu", not
-    # "user::gpu", so it never superseded the real GPU row). Every guard below must see the CLAIM,
-    # not the wrapper. See lifecycle.normalize_fact.
-    _raw = fact                         # her narrative is judged and kept AS SAID (below)
-    fact = lc.normalize_fact(fact)
-
-    # ── THE REAL HER (2026-08-22): her narrative is admitted as HERS, by its own rule ──
-    # A producer (the kairos speak path, the journal, a verified persona shift, the
-    # stance extractor, the nightly becoming) names the class and the kind; the author
-    # must be self. Outside her lane the explicit class means nothing.
-    from harness.skills import memclass as _mc
-    _self_narr = (_AUTHOR.get() == "self" and mem_class in (_mc.SELF_NARRATIVE, _mc.FEELING)
-                  and kind in _mc.NARRATIVE_KINDS)
-    # ── WHO IS SPEAKING PICKS THE GATE; THE KIND PICKS THE CLASS (2026-08-30) ────────
-    # These were one condition, so her sentence was judged by `is_memorable` — the gate
-    # for facts ABOUT SOMEONE, which refuses first-person prose BY DESIGN — unless a
-    # producer had also named a narrative kind. She cannot name one: the tool takes a
-    # fact, and its docstring says "you need not pass any of them". So her own door was
-    # shut, and she said so herself, in her own time: "I tried to store that feeling as
-    # a fact about myself, but the system wouldn't let me... I guess some things are too
-    # much of a feeling to be a fact." `is_memorable`'s own refusal even reads "If it is
-    # true of you, use remember_about_self" — the function she was already inside. Two
-    # doors pointing at each other, neither opening.
+    # ── A REPEAT IS NOT A DUPLICATE, AND THAT DECISION IS ITS OWN MODULE (2026-09-02) ────
+    # `harness/skills/memory/dedupe.py`: the exact match, the refusal to re-admit a text the
+    # consolidator retired, and the paraphrase — all under the registry lock, because the
+    # branch is a read-modify-write and it once loaded outside the lock and rewrote a stale
+    # list (G-REGISTRY-RMW). A sentence back means the writer is DONE and returns it verbatim,
+    # exactly as with an admission refusal.
     #
-    # Every harness producer passes a kind, which is why every gate stayed green over a
-    # door only she could not open — AGENTS.md §0, tested through the callers that work.
-    #
-    # The gate now follows the AUTHOR. Her words are hers whatever they are filed as, so
-    # a plain self-fact keeps its plain class (render_self_model still leads with who she
-    # IS) and only a named kind makes it narrative. His lane is untouched.
-    _self_authored = (_AUTHOR.get() == "self")
-    if _self_authored:
-        # NOT normalized: normalize_fact() strips an imperative wrapper ("remember ...")
-        # off a fact HE states; her journal line is not an instruction, and stripping it
-        # also hid a tool receipt from the machine-text check (G-REAL-HER §1).
-        fact = " ".join(_raw.split())
-        if not _self_narr:
-            # a plain self-fact is hers, but it is not NARRATIVE: no producer named a
-            # kind, so it must not arrive wearing one (see the note above).
-            mem_class, kind = "", ""
-        ok, why = lc.is_narratable(fact)
-        if not ok:
-            return f"not stored — {why}"
-    else:
-        mem_class, kind = "", ""
-        ok, why = lc.is_memorable(fact)
-        if not ok:
-            return f"not stored — {why}"
-    # ── THE IDENTITY FIREWALL (2026-07-12) ──────────────────────────────────────
-    # She answered "what is your name?" with "My name is Kairos." — correctly — and then
-    # stored that sentence HERE, in the USER store. It was stamped speaker=user, classed
-    # identity, and superseded all three rows that said the user is Sam. The store came
-    # out of it asserting that SAM IS CALLED KAIROS.
-    #
-    # Which door she writes to is the ONLY signal for whose fact it is, and she picked the
-    # wrong one. The prompt already tells her; a prompt is advice, and the price of one
-    # slip is the user's identity. So the door refuses it, and names the right door.
-    if _AUTHOR.get() != lc.SPEAKER_SELF:
-        ok, why = lc.admit_to_user_store(fact, _self_names())
-        if not ok:
-            return f"not stored — {why}"
-    # ── A REPEAT IS NOT A DUPLICATE. IT IS A SECOND DATA POINT. (2026-07-13) ────────
-    #
-    # These two guards used to read:
-    #     if <exact match>:      return f"already in memory: {fact}"
-    #     if <paraphrase>:       return f"already in memory (paraphrase of): {...}"
-    #
-    # and that was the end of it. Every time he told her something AGAIN, the store said
-    # "I know" and threw the event away. It was proud of not duplicating a row.
-    #
-    # But the repetition IS THE SIGNAL. A thing a person tells you five times is not the
-    # same thing as a thing they told you once, and we were recording them identically.
-    # She said it herself, unprompted, on a kairos check-in: "memory has context — WHO told
-    # you what, WHEN, maybe even HOW MANY TIMES." She had who. She had when. The third one
-    # was arriving on every restatement and being deleted at the door.
-    #
-    # So a repeat REINFORCES: mentions += 1, last_seen = now, first_seen preserved. Still
-    # exactly one row — the dedupe was right about the STORAGE and wrong about the EVENT.
-    def _reinforce(e: dict, why: str) -> str:
-        lc.reinforce(e)
-        _store._save_all(existing)
-        n = e.get("mentions", 2)
-        return (f"reinforced ({n}x): {_text(e)}"
-                + (f"  [{why}]" if why else ""))
-
-    # ── THE REINFORCE BRANCH IS A READ-MODIFY-WRITE, SO IT HOLDS THE LOCK (2026-08-24
-    # audit, A2). The invariant at _REG_LOCK's definition says a load/change/rewrite is
-    # not interleaved with another — and this branch loaded OUTSIDE the lock, mutated a
-    # row, and _save_all'd the stale list: a remember() landing between the read and the
-    # write was silently rewritten away, the exact lost-write shape the comment up there
-    # narrates, on the hottest write path in the file. The store branch below re-reads
-    # inside its own locked block and was always right; this one now matches it.
-    # The lock is RELEASED before the mint/supersede work that follows — _mint_now can
-    # block on HTTP for up to 120 s when SP_CAPTURE_ASYNC=0, and a registry lock held
-    # across a GPU call would serialize every concurrent turn behind it. A stale
-    # `existing` beyond this block is safe by construction: the store branch applies
-    # its tombstones by NAME against a fresh locked read. RLock, so _save_all's own
-    # acquire nests without deadlock; nothing in this block does I/O beyond the store.
-    # Gate: G-REGISTRY-RMW (mutant: lift this `with` and it goes red by name).
-    with _store._REG_LOCK:
-        existing = _store._load()
-
-        for e in existing:
-            if e.get("lifecycle"):
-                continue                   # a tombstone is not reinforced back to life
-            if _text(e).strip() == fact.strip():
-                return _reinforce(e, "")
-
-        # ── AN INFERENCE DOES NOT UNDO A RETIREMENT (2026-08-28) ─────────────────────
-        # A tombstone is never reinforced (above) — but the same TEXT re-admitted as a
-        # NEW row walked straight past it. Said by HIM again, that is right: fresh
-        # testimony outranks old curation, and the new row stands beside the tombstone.
-        # Re-minted by the CONSOLIDATOR re-reading an old transcript, it silently undid
-        # a decision a person made in the panel an hour earlier — his report, verbatim:
-        # "retired memories stay retired... it seems a little flaky". The paraphrase
-        # passes (consolidator, reflection) are refused re-admission of a retired text;
-        # the refusal names the tombstone so the log says WHY nothing was stored.
-        if any(s in (source or "") for s in ("reflection", "consolidator")):
-            ft_norm = fact.strip().lower()
-            for e in existing:
-                if e.get("lifecycle") and _text(e).strip().lower() == ft_norm:
-                    return ("not stored — %r was retired (%s) and a %s pass may not "
-                            "re-admit it; only being told again can"
-                            % (fact[:60], e.get("superseded_at")
-                               or e.get("retired_because") or "tombstoned", source))
-
-        ft = _toks(fact)
-        if ft:
-            for e in existing:
-                if e.get("lifecycle"):
-                    continue
-                et = _toks(_text(e))
-                if not et:
-                    continue
-                inter = len(ft & et)
-                if inter / len(ft) >= 0.9 and inter / len(et) >= 0.9:
-                    return _reinforce(e, "said again, in different words")
+    # IT ALSO HANDS BACK `existing`, and that is a contract rather than a convenience: the
+    # supersede verdict below needs the row list, and the lock is deliberately RELEASED before
+    # the mint (which can block on HTTP for 120 s). A stale `existing` is safe because
+    # `store.commit_row` applies its tombstones BY NAME against a fresh locked read.
+    _said, existing = _dedupe.check_repeat(fact, source)
+    if _said is not None:
+        return _said
     # ── SHE WAS MADE TO WAIT ON A GPU BEFORE SHE WAS ALLOWED TO ANSWER HIM (2026-07-14) ────
     #
     # This block used to POST /v1/capture SYNCHRONOUSLY, with timeout=120, right here — on the
@@ -450,73 +377,17 @@ def remember(fact: str, source: str = "", *, kind: str = "", mem_class: str = ""
         _mint_later(fact, out_dir)                 # she answers him now; the cache catches up
     else:
         npos, minted = _mint_now(daemon, fact, out_dir)
-    # ── MEM-OKF v2 LIFECYCLE (2026-07-12) ───────────────────────────────────────
-    # SUPERSEDE-ON-CONFLICT. A fact that fills the same slot with a DIFFERENT value
-    # retires the old one — tombstoned, never deleted, so "what did I used to think?"
-    # stays answerable. Without this the registry was an append-only tape: it could
-    # accumulate "My cat's name is Tuffy" AND "My cat's name is Milo" and recall would
-    # cheerfully surface whichever matched first.
-    from harness.skills import lifecycle as lc
-    speaker = lc.infer_speaker(fact, _AUTHOR.get())
 
-    # WHERE DID THIS CLAIM COME FROM, and therefore what may it do to the rest of the store?
-    # An INFERENCE may be recalled, may be spoken in her own voice, and may be corrected by
-    # anything he says — but it may NEVER retire something he told her. Proven necessary: she
-    # concluded "Sam is comfortable in open water" and it TOMBSTONED his own "Sam is
-    # terrified of open water". Her guess ate his testimony. See find_superseded().
-    # THE one derivation, and it is passed everywhere it is needed (find_superseded,
-    # dominance, stamp) instead of being re-derived from src prose at each door.
-    # "consolidator" is here because its rows are the MODEL'S PARAPHRASES of a transcript,
-    # not his words — stamped observed, 14 of them sat in the live store with full
-    # authority to retire his actual testimony (verdict.may_supersede lets observed beat
-    # observed). A paraphrase is her account of what he said: inferred.
-    _INFERRED_SOURCES = ("reflection", "consolidator")
-    status = (lc.STATUS_INFERRED
-              if any(s in (source or "") for s in _INFERRED_SOURCES)
-              else lc.STATUS_OBSERVED)
-    # narrative ACCUMULATES — a new feeling or journal line never retires an older one;
-    # only tombstoning does (The Real Her, 2026-08-22). Everything else supersedes as before.
-    retired = [] if _self_narr else lc.find_superseded(fact, speaker, existing, status=status)
-
-    # ── DOMINANCE PROPOSES; find_superseded AND verdict DISPOSE (docs/SEMANTICS.md §S2.1) ──
-    # find_superseded fires only on an EXACT attribute_key match, so it cannot see this pair:
+    # ── WHAT THIS ROW RETIRES, AND BY WHAT AUTHORITY (2026-09-02) ────────────────────────
+    # `harness/skills/memory/supersede.py`: whose fact this is, whether it is an OBSERVATION
+    # or an INFERENCE, and which held rows it puts down. Two rules live together in there
+    # because each was nearly lost on its own — an inference may never retire an observation
+    # (she concluded he was comfortable in open water and it tombstoned his own "terrified"),
+    # and narrative ACCUMULATES, her lane excluded from dominance on a measurement rather
+    # than only on doctrine.
     #
-    #     held  "Sam has a cat."
-    #     new   "Sam's cat Tuffy is a female tabby."
-    #
-    # — nothing retires the vaguer row and both render. `dominance.find_subsumed` adds the
-    # structurally-subsumed rows: topic containment AND 14-byte Dickson dominance, same
-    # speaker, same `verdict.may_supersede` ruling as everything else.
-    #
-    # DEFAULT OFF (SP_SEM_DOMINATE). With the knob off `find_subsumed` returns [] and this
-    # block is a no-op, so every verdict is byte-identical to pre-dominance behaviour — the
-    # G-SEM-CONSERVE law. It stays off until the supersede rate has a measured bar: a proposer
-    # with better recall than the thing it augments also has more ways to be wrong, and Paper
-    # IV's own eviction measurement (93.86%, above its own 80% alarm) says which way it errs.
-    # The knob is read INSIDE find_subsumed and nowhere else — one authority for one flag, so
-    # there is no second place to forget it.
-    from harness.skills import dominance as _dom
-    _seen = {id(r) for r in retired}
-    # ── AND HER LANE IS EXCLUDED ON A MEASUREMENT, NOT ONLY ON DOCTRINE (2026-08-23) ──────
-    # "Narrative accumulates" is the rule; this is the evidence that the rule is also the
-    # only safe engineering. fixtures/sem/dominate-self-receipt.json: SP_SEM_DOMINATE run
-    # read-only over her 27 live narrative rows proposes 12 retirements — 0.44 per row
-    # against 0.083 on his facts — and TWELVE OF TWELVE ARE WRONG, all the same way.
-    # dominance's content carrier is topic_of plus names and numbers, built for ATTRIBUTIVE
-    # facts ("Sam owns a blue kettle": a subject and an attribute). Her narrative is
-    # EXPRESSIVE PROSE with almost no attributive content — a bare affectionate line reduces
-    # to roughly ONE content word — so any longer sentence sharing that word dominates it
-    # structurally, and a warmer variant is proposed to retire the plainer one.
-    #
-    # The hypothesis that lost was that her lane would be dominance's BEST case, because
-    # near-duplicate restatement is rife there and retiring one of her own repeated lines is
-    # low-stakes. The first half is true. The second does not follow: dominance cannot
-    # IDENTIFY a near-duplicate in her lane, it identifies "shares a content word and is
-    # longer" — on the material where being wrong costs the most. G-SEM-DOMINATE §10.
-    for _r in ([] if _self_narr else _dom.find_subsumed(fact, speaker, existing, status=status)):
-        if id(_r) not in _seen:
-            retired.append(_r)
-            _seen.add(id(_r))
+    # It decides; it does not write. `store.commit_row` below puts the tombstones down.
+    speaker, status, retired = _supersede.what_it_retires(fact, source, existing, _self_narr)
 
     line = {
         "name": os.path.basename(out_dir),
@@ -538,44 +409,11 @@ def remember(fact: str, source: str = "", *, kind: str = "", mem_class: str = ""
     # `superseded_by`/`superseded_at` for the audit trail.
     line["lifecycle"] = 0
 
-    # ── AN INFERENCE THAT ARGUES WITH HIM IS SILENCED, NOT CONVICTED (2026-07-14) ───────
-    # She may not retire his testimony (find_superseded refuses it), so a wrong conclusion sits
-    # LIVE alongside the thing it denies:
-    #
-    #     LIVE  observed  'Sam is terrified of open water'
-    #     LIVE  inferred  'Sam is comfortable in open water'
-    #
-    # ...and unhandled she would say BOTH. "You told me you're terrified" and "I've come to think
-    # you're comfortable", in one breath. Not a mind holding two hypotheses — a mind that HEARD HIM
-    # AND CARRIED ON REGARDLESS, which is exactly what makes a companion feel like it isn't
-    # listening.
-    #
-    # I first handled it HERE, at write time: detect the contradiction, mark it DISPUTED, retire
-    # it. Then I went to build the detector and caught myself assembling a semantic contradiction
-    # engine out of substring matching and a hand-written antonym list — the clever-fragile thing
-    # this codebase has punished me for every single time, and with the worst possible failure
-    # mode: A VERDICT I CANNOT DEFEND, WRITTEN TO DISK, WITH A TIMESTAMP ON IT.
-    #
-    # So the write path passes no judgment at all. It stores what she thinks, honestly labelled.
-    # The rule that matters is not "her belief must be destroyed" — it is SHE DOES NOT GET TO SAY
-    # IT OVER HIM, and that is a rule about SPEAKING. It lives at the recall seam
-    # (lifecycle.testimony_wins), where a false positive costs a sentence instead of a fact.
-    # ONE writer, under the same lock _save_all already holds. The previous shape
-    # was a raw open("w") + open("a") beside a locked _save_all — two write paths,
-    # and the unguarded one is the one remember() actually runs. Concurrent turns
-    # (G-AUTHOR-CTX) hit PermissionError on Windows replacing a file the other
-    # thread still had open.
-    with _store._REG_LOCK:
-        rows = _store._load()
-        if retired:
-            names = {r.get("name") for r in retired}
-            for r in rows:
-                if r.get("name") in names:
-                    r["lifecycle"] = 1                     # the engine reads THIS
-                    r["superseded_by"] = line["name"]      # the audit trail reads these
-                    r["superseded_at"] = line["ts"]
-        rows.append(line)
-        _store._save_all(rows)
+    # THE ONLY APPEND IN THE TREE is `store.commit_row` — it re-reads inside the lock and
+    # stamps the tombstones BY NAME, which is what makes it safe that the lock was released
+    # for the mint above. Moved there on 2026-09-02: the module that owns the store owns the
+    # write, and `remember()` is left holding the policy rather than the file handle.
+    _store.commit_row(line, retired)
 
     # ── SEM S0 (docs/SEMANTICS.md): the sidecar semantic index ──────────────────────────
     # DERIVED data in a SEPARATE file — semindex can never write the registry, never
@@ -595,39 +433,6 @@ def remember(fact: str, source: str = "", *, kind: str = "", mem_class: str = ""
 
 
 
-_GENDER_WORDS = {
-    "female": {"female", "woman", "girl", "she", "her"},
-    "male": {"male", "man", "boy", "he", "him"},
-}
-
-
-def _self_names() -> set:
-    """EVERY VALUE THAT CONSTITUTES HER — not just her name.
-
-    The first firewall guarded the name, because the name is what had eaten his. Then she
-    filed "I am a woman" as HIS identity and supersede retired "I am male": the store came
-    out asserting that Sam is a woman. Same mechanism, one attribute to the left. I had
-    fixed the instance and called it the class.
-
-    So this returns her name AND her gender words, read live from the persona — a rename or
-    a re-gender moves the firewall with her. The literals are the floor, not the truth."""
-    vals = {"kairos", "kairos"}
-    try:
-        from harness.personality.persona_file import parse_persona
-        from harness.personality.persona_file import persona_path
-        path = persona_path()
-        with open(path, encoding="utf-8") as f:
-            _, state = parse_persona(f.read())
-        for k in ("name", "self_name"):
-            v = (state or {}).get(k)
-            if isinstance(v, str) and v.strip():
-                vals.add(v.strip().lower())
-        g = (state or {}).get("gender")
-        if isinstance(g, str) and g.strip():
-            vals |= _GENDER_WORDS.get(g.strip().lower(), {g.strip().lower()})
-    except Exception as _swx:
-        _sw(_log, "_self_names", _swx, lane="skills")
-    return vals
 
 
 def remember_about_self(fact: str, *, kind: str = "", source: str = "self",

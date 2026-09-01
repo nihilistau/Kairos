@@ -99,3 +99,58 @@ def _save_all(rows: List[dict]) -> None:
             for r in rows:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
         replace_atomic(tmp, p)
+
+
+# ── THE ONE WRITER FOR A NEW ROW AND ITS TOMBSTONES (moved here 2026-09-02) ───────────
+# This was the tail of `remember()`. It belongs in the module that owns the store: it is the
+# only place a row is appended, and the only place a tombstone is stamped.
+#
+# ONE writer, under the same lock `_save_all` already holds. The previous shape was a raw
+# open("w") + open("a") beside a locked `_save_all` — two write paths, and the unguarded one
+# is the one `remember()` actually ran. Concurrent turns (G-AUTHOR-CTX) hit PermissionError on
+# Windows replacing a file the other thread still had open.
+#
+# IT RE-READS INSIDE THE LOCK AND APPLIES TOMBSTONES BY NAME. That is what makes it safe for
+# the caller to have released the lock during the mint: whatever `retired` was computed
+# against, the rows put down here are found by name in a list loaded a moment ago. See
+# `dedupe.py`'s header for the other half of that contract.
+def commit_row(line: dict, retired: list) -> None:
+    """Append one row, tombstoning whatever it supersedes. The only append in the tree."""
+    # ── AN INFERENCE THAT ARGUES WITH HIM IS SILENCED, NOT CONVICTED (2026-07-14) ───────
+    # She may not retire his testimony (find_superseded refuses it), so a wrong conclusion sits
+    # LIVE alongside the thing it denies:
+    #
+    #     LIVE  observed  'Sam is terrified of open water'
+    #     LIVE  inferred  'Sam is comfortable in open water'
+    #
+    # ...and unhandled she would say BOTH. "You told me you're terrified" and "I've come to think
+    # you're comfortable", in one breath. Not a mind holding two hypotheses — a mind that HEARD HIM
+    # AND CARRIED ON REGARDLESS, which is exactly what makes a companion feel like it isn't
+    # listening.
+    #
+    # I first handled it HERE, at write time: detect the contradiction, mark it DISPUTED, retire
+    # it. Then I went to build the detector and caught myself assembling a semantic contradiction
+    # engine out of substring matching and a hand-written antonym list — the clever-fragile thing
+    # this codebase has punished me for every single time, and with the worst possible failure
+    # mode: A VERDICT I CANNOT DEFEND, WRITTEN TO DISK, WITH A TIMESTAMP ON IT.
+    #
+    # So the write path passes no judgment at all. It stores what she thinks, honestly labelled.
+    # The rule that matters is not "her belief must be destroyed" — it is SHE DOES NOT GET TO SAY
+    # IT OVER HIM, and that is a rule about SPEAKING. It lives at the recall seam
+    # (lifecycle.testimony_wins), where a false positive costs a sentence instead of a fact.
+    # ONE writer, under the same lock _save_all already holds. The previous shape
+    # was a raw open("w") + open("a") beside a locked _save_all — two write paths,
+    # and the unguarded one is the one remember() actually runs. Concurrent turns
+    # (G-AUTHOR-CTX) hit PermissionError on Windows replacing a file the other
+    # thread still had open.
+    with _REG_LOCK:
+        rows = _load()
+        if retired:
+            names = {r.get("name") for r in retired}
+            for r in rows:
+                if r.get("name") in names:
+                    r["lifecycle"] = 1                     # the engine reads THIS
+                    r["superseded_by"] = line["name"]      # the audit trail reads these
+                    r["superseded_at"] = line["ts"]
+        rows.append(line)
+        _save_all(rows)
