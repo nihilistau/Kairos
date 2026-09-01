@@ -149,6 +149,13 @@ _TICKER_GEN: int = 0
 # WHERE HER UNPROMPTED TURNS GO. The scheduler must not know what a day transcript is —
 # the gateway owns that file — so the gateway hands it a writer at startup. None means
 # nobody is listening, which is a legitimate state (tests, the CLI) and not an error.
+# A DRIVEN TURN'S CONTINUATION IS STILL DRIVEN (2026-09-02). `on_reply` records the
+# originating turn's `synthetic` reason here and `_arm` puts it back on the ContextVar for
+# the length of the unprompted turn, so `_settle_turn` and `remember_about_self` — both of
+# which run on THIS thread, inside `_attempt` — see it. Keyed by session and cleared when a
+# real turn arrives, because a stale reason would quarantine her actual speech.
+_SYNTH: dict = {}
+
 _ON_SPOKE = None
 
 
@@ -339,6 +346,7 @@ def on_reply(
     reply_text: str,
     kairos_payload: Optional[dict],
     generate: Callable[[str], str],
+    synthetic: str = "",
 ) -> Optional[Impulse]:
     """Called after each assistant reply. `generate(nudge)` runs one more turn with the
     nudge appended and returns her text. Returns the Impulse (for the receipt/telemetry)."""
@@ -353,6 +361,17 @@ def on_reply(
 
     if not cfg.enabled:
         return None
+
+    # WAS THE TURN THIS CONTINUES A DRIVEN ONE? A continuation is part of the turn it
+    # continues, so it inherits the flag — see `_arm`, which is where it is armed, and
+    # `turn._on_her_own_words`, which is where it was silently missing. Recorded per
+    # session because `_arm` runs on the scheduler's own thread, minutes later, with no
+    # request body in reach.
+    with _LOCK:
+        if synthetic:
+            _SYNTH[session] = str(synthetic)
+        else:
+            _SYNTH.pop(session, None)
 
     margin = None
     if kairos_payload:
@@ -852,7 +871,33 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
         #   spoken                       SPENDS  note_spoke still owns the speech facts
         _meter = [True]
         try:
-            _attempt(_meter)
+            # EVERYTHING SHE SAYS IN A DRIVEN SESSION IS DRIVEN (2026-09-02).
+            #
+            # The first cut of this scoped the inheritance to CONTINUE and EXPAND, on the
+            # reasoning that only those two ARE the previous turn while CHECK_IN / MUSE /
+            # SOLO are her own acts hours later. MEASURED AN HOUR LATER, ON THE LIVE STACK,
+            # AND IT IS WRONG: the idle ticker fired a CHECK_IN on the probe's own session
+            # 657 s after it ended ("quiet for 657s and she felt like saying something"),
+            # regenerated the probe's text, and filed it as a real `spoke_up`
+            # (`ep_tool_1788302812000`, quarantined). The ticker speaks from `_LAST[session]`
+            # for as long as the session lives, so a lane-shaped rule leaves the hole open
+            # on every lane it did not name.
+            #
+            # The boundary is the SESSION, not the lane — and it is not sticky: `on_reply`
+            # clears the reason the moment a real turn arrives on that session, so her
+            # genuine speech is never caught. What remains is exactly right: a session a
+            # probe drove is not their conversation, and nothing she says inside it is
+            # theirs either.
+            _syn_tok = None
+            _syn = _SYNTH.get(session)
+            if _syn:
+                from harness.skills import memory as _M_syn
+                _syn_tok = _M_syn.set_synthetic(_syn)
+            try:
+                _attempt(_meter)
+            finally:
+                if _syn_tok is not None:
+                    _M_syn.reset_synthetic(_syn_tok)
         finally:
             if _meter[0]:
                 with _LOCK:

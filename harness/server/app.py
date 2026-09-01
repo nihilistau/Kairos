@@ -848,7 +848,8 @@ def _kairos_after_turn(body: Dict[str, Any], reply: str) -> None:
                 _commit_unprompted(body, _base_len, hist, out)
             return out
 
-        ks.on_reply(session, reply, get_client().last_kairos, _continue)
+        ks.on_reply(session, reply, get_client().last_kairos, _continue,
+                    synthetic=(str(body.get("synthetic")) if body.get("synthetic") else ""))
     except Exception as exc:
         logger.warning("[gateway] kairos skipped: %s", exc)
 
@@ -2783,7 +2784,8 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
                     finally:
                         _disarm_self_turn(_tok_self)
 
-                _ks.on_reply(_session, _final, get_client().last_kairos, _continue)
+                _ks.on_reply(_session, _final, get_client().last_kairos, _continue,
+                             synthetic=(str(body.get("synthetic")) if body.get("synthetic") else ""))
         except Exception as exc:
             logger.warning("[gateway] kairos skipped: %s", exc)
         _phase("epilogue")   # capture + record + marks + receipts + kairos arming
