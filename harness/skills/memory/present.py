@@ -68,7 +68,9 @@ def attr_absent(query: str, fact: str) -> bool:
 # ── THE SECRET WAS GUARDED AT ONE OF FIVE DOORS (2026-08-24 audit, A3) ─────────────────
 # spine.recall_decider — the automatic per-turn injection — has honoured private-secret
 # since G-SECRET landed: absent attribute -> zero-inference decline, present attribute ->
-# she may answer him. And EVERY OTHER READ DOOR in this file served the row verbatim:
+# she may answer him. And EVERY OTHER READ DOOR served the row verbatim — they are the
+# package's doors, in `__init__.py` and `rank.py`; this comment said "in this file" when
+# the rule and the doors were one 2273-line module:
 # list_memories dumped it (model-callable, no question asked), recall() presented it,
 # search_memories returned its raw text, provenance() quoted it. The live store holds a
 # real credential as a private-secret row, so this was not hypothetical: the guard held
@@ -76,7 +78,8 @@ def attr_absent(query: str, fact: str) -> bool:
 # in the exact subsystem whose closed trap ("the privacy decline cannot fire") is the §0
 # table's last row.
 #
-# THE RULE, once, here, consumed by every door in this file:
+# THE RULE, once, here, consumed by every door in the PACKAGE (they call it through
+# `_present.secret_withheld`, never through the façade's alias — see this module's header):
 #   no question (a listing)      -> withheld. A dump has no attribute to test, and a
 #                                   secret in a listing is a leak with pagination.
 #   asked, attribute ABSENT      -> withheld (the decider's own attr_absent test).
@@ -99,8 +102,10 @@ def secret_withheld(row: dict, query: str = "") -> bool:
 
 
 def _present_row(row: dict, query: str = "") -> str:
-    """THE class-aware render for the speaks-ABOUT-the-store doors in this file
-    (list_memories, search_memories, provenance): lifecycle.render()'s framing, with the
+    """THE class-aware render for the speaks-ABOUT-the-store doors — `list_memories` and
+    `provenance` in `__init__.py`, `search_memories` through `rank.py`. (They lived in one
+    file with this function until 2026-09-01, which is what "in this file" used to mean.)
+    lifecycle.render()'s framing, with the
     secret rule applied first. recall() speaks TO HER through world.present_for_her and
     applies secret_withheld itself — presentation differs by addressee (two rendering
     doors, on purpose), the withholding rule does not."""
