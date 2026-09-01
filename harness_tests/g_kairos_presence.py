@@ -49,6 +49,7 @@ sys.path.insert(0, ROOT)
 # wrote HER LIVE var/tuning.json - it raced her running stack mid-sweep and died on
 # the os.replace, and on a quieter day it would simply have changed what she does.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _src as _srcmod  # noqa: E402
 from _gate import sandbox as _sandbox  # noqa: E402
 _sandbox(os.path.basename(__file__))
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
@@ -315,8 +316,7 @@ print("\n12. THE SEED IS A CONVERSATION, NOT A WAIT FOR ONE")
 #
 # He restarted, went to bed, and she was held 325 TIMES OVER FOURTEEN HOURS — mute for
 # exactly the window the seed was written for, one silent INFO line at a time.
-app = open(os.path.join(ROOT, "harness", "server", "app.py"),
-           encoding="utf-8", errors="replace").read()
+app = _srcmod.pkg("harness", "server")
 check("seeding installs a canon rather than waiting for one",
       "_CHAT_SESSIONS[sess] = list(hist)" in app,
       "the seed's whole purpose is the window where no conversation exists yet")

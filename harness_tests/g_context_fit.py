@@ -32,6 +32,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _src as _srcmod  # noqa: E402
 from _gate import check, finish, utf8_stdout  # noqa: E402
 
 utf8_stdout()
@@ -175,8 +176,7 @@ line = C.notice({"dropped": 6, "kept": 9, "before": 13000, "after": 8000, "budge
 check("the notice says what was lost, in his terms", "6 older turns" in line, line)
 check("...and that she still has the recent turns and her memory",
       "memory" in line and "recent" in line, line)
-app = open(os.path.join(ROOT, "harness", "server", "app.py"),
-           encoding="utf-8", errors="replace").read()
+app = _srcmod.pkg("harness", "server")
 check("the gateway emits it on the turn it happened",
       'evq.put({"notice": _ctx.notice(_trim)})' in app)
 check("...read off the client the same way last_kairos is",

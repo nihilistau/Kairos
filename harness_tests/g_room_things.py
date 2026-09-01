@@ -32,6 +32,7 @@ import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+import _src as _srcmod  # noqa: E402
 GW = os.environ.get("SP_GATEWAY_URL", "http://127.0.0.1:8800")
 LOCAL = "http://127.0.0.1:8800"
 
@@ -122,7 +123,7 @@ ok("current" in nar and "history" in nar,
 for path in ("/v1/narrative", "/v1/narrative/write", "/v1/journal"):
     st, _h, _ = req(path, "POST", {"text": "not hers"})
     ok(st in (404, 405, 403), f"POST {path} is not a route ({st})", st)
-src = open(os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read()
+src = _srcmod.pkg("harness", "server")
 ok("_narrative_json" in src and "narrative/write" not in src,
    "and no write handler exists in the gateway at all")
 

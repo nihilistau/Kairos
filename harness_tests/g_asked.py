@@ -51,6 +51,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _src as _srcmod  # noqa: E402
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 _fd, _reg = tempfile.mkstemp(suffix=".jsonl")
@@ -162,26 +163,38 @@ def target(q):
 # assert the ORDER, in the real source: any function that consults the memory lane must
 # have armed it first. Offline, no stack, no model.
 def _arm_order_ok():
+    """Every function that consults the memory lane armed it first — over the whole
+    gateway PACKAGE, and it says how many it looked at.
+
+    ── THIS WALK WAS ONE MOVE FROM VACUOUS (2026-09-01) ─────────────────────────────
+    It parsed `harness/server/app.py` and reported the functions that consult before
+    they arm. The turn lifecycle is being extracted to a sibling module — and the
+    moment it left, NO FUNCTION WOULD MATCH `run_pre_turn(`, `bad` would be empty, and
+    this check would pass over nothing at all while reading exactly as green as it does
+    now. That is the "GATES THAT ASSERTED THE PAST" class, and the cheap guard against
+    it is to return the POPULATION as well as the offenders: a walk that found zero
+    candidates is a walk that proved nothing.
+    """
     import ast
-    import os as _o
-    src_path = _o.path.join(_o.path.dirname(_o.path.dirname(_o.path.abspath(__file__))),
-                            "harness", "server", "app.py")
-    with open(src_path, encoding="utf-8") as fh:
-        src = fh.read()
-    tree = ast.parse(src)
-    bad = []
-    for fn in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]:
-        seg = ast.get_source_segment(src, fn) or ""
-        if "run_pre_turn(" not in seg:
-            continue
-        arm = seg.find("_arm_turn(")
-        pre = seg.find("run_pre_turn(")
-        if arm < 0 or arm > pre:
-            bad.append(fn.name)
-    return bad
+    bad, looked = [], 0
+    for name in _srcmod.files("harness", "server"):
+        src = _srcmod.text("harness", "server", name)
+        for fn in [n for n in ast.walk(ast.parse(src)) if isinstance(n, ast.FunctionDef)]:
+            seg = ast.get_source_segment(src, fn) or ""
+            if "run_pre_turn(" not in seg:
+                continue
+            looked += 1
+            arm = seg.find("_arm_turn(")
+            pre = seg.find("run_pre_turn(")
+            if arm < 0 or arm > pre:
+                bad.append("%s::%s" % (name, fn.name))
+    return bad, looked
 
 
-_bad = _arm_order_ok()
+_bad, _looked = _arm_order_ok()
+check("there are gateway paths that consult the memory lane at all",
+      _looked >= 1,
+      "no function in harness/server/ contains run_pre_turn( — this walk graded nothing")
 check("every gateway path ARMS the memory lane before it CONSULTS it",
       not _bad,
       "these read recall before _arm_turn set the question: %s" % _bad)

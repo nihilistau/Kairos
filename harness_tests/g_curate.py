@@ -28,6 +28,7 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _src as _srcmod  # noqa: E402
 from _gate import check, finish, utf8_stdout  # noqa: E402
 
 utf8_stdout()
@@ -160,8 +161,7 @@ check("its store is its own file, not the registry",
       "decisions.jsonl" in DEC.path() and "registry.jsonl" not in DEC.path())
 
 print("\n6. THE PANEL CAN ONLY ASK FOR WHAT THE SERVER ALLOWS")
-app = open(os.path.join(ROOT, "harness", "server", "app.py"),
-           encoding="utf-8", errors="replace").read()
+app = _srcmod.pkg("harness", "server")
 check("the relabel route exists and goes through ops.relabel",
       '"/v1/memory/relabel"' in app and "ops.relabel(" in app)
 check("the decide route exists and goes through decisions.decide",

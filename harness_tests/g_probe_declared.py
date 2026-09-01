@@ -102,6 +102,7 @@ gate_src = io.open(os.path.join(HERE, "_gate.py"), encoding="utf-8").read()
 check("_gate.probe() exists", "def probe(" in gate_src)
 sys.path.insert(0, HERE)
 from _gate import probe   # noqa: E402
+import _src as _srcmod  # noqa: E402
 check("...and it names the gate that drove the turn", "g_x" in probe("g_x"), probe("g_x"))
 check("...and says plainly it was not their conversation",
       "not their conversation" in probe("g_x"), probe("g_x"))
@@ -112,8 +113,7 @@ retyped = [n for n, _ok in live
 check("...and no gate hand-rolls the reason string instead", not retyped, retyped)
 
 print("\n3. THE SEAM STILL HONOURS IT — the flag is read, not merely written")
-app = io.open(os.path.join(ROOT, "harness", "server", "app.py"),
-              encoding="utf-8", errors="replace").read()
+app = _srcmod.pkg("harness", "server")
 check("the gateway forwards a declared body to the writer",
       'body.get("synthetic")' in app, "nothing reads the request field")
 check("...the writer stamps it on the row",

@@ -32,6 +32,7 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _src as _srcmod  # noqa: E402
 from _gate import check, finish, utf8_stdout  # noqa: E402
 
 utf8_stdout()
@@ -362,8 +363,7 @@ check("...and an inference no longer looks like testimony in the curate panel",
       "c-st-" in _mem_jsx and "r.status" in _mem_jsx)
 
 check("ONE row shape - the listing and the walk serve the same object",
-      "_mem_row_json(e) for e in _load()" in open(
-          os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read(),
+      "_mem_row_json(e) for e in _load()" in _srcmod.pkg("harness", "server"),
       "a second hand-kept spelling is this repo's signature bug with a new date")
 
 finish("G-PROVENANCE")

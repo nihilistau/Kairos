@@ -21,6 +21,7 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+import _src as _srcmod  # noqa: E402
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 PASS = FAIL = 0
@@ -260,8 +261,7 @@ check("...and the raw daemon Popen appears exactly %d time(s) (serve.py + engine
       (srv + _launch_src).count('"start",\n') == _want, (srv + _launch_src).count('"start",\n'))
 
 print("\n9. THE ROUTES EXIST AND REPLY BEFORE THEY EXIT")
-app = io.open(os.path.join(ROOT, "harness", "server", "app.py"),
-              encoding="utf-8", errors="replace").read()
+app = _srcmod.pkg("harness", "server")
 check("POST /v1/shutdown exists", '"/v1/shutdown"' in app)
 check("POST /v1/start exists", '"/v1/start"' in app)
 check("...and shutdown goes through the ladder, not its own teardown",

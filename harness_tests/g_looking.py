@@ -26,6 +26,7 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+import _src as _srcmod  # noqa: E402
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 os.environ["SP_DAEMON_URL"] = "http://127.0.0.1:9"
 
@@ -115,8 +116,7 @@ check("research() begins a look",
       "L.begin(\"research\"" in src_res or "L.begin('research'" in src_res)
 check("research() ends a look on success and on raise",
       src_res.count("L.end(") >= 2)
-src_app = open(os.path.join(ROOT, "harness", "server", "app.py"),
-               encoding="utf-8").read()
+src_app = _srcmod.pkg("harness", "server")
 check("the pulse carries research",
       'out["research"]' in src_app)
 check("GET /v1/research exists",

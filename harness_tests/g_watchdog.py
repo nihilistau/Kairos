@@ -40,6 +40,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = ""
 # writing into her REAL stores; `_gate.sandbox` points every root at a temp dir and
 # must run BEFORE any harness import, because a module resolves its root once.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _src as _srcmod  # noqa: E402
 from _gate import sandbox as _sandbox  # noqa: E402
 _sandbox(os.path.basename(__file__))
 
@@ -169,8 +170,7 @@ _src = open(os.path.join(ROOT, "harness", "agent.py"), encoding="utf-8").read()
 check("...and the agent loop does swallow it — a watchdog never costs her a turn",
       "_wd.note_generation" in _src and "must never be able to cost her a turn" in _src)
 check("the gateway injects its OWN restart door rather than the watchdog rolling one",
-      "_wd.start(_do_restart)" in
-      open(os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read())
+      "_wd.start(_do_restart)" in _srcmod.pkg("harness", "server"))
 check("off is off, and it is re-read every beat (no reboot to disarm)",
       "os.environ.get(\"SP_WATCHDOG\"" in
       open(os.path.join(ROOT, "harness", "control", "watchdog.py"), encoding="utf-8").read())

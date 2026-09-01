@@ -38,6 +38,7 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+import _src as _srcmod  # noqa: E402
 
 SB = os.path.join(tempfile.gettempdir(), "_g_games")
 shutil.rmtree(SB, ignore_errors=True)
@@ -288,7 +289,7 @@ check("...and a takeback puts it BACK in hiding",
       "answer" not in M.public(M.load("wr")) and not M.load("wr")["over"])
 
 print("\n13. the gateway routes all three")
-_app = io.open(os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read()
+_app = _srcmod.pkg("harness", "server")
 for _op in ('"resign"', '"offer_draw"', '"rewind"'):
     check("op %s is routed" % _op, _op in _app)
 

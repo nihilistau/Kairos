@@ -42,6 +42,7 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+import _src as _srcmod  # noqa: E402
 
 SB = os.path.join(tempfile.gettempdir(), "_g_avatar")
 shutil.rmtree(SB, ignore_errors=True)
@@ -80,8 +81,7 @@ src = io.open(os.path.join(ROOT, "harness", "control", "avatar.py"),
               encoding="utf-8").read()
 code = src + io.open(os.path.join(ROOT, "harness", "control", "wardrobe.py"),
                      encoding="utf-8").read() \
-           + io.open(os.path.join(ROOT, "harness", "server", "app.py"),
-                     encoding="utf-8").read()
+           + _srcmod.pkg("harness", "server")
 
 print("\n2. OUTFITS ARE PATH KEYS, NOT A LADDER — the censor is gone")
 # 2026-08-21, operator: "remove heat ceilings all together and tiers. let her

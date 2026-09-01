@@ -33,6 +33,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _src as _srcmod  # noqa: E402
 from _gate import check, finish, sandbox, utf8_stdout  # noqa: E402
 
 utf8_stdout()
@@ -270,8 +271,7 @@ print("\n7. A FAILED OPENAI TURN RELEASES THE LATCH (2026-08-28, external review
 # string: a failed turn muted her for fifteen minutes. Structural legs: the one release
 # helper exists, and both wrappers call it from their except branch.
 _ROOT7 = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_app_src = open(os.path.join(_ROOT7, "harness", "server", "app.py"),
-                encoding="utf-8", errors="replace").read()
+_app_src = _srcmod.pkg("harness", "server")
 check("the release helper exists and notes the turn ended",
       "def _release_turn_latch" in _app_src and
       "note_user_turn(False)" in _app_src.split("def _release_turn_latch")[1][:900])
@@ -303,5 +303,51 @@ check("...capture=False — a '[voice message]' placeholder is not his words",
       "capture=False" in _v_branch)
 check("...and a silence-skip cannot re-record the previous assistant reply",
       '.get("content") == "[voice message]"' in _v_branch.split("finally:")[1])
+
+print("\n10. THE EPILOGUE IS A MODULE BOUNDARY, NOT A CONVENTION")
+# ── STAGE 3 OF THE app.py SPLIT (2026-09-01) ────────────────────────────────────────
+# `_settle_turn` exists because the debt list had been re-implemented as trailing inline
+# code with five bypasses. That fixed it — and then the one function sat in a 6000-line
+# file with nine call sites, which is the same invitation in a longer corridor. It lives
+# in `harness/server/turn.py` now.
+#
+# ASSERTED AS IDENTITY, not as text: one implementation is the claim, and
+# `app._settle_turn is turn._settle_turn` is the only way to state it that a re-export
+# cannot fake. A file-scoped grep would have gone quiet the moment the definition moved,
+# which is the src-trap this split had to close first (G-SRC-TRAP).
+from harness.server import turn as _turnmod  # noqa: E402
+
+for _n in ("_settle_turn", "_arm_turn", "_arm_self_turn", "_disarm_self_turn",
+           "_on_her_own_words", "_finish_openai_turn", "_release_turn_latch",
+           "_capture_after_turn", "_commit_unprompted"):
+    check("§10 %-20s is ONE object, in turn.py" % _n,
+          getattr(app, _n) is getattr(_turnmod, _n),
+          "app.%s and turn.%s have drifted apart" % (_n, _n))
+
+# ── THE LATCH IS A ONE-SHOT, AND THAT IS WHAT MAKES NINE CALLERS SAFE ───────────────
+# Two callers may both believe they own the epilogue: the worker thread's `finally` and an
+# early-exit `return`. Whoever arrives first pays; the second must be a no-op. Driven,
+# because this is the property the nine call sites rely on and no amount of reading the
+# source establishes it.
+_paid = []
+_real_append = app._append_day_turn
+try:
+    app._append_day_turn = lambda *a, **k: _paid.append(a[:2])
+    _latch = {}
+    _turnmod._settle_turn("his words", "her words", latch=_latch,
+                          capture=False, close_his_turn=False, marks=False, stances=False)
+    _first = len(_paid)
+    _turnmod._settle_turn("his words", "her words", latch=_latch,
+                          capture=False, close_his_turn=False, marks=False, stances=False)
+    _second = len(_paid)
+finally:
+    app._append_day_turn = _real_append
+check("§10 the first owner of the latch pays the debts", _first == 1, _first)
+check("§10 ...and the second is a no-op, however many callers believe they own it",
+      _second == _first, "%d -> %d" % (_first, _second))
+# AND THE SHIM IS REAL: turn.py reached app.py's `_append_day_turn` across the module
+# edge, which is the one dependency Stage 3 deliberately left pointing backwards.
+check("§10 the day-row debt is paid through the shim into app.py",
+      _paid and _paid[0][0] == "his words", _paid[:1])
 
 finish("G-TURN-EPILOGUE")

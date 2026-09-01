@@ -11,7 +11,7 @@ never dropped; every row says who said it, what it came from, and when; an infer
 retire an observation; every verdict is a ruling of a committed finite table, not prose.
 
 ```
- the room (browser)  --->  gateway :8810 (Python, harness/server/app.py)  --->  any /v1/chat/completions server
+ the room (browser)  --->  gateway :8810 (Python, harness/server/)  --->  any /v1/chat/completions server
         ^                         |  memory . spine . kairos . wardrobe . voice . senses        (LM Studio . llama-server . vLLM . cloud)
         |                         '-->  optional: the xAI API (voice, images/motion, live search) . CPU sidecars
 ```

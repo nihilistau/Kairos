@@ -40,6 +40,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+import _src as _srcmod  # noqa: E402
 
 from harness.inference.inference_config import InferenceConfig  # noqa: E402
 
@@ -56,7 +57,7 @@ def check(name, cond, detail=""):
         print("  FAIL %s %s" % (name, detail))
 
 
-APP = io.open(os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read()
+APP = _srcmod.pkg("harness", "server")
 
 print("1. the continuation config is DERIVED, not rebuilt")
 # ── ANCHORED ON THE CODE, NOT ON A COMMENT (2026-08-28) ──────────────────────────────

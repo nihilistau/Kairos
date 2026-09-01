@@ -17,6 +17,7 @@ from __future__ import annotations
 import ast
 import os
 import sys
+import _src as _srcmod  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -34,27 +35,35 @@ def check(name, cond, detail=""):
 
 
 print("1. NO DICT LITERAL IN THE GATEWAY DECLARES THE SAME KEY TWICE")
-p = os.path.join(ROOT, "harness", "server", "app.py")
-tree = ast.parse(open(p, encoding="utf-8").read())
+# ── EVERY FILE IN THE GATEWAY, NOT ONE OF THEM (2026-09-01) ─────────────────────────
+# This parsed app.py alone. A route table that moves to a sibling module takes its
+# duplicate-key risk with it, and the check would have followed the file rather than the
+# risk. `_src.files` enumerates the package; `_seen` proves the walk was not empty.
+_seen = 0
 dupes = []
-for node in ast.walk(tree):
-    if not isinstance(node, ast.Dict):
-        continue
-    seen = {}
-    for k in node.keys:
-        if k is None:                      # **spread — not a literal key
+for _name in _srcmod.files("harness", "server"):
+    tree = ast.parse(_srcmod.text("harness", "server", _name))
+    _seen += 1
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Dict):
             continue
-        if isinstance(k, ast.Constant) and isinstance(k.value, str):
-            if k.value in seen:
-                dupes.append("line %d: %r (first at line %d)"
-                             % (k.lineno, k.value, seen[k.value]))
-            else:
-                seen[k.value] = k.lineno
-check("app.py has no duplicated string key in any dict literal",
+        seen = {}
+        for k in node.keys:
+            if k is None:                  # **spread — not a literal key
+                continue
+            if isinstance(k, ast.Constant) and isinstance(k.value, str):
+                if k.value in seen:
+                    dupes.append("%s line %d: %r (first at line %d)"
+                                 % (_name, k.lineno, k.value, seen[k.value]))
+                else:
+                    seen[k.value] = k.lineno
+# A WALK OVER NOTHING REPORTS NO DUPLICATES EITHER, so say how many files it read.
+check("the walk covered the gateway package", _seen >= 1, _seen)
+check("no duplicated string key in any dict literal under harness/server/",
       not dupes, "; ".join(dupes[:4]))
 
 print("\n2. THE ROUTE THAT FROZE THE WINDOW CARRIES ITS CONTRACT")
-src = open(p, encoding="utf-8").read()
+src = _srcmod.pkg("harness", "server")
 check("/v1/tuning is declared exactly once", src.count('"/v1/tuning": lambda') == 1,
       "count=%d" % src.count('"/v1/tuning": lambda'))
 check("...and that one declaration ships ok:true",

@@ -46,6 +46,7 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _src as _srcmod  # noqa: E402
 from _gate import check, finish, utf8_stdout  # noqa: E402
 
 utf8_stdout()
@@ -279,9 +280,9 @@ check("...and it gives no orders", not any(
       AN.NOTE)
 check("...it just says the true thing", "off the record" in AN.NOTE.lower()
       and ("saved" in AN.NOTE.lower() or "written" in AN.NOTE.lower()), AN.NOTE)
-_src = io.open(os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read()
+_src_app = _srcmod.pkg("harness", "server")
 check("...and the gateway staples it where the silence note is stapled",
-      "_anon_n.note()" in _src and '{"anon": True}' in _src)
+      "_anon_n.note()" in _src_app and '{"anon": True}' in _src_app)
 
 print("\n5. A HOLD THAT ONLY DEFERS IS NOT A HOLD")
 # Push receipts into the ring the way a turn does, then flush. The failure this catches

@@ -32,6 +32,7 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+import _src as _srcmod  # noqa: E402
 
 SB = os.path.join(tempfile.gettempdir(), "_g_stage")
 shutil.rmtree(SB, ignore_errors=True)
@@ -167,7 +168,7 @@ check("the stop words ship IN the payload", "stop" in (d.get("stop_words") or ""
 check("no scene -> scene is None, not a fake one", rp.status("nobody")["scene"] is None)
 
 print("\n9. the gateway consults all of it")
-app = io.open(os.path.join(ROOT, "harness", "server", "app.py"), encoding="utf-8").read()
+app = _srcmod.pkg("harness", "server")
 check("the opening is fired on entry", "rp.opening_for(" in app)
 check("the pacing dial is read", 'tune.get("roleplay.dwell_scale")' in app)
 check("the scene is persisted after the director moves it", "rp.touch(" in app)

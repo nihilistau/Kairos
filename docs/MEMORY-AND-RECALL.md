@@ -276,7 +276,7 @@ Narrative rows never supersede; a repeat reinforces. Presence-mode turns (C, 202
 
 > **QUALIFIED 2026-08-25 — the kind mapping above is still right, and the fourth producer no
 > longer fires on those turns.** A presence-mode turn now settles with `record=False,
-> stances=False` (`harness/server/app.py`, the scheduler passes the impulse KIND to
+> stances=False` (`harness/server/turn.py::_on_her_own_words` since the 2026-09-01 split; the scheduler passes the impulse KIND to
 > `on_spoke`): it writes **no** day-transcript row and **no** `self_stance` rows. Her dials
 > still move — a dream can leave her wistful — but nothing is filed. The operator's call, in his words:
 > the lucid/reading lines are *too specific and too repetitive to be stored as her memories*,
@@ -417,8 +417,8 @@ decline unreachable; the guard must fire, not evaporate.
   `routes.rs:2773`) — authoritative only for **daemon-direct chat when the gateway is down**.
   the live profile: `authority = 'spine'` under `[agent]` means the harness owns
   recall on gateway turns; this maps to `SP_GATEWAY_AUTHORITY=spine`
-  (`serve.py:208` → `harness/server/app.py:816`), which disarms the daemon's
-  `auto_recall` passthrough for that request. `harness/server/app.py:820-829` is the
+  (`serve.py::build_env` → the gateway's `SP_GATEWAY_AUTHORITY` read), which disarms the
+  daemon's `auto_recall` passthrough for that request. And the gateway holds the
   ONE-AUTHORITY GUARD: if the request arms the daemon's L5 recall, spine recall auto-disarms,
   and vice versa — composing both was refuted on the metal (an L5 `systemecho` delivery
   overrides the harness note, and cross-picks surfaced things like "favorite color?" →
