@@ -1,0 +1,104 @@
+# ── CI FOR THE PUBLIC TREE (2026-08-31, external review: "no CI, a clone can rot") ────
+# The offline suite is the only thing that can tell an adopter whether THEIR clone is sound
+# on a machine that is not the operator's. It ran on one Windows box for months, which is
+# how a launcher that crashes on POSIX and a `nul` path that only breaks on Windows both
+# survived: green is a property of a machine until something else runs it.
+#
+# ON LINUX ON PURPOSE. The upstream stack is Windows + CUDA; this tree is neither, and the
+# whole point of the split is that the public framework does not inherit that. If a gate
+# needs Windows, it should say so and skip (exit 2), not pass by luck.
+#
+# NO ENGINE, NO GPU, NO KEYS. Every gate here is OFFLINE by the index's own lane column.
+# The three that skip (`g_avatar_default`, `g_batch_cont_guard`, `g_voice0_parity`) skip
+# because their subject is genuinely absent, and the runner treats exit 2 as a pass —
+# which is the convention `harness_tests/_gate.py` exists to enforce.
+name: gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 is the floor pyproject declares; 3.12 is what people actually have.
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: install (the harness core has zero third-party deps)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[http]"
+
+      - name: every module imports
+        # CHEAPEST REAL SIGNAL, AND IT RUNS FIRST. A syntax error or a bad import in one
+        # file cannot fail a suite that never reaches it — and the sweep runs gates as
+        # subprocesses, so an unimportable module shows up as one confusing red rather
+        # than as itself.
+        run: |
+          python - <<'PY'
+          import importlib, os, sys
+          sys.path.insert(0, ".")
+          bad = []
+          mods = []
+          for here, dirs, files in os.walk("harness"):
+              dirs[:] = [d for d in dirs if d != "__pycache__"]
+              for fn in sorted(files):
+                  if fn.endswith(".py") and not fn.startswith("_"):
+                      mods.append(os.path.join(here, fn)[:-3].replace(os.sep, "."))
+          for m in mods:
+              try:
+                  importlib.import_module(m)
+              except Exception as exc:
+                  bad.append("%s: %s: %s" % (m, type(exc).__name__, exc))
+          print("imported %d/%d" % (len(mods) - len(bad), len(mods)))
+          for b in bad:
+              print("  FAIL", b)
+          sys.exit(1 if bad else 0)
+          PY
+
+      - name: the five named in AGENTS.md
+        # NAMED SEPARATELY from the sweep so a failure says WHICH door, in the log, without
+        # anybody having to read a 160-line summary.
+        run: |
+          set -e
+          for g in g_claim g_durability g_memory_lifecycle g_docs_true g_real_her; do
+            echo "── $g"
+            python "harness_tests/$g.py"
+          done
+
+      - name: the whole offline suite
+        run: python tools/sweep.py
+
+      - name: the store rules
+        # The two that generalise past this repo: no store writer renames with a bare
+        # os.replace, and no broad handler under harness/ is unbound.
+        run: python harness_tests/g_store_writes.py
+
+  room:
+    # THE COMMITTED BUNDLE IS THE SOURCE. `console/room/` is a Vite build checked in so the
+    # stack needs no Node at runtime; G-ROOM-BUNDLE rebuilds `ui/` and compares the emitted
+    # bytes. It skips (exit 2) without npm, which on a clean runner means it would silently
+    # never run — so this job installs npm on purpose.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: pip install -e ".[http]"
+      - run: cd ui && npm ci
+      - run: python harness_tests/g_room_bundle.py

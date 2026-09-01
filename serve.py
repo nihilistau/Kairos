@@ -45,6 +45,52 @@ def tts_port(c) -> int:
         return 8123
 
 
+# ── ONE PLATFORM SEAM (2026-08-31, external review: "the launcher is Windows-only") ──
+# `python serve.py companion` is the first command in the public README, and off Windows
+# it did not degrade — it CRASHED: `subprocess.CREATE_NO_WINDOW` is not defined on POSIX,
+# so the very first spawn raised AttributeError before anything started. Three more
+# Windows-only calls owned stopping (`taskkill`, and a PowerShell `Get-CimInstance` query
+# for the gateway).
+#
+# The rule this repo already lives by applies: one door, not a platform branch at every
+# call site. `NO_WINDOW` is the spawn flag (0 is a valid `creationflags` everywhere), and
+# `kill_image` / `kill_by_cmdline` are the two stop primitives, each with its POSIX half.
+#
+# NOT A PROMISE THAT THE ENGINE RUNS THERE. `[engine].kind = "sp"` still wants a Rust
+# daemon built for the box, and the `.exe` defaults in the profiles are Windows names.
+# What this makes portable is the LAUNCHER and the `openai` backend the public framework
+# actually documents — see docs/BACKENDS.md.
+NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+
+
+def kill_image(image: str) -> None:
+    """Kill every process running `image` (a basename, `.exe` and all)."""
+    if not image:
+        return
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/F", "/IM", image], capture_output=True)
+        return
+    # POSIX: the profile's name may carry a Windows suffix the real binary does not.
+    stem = image[:-4] if image.lower().endswith(".exe") else image
+    for name in {image, stem}:
+        subprocess.run(["pkill", "-f", name], capture_output=True)
+
+
+def kill_by_cmdline(pattern: str) -> None:
+    """Kill processes whose COMMAND LINE matches `pattern` — how one of two stacks
+    sharing a box is stopped without touching the other."""
+    if os.name == "nt":
+        subprocess.run(["powershell", "-NoProfile", "-Command",
+                        "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
+                        "Where-Object {$_.CommandLine -match '%s'} | "
+                        "ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" % pattern],
+                       capture_output=True)
+        return
+    # `pkill -f` takes an ERE over the whole command line, which is what the Windows
+    # branch is doing the long way round. `\b` is a PCRE-ism; ERE has no word boundary.
+    subprocess.run(["pkill", "-f", pattern.replace("\\b", "")], capture_output=True)
+
+
 def launch_tts(c, env):
     """Start the resident voxtral TTS server, if the profile asks for one.
 
@@ -103,7 +149,7 @@ def launch_tts(c, env):
          "--device", c.get("tts", {}).get("device", "discrete"),
          "--euler-steps", str(c.get("tts", {}).get("euler_steps", 3))],
         env=env, cwd=TTS_ROOT, stdout=log, stderr=subprocess.STDOUT,
-        creationflags=subprocess.CREATE_NO_WINDOW)
+        creationflags=NO_WINDOW)
     return {"state": "starting", "port": port}
 
 
@@ -142,7 +188,7 @@ def launch_aux_embed(c, env):
          "-b", "2048", "-ub", "1024",
          "--threads", str(aux.get("embed_threads", 8))],
         stdout=log, stderr=subprocess.STDOUT,
-        creationflags=subprocess.CREATE_NO_WINDOW)
+        creationflags=NO_WINDOW)
     try:
         with open(os.path.join(VAR, "aux", "embed-server.pid"), "w") as f:
             f.write(str(p.pid))
@@ -1248,7 +1294,7 @@ def stop(c=None) -> None:
         _stop_daemon(c)
     except ImportError:
         tts_img = os.path.basename((c or {}).get("tts", {}).get("server_exe") or "tts-server.exe")
-        subprocess.run(["taskkill", "/F", "/IM", tts_img], capture_output=True)
+        kill_image(tts_img)
     # the gateway — BY PORT when a profile names one (two stacks may share the box now)
     stop_gateway_only((c or {}).get("serve", {}).get("gateway_port") if c else None)
     print("stack stopped")
@@ -1300,10 +1346,7 @@ def stop_gateway_only(port=None) -> None:
     m = "harness.server.app"
     if port:
         m = "harness.server.app.*--gateway-port %s\\b" % int(port)
-    subprocess.run(["powershell", "-NoProfile", "-Command",
-                    "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
-                    "Where-Object {$_.CommandLine -match '%s'} | "
-                    "ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" % m], capture_output=True)
+    kill_by_cmdline(m)
 
 
 def main() -> int:
@@ -1422,7 +1465,7 @@ def main() -> int:
             [sys.executable, "-m", "harness.server.app",
          "--gateway-port", str(c["serve"]["gateway_port"])],   # identification only (app.py reads no argv): stop() kills BY PORT
             env=env, cwd=ROOT, stdout=gw_log, stderr=subprocess.STDOUT,
-            creationflags=subprocess.CREATE_NO_WINDOW)
+            creationflags=NO_WINDOW)
         if not wait_http(f"http://127.0.0.1:{c['serve']['gateway_port']}/health", 45):
             print("!! gateway did not come up — see var/gateway.log")
             return 1
@@ -1488,10 +1531,9 @@ def main() -> int:
                   "     %s\n   Replacing THE DAEMON ONLY (the gateway is the caller and "
                   "is never touched)." % (running, name, want))
             _img = os.path.basename(c["paths"]["engine_exe"])
-            subprocess.run(["taskkill", "/F", "/IM", _img], capture_output=True)
+            kill_image(_img)
             if _img.lower() != "sp-daemon.exe":
-                subprocess.run(["taskkill", "/F", "/IM", "sp-daemon.exe"],
-                               capture_output=True)
+                kill_image("sp-daemon.exe")
             time.sleep(1.0)
         if not launch_daemon(c, env):
             print("!! daemon did not come up — see var/daemon.boot.log (stdout) "
@@ -1538,7 +1580,7 @@ def main() -> int:
         [sys.executable, "-m", "harness.server.app",
          "--gateway-port", str(c["serve"]["gateway_port"])],   # identification only (app.py reads no argv): stop() kills BY PORT
         env=env, cwd=ROOT, stdout=gw_log, stderr=subprocess.STDOUT,
-        creationflags=subprocess.CREATE_NO_WINDOW)
+        creationflags=NO_WINDOW)
     if not wait_http(f"http://127.0.0.1:{c['serve']['gateway_port']}/health", 45):
         print("!! gateway did not come up — see var/gateway.log")
         return 1

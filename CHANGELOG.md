@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.8.14 — this tree gets its own orientation, a POSIX launcher, and CI (2026-09-01)
+
+Everything here is about making the framework runnable by someone who is not its author.
+
+- **`python serve.py <profile>` now runs on Linux and macOS.** It did not degrade off
+  Windows — it crashed: `subprocess.CREATE_NO_WINDOW` does not exist on POSIX, so the first
+  spawn raised `AttributeError`, and that command is the first line of the README. One
+  platform seam now (`NO_WINDOW` for spawning, `kill_image` / `kill_by_cmdline` for
+  stopping), and `G-BACKEND-SEAM` §10 holds it — including driving the constant with
+  `os.name = "posix"` rather than only grepping for it. **Not yet exercised on real Linux
+  hardware**; `docs/BACKENDS.md` says so plainly instead of a badge saying otherwise.
+- **`AGENTS.md` describes THIS tree.** It used to be the private stack's file with names
+  rewritten, which produced the sentence *"Kairos is the production rebuild of Kairos"* and
+  then asked you for an RTX 2060, a Rust CUDA daemon on :3000, and a repo you do not have.
+  The doctrine is the part worth publishing and all of it carries over — the bug class with
+  its six real instances, the non-negotiables, the memory rules, the two rules the gates
+  themselves are held to. The hardware and the private engine do not.
+- **CI: `.github/workflows/gates.yml`.** Every module imports, the five gates AGENTS.md
+  names, the whole offline suite, and the store rules — on ubuntu-latest, Python 3.10 and
+  3.12, plus a Node job so the room-bundle gate actually runs instead of skipping.
+  Running this suite for the first time found **two reds that had been sitting in the
+  shipped tree**: a gate that constructs a JS file this tree deliberately excludes (red on
+  a missing file, for a copy that cannot drift because it does not ship), and a docs gate
+  whose requirement the new orientation file had not yet met. **The suite is green now —
+  135 green, 1 skip, 0 red** — and from here a clone can tell.
+- **`docs/BACKENDS.md`** answers the question adopters actually ask: what runs off Windows,
+  and which presence features degrade on a foreign endpoint. Verified against the source,
+  and it corrects the record in both directions — the turn epilogue is **shared** between
+  the two backends (one `_settle_turn`), as are the off-the-record staple and the
+  thought-channel stripper. What you lose is observability: named phase timing, typed SSE
+  events, the warm gate.
+
 ## 0.8.13 — the doors above the fixes (2026-08-31)
 
 An outside review, checked line by line against the source. Four findings were real, two

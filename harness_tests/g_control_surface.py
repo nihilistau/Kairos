@@ -368,6 +368,15 @@ if not _node:
     print("  SKIP node is not installed here — the two JS copies were not constructed")
 else:
     for _f in ("ui/src/room/tags.js", "console/index.html"):
+        # ── A COPY THAT IS NOT HERE IS NOT A DRIFTED COPY (2026-08-31) ─────────────
+        # `console/index.html` is the legacy page, and the Kairos export excludes it —
+        # so inside the public tree node was handed a path that does not exist and the
+        # gate went RED on an ENOENT, for a stripper copy that cannot drift because it
+        # does not ship. Found by running the export's own suite for the first time,
+        # which is also why that tree now has CI. Absent is a SKIP; present is checked.
+        if not os.path.exists(os.path.join(ROOT, _f)):
+            print("  --   %s is not in this tree — no copy to drift" % _f)
+            continue
         r = _sp.run([_node, os.path.join(ROOT, "harness_tests", "tags_mirror_check.js"),
                      os.path.join(ROOT, _f)], capture_output=True, text=True, timeout=30)
         lines = (r.stdout or "").strip().splitlines()
