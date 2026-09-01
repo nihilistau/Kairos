@@ -47,10 +47,13 @@ that silently becomes the other one has cost a session here before.
 a harness from Friday is three components that were each fine and were never tested together.
 
 **And `kairos-engine` supersedes nothing.** It is a curated cut of the daemon source *this*
-stack runs — the companion family. The lattice family is separate and
+stack runs — 152 files, the companion family. The lattice family is separate and
 [`kairos-system-engine`](https://github.com/nihilistau/kairos-system-engine) is
-`STANDING`, holding work that is not here and is not a companion feature: SP-SWARM / DHT, the
-byte-exact exact-integer forward (`SP_BYTEEXACT`), the NTT / CRT kernels, the frozen L1 C ABI.
+`STANDING`. The distinction is **ownership and scope, not contents**: being the daemon's
+source, the cut necessarily *contains* lattice substrate (`SP_BYTEEXACT`, `ptx_ntt.cuh`,
+`sieve_ffi.rs`, the `sp_l1` bindings, an optional default-off `sp-swarm` crate), while
+SP-SWARM / DHT, the byte-exact forward and the NTT / CRT matrix are *developed* in the 2095-file
+lattice tree. A downstream cut does not replace the tree it was cut from.
 The project's repo map is
 [`JOURNEY.md`](https://github.com/nihilistau/Position_Is_Arithmetic/blob/main/JOURNEY.md) and
 its rule 2 is *do not collapse the lattice family into a companion harness*; each tree carries
