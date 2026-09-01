@@ -238,4 +238,50 @@ finally:
     else:
         os.environ["SP_ENGINE_KIND"] = _old_kind
 
+print("\n9. THE PUBLIC FRONT DOOR RUNS OFF WINDOWS")
+# ── `python serve.py companion` IS THE FIRST COMMAND IN THE PUBLIC README ────────────
+# (2026-08-31, external review: "the launcher is Windows-only".) Off Windows it did not
+# degrade, it CRASHED — `subprocess.CREATE_NO_WINDOW` is not defined on POSIX, so the
+# first spawn raised AttributeError before anything started; three more Windows-only
+# calls owned stopping. This gate owns the openai backend, which is the ONLY backend a
+# public clone has, so the launcher that starts it belongs here too.
+#
+# Checked as ONE SEAM rather than as four call sites, which is the same rule the rest of
+# this repo lives by: `NO_WINDOW` for spawning, `kill_image` / `kill_by_cmdline` for
+# stopping, each with its POSIX half, and nothing platform-specific outside them.
+import io as _io9
+
+_serve = _io9.open(os.path.join(ROOT, "serve.py"), encoding="utf-8", errors="replace").read()
+_seam_start = _serve.index("NO_WINDOW = ")
+_seam_end = _serve.index("def launch_tts(")
+_seam, _rest = _serve[_seam_start:_seam_end], _serve[:_seam_start] + _serve[_seam_end:]
+_rest_code = "\n".join(l for l in _rest.splitlines() if not l.lstrip().startswith("#"))
+
+check("§10 the launcher has a platform seam at all", "def kill_image(" in _seam
+      and "def kill_by_cmdline(" in _seam)
+for _tok in ("CREATE_NO_WINDOW", "taskkill", "Get-CimInstance"):
+    check("§10 no bare %-16s outside the seam" % _tok,
+          _tok not in _rest_code,
+          [l.strip()[:70] for l in _rest_code.splitlines() if _tok in l][:2])
+check("§10 ...and every spawn takes the seam's flag",
+      _rest_code.count("creationflags=NO_WINDOW") >= 4,
+      _rest_code.count("creationflags=NO_WINDOW"))
+# DRIVEN, not read: the constant must evaluate to a valid `creationflags` off Windows,
+# and 0 is the portable "no flags". A gate that only greps would pass on `= None`.
+_ns = {"subprocess": __import__("subprocess"),
+       "os": type("_o", (), {"name": "posix"})()}
+exec(_seam[:_seam.index("\n\n")], _ns)
+check("§10 NO_WINDOW is a usable creationflags value on POSIX",
+      _ns["NO_WINDOW"] == 0, _ns["NO_WINDOW"])
+check("§10 both stop primitives have a POSIX branch",
+      _seam.count("if os.name == \"nt\":") == 2 and "pkill" in _seam,
+      _seam.count("if os.name == \"nt\":"))
+# AND THE DOC SAYS WHAT IS STILL WINDOWS-SHAPED, because a portable launcher is not a
+# portable engine — the sp daemon is a Rust binary built for the box.
+_bk = _io9.open(os.path.join(ROOT, "docs", "BACKENDS.md"), encoding="utf-8",
+                errors="replace").read()
+check("§10 BACKENDS.md says which half is portable",
+      "launcher" in _bk.lower() and ("posix" in _bk.lower() or "linux" in _bk.lower()),
+      "docs/BACKENDS.md must name what runs off Windows and what does not")
+
 finish("G-BACKEND-SEAM")

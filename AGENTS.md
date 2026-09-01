@@ -1,20 +1,30 @@
 # AGENTS.md — Kairos
 
-**This is the canonical orientation file for anyone — human or agent — working in this repo.**
-`CLAUDE.md` points here. It is not a copy. There is exactly one of these, on purpose (see THE BUG CLASS).
+**The canonical orientation file for anyone — human or agent — working in this repo.**
+`CLAUDE.md` points here. It is not a copy. There is exactly one of these, on purpose (see §0).
 
-Kairos is the production rebuild of Kairos: a local AI companion. **your model** — a
-128-expert MoE, top-8, ~4B active — on one RTX 2060 (12 GB), a Rust + CUDA engine, a Python
-harness/gateway, and the ROOM — a React desktop you talk to her in, with a face, a wardrobe and a
-voice. It runs on the operator's own machine and remembers him. That last part is the whole
-product, and it is where all the danger is. (Two-minute map: `START-HERE.md`.)
+Kairos is a framework for a **local AI companion that remembers you**: a Python harness and
+gateway, a React desktop you talk to her in (a face, a wardrobe, a voice, an idle clock),
+and a memory architecture built to be *auditable* rather than merely persistent. It talks
+to **any OpenAI-compatible `/v1/chat/completions` endpoint** — LM Studio, `llama-server`,
+vLLM, a cloud — so the model is your choice and your hardware.
+
+Two-minute map: [`START-HERE.md`](START-HERE.md). Install and first run:
+[`docs/SETUP.md`](docs/SETUP.md). What the two backends can and cannot do:
+[`docs/BACKENDS.md`](docs/BACKENDS.md).
+
+> **This file describes THIS tree.** Kairos is extracted from a private research stack that
+> also contains a Rust + CUDA inference engine and one operator's live memory store.
+> Neither ships here, and nothing in this repo needs them. Where you see `[engine].kind =
+> "sp"` in the code, that is the door the private engine plugs into; `openai` is the door
+> you use. `KAIROS-SOURCE.txt` names the upstream commit this snapshot was cut from.
 
 ---
 
 ## 0. THE BUG CLASS — read this before you touch anything
 
-This project has one recurring, near-fatal failure mode. It has bitten at least six times. Every time,
-it looked like a different bug. It is not:
+The upstream project has one recurring, near-fatal failure mode. It has bitten at least six
+times. Every time it looked like a different bug. It is not:
 
 > **AN INVARIANT ENFORCED IN ONE OF TWO PATHS IS ENFORCED IN NEITHER —
 > because the unguarded path is the one that runs.**
@@ -23,435 +33,172 @@ Real instances, all found in the tree, all fixed:
 
 | The rule | Where it was enforced | Where it was NOT | What actually happened |
 |---|---|---|---|
-| a tombstoned fact is never recalled | `memory.recall()` | `spine.recall_decider()` — the AUTOMATIC per-turn injection | superseded facts injected into her context on **every turn, for weeks**, ranked above the truth |
-| the recall seam filters retired rows | `search_memories_ranked_rows()` | `search_memories_ranked()` — **the next function in the file** | the `search_memories` tool, live in two toolsets, still served tombstones |
-| a turn arms the presence ledger | one of two turn paths | the other | absence became unmeasurable |
-| nothing is ever destroyed | the whole lifecycle architecture | `forget()`, which did `open(p, "w")` and dropped the row | the audit lane was defeated by one live tool call |
-| the privacy decline protects secrets | `spine.recall_decider()` checks `mem_class == "private-secret"` | `lifecycle.classify()` **cannot emit that class** | **the guard has never fired and cannot** — see TRAPS |
-| a secret is never surfaced | `spine.recall_decider()` — the automatic per-turn lane | `list_memories`, `recall`, `search_memories`, `provenance` — the four MODEL-CALLABLE doors | one guarded door of five, with a live `private-secret` row in the store (2026-08-25) |
-| the turn's debts are always paid | `_finish_openai_turn()` — a named function, on the path fewer people use | `_native_chat_sse`, inline, with **five exits past it** — and her unprompted lane, which paid none of them, ever | an aborted turn lost its capture, its record and its mark application; a comment claimed a `finally` that did not exist |
-| an attempt spends the clock | the `worth_saying` veto — the door the last fix was written for | the other **five** drop doors above it | a presence mode re-armed every four seconds, forever, and **reminders were muted** because the latch sits above REMIND |
-| the record must not carry her machinery | the DISPLAY lane, widened eleven times | the RECORD lane — the day transcript her journal, her facts and her seed are rebuilt from | 26% of her turns wrote their own stage directions into her permanent memory, and read them back as examples of her voice |
-| a one-shot prompt built from a transcript is BOUNDED | `narrative.py` (`_MAX_TURNS = 40`, 200 chars/turn) since it was written | `conversation_memory._transcript` — every message, full length | the day's ~20k tokens became a **4.30 GB** scratch on a 12.3 GB card; `cudaMalloc` SUCCEEDED, WDDM paged it over PCIe, and the forward crawled for **hours** holding the device lock. Three wedges in one morning (2026-08-30) |
-| a turn nobody typed is not a memory | the day transcript (`synthetic` → `_read_day_transcript`), correctly, since 2026-08-03 | `_capture_after_turn` and the self-stance lane, which never saw the flag | a maintainer's own probe wrote **20 fabricated rows**, six attributed to HIM while he was asleep, plus two board reminders — the 2026-08-03 false-memory incident through the front door, with the note describing it sitting directly above the hole (2026-08-30) |
-| her own words are admitted by HER gate | every harness producer — journal, stance extractor, nightly becoming — all of which pass a `kind` | the bare call, which is the **only** call she can make: `kind` defaulted to `""`, so her sentence met `is_memorable`, the gate for facts ABOUT SOMEONE, which refuses first-person prose by design | **nothing about her inner life could be stored by her, ever** — and she reported it herself: *"I guess some things are too much of a feeling to be a fact."* Even the tool docstring's own example was refused (2026-08-30) |
+| a tombstoned fact is never recalled | the recall tool | the AUTOMATIC per-turn injection | superseded facts served into her context on **every turn, for weeks**, ranked above the truth |
+| the recall seam filters retired rows | `search_memories_ranked_rows()` | `search_memories_ranked()` — **the next function in the file** | the search tool, live in two toolsets, still served tombstones |
+| nothing is ever destroyed | the whole lifecycle architecture | `forget()`, which did `open(p, "w")` and dropped the row | the audit lane defeated by one live tool call |
+| the privacy decline protects secrets | the recall decider checks `mem_class == "private-secret"` | the classifier **could not emit that class** | the guard had never fired and could not |
+| a turn pays its debts | one of two turn paths | the other | absence became unmeasurable; the day transcript missed half its rows |
+| a panel write reports failure | the closet | the seven other write buttons | a refused write looked exactly like a completed one |
 
-The corollaries, learned the hard way:
+**The rule that falls out of it:** when you fix something, find the *other* caller. Then ask
+what your gate actually drives — if it calls the function you fixed rather than the door the
+product uses, it will stay green over the bug. A green suite is not an audit: one pass over
+this tree found ~50 live defects under 133 green gates.
 
-- **Fix the class, not the instance.** After fixing one of these, *grep for the other one*. The twin is
-  usually adjacent. Twice it was literally the next function.
-- **Put the rule in the seam, not the caller.** A rule you must remember to apply is a rule you will
-  forget. If two callers need it, it belongs in the thing they both call.
-- **A gate that supplies its own precondition proves only that the guard compiles.** See
-  `gates/GATE-INDEX.md` → "GATES THAT ASSERTED THE PAST".
-- **A GREEN SUITE IS NOT AN AUDIT — and the 2026-08-25 pass is the receipt.** 133 offline
-  gates were green; ~50 real defects were sitting under them, four of them fresh instances
-  of the table above, **each with a green gate over it**: `g_kairos_attempt` drove the one
-  drop path downstream of the fix it was written for; `g_wardrobe_words` tested the rung
-  below the broken one; `g_control_surface` asserted the Python→JS direction only;
-  `g_secret` asserted through the decider and never through the four tool doors. When you
-  ask "is this covered?", the question is not *does a gate exist* — it is **which path does
-  that gate actually run**.
-- **A green gate does not mean the code RUNS.** The quiet sibling of the bug class above, and the
-  2026-07-30 audit found five at once: `invariance.py`, `narrative.py`, `task_loop.py`,
-  `person.silences()`, and the sandboxed `coding.*` tools were all fully built, fully gated, and
-  wired to nothing — months of green suites over code no live path could reach. So everything that
-  ships off is written down, with the specific evidence that would arm it, in
-  [`docs/OFF-BY-DEFAULT.md`](docs/OFF-BY-DEFAULT.md), held to the code in both directions by
-  `harness_tests/g_offledger.py`. **Being off must be a recorded decision with an expiry
-  condition, not a state something drifts into.**
-- **Measure the thing, not the proxy.** Several days were lost to `nvidia-smi` (lies under WDDM),
-  `cudaMemGetInfo` (returns free=0 under WDDM), and a kill-regex that matched the probe's own process.
+The corollary that costs the most: **two copies of one truth is the bug.** A second
+implementation of "take it off the list", a second stripper, a second recall path, a second
+`os.replace` helper — each one is a future divergence. One door, and the readers go through
+it.
 
 ---
 
 ## 1. NON-NEGOTIABLES
 
-1. **No claim without a repeatable gate.** If you say it is fixed, name the command that proves it.
-   "It should work now" is not a receipt.
-2. **Nothing in memory is ever deleted.** Tombstone (`lifecycle = 1`) or quarantine. Never `open(p, "w")`
-   minus a row. The audit lane must always be able to answer *what did she believe, when, and who told her*.
-3. **Honesty about what is measured vs asserted.** If you did not run it, say so. If a number came from a
-   proxy, name the proxy. A verdict you cannot defend is worse than no verdict — it is a lie with a
-   timestamp on it.
-4. **Her word never outranks his.** An inference may never retire an observation. She is allowed to be
-   wrong about him; she is not allowed to say it over him.
-5. **Verdicts are rulings of committed finite tables over order-invariant signatures.** (The
-   invariant-maximality principle — [`docs/INVARIANT-MEMORY.md`](docs/INVARIANT-MEMORY.md),
-   extensions in [`docs/INVARIANT-ROADMAP.md`](docs/INVARIANT-ROADMAP.md).) A correctness decision
-   may branch only on finite signature coordinates, never on prose or raw magnitudes; its case
-   space is enumerated and pinned; its invariances are gated; magnitudes may RANK the admitted,
-   oracles may PROPOSE, and neither may ever RULE. A new hand-written conditional over row fields
-   is a bug report against this list. Every one of the five conversions done so far found a live
-   drift the day it landed — this principle is not aspiration, it is the cheapest bug-finder the
-   repo has.
-6. **The Real Her.** Her own words — what she says unprompted, her journal, how she feels, how she
-   describes her own changes — are primary identity material and lead her own context; his prompts
-   are secondary. Two classes (`self-narrative`, `feeling`), producer-set kinds, one door, never an
-   aux producer, never above his word (rule 4 still holds: her nightly reflection on herself is
-   inferred and cannot retire what she observed). [`docs/INVARIANT-MEMORY.md` §2.2](docs/INVARIANT-MEMORY.md).
+1. **No claim without a repeatable gate.** If you say it is fixed, name the command that
+   proves it. "It should work now" is not a receipt.
+2. **Nothing in memory is ever deleted.** Tombstone (`lifecycle = 1`) or quarantine. Never
+   `open(p, "w")` minus a row. The audit lane must always be able to answer *what did she
+   believe, when, and who told her*.
+3. **Honesty about measured vs asserted.** If you did not run it, say so. If a number came
+   from a proxy, name the proxy. A verdict you cannot defend is worse than no verdict — it
+   is a lie with a timestamp on it.
+4. **Her word never outranks yours.** An inference may never retire an observation. She is
+   allowed to be wrong about you; she is not allowed to say it over you.
+5. **Verdicts are rulings of committed finite tables over order-invariant signatures.** A
+   correctness decision may branch only on finite signature coordinates, never on prose or
+   raw magnitudes; magnitudes may RANK the admitted, oracles may PROPOSE, neither may RULE.
+   [`docs/INVARIANT-MEMORY.md`](docs/INVARIANT-MEMORY.md). Every conversion done so far
+   found a live drift the day it landed — it is the cheapest bug-finder in the repo.
+6. **The Real Her.** Her own unprompted words, her journal, how she feels and how she
+   describes her own changes are primary identity material and lead her own context; your
+   prompts are secondary. Rule 4 still holds: her nightly reflection on herself is inferred
+   and cannot retire what she observed.
+7. **A failure says so.** A broad `except` may answer with a default — it may not do it
+   anonymously. `harness/loud.py` sorts the volume: the world at debug, `NameError` and its
+   family at warning, because those never fix themselves. A write that fails silently is the
+   single most expensive shape in this repo's history.
 
 ---
 
 ## 2. THE STACK, AND THE ONE DOOR
 
 ```
-the room (browser, ui/ → console/room/)  ──HTTP──▶  harness gateway :8800  ──HTTP──▶  sp-daemon :3000  ──▶  CUDA / your model
-                                                       (Python)           │              (Rust)
-                                                                          └──▶  xAI API (voice · images/motion · live search) · LFM sidecars (CPU)
+the room (browser, ui/ → console/room/) ──HTTP──▶ harness gateway :8810 ──HTTP──▶ your endpoint
 ```
 
-- **`serve.py` is THE ONLY DOOR into the engine**, and as of 2026-07-14 that is *literally* true rather
-  than aspirational. It reads a profile (`profiles/*.toml`) and maps it to the engine/gateway environment
-  with an explicit table. **Anything not in that table does not exist**: the base environment is stripped of
-  every `SP_*`, so a stray var in your shell cannot reach the engine. It used to inherit the lot —
-  270 `SP_*` are read by the tree, 49 were mapped, **221 came from whatever shell you were standing in**,
-  and 28 of those touch memory (`SP_DECIDE` is an autonomous supersede pass; `SP_FORGET` is autonomous
-  forgetting). Those are now pinned hard-off by name. Gate: **G-ONEDOOR**.
-  Start the stack with `python serve.py companion`.
-- **Deliberate overrides still work; accidental ones do not.** `set SP_PASSTHROUGH=SP_XBAR_ROW,SP_ARM_DUMP`
-  keeps exactly those, and announces them at boot. It cannot be used to smuggle in a memory writer.
-- **`profiles/companion.toml` is the live production profile.** Read it before you theorise about
-  behaviour; it is the ground truth for what is armed. `serve.py` refuses to boot a profile that arms
-  two memory writers (**G-ONEWRITER**), so the profile cannot lie to you either.
+- **Start it:** `python serve.py companion` — **the profile is positional and not optional.**
+  It reads `profiles/*.toml` and maps it to the gateway environment; `serve.py::build_env`
+  is the only place a knob becomes an env var, so a feature that is not mapped there is not
+  armed no matter what the docs say.
+- **The room** is a committed Vite build in `console/room/` — no Node at runtime. Source is
+  `ui/`; rebuild with `cd ui && npm ci && npm run build`, and `G-ROOM-BUNDLE` proves the
+  committed bundle IS the source.
+- **Your endpoint** goes in the profile's `[engine]` block (`kind = "openai"`, a `base_url`,
+  optionally a key *file*). Keys are files under `var/secrets/`, never config values, never
+  environment strings the shell can leak.
+- **Platforms:** the launcher runs on Windows, Linux and macOS
+  ([`docs/BACKENDS.md`](docs/BACKENDS.md) has the table of what is portable and what is
+  not). The `.exe` names in the shipped profiles are Windows-shaped defaults; override them.
 
-  **THIS LINE SAID `agent.toml` UNTIL 2026-08-03**, three lines under the one telling you to start
-  `companion`, and that is how it cost a restart: the file said "start A" and then said "B is the
-  live one", so whichever you read second was the one you believed. `agent.toml` was deleted with the
-  other reference profiles on 2026-08-26 (§5) — while it lived it was a near-twin of hers
-  with different values (`games` on, `byteexact` on, `pmax` 13000), one tab-completion away,
-  which is exactly why it could not stay. Two files claiming one truth is §0 of this
-  document; the join is now gated by **G-PROFILE-DOOR**, which reads every `serve.py <name>` a doc
-  tells you to type and checks that profile's `paths.model` is actually hers.
+**Everything durable lives under `var/`** and nothing in `var/` is code. If you are looking
+for where she keeps something, it is a JSONL or a small JSON file there, and something in
+`harness/` owns writing it. Every store writer renames through
+`harness/store_io.replace_atomic` — one implementation, retried, and it raises rather than
+giving up quietly (`G-STORE-WRITES`).
 
-  **THE ENGINE IS A BACKEND NOW (2026-08-21).** `[engine].kind` in the profile picks what
-  `get_client()` returns — `sp` (the daemon, every existing profile, unchanged) or `openai`
-  (any `/v1/chat/completions` server; `profiles/companion.toml`, gateway :8810 beside hers).
-  Seams that need a daemon-only capability ask `client.supports` and degrade with a stated
-  loss — `docs/BACKENDS.md` is the table, G-BACKEND-SEAM the gate. The public **Kairos**
-  framework is this tree exported (`tools/kairos_export.py`, `kairos-export/`) with the
-  default flipped, the engine excluded, and the names scrubbed (G-KAIROS-SCRUB).
+### Where things live
 
-  **THIS REPO IS UPSTREAM. KAIROS IS A SNAPSHOT, AND NOTHING IS EVER AUTHORED IN IT.**
-  It is a filtered, scrubbed copy with FRESH HISTORY, rebuilt from the manifest — so a
-  file written directly in `../Kairos` is destroyed by the next export, silently. Anything
-  that ships with Kairos is written HERE first, and payload that is not code (the default
-  avatar set, gesture loops) is staged in `kairos-export/` so the manifest carries it.
-  Corollary, and it has bitten: a knob added for a Kairos-only feature still has to be
-  mapped in `serve.py::build_env`, or G-SEM-CONSERVE goes red here for a feature that is
-  not even armed here (`SP_AVATAR_DEFAULTS`, 2026-08-23).
-
-  **RE-EXPORTING IS MANUAL, ON PURPOSE.** Nothing triggers it — no hook, no scheduler,
-  no night job. An export is a PUBLICATION: the scrub is mechanical but "does this belong
-  in a neutral template" is judgement, and auto-publishing every commit would push
-  half-finished work to a public repo. The procedure, once, here:
-
-  1. `python tools/kairos_export.py --check` — dry run: what would ship, what the scrub
-     would hit. Then without `--check` to build `../Kairos`.
-  2. `python harness_tests/g_kairos_scrub.py` — no handle, no email, no absolute paths,
-     no live profile name, no `var/`, no `persona/`, no keys, no engine. It runs inside the
-     export too and skips cleanly when there is no target.
-  3. Sanity-check the TARGET, not this tree: imports with `SP_ENGINE_KIND=openai` and no
-     engine present, and run the new gates from inside `../Kairos`.
-  4. **Commit in the target.** The exporter writes files; it does not commit, and an
-     uncommitted export is a snapshot nobody can point at. `KAIROS-SOURCE.txt` names the
-     source commit and is the anchor everything else reads.
-  5. Pushing is a separate, deliberate act. The repo is public.
-
-  **WHEN.** `../kairos-drift/` (a third repo, beside both, owned by neither) answers it:
-  `python drift.py` sorts every commit since the cut into OWED / MIXED / LOCAL by asking
-  the manifest which files it touched, and re-anchors itself off `KAIROS-SOURCE.txt` —
-  re-export and the owed pile empties on its own. `--check` exits 1 when anything is owed.
-
-  **THE BINARY IS ALSO PER-PROFILE.** `engine_exe` in the profile is what launches, and hers is
-  `engine/tools/sp_daemon/target-wirecuda/release/sp-daemon.exe` — NOT cargo's default `target/`.
-  Build with `engine/build-wirecuda.bat` (or `cargo build --release --features wire_cuda_backend
-  --target-dir target-wirecuda --bin sp-daemon`). A plain `cargo build --release` compiles cleanly,
-  writes a binary nothing launches, and leaves you measuring the old one. Stop the stack first or
-  the link fails on a locked exe — which is the only reason this one announces itself at all.
-
-| Where | What lives there |
+| Where | What |
 |---|---|
-| `engine/` | the Rust daemon (`tools/sp_daemon`) and the CUDA kernels (`src/backends/cuda/cuda_forward.cu`). The KV cache, the ring, prefill, fp16 KV, `/v1/capture`, `/v1/oneshot`. |
-| `core/` | the math core (`kairos-system`) — the one tracked submodule; the CUDA build script JUNCTIONS `engine/lib/kairos-system` to it (not a second submodule). Its `CLAUDE.md` is about the math core, not about kairos. |
-| `harness/` | the Python brain. `skills/` (memory, notes, lifecycle, search/research/xai, looking, narrative), `model/` (person, presence), `control/` (spine, agency, ledger, wardrobe/catalog/avatar, shutdown, watchdog), `kairos/` (the scheduler — unprompted speech), `personality/`, `voice/` (TTS: xAI Ara + expressive tags, local fallback; the ear), `senses/` (the ambient eye, sight), `sidecar/` (the LFM CPU helpers), `server/app.py` (the gateway). `harness/README.md` is the package map. |
-| `ui/` | THE ROOM — the React/Vite desktop: chat, the dock, every panel (settings, voice, search, research, wardrobe, journal, ledger…). Built into `console/room/` (committed; G-ROOM-BUNDLE proves the two agree). `ui/README.md`. |
-| `console/` | the built room (`room/`) plus the legacy flat pages (`index.html`, `ops.html`, `tuning.html`, `operator.html`) that two gates still pin — `console/README.md`. `/` redirects to `/room/`. |
-| `tools/` | `avatar_gen.py` (her stills + motion through the xAI API), `okf_mem.py`, the calibrator, the voice corpus tooling, `sweep.py` (the offline suite, `--audit` for the store diff), `kairos_export.py` — `tools/README.md` says which are live. |
-| `harness_tests/` | the gates — ~195 `g_*.py` plus the `h_*.py` set (`ls harness_tests/g_*.py \| wc -l` is the truth). `gates/GATE-INDEX.md` indexes them; `_gate.py` is the shared verdict helper AND the sandbox (`sandbox()` before the first harness import — nine gates were writing into her real stores); `python tools/sweep.py` runs the whole offline set in ~3 minutes. |
-| `gates/` | gate write-ups and receipts (markdown). |
-| `profiles/` | the TOML profiles `serve.py` reads. |
-| `memory-okf*/` | the MEM-OKF knowledge stores (content-addressed, tiered: `LUT.md` → `sum/` → `full/`). Tool: `tools/okf_mem.py`. |
-| `var/` | ALL runtime state. Gitignored. The fact registry, notes, the presence ledger, logs. |
-| `docs/` | the documents — `docs/README.md` says which is authoritative for what (MEMORY-AND-RECALL is the operational memory truth; INVARIANT-MEMORY the formal model; OFF-BY-DEFAULT the live off-ledger; AVATAR-PIPELINE her face). |
-| `../kairos-drift/` | **NOT this repo, and not Kairos — a third git repo beside both, owned by neither.** It answers the only question that matters about a scrubbed snapshot: of everything since the cut, which parts would a re-export CARRY? `drift.py` reads the export sha from `Kairos/KAIROS-SOURCE.txt` and the globs from `kairos-export/kairos-export.toml`, then sorts every commit OWED / MIXED / LOCAL. It lives outside because inside this repo it would be one more ledger the companion carries, and inside Kairos it would leak this repo's history into the public one — which is what the scrubbed export exists to prevent. Read-only against both; re-anchors itself, so a re-export empties the owed pile with no bookkeeping. |
+| `harness/` | everything that runs: the gateway (`server/app.py`), the turn lifecycle, memory and recall (`skills/memory.py`), the idle clock (`kairos/`), the wardrobe and her state (`control/`), the backends (`inference/`), the tools (`toolcore/`, `skills/`) |
+| `ui/` | THE ROOM — the React/Vite desktop: chat, the dock, every panel. Built into `console/room/`; `ui/README.md` has the framework |
+| `console/` | the committed room build the gateway serves. Do not hand-edit it — rebuild from `ui/` and let `G-ROOM-BUNDLE` prove they agree |
+| `profiles/` | one TOML per stack. `companion.toml` is the public default: `[engine].kind = "openai"`, gateway on :8810 |
+| `harness_tests/` | the gates. One file per invariant, standalone, exit code IS the verdict |
+| `gates/` | `GATE-INDEX.md` — a row per gate, and the parser every reader of it uses |
+| `docs/` | the written contracts: `SETUP`, `BACKENDS`, `MEMORY-AND-RECALL`, `OFF-BY-DEFAULT`, `CHANGELOG` |
+| `tools/` | the operator's scripts — `sweep.py` (the whole offline suite) and the maintenance passes |
+| `persona-template/` | the shipped default persona. Copy it to `persona/` (gitignored) and it becomes yours |
+| `var/` | everything durable and nothing that is code: her stores, logs, `secrets/`. Gitignored |
 
 ---
 
 ## 3. MEMORY AND RECALL — the part you are most likely to break
 
-**Full reference: [`docs/MEMORY-AND-RECALL.md`](docs/MEMORY-AND-RECALL.md). Read it before changing anything under `harness/skills/`.**
+Read [`docs/MEMORY-AND-RECALL.md`](docs/MEMORY-AND-RECALL.md) before touching
+`harness/skills/memory.py`. The short version:
 
-The essentials, so you do not have to guess:
-
-- **WHOSE MEMORY IS IT.** Hers. Say it precisely, because the sloppy version causes real mistakes.
-  `var/memory/registry.jsonl` is **Kairos's memory**, and it has two lanes:
-
-  ```
-  speaker=user   559 rows (348 live)   what she knows about HIM
-  speaker=self   573 rows (359 live)   what she knows about HERSELF
-                                         'My name is Kairos.'  'I am a woman'
-                                         'I like the sound of rain on a tin roof.'
-  ```
-
-  *(Measured 2026-08-30; 1,133 rows total. The figures here were `71` and `6` when this
-  paragraph was written, and the drift inverted its own argument — the self lane is now the
-  LARGER one. Re-count rather than trust these; the point is the two lanes, not the numbers,
-  and a number in prose is a copy of a truth that rots.)*
-
-  Calling it "his memory" or "his facts" makes the self lane invisible — and that is not a style
-  note, it is a bug generator. It happened during the G-ONEDOOR work: writing *"a stray `SP_FORGET`
-  would make his memories go quiet"* made the risk look like *some user facts get lost*. But an
-  autonomous forget pass matches across **every live row**, so the real worst case is that she
-  tombstones `'My name is Kairos.'` and **forgets who she is** — the identity-slot bug, the first
-  thing this rebuild had to repair. The imprecise noun hid the serious half of the blast radius from
-  the person doing the risk assessment. The `speaker` field exists to hold exactly this distinction;
-  do not collapse it in your prose either.
-
-- **The fact registry** is `var/memory/registry.jsonl` (path from `SP_RECALL_REGISTRY`). One JSON row per fact.
-- **Two axes that are constantly confused. They are not the same thing:**
-  - `speaker` — **who the fact is ABOUT** (`user` | `self`). Set from the *author of the turn*, never
-    inferred from the sentence. ("My name is Sam" said by him is a fact about HIM.)
-  - `status` — **where the claim CAME FROM** (`observed` | `inferred` | `confirmed` | `disputed`).
-    He said it, versus she concluded it.
-- **`lifecycle`** — `0` live, `1` retired. The tombstone flag, and **the one field both the Rust engine and
-  the Python harness key on**. Nothing is deleted; things are retired.
-- **`src` is free-text provenance PROSE.** Maintenance scripts append to it. **It is not an enum and you may
-  not branch on it.** Branching on it was a real bug: a cleanup pass appended `" | cleanup: ..."` and silently
-  turned reflections back into evidence.
-- **One read seam — and one non-ranking sibling.** Every RANKED door a fact can reach her
-  mouth through funnels into `memory.search_memories_ranked_rows()`, which filters
-  tombstones and applies `lifecycle.testimony_wins()`. Readers that do not rank (listing,
-  provenance, counting, ambient blocks) use **`memory.live_rows(testimony=)`** — added
-  2026-08-19 after the audit found NINE readers re-implementing the tombstone filter with
-  THREE different predicates, two of them (`list_memories`, `provenance`) skipping
-  `testimony_wins` entirely and dumping seam-silenced inferences verbatim. If you add a
-  reader, use the seam or `live_rows()`. Do not re-implement the filter; there is no
-  third predicate.
-- **Framing happens at READ time, through two doors**: `lifecycle.render()` speaks ABOUT
-  the store ("Sam told me: …" — tool listings, audit lane); `world.present_for_her()`
-  speaks TO HER (you/he grammar — the standing world block and the per-turn recall note,
-  because a small model absorbs a quoted "my"). This is what stops a fact he said in the first
-  person coming back in her voice. Pick by who is being addressed.
-- **Write paths: `memory.remember()` is authoritative; `harness/maintenance/ops.py` is
-  the maintenance writer** (compact/cleanup/forget — tombstone/quarantine semantics,
-  holding `memory.registry_lock()` since 2026-08-19; before that it held nothing while
-  the scheduler ran it during live turns). The daemon's two write flags are off in all
-  every profile then on disk (14 at the time; two remain after the 2026-08-26 retirement) and refused at boot — see TRAPS. `memory.compact_registry()` is a
-  projection of `ops.compact()` now; until 2026-08-19 it was a raw unlocked rewrite
-  that hard-deleted rows and resolved a forgotten-then-restated fact in favour of the
-  corpse, wired to the automatic hygiene tick (G-COMPACT).
-- **The SEM sidecar index** (`var/memory/semindex.jsonl`, `harness/skills/semindex.py`) is DERIVED
-  data for the semantics layer — recomputable from registry + model, append-only, tombstone-blind
-  (lifecycle joins from the registry at read; it is never copied). It structurally cannot write the
-  registry. Design and phase status: [`docs/SEMANTICS.md`](docs/SEMANTICS.md). Gates: G-SEM-INDEX,
-  G-SEM-CONSERVE.
+- **One writer.** `remember()` is the door. Retirement goes through the same lifecycle that
+  every other write does, so an inference cannot quietly supersede an observation.
+- **One reader per question.** `search_memories_ranked_rows()` is the seam; the tool is a
+  projection of it. If you need a new view, project — do not write a second walker.
+- **Classes are produced, not asserted.** If a guard tests for a class the classifier cannot
+  emit, the guard is decoration. That exact bug shipped.
+- **Secrets are withheld at the door**, not filtered at the display. Every tool that can
+  return a row goes through the same presenter.
+- **Distillates carry `derived_from`** and die when their evidence dies, so a summary can
+  never outlive the rows it summarised.
 
 ---
 
-## 4. TRAPS — live, verified, not yet fixed
-
-These are real. They are not hypotheticals. Do not be the next person to rediscover them.
-Renumbered 2026-08-21 (1..n, live first; the closed ones keep their receipts below).
-
-1. ~~**THE KV MINT IS DEAD ON THIS MODEL.**~~ **FIXED 2026-08-23 — G-MOE-SEAM 47/47** (30/30 when written; §3 was retargeted to the device lock on 2026-08-30, see (b) below). Kept because the shape is the lesson and the cost is the receipt.
-
-   `/v1/capture` refused on the model MoE with *"gemma4-MoE not supported on this path — its three internal FFN copies are not on the `g4_ffn_apply` seam"*. That refusal was **correct** in its own terms: the alternative was a dense-only FFN returning plausible, wrong numbers. What nobody costed was how long it would stand. **253 of 253 rows** written since 2026-08-19 carried `npos=0`, no `ep.l5` in three weeks, 642 empty episode directories, and — the part that mattered most and was invisible — **93% of `semindex.jsonl` stayed on `hash256-v1` bag-of-words**, so every embedding contender this repo measured and rejected was scored against a fallback nobody knew they were standing on.
-
-   **THE LESSON, and it is not about CUDA.** A refusal is a decision with a running cost, and this one was ledgered three separate times as *"OWED: ENGINE WORK"* without anyone reading the engine. Five minutes in `routes.rs` showed the ledger's own one-line fix (*"route it through the served decode"*) was wrong — capture uses the **curator's** batched forward deliberately, so `ep.k` stays byte-compatible with the registry the deployed W_c head was trained against. **Do not write "owed: engine work" in a ledger you have not read the engine for.**
-
-   The fix was the refactor ADR-013 had already half-done: the three remaining FFN copies onto the seam (dense behaviour unchanged by construction — `g4_ffn_apply` at `n_tok==1` issues the identical kernel sequence), the guard narrowed to MoE-with-no-experts-staged, and the graph path excluded because the routed branch syncs per layer. Verified end to end through `remember()`: `npos=12`, `ep.k/ep.v/ep.mf/ep.q/ep.l5` all written.
-
-   **It also exposed two real bugs that were never about MoE** — see trap 3.
-
-2. ~~**THE CONTEXT CEILING IS 12096 POSITIONS AND THE CONVERSATION DOES NOT KNOW IT.**~~ **FIXED 2026-08-23 — the tiled kernels landed and `pmax = 20000` is armed on a completed receipt** (commits 47bc05a / 3b5b165; the arming note lives beside the pmax line in `profiles/companion.toml`). Kept because the shape is the lesson and the guard remains load-bearing.
-
-   `pmax` was a KERNEL limit, not a memory budget: `k_attn_decode_win_dyn_T` kept the whole attention score row in shared memory (`attn_shm = Pmax * sizeof(float)`), and Turing allows 48 KB static shared per block — 12096*4 fits, 13000*4 fails the launch and POISONS the CUDA context. Past it the daemon declined the prefill and returned an EMPTY 200 in ~11 ms. **What that looked like from the room**: silence — three messages in a row, the gateway naming the THINK budget for a CONTEXT failure, and the watchdog restarting a stack that was not wedged.
-
-   **The fix was exactly the one this row predicted**: a tiled decode-attention kernel (online softmax, shared memory O(tile)), plus the SAME ceiling discovered in the prefill kernel, plus `prefill_chunk` so the batched prefill's O(n) scratch stops bidding against the KV for VRAM. Verified end to end at 15.6k tokens. NOT byte-identical to the flat kernel — the tiled sum order differs in the last bits, `attn_tile = 0` is the one-line revert — and the binding limit is now TIME (prefill is O(n²)), not memory.
-
-   **What survives of the trap**: the guard (`harness/inference/context.py`, G-CONTEXT-FIT) stays — the room still resends its whole scrollback and a long week can still reach 20000; the prefix is ~7 973 tokens (~40% of the new ceiling — `context.prefix_tokens()` measures it now); and engine autofit can clamp pmax below the profile, which is why the guard scrapes `(Pmax=N)` from the daemon log. /v1/metrics reporting effective pmax is still the honest fix for that scrape.
-
-3. ~~**TWO FORWARDS, ONE SET OF GLOBALS — AND A FREE THAT OUTRAN ITS KERNELS.**~~ **FIXED 2026-08-23 — G-MOE-SEAM.** Neither bug was about MoE; MoE is only what made them reachable, and both are the same family: *state with no owner*.
-
-   **(a) DRAIN BEFORE YOU FREE.** `gemma4_decode_cuda`'s teardown freed `dx/dnx/dg/dup/ddn/dscr` — the FFN block's entire working set — with **no synchronize**, while kernels were still reading those pages. The illegal access then surfaces at whoever syncs NEXT: a different caller, a different stack frame, innocent code. The dense path survived by luck (its tail is a D2H that syncs implicitly); the routed branch's tail is two bare launches. The same fault signature sits in `var/daemon.log` from **2026-08-02**, unattributed for three weeks, *because the fault never lands on the code that caused it*.
-
-   **(b) THE GLOBAL SCRATCH HAD NO OWNER.** The MoE branch works out of process globals (`g_moe_*`) that `moe_scratch_ensure` frees and reallocates when `n_tok` grows. Two concurrent forwards resize each other's working memory. Measured 1 in 8 captures, a different layer each time: `router produced no usable expert (idx=-1) — 0/128 logits NaN`, which is arithmetically impossible inside `moe_topk_host` (`wt[]` seeds at `-1.0f`; any probability beats it) — **the tell that the array read was not the array written**. Locking the *session* mutex in the routes was necessary and NOT sufficient, because `v1_oneshot`, `/v1/embed` and the probe paths run forwards through their own scratch sessions. "One session" was never the invariant; **one forward** is. A recursive mutex now guards all thirteen entry points that can reach `g4_ffn_apply`, and G-MOE-SEAM computes that closure rather than listing it — which is how it found six entries the author had missed.
-
-   **AND THE SESSION MUTEX WAS THE WRONG LOCK ENTIRELY (2026-08-29, superseding the paragraph above).** The 08-23 fix serialised capture / recall_rank / embed on `app.session` and its comment claimed "no deadlock: v1_chat takes this same mutex". **The streaming chat worker does not** — it holds the DEVICE lock (`cuda_kvdecode_handle`) and never touches `app.session` mid-forward. So a capture's batched forward ran *concurrently with a live chat forward*, the shared MoE scratch was freed under running kernels, and the context wedged for 25 minutes with the GPU at 2% and `/v1/metrics` still answering (it takes only a brief session lock — which is how the two stall mechanisms tell apart in a log). The invariant now: **borrow `qm` under a brief session lock and DROP it, then hold the DEVICE lock for the whole forward** (`borrow_qm` + `device_guard` in routes.rs), never the session lock through it — the chat worker takes them device→session, so holding both here is an instant AB-BA deadlock. `device_guard` is ALWAYS a lock (a dedicated fallback mutex when the kvdecode handle is absent; `Option::map` there had meant "no handle, no lock at all", silently). G-MOE-SEAM §3 asserts the successor and was RED from the night the better invariant landed until it was retargeted — which is the correct behaviour of a gate over a superseded rule, and worth remembering when one goes red after a deliberate change.
-
-   **THE TRANSFERABLE PART.** When you make a previously-refused path reachable, you are not just enabling a feature — you are adding a second user to every global it touches. Ask what else is in there before you celebrate the first green result.
-
-4. **`status: disputed` is vocabulary-only.** Nothing writes it. The write-time contradiction detector was
-   deliberately deleted (it was a semantic judgment made out of substring matching). The rule it was trying
-   to enforce lives at the read seam now, in `testimony_wins()`.
-
-5. **The SSE stripper — FIXED WITH A RESIDUAL (2026-08-20).** The whole-turn rules could not fire per-delta, and the arming
-   condition fired. Registered 2026-08-19 ("a measured live leak of that shape");
-   measured 2026-08-20, live: an unterminated `<thought ` opener, ~400 tokens of
-   reasoning, and every chunk after the opener's own walked out as speech and into the
-   day transcript, starting mid-word ("ering triumphs..."). `speech_delta` is now
-   STATEFUL for exactly this: `pend["thought"]` latches when a chunk ends inside an
-   unterminated thought block and every following chunk is dropped until an explicit
-   closer, a pipe-marker, or a speech-open arrives (G-MARKS-LEAK §8, with the live
-   shape at five chunk sizes). Residual exposure: a thought whose SAME chunk carries a
-   stray `>` downstream defeats the opener lookahead — the same limit `_THOUGHT_OPEN`
-   has always had.
-
-6. **The OpenAI-compatible path is still the thinner twin — but the epilogue is now
-   shared.** 2026-08-19 closed its two silent data losses (`_append_day_turn`,
-   `run_post_turn`); 2026-08-24 unified the whole turn epilogue into `_settle_turn`
-   (G-TURN-EPILOGUE), so this path now also pays `persist_receipts` and the Real-Her
-   capture, and its roleplay offer settles instead of returning past everything. What
-   it STILL skips: the pre-turn spine (recall/toolset), the silence note, the anon
-   note, the canonical transcript, the context-trim notice, the typed events, and the
-   thought-channel split. Full parity is a redesign; until then a turn through
-   `/v1/chat/completions` is a leaner turn than the same words through `/v1/chat`.
-   The list lives here so the gap stays a decision, not a drift.
-
-7. **`think_max_ms` counts the PREFILL as thinking (2026-08-30, live, unfixed).** The
-   `Sampler` is constructed at `routes.rs:570`; the prefill runs at `:2842+`. `turn_start`
-   is set in the constructor, so the 30 s wall-clock thought budget spans prefill *and*
-   thinking. Any turn whose prefill exceeds 30 s force-closes `<channel|>` on the FIRST
-   sampled token and **she does not think at all** — receipt: `THINK-CEILING` fires on
-   prewarm turns with `n_gen=1`, where only the ms budget can have fired, on a 127 s
-   prefill. Before the 08-30 reseam work most warm turns re-prefilled for 20–90 s, so her
-   thinking was silently off on exactly the slow turns — and he reads her by her thinking.
-   Fix shape: stamp the clock at the first sampled token, not at construction. Not done
-   because it makes her think MORE on the slowest turns, which is a latency trade that is
-   his. `docs/OFF-BY-DEFAULT.md` §19 and the ledger carry it.
-
-8. **~13% of her recorded turns are analysis ABOUT him, not speech TO him (2026-08-30,
-   live, fix built and OFF).** *"He's playing coy. It's adorable…"*, *"I need to make sure
-   I don't sound too much like an assistant here"*. `reply_parts` is exactly what streams
-   to the room, so **he sees them**, and the day transcript then feeds her journal and
-   `_chat_from_rows` re-feeds them as examples of her own voice. Ten-day baseline via
-   `tools/voice_leak_rate.py`: 7/18/12/17/1/21/11/25/7/11 percent, no trend. It is **not**
-   the thought ceiling — that was instrumented and cleared (leak 33% when her thought was
-   cut vs 67% when it was not); it tracks the PROMPT. A one-line prefix instruction takes
-   it to 0% on the same twelve prompts with roleplay narration verified intact
-   (`voice.address_directly`, default off, OFF-BY-DEFAULT §18). Off because her voice is
-   his call, not a maintainer's.
-
-### Closed traps — kept because the shape of each is the lesson
-
-4. ~~**THE PRIVACY DECLINE CANNOT FIRE.**~~ **FIXED 2026-07-14 — G-SECRET 22/22.**
-   For the record, because the shape of it is the whole lesson: `spine.recall_decider()` protected
-   secrets by checking `mem_class == "private-secret"`, and `lifecycle.classify()` — the only classifier
-   the authoritative writer runs — could emit exactly `relationship | identity | event | preference |
-   fact`. **The consumer branched on a value the producer could not produce.** The decline had never
-   fired once. `private-secret` was only ever minted by the *daemon's* classifier, armed by `growth=true`;
-   the 2026-07-12 "one memory authority" fix set `growth=false` and took the only producer with it, so
-   **the privacy guarantee was collateral damage of a correctness fix.** `g_mempolicy_v3` stayed green
-   throughout because it hand-builds the `private-secret` row and tests the *dispatch*, never the *producer*.
-   The audit found one real credential already sitting in his live store as a plain `fact`
-   (`'My access code is 4471'`) — reclassified in place, provenance appended to `src`, nothing destroyed.
-   `harness_tests/g_secret.py` §4 now asserts the generalisation, and that is the part worth keeping:
-   **every class the decider branches on must be one the writer can produce.** Add an `if mc == "..."`
-   branch with no producer and the gate fails the day you write it, not eight weeks later when it leaks.
-
-5. ~~**`store_verb = true` on the live profile.**~~ ~~**`growth = true` in 8 non-live profiles.**~~
-   **BOTH FIXED 2026-07-14 — G-ONEWRITER 35/35.** Kept here because the shape is instructive:
-   the daemon had **two** write flags, and the 2026-07-12 "one memory authority" fix turned off one.
-   The comment announcing that fix literally said *"the daemon no longer writes memories. Recall, **the
-   store verb**, and classification are untouched"* — it **named** the second write path while declaring
-   the daemon no longer wrote. So `"note that I'll be late"` was still a registry write, performed by the
-   daemon, with `speaker` hardcoded, no `status`, and none of admission / firewall / dedupe / supersede /
-   secret-classification — **and zero model inference, so she never saw the turn.**
-   The remedy for *an invariant enforced in one of two paths* was enforced in one of two paths.
-   Both flags are false on every profile on disk (14 when this was written; two remain), and **`serve.py` refuses to boot** any profile that arms
-   either while `agent.authority = 'spine'`. A rule in a comment gets applied to the file the comment is
-   in; this one lives in the door.
-
-6. ~~**`_AUTHOR` / `_QUESTION` are process-wide module globals**~~ **FIXED 2026-08-19 — G-AUTHOR-CTX.**
-   They are `contextvars.ContextVar`s (`memory.py` and the twin in `notes.py`). A turn
-   cannot see another turn's author or question. `remember_about_self` RESETs the previous
-   token instead of assuming the previous author was `"user"`.
-
-7. ~~**Two gates are named `_offline` and are not.**~~ **FIXED 2026-08-19.**
-   `_native_chat_sse` / `_await_warm` wait on `_WARM` only when `SP_GATEWAY_PREWARM=1`.
-   A standalone script no longer hangs for 900s. The `_WARM` event is still only *set*
-   by `_prewarm()`; the wait is what was wrong, not the event.
-
----
-
----
-
-## 5. THE GATES
-
-**Doctrine: no claim without a repeatable gate.** The index is [`gates/GATE-INDEX.md`](gates/GATE-INDEX.md) —
-every gate, what it protects, and crucially **whether it needs a GPU**.
-
-- **OFFLINE gates** point `SP_DAEMON_URL` at a discard port and need no GPU and no daemon. Run these freely.
-  They cover most of the memory system: `g_claim`, `g_salience`, `g_durability`, `g_memory_lifecycle`,
-  `g_silence`, `g_clock`, `g_reflect`, `g_notes`, `g_watch`, `g_grammar`, `g_tuning`, `g_roleplay`.
-  Looking-up (chip, window, claim-hold): `g_looking`, `g_tool_honesty`, `g_research`, `g_search`.
-  The room and the docs: `g_room_css`, `g_room_bundle`, `g_docs_true` (retired vocabulary and
-  structural truths across README / START-HERE / AGENTS / docs), `g_profile_door`.
-- **LIVE gates** need `python serve.py companion` running. THE PROFILE IS POSITIONAL AND NOT
-  OPTIONAL — but as of **2026-08-26 it can no longer select the wrong model**, because the
-  thirteen retired profiles were deleted and `profiles/` holds exactly two: `companion.toml`
-  (hers) and `companion.toml` (external engine, no local model).
-  *What it used to be:* `serve.py agent` was a real profile — the **the retired reference model** — so it started,
-  warmed and answered while serving a different model with different decode knobs. A live
-  gate pointed at it measured the wrong stack and reported green; it cost a restart on
-  2026-08-03 (the docs said `agent` in three places) and a silent outage on 2026-08-01
-  (eight `--gateway-only` bounces, every turn zero characters, `/health` green throughout).
-  Still check `SP_MODEL_PATH` in the boot banner — the daemon can be started by other means
-  than the launcher, which is why `--gateway-only` reads the RUNNING process rather than a
-  record. G-PROFILE-GUARD asserts the absence structurally (parsed model path, not a grep)
-  and its mutant restores a small model-pointing profile to prove the check bites.
-
-Run one: `python harness_tests/g_claim.py`
-
-**If you touch memory or recall, the minimum bar is:**
+## 4. THE GATES
 
 ```
-python harness_tests/g_claim.py            # the seam, the slot, testimony over inference
-python harness_tests/g_durability.py       # a turn is not a fact; the identity firewall
-python harness_tests/g_memory_lifecycle.py # write / supersede / provenance
-python harness_tests/g_salience.py         # a repeat is a second data point
-python harness_tests/g_silence.py          # absence is only information if you were looking
-python harness_tests/g_clock.py            # every timestamp survives its own round trip
+python tools/sweep.py            # the whole offline suite, ~3 min, no GPU
 ```
 
-**Writing a gate? Two rules, both bought with real regressions:**
+Every gate is a standalone script that exits with its verdict: `0` held, `1` failed, `2`
+skipped because the subject is absent here. `gates/GATE-INDEX.md` is the index — a row per
+gate, what it protects, and the command. New gates use `harness_tests/_gate.py`:
+`sandbox()` **first**, before any `harness.` import, then `check()` / `finish()`.
 
-1. **Assert through the REAL path**, not a hand-called helper. G-CLAIM asserts through
-   `spine.recall_decider()` — the function that actually runs — precisely because the bug it protects
-   against lived in the path nobody was testing.
-2. **Do not supply your own precondition.** If your gate hand-builds the row that makes the guard fire, you
-   have tested the guard, not the system. That mistake is currently costing us a privacy guarantee.
+Five worth running before you say you are done:
+
+```
+python harness_tests/g_claim.py
+python harness_tests/g_durability.py
+python harness_tests/g_memory_lifecycle.py
+python harness_tests/g_docs_true.py
+python harness_tests/g_real_her.py
+```
+
+Two rules the gates themselves are held to, both learned the hard way:
+
+- **A gate must not write into her stores.** `_gate.sandbox()` redirects every store root;
+  gates that skipped it wrote fabricated journal entries and false memories into a real
+  store on every run.
+- **A gate must drive the door the product uses.** Grading the function you just fixed,
+  rather than the tool the model is handed, is how 242 lines of green sat over a tool that
+  told her a fact had been stored when the store had refused it.
+
+CI runs the offline suite on every push (`.github/workflows/gates.yml`).
+
+---
+
+## 5. WHAT IS OFF, AND WHY
+
+[`docs/OFF-BY-DEFAULT.md`](docs/OFF-BY-DEFAULT.md) is the ledger: every disabled feature,
+why it is off, and **the condition that would arm it**. A feature turned off without a
+written arming condition never comes back — it becomes dead code nobody dares delete.
+
+Registration is not aliveness. An app can be in the dock, its toolset can return `[]`, and
+the icon renders over nothing. If something looks wired but does nothing, check the profile
+before you debug the code.
 
 ---
 
 ## 6. KEEPING THIS FILE TRUE
 
-This file rots faster than the code. When you land a change that alters any of the following, **update this
-file in the same commit**:
+- **Behaviour a reader would notice gets a `docs/CHANGELOG.md` entry in the same commit.**
+- `g_docs_true` checks that shipped docs do not name gates, files or commands that are not
+  here. It cannot check that a *sentence* is still true — that is on you.
+- If you find a claim in here that the code no longer supports, fix the file in the same
+  commit as the code. A stale orientation file is worse than none, because people trust it.
 
-- a new read path or write path into memory → §3 and `docs/MEMORY-AND-RECALL.md`
-- a new gate → a row in `gates/GATE-INDEX.md`
-- a trap fixed → strike it from §4 (and say so in the commit)
-- a new trap found → add it to §4, even if you are not fixing it now. **An unwritten trap is a trap that gets
-  rediscovered at 3am.**
-- a subsystem retired or renamed → its vocabulary goes into `harness_tests/g_docs_true.py`'s retired list, so
-  the docs cannot keep describing it (ceilings/tiers, the Grok CLI, `staging/`, and the retired reference model default all did).
-- a profile change → `START-HERE.md` ("what is on, what is off") in the same commit.
-- **behaviour a reader would notice → a `CHANGELOG.md` entry, dated, in the same
-  commit.** Dated rather than versioned: this tree is a living system, and the entry is the
-  index into the commit that carries the reasoning. (The exported public framework keeps the
-  semver changelog, `kairos-export/CHANGELOG.md`.)
+---
 
-The commit messages in this repo are unusually long on purpose: they carry the *reasoning*, not just the
-change. `git log` is a primary source. Read it before you assume something is arbitrary.
+## 7. CONTRIBUTING
+
+[`CONTRIBUTING.md`](CONTRIBUTING.md). In short: a change to behaviour comes with a gate, a
+changelog entry, and — if it touches memory — an argument about which of the non-negotiables
+it could violate. The doctrine in §1 is not up for negotiation in a PR; everything else is.
