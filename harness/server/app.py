@@ -17,6 +17,7 @@ gateway runs with zero third-party deps.
 
 from __future__ import annotations
 
+import contextvars as _contextvars
 import dataclasses
 import json
 import subprocess
@@ -2974,7 +2975,27 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
             evq.put(None)   # sentinel
 
     _st["thread_started"] = True    # from here the thread's finally owns the epilogue
-    t = _threading.Thread(target=_run, daemon=True)
+    # ── THE TURN'S CONTEXT CROSSES INTO THE GENERATION THREAD (2026-09-02) ──────────────
+    # `_arm_turn` runs up at the top of this function, in the REQUEST thread, and sets three
+    # ContextVars: `_QUESTION` (his actual words, so recall can resolve ownership),
+    # `_AUTHOR` (whose fact a write is) and `_SYNTHETIC` (whether anyone typed this turn).
+    # Everything that reads them — the tool loop, recall, `remember()` — runs in THIS
+    # thread, and per PEP 567 a new `threading.Thread` starts with an EMPTY context. So all
+    # three reverted to their defaults the moment the generation began.
+    #
+    # MEASURED, live, on the running gateway: a turn declared `synthetic` still wrote
+    # "Sam's workshop bench is made of oak999777." into her registry, and no refusal
+    # reached the log — the door never saw the flag. `_AUTHOR` defaulting to "user" is
+    # right by luck on a user turn, which is why this went unnoticed; `_QUESTION`
+    # defaulting to "" is not lucky at all — it is exactly the 2026-07-12 defect
+    # `_arm_turn`'s own docstring exists to prevent, where ownership falls back to HER
+    # paraphrase ("what is YOUR name?" and "what is MY name?" arrive as one string).
+    #
+    # `copy_context()` snapshots the arm-time context; `ctx.run` makes the thread start
+    # from it. Writes inside the thread stay inside it, which is what we want: a turn's
+    # author must not leak out into the server's context.
+    _turn_ctx = _contextvars.copy_context()
+    t = _threading.Thread(target=_turn_ctx.run, args=(_run,), daemon=True)
     t.start()
     while True:
         # ADR-006 §D3 heartbeat: during a long prefill nothing streams for minutes and the UI
