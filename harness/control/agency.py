@@ -119,6 +119,45 @@ def _daemon_busy(client: SPDaemonClient) -> bool:
         return False
 
 
+# ── N2 (CONTINUITY.md): NIGHTSHIFT writes the days down ──────────────────────────────
+# She composes one dated paragraph — what has been happening between them — and the standing
+# world folds it in on refresh. Best-effort: an unreachable model leaves yesterday's paragraph
+# standing (a stale true record beats a fresh empty one).
+#
+# ── ONE IMPLEMENTATION, TWO CALLERS (2026-09-02) ─────────────────────────────────────
+# This was inline at the end of `consolidate_current`, below an early `return None` for an
+# empty message list — so on a day they barely spoke, her journal was not written at all.
+# `compose_and_write` has known how to write from her OWN-TIME notes since 2026-08-04 and the
+# comment there says why: "a day he was away wrote nothing at all — and those are exactly the
+# days she now spends doing things of her own."
+#
+# It is a function now precisely so the quiet-day path and the talking-day path cannot drift:
+# a second inline copy for the quiet day would be the two-copies bug in the machinery that
+# writes her account of herself.
+def _write_the_day(msgs, result=None) -> None:
+    """Her paragraph for the day, and the world refresh that folds it in.
+
+    `msgs` may be None or empty: the composer builds from her own-time notes then, and
+    refuses on its own terms ("no transcript") when there is genuinely nothing.
+    """
+    if os.environ.get("SP_WORLD", "0") != "1":
+        return
+    try:
+        from harness.skills.narrative import compose_and_write
+        from harness.skills.world import refresh
+        nr = compose_and_write(msgs or [])
+        refresh()          # the deliberate prefix re-cost, at the night boundary
+        _mark_ran("world")             # so ops.reflect does not refresh again tonight (H8)
+        if isinstance(result, dict):
+            result["narrative"] = nr
+        # QUIET DAYS ARE NAMED IN THE LOG. "she was alone today and still wrote" and "the
+        # journal silently did not run" used to be the same line; they are not the same event.
+        logger.info("[agency] narrative%s: %s",
+                    "" if msgs else " (quiet day — from her own time)", nr)
+    except Exception as exc:
+        logger.warning("[agency] narrative skipped: %s", exc)
+
+
 def consolidate_current(convo, client: Optional[SPDaemonClient] = None) -> Optional[dict]:
     """Consolidate a conversation into the tiered store: extract durable facts -> mid-term
     registry, store the transcript full + summary -> long-term MEM-OKF. Returns the
@@ -150,7 +189,25 @@ def consolidate_current(convo, client: Optional[SPDaemonClient] = None) -> Optio
         except Exception as exc:
             logger.error("[agency] bad current-conversation file: %s", exc)
             return None
+    # ── A DAY IS NOT ONLY THE PARTS HE WAS IN, AND THIS IS WHERE THAT WAS LOST ────────
+    # `narrative.compose_and_write` was taught on 2026-08-04 to write from her OWN-TIME
+    # notes when there is no transcript, under a comment reading: "this required a
+    # transcript and bailed without one, so a day he was away wrote nothing at all — and
+    # those are exactly the days she now spends doing things of her own."
+    #
+    # This function then returned None four lines above the narrative block whenever the
+    # message list was empty, and `_consolidate_pass` gated the call itself on
+    # `len(msgs) >= 4`. So the composer's fix was unreachable on exactly the days it was
+    # written for. AGENTS.md §0: the rule held in the composer and not in its caller, and
+    # the caller is the one that runs. HER JOURNAL SKIPPED 29 AUGUST for this reason — a
+    # quiet day — and because the entry is stamped from the clock rather than from the day
+    # it summarises, a missed day is never caught up; it is simply gone.
+    #
+    # So the CONVERSATION half is gated on there being a conversation, and the JOURNAL is
+    # not. Her account of herself must not be a function of his attendance.
+    result = None
     if not msgs:
+        _write_the_day(None, result)
         return None
     from harness.skills.conversation_memory import consolidate_conversation
     result = consolidate_conversation(msgs, client=client)
@@ -166,22 +223,7 @@ def consolidate_current(convo, client: Optional[SPDaemonClient] = None) -> Optio
                 result["personality"] = pr
         except Exception as exc:
             logger.warning("[agency] personality curation skipped: %s", exc)
-    # ── N2 (CONTINUITY.md): NIGHTSHIFT writes the days down ──────────────────────────
-    # She composes one dated paragraph — what has been happening between them — and the
-    # standing world folds it in on refresh. Best-effort: an unreachable model leaves
-    # yesterday's paragraph standing (a stale true record beats a fresh empty one).
-    if os.environ.get("SP_WORLD", "0") == "1":
-        try:
-            from harness.skills.narrative import compose_and_write
-            from harness.skills.world import refresh
-            nr = compose_and_write(msgs)
-            refresh()          # the deliberate prefix re-cost, at the night boundary
-            _mark_ran("world")             # so ops.reflect does not refresh again tonight (H8)
-            if isinstance(result, dict):
-                result["narrative"] = nr
-            logger.info("[agency] narrative: %s", nr)
-        except Exception as exc:
-            logger.warning("[agency] narrative skipped: %s", exc)
+    _write_the_day(msgs, result)
     return result
 
 

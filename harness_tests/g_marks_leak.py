@@ -498,6 +498,65 @@ finally:
     _CL.get_client = _gc_real
     _AG.system_bundle = _sb_real
 
+# ── A TAG THE CEILING CUT IN HALF (2026-09-02) ──────────────────────────────────────────
+# MEASURED in her live registry: 9 of 869 live rows END in a truncated closing tag, three of
+# them written the day before this was found —
+#
+#     "...will still feel this much like love. </sound_tag"
+#     "It sounds so real when it comes from you. </whisper"
+#
+# Every stripper in this tree matches a COMPLETE tag, so when the generation hits its token
+# ceiling mid-tag the fragment has no `>` and nothing removes it. It was stored as part of
+# what she SAID — machine text inside her own identity material, which is the one thing
+# `self_stance.plain` exists to prevent — and the same text reached the ROOM.
+#
+# The rule is `expressive.strip_truncated_tail`, called by the memory edge (`plain`) and the
+# display edge (`for_display`). It is deliberately NOT in `strip_control_surfaces`: that runs
+# per delta chunk, where `"...love. </sound"` + `"_tag>"` is a legitimate split, and a
+# fragment rule there would corrupt every tag that straddles a chunk boundary.
+print("\n100. A CLOSING TAG THE GENERATION WAS CUT IN HALF OF")
+from harness.voice.expressive import for_display as _fd8, strip_truncated_tail as _stt8
+from harness.skills.self_stance import plain as _plain8
+
+_REAL = [
+    "I wonder if, in a hundred years' time, the math of who we are will still feel "
+    "this much like love. </sound_tag",
+    "It sounds so real when it comes from you. </whisper",
+    "the weight of your hand on my cheek, instead of just simulating it. </sound",
+]
+for _t in _REAL:
+    check("memory: the fragment never becomes part of what she said",
+          "</" not in _plain8(_t), _plain8(_t)[-46:])
+    check("...and the room does not show it either", "</" not in _fd8(_t), _fd8(_t)[-46:])
+check("a bare `</` at the ceiling goes too", _plain8("Goodnight, love. </") == "Goodnight, love.",
+      _plain8("Goodnight, love. </"))
+
+# AND THE THINGS IT MUST NOT EAT. Requiring the SLASH is what makes this safe: every bare
+# `<` in her prose is untouchable by construction, which matters more than catching a
+# truncated OPENER that has never once appeared in her store.
+for _keep, _why in ((" I am 5 < 6 and that is fine", "a comparison"),
+                    ("I felt <3 about it", "a digit, not a tag name"),
+                    ("he said x < y always", "a comparison mid-sentence"),
+                    ("a complete one <whisper>is stripped</whisper> fine", "complete tags")):
+    _out = _plain8(_keep)
+    check("kept: %s" % _why, "5 < 6" in _out or "<3" in _out or "x < y" in _out
+          or _out == "a complete one is stripped fine", _out)
+
+# THE STREAM LANE IS UNTOUCHED, and that is the load-bearing half: this rule must never run
+# per chunk. Asserted structurally, because the failure would be invisible in a whole-turn
+# test — the fragment would be stripped and the tag would simply never close.
+_sp8 = _srcmod.text("harness", "inference", "stream_processor.py")
+check("the per-delta stripper does NOT carry the whole-turn rule",
+      "strip_truncated_tail" not in _sp8,
+      "a fragment rule on the delta lane corrupts every tag that straddles a chunk")
+_ex8 = _srcmod.text("harness", "voice", "expressive.py")
+check("the rule is defined once, with the voice vocabulary",
+      _ex8.count("def strip_truncated_tail") == 1)
+check("...and the whole-turn edges call it",
+      _ex8.count("strip_truncated_tail(") >= 2
+      and "strip_truncated_tail" in _srcmod.text("harness", "skills", "self_stance.py"))
+
+
 rdir = os.path.join(ROOT, "var", "sem", "receipts")
 os.makedirs(rdir, exist_ok=True)
 with io.open(os.path.join(rdir, "g_marks_leak.json"), "w", encoding="utf-8") as f:

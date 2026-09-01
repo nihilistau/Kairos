@@ -185,7 +185,13 @@ print("\n5. HIS WORDS, not the message list he never sent")
 # means what this check means by it. `inspect.getsource`, the read eight other gates
 # already use.
 _handler = _srcmod.body(A._native_chat_sse_body)
-bind = _handler.index("_human = _arm_turn(msgs)")
+# ── ANCHORED ON THE CALL, NOT ON ITS ARGUMENT LIST (2026-09-02) ─────────────────────
+# This read `"_human = _arm_turn(msgs)"` and died on a ValueError the day `_arm_turn` gained
+# a second argument (`synthetic=`, so the flag reaches the TOOL lane and not only the
+# epilogue). Loud, and therefore the safe half of the src-trap — but an anchor that includes
+# a signature is an anchor that breaks on every signature change, and what this check is
+# about is the ASSIGNMENT's position, not the arguments. `_human = _arm_turn(` is the claim.
+bind = _handler.index("_human = _arm_turn(")
 call = _handler.find("_settle_turn(_human, final_text")
 # find(), not index(): a call site that stopped passing his words must read as a FAIL
 # with a name on it, not as a traceback halfway down the gate.

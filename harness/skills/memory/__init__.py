@@ -109,8 +109,9 @@ from harness.loud import swallowed as _sw
 from harness.skills.memory.words import (          # noqa: E402
     _STOP, _text, _depluralise, _toks, _overlap)
 from harness.skills.memory.authorship import (     # noqa: E402
-    _AUTHOR, _QUESTION, current_author, current_question,
-    set_author, reset_author, set_question, reset_question)
+    _AUTHOR, _QUESTION, _SYNTHETIC, current_author, current_question,
+    set_author, reset_author, set_question, reset_question,
+    SYNTHETIC_WHY, synthetic_reason, set_synthetic, reset_synthetic)
 
 # ── THE PRESENTER IS REACHED AS A MODULE, ON PURPOSE ────────────────────────────────
 # `g_secret` proves every read door consults the secret rule by LIFTING it — patching

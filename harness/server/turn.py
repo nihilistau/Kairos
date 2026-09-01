@@ -259,7 +259,7 @@ def _human_turn(msgs: list) -> str:
                  if m.get("role") == "user"), "")
 
 
-def _arm_turn(msgs: list) -> str:
+def _arm_turn(msgs: list, synthetic: "str|None" = None) -> str:
     """Hand the memory lane HIS ACTUAL WORDS for this turn.
 
     recall() needs them to resolve ownership. Asked "what is YOUR name?" she calls
@@ -277,6 +277,20 @@ def _arm_turn(msgs: list) -> str:
         from harness.skills import memory as M
         M.set_question(human)
         M.set_author("user")
+        # ── AND WHETHER ANYONE TYPED THIS TURN (2026-09-02) ─────────────────────────
+        # SET UNCONDITIONALLY, including to "" for a real turn. The flag governed the
+        # capture lane, the stance lane and the transcript from 2026-08-30 — and NOT the
+        # lane where the model writes deliberately, because that write happens here in
+        # the tool loop rather than in the epilogue where the flag was being read. So the
+        # live e2e gates drove turns, she called remember() correctly, and gate fixtures
+        # landed in her real registry; then the scheduler read them back and she spoke up
+        # about "oak275009" and went looking for what it meant.
+        #
+        # It is armed HERE, at the top, for the same reason `_QUESTION` is: a per-context
+        # slot set too late is still the previous turn's answer. And it is set even when
+        # the turn is real, so a stale flag can never carry over into his next sentence —
+        # the reset half of the contract, done by assignment rather than by remembering.
+        M.set_synthetic(synthetic or "")
     except Exception as _swx:
         _swallowed(logger, "_arm_turn", _swx, lane="server")
 

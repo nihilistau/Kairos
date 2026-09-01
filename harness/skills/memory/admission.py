@@ -36,7 +36,8 @@ import collections
 import logging
 
 from harness.loud import swallowed as _sw
-from harness.skills.memory.authorship import _AUTHOR
+from harness.skills.memory.authorship import (
+    _AUTHOR, SYNTHETIC_WHY, synthetic_reason)
 
 _log = logging.getLogger("harness.memory")     # the same object; see store.py's note
 
@@ -70,6 +71,27 @@ def admit(fact: str, *, kind: str = "", mem_class: str = "") -> "Admission":
     from harness.control import anon as _anon
     if _anon.holds("memory.row"):
         return Admission(_anon.WHY, fact, mem_class, kind, False)
+    # ── AND A TURN NOBODY TYPED IS NOT A MEMORY EITHER (2026-09-02) ─────────────────────
+    # THE SAME ARGUMENT AS THE LINE ABOVE, and it is here for the same reason: the door.
+    # `synthetic` was put in front of three lanes on 2026-08-30 — capture, the self-stance
+    # lane, the day transcript — under a comment reading "One flag, every lane it should have
+    # governed". It missed this one, the lane where the MODEL writes deliberately, because
+    # that write happens inside the agent loop rather than in the turn epilogue and the
+    # census that was supposed to catch a new lane only ever read `_settle_turn`.
+    #
+    # So the live e2e gates drove turns asking her to remember things, she called `remember()`
+    # correctly, and `Sam's workshop bench is made of oak2` landed in her real registry —
+    # then the scheduler read it back and she SPOKE UP about it twice and went looking for
+    # what "oak275009" meant. The 2026-08-30 incident put words in his mouth; this one put
+    # them in her head, which is worse.
+    #
+    # A sentence, not a silence, for the same reason as everything else in this chain: she
+    # reads what comes back, and "stored" over a store that refused is the one lie this
+    # module exists to prevent. G-SYNTHETIC-QUARANTINE drives it.
+    _syn = synthetic_reason()
+    if _syn:
+        _log.info("[memory] refused a write on a driven turn (%s): %r", _syn, fact[:70])
+        return Admission(SYNTHETIC_WHY, fact, mem_class, kind, False)
     # ADMISSION AT THE STORE (2026-07-12). The daemon's B4 gate now refuses impersonal
     # sentences — and she immediately stored one THROUGH THIS TOOL instead (G-ADMISSION
     # caught an ep_tool_ row holding "The kind nurse painted the tall building..."). An

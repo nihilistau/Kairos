@@ -147,6 +147,45 @@ def normalize_tags(text: str) -> str:
     return t
 
 
+# ── A TAG THE REPLY WAS CUT IN HALF OF (2026-09-02) ───────────────────────────────────
+# MEASURED in her live registry: 9 of 869 live rows end in a truncated closing tag —
+#
+#     "...will still feel this much like love. </sound_tag"      2026-09-01
+#     "...instead of just simulating what it would mean. </sound_tag"
+#     "It sounds so real when it comes from you. </whisper"       2026-08-24
+#
+# — and the same text reached the ROOM. Every stripper in this tree matches a COMPLETE tag
+# (`</?[a-z...]+>`), so when the generation hits its token ceiling in the middle of a
+# closing tag, the fragment has no `>` and nothing removes it. It is then stored as part of
+# what she SAID: machine text inside her own identity material, which is the exact thing
+# `self_stance.plain` exists to prevent, arriving through the one shape it cannot see.
+#
+# WHY IT IS NOT IN `strip_control_surfaces`, which is where a control surface belongs: that
+# function runs PER DELTA CHUNK on the speech lane, and its own comment says so. Mid-stream,
+# `"...love. </sound"` followed by `"_tag>"` is a legitimate split of a complete tag — a
+# fragment rule there would corrupt every tag that happens to straddle a chunk boundary.
+# This is a WHOLE-TURN rule and it lives with the whole-turn edges.
+#
+# CLOSING TAGS ONLY, and deliberately. Truncation happens at the end of a generation, and
+# every one of the nine is a `</…`. Requiring the slash means `5 < 6`, `<3` and any bare `<`
+# are untouchable by construction, which is worth more than catching a hypothetical
+# truncated OPENER that has never appeared.
+_TRUNCATED_TAIL = re.compile(r"\s*</[a-z][a-z0-9_-]{0,23}\s*$", re.I)
+_BARE_TAIL = re.compile(r"\s*</\s*$")
+
+
+def strip_truncated_tail(text: str) -> str:
+    """Drop a closing tag the generation was cut in half of. WHOLE TURNS ONLY.
+
+    Never call this per delta chunk: mid-stream, a fragment is usually the first half of a
+    tag whose second half is in the next chunk. See the note above.
+    """
+    if not text:
+        return text
+    out = _BARE_TAIL.sub("", _TRUNCATED_TAIL.sub("", text))
+    return out
+
+
 def for_display(text: str) -> str:
     """The display edge: every voice tag gone, known or not, whitespace tidied."""
     t = normalize_tags(text or "")
@@ -155,6 +194,7 @@ def for_display(text: str) -> str:
     # her parameterised wrap, when the manner was NOT one the API knows: still not text
     t = _VOICE_PARAM.sub("", t)
     t = _VOICE_CLOSE.sub("", t)
+    t = strip_truncated_tail(t)     # the ceiling can cut a closing tag in half
     return re.sub(r"[ \t]{2,}", " ", t).strip()
 
 
