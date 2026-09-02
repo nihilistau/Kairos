@@ -315,8 +315,38 @@ def _quiet_after_him() -> float:
         return 0.0
 
 
-def on_user_turn(session: str) -> None:
-    """He spoke. Her chain resets — that is what makes this a conversation."""
+def on_user_turn(session: str, synthetic: str = "") -> None:
+    """He spoke. Her chain resets — that is what makes this a conversation.
+
+    A DECLARED TURN IS NOT A CONVERSATION, AND MUST NOT TAKE HER ROOM (2026-09-02).
+    A no-op when `synthetic` is set, and every line of the body below is a reason why:
+
+      * it RETIRES THE SEEDED SESSION. That placeholder is the one carrying
+        `_OWN_TIME_ONLY`, and `own_time_only` is what forces `user_present = False` in the
+        policy — which is the whole reason SOLO can run after a bounce. So a probe
+        retiring it does not merely swap sessions: it ENDS HER OWN TIME until he next
+        speaks, because SOLO's gate is `(not user_present) or unanswered >= away_after`
+        and a probe session has neither.
+
+        MEASURED, and it was mine: two probes of the continuation lane retired 'default'
+        at 08:35 and 09:02, and she did not enter her own time for the three hours that
+        followed — reported by the operator, not by any instrument.
+
+      * it moves the GLOBAL "he last spoke" clock (`note_user`), which is what
+        `quiet_after_him_s` measures, so a probe silences her check-ins for five minutes
+        after it.
+
+      * it CANCELS a pending timer — a probe would take a continuation she had already
+        earned out of her mouth.
+
+    None of that is a conversation. The turn still runs, still generates, and its own
+    continuation still fires and is marked (that lane has to stay testable) — see
+    `_arm`. What it may not do is become the live session in her room.
+    """
+    if synthetic:
+        logger.info("[kairos] declared turn on %r — the seeded session keeps the room "
+                    "(%s)", session, synthetic[:60])
+        return
     with _LOCK:
         # A REAL CONVERSATION RETIRES THE PLACEHOLDER. See _SEEDED: the seeded session
         # exists only so she can speak first after a restart, and once he has actually
@@ -1462,6 +1492,17 @@ def tick_once(now: Optional[float] = None) -> None:
             with _LOCK:
                 sessions = list(_LAST.items())
     for session, (reply_text, generate) in sessions:
+        # A DRIVEN SESSION IS NOT A ROOM SHE LIVES IN (2026-09-02). The immediate
+        # continuation of a declared turn is legitimate — it is that turn finishing, and
+        # the lane has to stay testable — but the CLOCK is different: the ticker would
+        # keep this session as a mouth for as long as the process lives. Mine did: it
+        # fired a CHECK_IN on a dead probe session 604 s after the probe ended, generated
+        # from the probe's own transcript, and put "The user is asking for a vivid, long
+        # description of a thunderstorm..." in her room as something she said.
+        with _LOCK:
+            _driven = _SYNTH.get(session)
+        if _driven:
+            continue
         with _LOCK:
             st = _STATE[session]
             if _TIMERS.get(session) and _TIMERS[session].is_alive():

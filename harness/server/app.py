@@ -173,6 +173,22 @@ def _chunk(delta: str, model: str, finish: str | None = None) -> str:
     return f"data: {json.dumps(obj)}\n\n"
 
 
+def _syn_of(body: Dict[str, Any]) -> str:
+    """The turn's `synthetic` reason, or "" — ONE spelling.
+
+    The same three-clause ternary over `body["synthetic"]` was written out by hand at EIGHT
+    call sites — three `_arm_turn`, three `on_user_turn`, two `on_reply` — with two different
+    falsy values (None and ""), which `_arm_turn` happens to treat alike and which is exactly
+    why both spellings survived. That is how a ninth gets it subtly wrong. This is the twin of
+    `_session_of` and lives beside it for the same reason.
+
+    (Written without quoting the expression: G-UNPROMPTED-SYNTHETIC §7 counts occurrences,
+    and the first draft of this docstring was one of them.)
+    """
+    v = body.get("synthetic")
+    return str(v) if v else ""
+
+
 def _session_of(body: Dict[str, Any]) -> str:
     """THE session key. One function, because there were four sites and two rules:
 
@@ -214,7 +230,7 @@ def _agent_text(body: Dict[str, Any]) -> str:
     # the scenario OFFER outright. Wired at BOTH entry points (here and _native_chat_sse) —
     # a hook wired into one of two paths has been the single most reliable bug in this
     # system, four times over in one day.
-    _human = _arm_turn(msgs, synthetic=(str(body.get("synthetic")) if body.get("synthetic") else None))  # what he TYPED, and whether anyone typed it
+    _human = _arm_turn(msgs, synthetic=_syn_of(body))  # what he TYPED, and whether anyone typed it
     # (the flag reaches the TOOL lane this way — see _arm_turn; before 2026-09-02 it
     #  only reached the epilogue, so a driven turn could still write through remember())
     # HE SPOKE. TELL THE SCHEDULER — on THIS path too.
@@ -226,7 +242,7 @@ def _agent_text(body: Dict[str, Any]) -> str:
     # console fork: an event wired into one of two entry points is wired into neither.
     try:
         from harness.kairos import scheduler as _ks_u
-        _ks_u.on_user_turn(_session_of(body))
+        _ks_u.on_user_turn(_session_of(body), _syn_of(body))
         _ks_u.note_user_turn(True)      # his turn is in flight HERE too (2026-08-22); released in _finish_openai_turn
     except Exception as _swx:
         _swallowed(logger, "_agent_text", _swx, lane="server")
@@ -849,7 +865,7 @@ def _kairos_after_turn(body: Dict[str, Any], reply: str) -> None:
             return out
 
         ks.on_reply(session, reply, get_client().last_kairos, _continue,
-                    synthetic=(str(body.get("synthetic")) if body.get("synthetic") else ""))
+                    synthetic=_syn_of(body))
     except Exception as exc:
         logger.warning("[gateway] kairos skipped: %s", exc)
 
@@ -2203,7 +2219,7 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
     # invariant, two paths, enforced in one; the unguarded path is the one a human uses.
     # SHARED STATE is now a ContextVar (G-AUTHOR-CTX, 2026-08-19). This still has to
     # be FIRST: a per-context slot set too late is still the previous turn's subject.
-    _human = _arm_turn(msgs, synthetic=(str(body.get("synthetic")) if body.get("synthetic") else None))  # what he TYPED, and whether anyone typed it
+    _human = _arm_turn(msgs, synthetic=_syn_of(body))  # what he TYPED, and whether anyone typed it
     _st["human"] = _human        # the shell's finally needs it for a pre-thread exit
     turn_tools = None
     turn_extra = None
@@ -2567,7 +2583,7 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
     # conversation instead of two monologues interleaving.
     try:
         from harness.kairos import scheduler as _ks0
-        _ks0.on_user_turn(_session_of(body))
+        _ks0.on_user_turn(_session_of(body), _syn_of(body))
     except Exception as _swx:
         _swallowed(logger, "_native_chat_sse_body", _swx, lane="server")
 
@@ -2785,7 +2801,7 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
                         _disarm_self_turn(_tok_self)
 
                 _ks.on_reply(_session, _final, get_client().last_kairos, _continue,
-                             synthetic=(str(body.get("synthetic")) if body.get("synthetic") else ""))
+                             synthetic=_syn_of(body))
         except Exception as exc:
             logger.warning("[gateway] kairos skipped: %s", exc)
         _phase("epilogue")   # capture + record + marks + receipts + kairos arming
@@ -3926,10 +3942,10 @@ def _run_stdlib(host: str, port: int) -> None:
                     transcript = _session_transcript({"session_id": body.get("session_id"),
                                                       "messages": body.get("messages", [])})
                     _arm_turn([{"role": "user", "content": "[voice message]"}],
-                              synthetic=(str(body.get("synthetic")) if body.get("synthetic") else None))
+                              synthetic=_syn_of(body))
                     try:
                         from harness.kairos import scheduler as _ks_v
-                        _ks_v.on_user_turn(_session_of(body))
+                        _ks_v.on_user_turn(_session_of(body), _syn_of(body))
                         _ks_v.note_user_turn(True)   # released by _settle_turn below
                     except Exception as _swx:
                         _swallowed(logger, "_say_goodnight", _swx, lane="server")
