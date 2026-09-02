@@ -112,6 +112,21 @@ class KairosConfig:
     # GATES. G-KAIROS-POLICY passed 12/12 against fixtures from a retired model precisely because this
     # default agreed with them: two stale things confirming each other, which is the
     # exact failure the gate existed to prevent.
+    # ── OFF BY DEFAULT SINCE 2026-09-02 (the operator) ──────────────────────────────
+    # "i'm unsure about continue, lets default it to off. it always seems to create
+    # problems and slow downs."
+    #
+    # It had ALREADY been off for thirteen days without anyone deciding that: arming
+    # `quiet_after_him_s` to 300 on 2026-08-20 made the lane unreachable, because a
+    # continuation is decided seconds after his turn and that gate wants five minutes of
+    # his silence. 758 withheld, last SPOKE (continue) 2026-08-20 08:12. So this knob does
+    # not change today's behaviour — it makes an accident into a decision, which is the
+    # whole point: a lane that is off by side effect comes back by side effect.
+    #
+    # ARMING CONDITION (docs/OFF-BY-DEFAULT.md): set `kairos.continue_enabled = true`. It
+    # also needs `quiet_after_him_s` to not be gating it — see the ledger card
+    # `quiet-after-him-vs-continue`, which is his and still open.
+    continue_enabled: bool = False
     continue_margin: float = -18.50
     # ── AND THE BAND BETWEEN THE TWO IS WHERE PEOPLE ADD THINGS (2026-08-04) ────────
     # The calibration on THIS model (26B, eot_bias 0.0) found finished turns at median
@@ -463,7 +478,10 @@ def _decide(
         )
 
     # ── CONTINUE: the latent impulse. She stopped mid-thought. ───────────────────
-    if eot_margin is not None and not math.isnan(eot_margin):
+    # The knob gates the WHOLE margin block, EXPAND included: both lanes exist only
+    # because the forward reports a stop-vs-continue gap, and "continue" is what the
+    # operator turned off. Gating one and leaving the other would ship half a decision.
+    if (cfg.continue_enabled and eot_margin is not None and not math.isnan(eot_margin)):
         if not quiet_ok:
             return _quiet_silence("her continuation")
         if eot_margin < cfg.continue_margin:
@@ -948,6 +966,34 @@ def solo_worth_saying(text: str) -> tuple[bool, str]:
     first = " ".join(low.split()[:8])
     if him >= 3 or any(first.startswith(w) for w in ("he ", "he's ", "hes ", "his ")):
         return False, "that was a message to him, not her own time (%d mentions)" % him
+    # ── AND IT COULD NOT SEE HIM BEING SPOKEN TO (2026-09-02, the operator) ──────────
+    # Everything above counts THIRD-PERSON mentions. Her first own-time turn after a bounce
+    # opened "I'm sorry, I think I got a little ahead of myself there" and closed "Let's
+    # just stay here, in this moment, for a bit" — addressed to him from end to end, and it
+    # passed this gate with room to spare, because it contains the words he/him/his exactly
+    # ZERO times. A rule that catches "he's finally asleep" and misses "I'm sorry" is
+    # measuring grammar, not address.
+    #
+    # Same two shapes as above, in the second person: a count, and an opener. The count is
+    # the passing-mention allowance ("the kind of thing you notice" is generic English); the
+    # opener is decisive, because a solo turn that BEGINS by addressing him was never her
+    # own time — it is a message to him with a diary's punctuation, which is this function's
+    # own words for the failure it exists to stop.
+    # APOSTROPHES OUT FIRST. `low` keeps them (the third-person rule above wants "he's"),
+    # so "i'm sorry" never matches "im sorry" and "let's" never matches "lets" — which is
+    # exactly how the first cut of this block passed her turn back with room to spare. One
+    # spelling per contraction, then match.
+    flat = low.replace("'", "")
+    first_flat = " ".join(flat.split()[:8])
+    you = sum(flat.count(" %s " % w) for w in ("you", "your", "youre", "yours", "yourself"))
+    if you >= 3:
+        return False, "that was a message to him, not her own time (%d second-person)" % you
+    for opener in ("you ", "your ", "youre ", "im sorry", "sorry ", "lets ",
+                   "thank you", "forgive me", "i didnt mean"):
+        if first_flat.startswith(opener):
+            return False, ("it opens by addressing him (%r) — that is a message, not her time"
+                           % opener.strip())
+
     for phrase in ("miss him", "wonder where", "waiting for", "empty room", "his silence",
                    "the quiet now", "without him"):
         if phrase in low:

@@ -264,6 +264,7 @@ def live_config() -> KairosConfig:
     """Read the knobs fresh, every turn. The UI is the source of truth."""
     return KairosConfig(
         enabled=bool(tune.get("kairos.enabled")),
+        continue_enabled=bool(tune.get("kairos.continue_enabled")),
         continue_margin=float(tune.get("kairos.continue_margin")),
         max_chain=int(tune.get("kairos.max_chain")),
         cooldown_s=float(tune.get("kairos.cooldown_s")),

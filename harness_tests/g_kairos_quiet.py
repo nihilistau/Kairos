@@ -68,11 +68,21 @@ check("kairos.seed_on_boot is a declared knob",
       tune.get("kairos.seed_on_boot") is not None)
 reg_src = open(os.path.join(ROOT, "harness", "tuning", "registry.py"),
                encoding="utf-8").read()
+# ANCHOR ON THE DECLARATION, NOT ON THE NAME (2026-09-02). These sliced 400 chars after
+# the FIRST occurrence of the knob's name anywhere in the file — which for a while was a
+# COMMENT on a neighbouring knob explaining that arming this one to 300 had made the
+# continuation lane unreachable. The slice then read that prose and found "300" where it
+# wanted "0.0", and the gate failed pointing at a default that had not moved. Same src-trap
+# this tree has a name for, arriving through a comment about the very knob under test.
+def _ships(key: str, want: str) -> bool:
+    at = reg_src.find('Knob("kairos.%s"' % key)
+    return at >= 0 and want in reg_src[at:at + 500]
+
+
 check("quiet_after_him_s ships 0.0 (off)",
       '"kairos.quiet_after_him_s"' in reg_src.replace("'", '"')
-      and '0.0' in reg_src.split("quiet_after_him_s", 1)[1][:400])
-check("seed_on_boot ships False (off)",
-      "False" in reg_src.split("seed_on_boot", 1)[1][:400])
+      and _ships("quiet_after_him_s", "0.0"))
+check("seed_on_boot ships False (off)", _ships("seed_on_boot", "False"))
 
 print("\n2. SEED IS A CHOICE — off means a fresh boot waits for him")
 from harness.kairos import scheduler as S  # noqa: E402
@@ -164,7 +174,9 @@ def _world(**kw):
 
 
 def _cfg(quiet_s):
-    return KairosConfig(enabled=True, cooldown_s=45.0, checkin_idle_s=240.0,
+    # continue_enabled=True: CONTINUE/EXPAND are OFF by default since 2026-09-02 (the operator), and the legs below are ABOUT that lane — a gate that needs a feature turns it on rather than inheriting it
+    return KairosConfig(enabled=True, continue_enabled=True,
+                        cooldown_s=45.0, checkin_idle_s=240.0,
                         checkin_chance=1.0, solo_every_s=900.0, solo_chance=1.0,
                         quiet_after_him_s=quiet_s)
 

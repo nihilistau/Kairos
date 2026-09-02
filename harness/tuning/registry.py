@@ -113,6 +113,19 @@ KNOBS: list[Knob] = [
          "Master switch. Off = she only ever speaks when spoken to. On = she may finish a "
          "thought she was cut off in, and may check in after a long silence — bounded by "
          "the knobs below, and she stays silent almost always."),
+    # ── OFF BY DEFAULT, BY HIS DECISION (2026-09-02) ────────────────────────────
+    # "i'm unsure about continue, lets default it to off. it always seems to create
+    # problems and slow downs."
+    #
+    # The lane had already been dark for thirteen days by ACCIDENT — quiet_after_him_s at
+    # 300 makes it unreachable, since a continuation is decided seconds after his turn.
+    # This turns that into a decision. The margin knob below still applies when it is on.
+    Knob("kairos.continue_enabled", "Kairos — speaking unprompted",
+         "Finish a cut-off thought", "bool", False,
+         "When the forward reports she was cut off mid-sentence, may she pick the thread "
+         "back up a few seconds later? OFF by default: it needs the native engine's "
+         "eot_margin, and on a slow turn a continuation is a second full generation.",
+         danger="Also gates the follow-on (EXPAND) — both lanes read the same signal."),
     Knob("kairos.continue_margin", "Kairos — speaking unprompted",
          "Continue margin (logits)", "float", -18.50,
          "How reluctantly she must have stopped before she picks the thread back up. "

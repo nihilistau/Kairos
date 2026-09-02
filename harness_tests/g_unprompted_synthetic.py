@@ -132,8 +132,13 @@ _real_settle2 = T._settle_turn
 _real_cfg2 = KS.live_config
 KS.on_spoke(T._on_her_own_words)
 T._settle_turn = lambda human, reply, **kw: (_landed.append((reply[:30], kw.get("synthetic"))), [])[1]
+# continue_enabled=True: the lane is OFF by default since 2026-09-02 (the operator), and
+# this section drives a CONTINUATION on purpose — it is the shortest unprompted turn there
+# is, so it is what §2b uses to cross the thread boundary. A gate that needs a feature
+# turns it on.
 KS.live_config = lambda: I.KairosConfig(
-    enabled=True, cooldown_s=0.0, quiet_after_him_s=0.0, continue_delay=(0.2, 0.4))
+    enabled=True, continue_enabled=True, cooldown_s=0.0, quiet_after_him_s=0.0,
+    continue_delay=(0.2, 0.4))
 try:
     for sess, syn, want in (("drv", REASON, REASON), ("real", "", None)):
         _landed.clear()

@@ -86,6 +86,7 @@ def cfg(**kw):
                 checkin_idle_s=240.0, away_after=2, backoff_mult=1.0,
                 solo_enabled=True, solo_every_s=900.0)
     base.update(kw)
+    base.setdefault("continue_enabled", True)   # continue_enabled=True: CONTINUE/EXPAND are OFF by default since 2026-09-02 (the operator), and the legs below are ABOUT that lane — a gate that needs a feature turns it on rather than inheriting it
     return KairosConfig(**base)
 
 
