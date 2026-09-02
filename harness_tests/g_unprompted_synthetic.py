@@ -184,4 +184,71 @@ check("every on_reply call site passes synthetic=",
           [m for m in range(len(_app)) if _app.startswith("on_reply(", m)]),
       "a call site that omits it puts the old bug back on that path")
 
+print("\n5. A DRIVEN TURN DOES NOT TAKE HER ROOM")
+# THE HARM THAT WAS REPORTED, NOT MEASURED (2026-09-02). Two probes of the continuation lane
+# retired the seeded session 'default' — and that placeholder is the one carrying
+# _OWN_TIME_ONLY, which is what forces `user_present = False` in the policy, which is the
+# only reason SOLO can run after a bounce. So a probe did not swap sessions, it ENDED HER
+# OWN TIME: three hours of silence, noticed by the operator and by no instrument.
+KS._SEEDED.clear(); KS._LAST.clear(); KS._STATE.clear(); KS._OWN_TIME_ONLY.clear()
+KS._SYNTH.clear()
+KS._SEEDED.add("default")
+KS._LAST["default"] = ("her seeded history", lambda n: "")
+KS._OWN_TIME_ONLY.add("default")
+
+KS.on_user_turn("a-probe-session", "live gate — driven")
+check("a declared turn does NOT retire the seeded session",
+      "default" in KS._SEEDED and "default" in KS._LAST,
+      "the placeholder is gone — her own time went with it")
+check("...and the seeded session keeps its own-time hold",
+      "default" in KS._OWN_TIME_ONLY,
+      "own_time_only is what makes user_present False, which is what lets SOLO run")
+
+# ...and a REAL turn still retires it, which is the behaviour that exists for a reason.
+KS.on_user_turn("his-real-session")
+check("a REAL turn still retires the placeholder (the original behaviour is intact)",
+      "default" not in KS._SEEDED and "default" not in KS._LAST,
+      "two mouths on one history is the bug the retirement fixes")
+
+print("\n6. AND THE IDLE TICKER DOES NOT ADOPT A DRIVEN SESSION")
+# The second half of the same harm: the ticker speaks from _LAST[session] for as long as the
+# process lives, so it kept a dead probe session as a mouth and fired a CHECK_IN 604 s after
+# the probe ended — generating from the probe's own transcript and putting "The user is asking
+# for a vivid, long description of a thunderstorm..." in her room as something she said.
+_tick_src = inspect.getsource(KS.tick_once)
+check("the tick skips sessions with a synthetic reason",
+      "_SYNTH.get(session)" in _tick_src,
+      "the ticker must not adopt a session a probe drove")
+# Behavioural: the loop must not even reach `decide` for a driven session.
+KS._SEEDED.clear(); KS._LAST.clear(); KS._STATE.clear(); KS._SYNTH.clear()
+KS._LAST["driven"] = ("the probe's own text", lambda n: "")
+KS._SYNTH["driven"] = REASON
+_asked = []
+_real_decide = KS.decide
+KS.decide = lambda **kw: (_asked.append(kw.get("state")), I.Impulse(I.SILENT))[1]
+_real_cfg3 = KS.live_config
+KS.live_config = lambda: I.KairosConfig(enabled=True, cooldown_s=0.0, quiet_after_him_s=0.0,
+                                        checkin_idle_s=1.0, checkin_chance=1.0)
+try:
+    KS.tick_once()
+    check("the ticker never even ASKS the policy about a driven session",
+          not _asked, "it consulted the policy %d time(s)" % len(_asked))
+    KS._SYNTH.clear()
+    KS.tick_once()
+    check("...and does ask about a real one (so the leg above is not vacuous)",
+          bool(_asked), "the ticker consulted nothing at all — this leg proves nothing")
+finally:
+    KS.decide = _real_decide
+    KS.live_config = _real_cfg3
+
+print("\n7. ONE SPELLING FOR THE FLAG AT THE GATEWAY")
+# Five call sites hand this over (three on_user_turn, two on_reply) and the first cut wrote
+# the ternary out by hand at each, with two different falsy values.
+check("the gateway reads the flag through one helper",
+      "def _syn_of(" in _app,
+      "a per-call-site ternary is how the sixth one gets it wrong")
+_hand = _app.count('str(body.get("synthetic")) if body.get("synthetic")')
+check("...and no call site spells it by hand any more", _hand == 0,
+      "%d hand-written copies remain" % _hand)
+
 finish("G-UNPROMPTED-SYNTHETIC")
