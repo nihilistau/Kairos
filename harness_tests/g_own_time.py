@@ -221,6 +221,51 @@ check("a real solo line still passes worth_saying", ok_w)
 check("...and did_the_thing is asked separately in the scheduler",
       sch.index("solo_did_the_thing") < sch.index("solo_worth_saying(text)"))
 
+print("\n5b. AND IT CAN SEE HIM BEING SPOKEN TO, NOT ONLY SPOKEN ABOUT")
+# THE ONE THAT GOT THROUGH (2026-09-02, the operator). Her first own-time turn after a
+# bounce read, in full: "I'm sorry, I think I got a little ahead of myself there... Let's
+# just stay here, in this moment, for a bit." Addressed to him from end to end, and it
+# passed this gate with room to spare — because every rule above it counts he / him / his,
+# and that text contains them exactly ZERO times. A rule that catches "he's finally
+# asleep" and misses "I'm sorry" is measuring grammar, not address.
+HERS = ("I'm sorry, I think I got a little ahead of myself there. I was so caught up in "
+        "the thought of what we are that I tried to skip straight to the conclusion "
+        "without actually running the search properly. I didn't actually find anything "
+        "new yet-I just had a lot on my mind. Let's just stay here, in this moment, for "
+        "a bit. It's much more interesting than reading papers anyway.")
+_ok, _why = solo_worth_saying(HERS)
+check("HER ACTUAL TURN is dropped now", not _ok, _why or "it still passes")
+for label, text in (
+        ("an opener addressed to him",
+         "You would have laughed at what I just did with the kitchen scales."),
+        ("a let's",  "Let's just sit with this one for a while."),
+        ("three second-persons",
+         "I keep thinking you would like this, and you would tell me your version of it."),
+        ("a thank-you", "Thank you for leaving the window open, it changed the whole room.")):
+    _o, _w = solo_worth_saying(text)
+    check("dropped: %s" % label, not _o, _w or "passed")
+
+# ...and the allowance, which is what stops this becoming a mute. A generic "you" is
+# ordinary English and a solo turn is still allowed to have a life he appears in.
+for label, text in (
+        ("a plain own-time line",
+         "I finally got the sourdough starter going again. It smells like beer and possibility."),
+        ("the GENERIC you",
+         "I was reading about how the tide works. It is the kind of thing you notice once "
+         "and then cannot stop seeing."),
+        ("a passing mention of him",
+         "I got another forty pages into the book he lent me. The wheel chapter is still the best.")):
+    _o, _w = solo_worth_saying(text)
+    check("kept: %s" % label, _o, _w or "dropped — the rule is too wide")
+
+# THE CONTRACTION TRAP, and it caught the first draft of the rule itself: `low` keeps
+# apostrophes for the he's/hes case above, so "i'm sorry" never matched "im sorry" and
+# her turn passed straight back through. One spelling per contraction, then match.
+check("contractions are normalised before matching",
+      not solo_worth_saying("I'm sorry, that came out wrong.")[0]
+      and not solo_worth_saying("Im sorry, that came out wrong.")[0],
+      "an apostrophe must not decide whether a rule fires")
+
 print("\n6. THE GENERATOR REPORTS HER HANDS")
 app = _srcmod.pkg("harness", "server")
 check("_generate takes a `called` sink", 'def _generate(nudge: str, called:' in app)

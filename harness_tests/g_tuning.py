@@ -76,7 +76,8 @@ def main() -> int:
     check("reset restores the declared default", tune.get("kairos.cooldown_s") == 45.0)
 
     # ── THE LOAD-BEARING TEST: does the knob actually bite? ────────────────────
-    from harness.kairos.impulse import CONTINUE, SILENT, TurnState, decide, note_spoke
+    from harness.kairos.impulse import (CONTINUE, SILENT, KairosConfig, TurnState,
+                                        decide, note_spoke)
     from harness.kairos import scheduler as ks
 
     # SYNTHETIC CLOCKS (2026-08-23): a fresh TurnState's clocks default to impulse.BOOT_AT,
@@ -89,10 +90,34 @@ def main() -> int:
     import harness.kairos.impulse as _imp_pin  # noqa: E402
     _imp_pin.BOOT_AT = 1.0
 
-    tune.set_many({"kairos.enabled": True, "kairos.max_chain": 1})
+    # CONTINUE IS OFF BY DEFAULT SINCE 2026-09-02 (the operator: "it always seems to create
+    # problems and slow downs"), and the three legs below drive the continuation lane to
+    # prove max_chain and continue_margin BITE. They are about those two knobs, so the lane
+    # is armed here explicitly rather than being assumed on — which is also the honest
+    # shape: a gate that needs a feature should turn it on, not inherit it. The new knob
+    # gets its own leg immediately below.
+    tune.set_many({"kairos.enabled": True, "kairos.max_chain": 1,
+                   "kairos.continue_enabled": True})
     cfg = ks.live_config()
     check("the scheduler reads the LIVE config", cfg.enabled and cfg.max_chain == 1,
           f"enabled={cfg.enabled} max_chain={cfg.max_chain}")
+
+    # ── THE NEW KNOB BITES, BOTH WAYS ────────────────────────────────────────────────
+    # A knob that does not change behaviour is decoration — this gate's own first line.
+    _st0 = TurnState(last_user_at=100.0)
+    _deep = cfg.continue_margin - 5.0
+    tune.set_many({"kairos.continue_enabled": False})
+    _off = decide(cfg=ks.live_config(), state=_st0, now=101.0, eot_margin=_deep,
+                  reply_text="mid thought")
+    check("continue_enabled=False -> a genuine cut-off produces NOTHING",
+          _off.action != CONTINUE, f"margin {_deep} still continued: {_off.reason}")
+    tune.set_many({"kairos.continue_enabled": True})
+    _on = decide(cfg=ks.live_config(), state=_st0, now=101.0, eot_margin=_deep,
+                 reply_text="mid thought")
+    check("...and True brings the same turn straight back (so the leg above is not vacuous)",
+          _on.action == CONTINUE, _on.reason)
+    check("OFF is the shipped default", KairosConfig().continue_enabled is False,
+          "the operator turned this off; a default of True would put it back silently")
 
     # THE CUT-OFF MARGIN IS DERIVED, NOT HARDCODED (2026-07-30). This said -15.0, a
     # number chosen because it sat below the retired reference model's calibrated -11.75. The margin scale is

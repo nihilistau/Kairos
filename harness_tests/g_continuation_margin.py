@@ -52,7 +52,8 @@ def _decide(cfg, now, margin, **kw):
 
 
 now = time.monotonic()
-cfg = I.KairosConfig(enabled=True)   # quiet_after_him_s = 0 -> the quiet gate is open
+# continue_enabled=True: CONTINUE/EXPAND are OFF by default since 2026-09-02 (the operator), and the legs below are ABOUT that lane — a gate that needs a feature turns it on rather than inheriting it
+cfg = I.KairosConfig(enabled=True, continue_enabled=True)   # quiet_after_him_s = 0
 
 # ── §1  THE CAPABILITY IS THE ENGINE'S, AND THE LANE IS BEHIND IT ────────────────────
 print("1. EOT_MARGIN IS ENGINE-ONLY, AND CONTINUE/EXPAND ARE BEHIND IT")
@@ -225,7 +226,9 @@ print("\n4. THE UNPROMPTED LANES ARE UNAFFECTED BY THE MARGIN'S ABSENCE")
 # Published claim: spoke-up (CHECK_IN / MUSE / REMIND) and her own-time acts (SOLO) run on
 # any backend. They live BELOW the margin block, so a None margin must not shortcut them.
 _src_dec = __import__("inspect").getsource(I._decide)
-_guard = _src_dec.find("if eot_margin is not None")
+# The guard gained `cfg.continue_enabled and` in front of it when the lane was turned
+# off by default (2026-09-02), so anchor on the part that is ABOUT the margin.
+_guard = _src_dec.find("eot_margin is not None")
 check("the margin block exists and is bounded", _guard > 0)
 for lane in ("REMIND", "SOLO", "MUSE"):
     at = _src_dec.find("%s," % lane)

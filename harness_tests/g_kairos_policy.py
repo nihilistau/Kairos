@@ -57,7 +57,8 @@ def main() -> int:
     # confirming each other is the exact failure a gate exists to prevent, so the numbers
     # are named here rather than sprinkled as literals.
     FINISHED, CUT = 13.10, -28.43        # 26B medians; threshold -18.50
-    cfg = KairosConfig(enabled=True)
+    # continue_enabled=True: CONTINUE/EXPAND are OFF by default since 2026-09-02 (the operator), and the legs below are ABOUT that lane — a gate that needs a feature turns it on rather than inheriting it
+    cfg = KairosConfig(enabled=True, continue_enabled=True)
     rng = random.Random(7)
 
     # 1. ordinary finished turn -> SILENT (the calibrated margin of a completed thought)

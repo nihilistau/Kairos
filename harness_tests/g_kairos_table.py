@@ -117,7 +117,15 @@ def run_cell(bits):
     """Build the EXACT world for one cell and ask the REAL decide()."""
     d = dict(zip(COORDS, bits))
     now = 100000.0
-    cfg = I.KairosConfig(enabled=bool(d["enabled"]))
+    # continue_enabled=True: the lane went OFF by default on 2026-09-02 (the operator's
+    # call — "it always seems to create problems and slow downs"). THIS TABLE IS ABOUT
+    # PRECEDENCE, not about which knobs are currently set: `contlow` is a coordinate, and a
+    # coordinate that can never be reached is not a ruling, it is a hole. Freezing the table
+    # with the lane off would have deleted the `contlow -> CONTINUE` row from the artifact —
+    # so the day he arms it, the board would silently disagree with decide() and this gate
+    # would go red pointing at a policy nobody changed. The knob's own both-ways legs live
+    # in G-TUNING; the shape of the rules lives here.
+    cfg = I.KairosConfig(enabled=bool(d["enabled"]), continue_enabled=True)
     state = I.TurnState(
         chain=cfg.max_chain if d["chainmax"] else 0,
         last_spoke_at=(now - 10.0) if d["cooling"] else 0.0,       # 10 < cooldown 45
