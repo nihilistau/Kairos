@@ -986,6 +986,27 @@ _ACT_CLAIMS = (
 )
 
 
+def _act_already_done(text: str, did_call) -> "tuple|None":
+    """Has the act this text reports ALREADY HAPPENED in this turn? -> (name, tools) or None.
+
+    `_claims_an_act` names the shape of a reported act and deliberately does not judge
+    truth ("the caller decides whether a matching call actually happened"). For most of a
+    year the caller decided that PER ROUND — and the normal shape of a tool-using turn is
+    round 0 CALLS, round 1 NARRATES, so round 1 always looked like an invention and the
+    re-ask accused her of a tool that had run ninety seconds earlier.
+
+    A FUNCTION AND NOT AN INLINE `&` (2026-09-02). The first cut was one expression inside
+    the stream loop, and its gate could only grep for it — which passed against a mutant
+    that deleted the check, because the same substring survived in the log line beside it.
+    A seam gets a gate that drives it; this is the seam.
+    """
+    hit = _claims_an_act(text)
+    if not hit:
+        return None
+    done = set(hit[1]) & set(did_call or ())
+    return (hit[0], tuple(sorted(done))) if done else None
+
+
 def _claims_an_act(s: str):
     """If this text reports an act from the committed table, return (name, tools).
 
@@ -1181,6 +1202,21 @@ def agent_chat_stream(
     _out_of_time = False
     _replanned = False        # the one re-ask a planning turn gets, per turn
     _owed_answer = False      # last round called a tool and she has not replied yet
+    # ── WHAT SHE HAS ACTUALLY DONE THIS TURN (2026-09-02) ────────────────────────────
+    # The claimed-act guard below was measured PER ROUND: "this round's text reports an
+    # act and this round emitted no fence" -> she is claiming. But the normal, correct
+    # shape of a tool-using turn is round 0 CALLS and round 1 NARRATES, so round 1 always
+    # looks like a claim — and the re-ask tells her "you said you did it and nothing ran"
+    # about a tool that ran ninety seconds earlier.
+    #
+    # It bit hardest on her OWN TIME, because the solo nudge asks her to do a thing and
+    # then say what she did, which is verbatim what `_claims_an_act` matches. Live
+    # 2026-09-02: web_search ran at 14:10:30, round 1 narrated it, the guard called it a
+    # claim, the re-ask made her apologise ("I hit a wall with my own execution"), and the
+    # apology was then dropped as a message to him. Three own-time turns in a row produced
+    # nothing, at two to three minutes of GPU each, and the operator's report was the only
+    # instrument that noticed.
+    _did_call: set = set()    # tool names that really executed, across the whole turn
 
     for _round in range(max_rounds):
         # Round 0 always runs — she must be allowed to try once however slow the box is.
@@ -1386,6 +1422,19 @@ def agent_chat_stream(
             # even if a fence-shaped substring made the hold think "tool".
             if flushed == 0 and _looks_like_scratchpad(buf) and is_tool not in ("plan", "claim"):
                 is_tool = "plan"
+            # A NARRATION OF SOMETHING SHE ACTUALLY DID IS NOT A CLAIM. If any tool
+            # this text needs has already run in this turn, the report is TRUE and the
+            # re-ask would be accusing her of the thing she just did correctly.
+            if is_tool == "claim":
+                _done = _act_already_done(buf, _did_call)
+                if _done:
+                    _logging.getLogger(__name__).info(
+                        "[agent] round=%d reports %s and %s really ran this turn "
+                        "— that is a report, not a claim",
+                        _round, _done[0], "/".join(_done[1]))
+                    is_tool = False
+                    yield buf
+                    flushed = len(buf)
             if is_tool in ("plan", "claim") and not _replanned:
                 _replanned = True
                 claim = _claims_an_act(buf) if is_tool == "claim" else None
@@ -1448,6 +1497,7 @@ def agent_chat_stream(
                 str(result).replace("\n", " "))
             if on_tool:
                 on_tool(name, {"args": args, "kwargs": kwargs}, result)
+            _did_call.add(name)          # she really did this one, this turn
             outputs.append(f"{name} -> {result}")
         # HINDSIGHT 2026-07-10 numeric-fidelity fix: after a tool round, answer at low
         # temperature (the 0.6/1.3 chat config garbles numbers when paraphrasing tool
