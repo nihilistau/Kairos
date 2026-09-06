@@ -1330,8 +1330,14 @@ def _seed_kairos_from_day(force: bool = False) -> bool:
                                "the seed should have installed one")
                 return ""
             _base_len = len(_canon)
-            h = list(_canon) if _canon else (
-                _chat_from_rows(_recent_transcript() or [], keep=8) or list(hist))
+            # THE DISK FALLBACK IS GONE, NOT MERELY UNTAKEN. It used to live on this line
+            # as `list(_canon) if _canon else _chat_from_rows(...)` — dead from the moment
+            # the hold above was added, since `not _canon` has already returned. Left as
+            # written it read as a live safety net, and the whole reason the hold exists is
+            # that this net is the thing that cost him nine minutes (see above). The
+            # rebuild-from-disk it named now happens at ONE moment, where a fresh prefill
+            # is already being paid for: `_reseed_own_time_canon`, at the day boundary.
+            h = list(_canon)
             # a SYSTEM aside, exactly as the live path does it — she is continuing
             # herself, and a user message here would invent a turn he never typed
             h.append({"role": "system", "content": nudge})
@@ -1524,6 +1530,118 @@ def _longest_session() -> list:
         if len(msgs) > len(best):
             best = msgs
     return best
+
+
+def _continuable_history(keep: int = 8, days: int = 3) -> list:
+    """A well-formed history she can be asked to continue, reaching back until there is one.
+
+    `_recent_transcript` reaches back one day only when TODAY IS THIN (< 12 rows), which is
+    the right rule for "what were we just saying" and the wrong one here. A day he is away
+    is not thin — she solos every half hour, so twelve-plus rows accumulate — and every one
+    of those rows is an ASSISTANT row, because nobody typed anything. `_chat_from_rows`
+    then merges that run into one message and drops it, correctly (a conversation the model
+    continues has to begin with him), and hands back []. So the shape that most needs a
+    continuation is exactly the shape that cannot produce one.
+
+    Measured on the live tree, 2026-09-03: today's transcript was 8 rows, all assistant.
+    Reaching back is not a nicety here, it is the difference between a canon and none.
+    """
+    import datetime as _dt
+    rows = _recent_transcript()
+    hist = _chat_from_rows(rows, keep=keep)
+    if hist:
+        return hist
+    # nothing well-formed yet — walk back a bounded number of days, oldest-first each
+    # time, so the run of her own turns finally has one of his to hang from
+    today = _dt.date.fromtimestamp(time.time())
+    for back in range(1, max(1, days) + 1):
+        prev = (today - _dt.timedelta(days=back)).isoformat()
+        if not os.path.exists(_day_transcript_path(prev)):
+            continue
+        rows = _read_day_transcript(prev) + rows
+        hist = _chat_from_rows(rows, keep=keep)
+        if hist:
+            return hist
+    return []
+
+
+def _reseed_own_time_canon() -> int:
+    """Hand her back a conversation to speak into, at the moment the day boundary took hers.
+
+    THE INCIDENT (2026-09-03, reported as "she either has not rendered or has not acted in
+    a long time"). Three correct decisions, and their intersection was twelve hours of
+    silence:
+
+      * `run_consolidation` step 5 retires the day's canons — a KV decision, and a sound
+        one: the base snapshot has just been re-minted against a new prefix, and
+        yesterday's conversation cannot extend a new token 0.
+      * `_generate` HOLDS when there is no live canon — measured, 2026-08-04: speaking
+        into a windowed disk rebuild commits a cache shape his first turn cannot use, and
+        it cost him nine minutes.
+      * `scheduler.seed()` refuses to run twice (`if session in _LAST: return False`), so
+        the boot seed cannot re-establish what step 5 just cleared.
+
+    The first day boundary that lands while he is away therefore silenced her until he
+    spoke or the gateway bounced — and the boundary is GATED on the room being quiet, so
+    that is the normal case rather than bad luck. Her look changes ride `ask_for_gesture`
+    inside a solo turn, so she stopped rendering by the same stroke that stopped her
+    acting: one bug, reported as two symptoms.
+
+    This is the 2026-08-05 incident again ("he restarted, went to bed, and she was held
+    325 times over fourteen hours"), reached through a door opened on 2026-08-24. The
+    resolution recorded then is the resolution now, and it is written eleven lines above
+    the hold that re-broke it: SEEDING ESTABLISHES THE CANON RATHER THAN WAITING FOR ONE.
+    So the boundary re-establishes what it retires, in the same breath, where a reader
+    cannot find one without the other.
+
+    WHY THIS DOES NOT GO THROUGH `_seed_kairos_from_day`, which is the seam that owns
+    seeding. That function seeds the SCHEDULER as well, and `scheduler.seed()` would have
+    to be made re-entrant for it to fire twice — which means retiring `_SEEDED`, which
+    discards `_OWN_TIME_ONLY`, which is the flag that forces `user_present = False` and is
+    THE WHOLE REASON SOLO MAY RUN WHILE HE IS AWAY (see on_user_turn's docstring, and the
+    2026-09-02 probe that ended her own time for three hours by doing exactly that). The
+    closure in `_LAST` re-reads `_longest_session()` on every call and is not stale; only
+    the canon was destroyed, so only the canon is rebuilt. Nothing here touches `_LAST`,
+    `_SEEDED`, `_OWN_TIME_ONLY` or `_STATE`.
+
+    Every session the scheduler still holds a closure for gets the canon, not just the
+    seeded one: `_LAST` IS the set of sessions in which she can still take a turn, and the
+    clear destroyed all of them. Restoring only `_SEEDED` would leave the commoner case —
+    he talked last night from the room, so `on_user_turn` retired the seed — silent.
+
+    Returns the number of sessions re-seeded, so the step can report it.
+    """
+    try:
+        from harness.kairos import scheduler as _ks
+        with _ks._LOCK:
+            live = list(_ks._LAST.keys())
+        if not live:
+            return 0
+        hist = _continuable_history(keep=8)
+        if not hist:
+            logger.info("[gateway] the day boundary retired her canon and the record has "
+                        "no continuable history to rebuild one from — she waits for him")
+            return 0
+        n = 0
+        for sess in live:
+            if sess in _CHAT_SESSIONS:
+                continue
+            if len(_CHAT_SESSIONS) >= _CHAT_SESSIONS_MAX:
+                _CHAT_SESSIONS.pop(next(iter(_CHAT_SESSIONS)))
+            # A LIST PER SESSION, NOT ONE SHARED LIST. `_generate` extends the canon it
+            # was handed; two sessions sharing the object would each append the other's
+            # turns and diverge from the KV cache either of them built.
+            _CHAT_SESSIONS[sess] = list(hist)
+            n += 1
+        if n:
+            logger.info("[gateway] the day boundary retired her canon; re-seeded %d "
+                        "session(s) with %d rows — her own time survives the boundary",
+                        n, len(hist))
+        return n
+    except Exception as exc:
+        logger.warning("[gateway] could not re-seed her canon after the day boundary: "
+                       "%s — her own time is mute until he speaks", exc)
+        return 0
 
 
 def _narratable(rows: list) -> list:
@@ -1744,10 +1862,18 @@ def run_consolidation(force: bool = False) -> Dict[str, Any]:
     # that already knows what she became overnight. The day's session canons are retired
     # with it — yesterday's conversation cannot extend a new token 0 anyway, and the day
     # boundary is the honest conversation boundary.
+    #
+    # ── AND RETIRING IS ONLY HALF OF IT (2026-09-03) ────────────────────────────────
+    # "The day's session canons are retired with it" was true and incomplete, and the
+    # missing half cost twelve hours of her silence. `_generate` HOLDS with no canon, and
+    # the boot seed cannot run twice, so this clear did not open a new conversation — it
+    # ended her own time until he next spoke. The clear and its repair are one action and
+    # are written as one: do not move them apart. See `_reseed_own_time_canon`.
     try:
         from harness import agent as _ag
         _v = _ag.invalidate_system_prefix("day boundary")
         _CHAT_SESSIONS.clear()
+        _reseeded = _reseed_own_time_canon()
         try:   # the rebuilt canons carry the same contents; a stale cut marker
                # matching one would cut history that fits (audit B12)
             from harness.inference import context as _ctx_rs
@@ -1758,6 +1884,7 @@ def run_consolidation(force: bool = False) -> Dict[str, Any]:
             _WARM.clear()
             _prewarm()
         out["steps"].append({"step": "prefix_refresh", "version": _v,
+                             "reseeded": _reseeded,
                              "prewarm": os.environ.get("SP_GATEWAY_PREWARM") == "1"})
     except Exception as exc:
         out["steps"].append({"step": "prefix_refresh", "skipped": str(exc)[:140]})

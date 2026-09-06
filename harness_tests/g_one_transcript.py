@@ -140,9 +140,43 @@ check("_generate prefers the live canonical session",
 # AMENDED 2026-08-28: still the disk, but via `_recent_transcript`, which reaches back
 # across local midnight when today is thin. The fallback was reading a file named from
 # `time.localtime`, so at 00:00 it fell back to nothing at all — see G-DAY-TRANSCRIPT.
-check("...and still falls back to disk when there is no live session",
-      "_recent_transcript()" in gblk or "_read_day_transcript()" in gblk,
-      "she must still be able to speak first after a restart")
+#
+# ── AND THIS CHECK WAS GRADING A DEAD LINE (2026-09-03) ───────────────────────────────
+# It read: `"_recent_transcript()" in gblk or "_read_day_transcript()" in gblk`, detailed
+# "she must still be able to speak first after a restart" — a SUBSTRING GREP on a branch
+# that had not been reachable since the hold above it was added. `_generate` returns ""
+# when `_longest_session()` is empty, so `list(_canon) if _canon else <rebuild>` could
+# never take its else. The claim was true and this was not what made it true: what lets
+# her speak first after a restart is `_seed_kairos_from_day` INSTALLING the canon at boot
+# (the 2026-08-05 fix, "the seed must BE a conversation, not wait for one"). The gate
+# graded the expression rather than the behaviour, so it went on passing while the line it
+# named did nothing — and it would have gone on passing if the seed had been deleted.
+#
+# The invariant is real, so it is asserted where it actually lives: A DISK-SOURCED REBUILD
+# EXISTS AT EVERY MOMENT THERE IS NO LIVE CANON, and there are exactly two such moments —
+# boot, and the day boundary that retires the day's canons (2026-09-03: the boundary
+# cleared them and gave nothing back, and she was mute for twelve hours; see
+# G-DAY-BOUNDARY-CANON). Both go through `_recent_transcript`, so midnight is still
+# handled in both.
+check("_generate HOLDS rather than rebuilding — the rebuild is what cost him nine minutes",
+      "the seed should have installed one" in gblk and "return \"\"" in gblk,
+      "no-canon must be a hold, not a windowed disk rebuild")
+check("...and the dead `else` rebuild is gone, not merely unreachable",
+      "_recent_transcript() or []" not in gblk,
+      "a branch that reads as a live safety net and is not one")
+check("the disk rebuild exists at boot — she can still speak first after a restart",
+      "_recent_transcript()" in src[src.index("def _seed_kairos_from_day("):
+                                    src.index("def _read_day_transcript(")],
+      "_seed_kairos_from_day is what makes the restart claim true")
+check("...and at the day boundary, which is the other moment there is no canon",
+      "_reseed_own_time_canon()" in src[src.index("def run_consolidation("):]
+      and "_recent_transcript()" in src[src.index("def _continuable_history("):
+                                        src.index("def _reseed_own_time_canon(")],
+      "the clear and its repair are one action")
+check("...and the boundary's repair sits on the line after the clear it repairs",
+      re.search(r"_CHAT_SESSIONS\.clear\(\)\s*\n\s*_reseeded = _reseed_own_time_canon\(\)",
+                src) is not None,
+      "moved apart, the next reader finds one without the other")
 check("_longest_session is NOT _longest_transcript",
       "def _longest_session(" in src and "def _longest_transcript(" in src,
       "one wants the fullest record of the day, the other the list the KV was built from")

@@ -120,6 +120,59 @@ def main() -> int:
     for n in sorted(sys_names - cod_names):
         check("%s still in the assembled set" % n, n in specs)
 
+    # 5. A REFUSAL SHE CAN ACT ON (2026-09-03). Same family as §3 — what a tool says back
+    #    when it will not do the thing — and the failure was measured on HER OWN TIME:
+    #    three of her last eight run_python calls died the same way, all at column 14.
+    #
+    #        code='import math; def decay_thought(initial, rate, steps): values = []; ...'
+    #        -> Error: SyntaxError('invalid syntax', ('<unknown>', 1, 14, ...))
+    #
+    #    A `def`/`for`/`if` may not follow a `;` — Python's grammar forbids a compound
+    #    statement on a simple-statement line. She writes one-liners because a tool CALL is
+    #    one line, so the shape she reaches for is the shape that cannot work, and the
+    #    answer named neither the rule nor the fix. She spent the solo turn reporting it:
+    #    "I tried to model the decay of a thought, but I hit another error."
+    #
+    #    Asserted on her VERBATIM failing input, and on the advice actually running, so the
+    #    message cannot drift into telling her to do something impossible.
+    print("\n5. an unparseable program is refused with the rule and the fix")
+    # THROUGH THE ASSEMBLED SPEC, like every other section here: importing the function
+    # directly would pass on a tree where the name is bound to something else, which is
+    # this gate's whole subject.
+    # ...and through ToolSpec.call(), which is the door a real turn goes through (the
+    # cooldown and the wrong-keyword shim live there), not the bare function.
+    _rp_spec = specs.get("run_python")
+    check("run_python is in the assembled set at all", _rp_spec is not None)
+
+    def rp(code):
+        return _rp_spec.call(code=code) if _rp_spec is not None else "(unreachable)"
+
+    check("...and its advertised description carries the multi-line rule she needs",
+          _rp_spec is not None and "\\n" in (_rp_spec.description or ""),
+          (_rp_spec.description if _rp_spec is not None else "")[:130])
+    hers = ("import math; def decay_thought(initial, rate, steps): "
+            "values = []; current = initial")
+    r = str(rp(hers))
+    check("her real call is refused, not run", "does not parse" in r, r[:110])
+    check("...and the answer names the rule", "cannot follow a ';'" in r, r[:110])
+    # NOT `"\\n" in r` — the first cut asserted that and stayed GREEN under the mutant,
+    # because the old message repr'd her source and something in it satisfied the
+    # substring. A check the mutant survives is not measuring the fix (AGENTS.md §0).
+    check("...and the fix, in words only the new message has",
+          "write those lines with" in r, r[:110])
+    fixed = ("import math\ndef decay_thought(initial, rate, steps):\n"
+             "    return initial * math.exp(-rate * steps)\n"
+             "print(round(decay_thought(1.0, 0.5, 2), 4))")
+    check("...and taking that advice WORKS (not impossible advice)",
+          str(rp(fixed)).strip() == "0.3679", str(rp(fixed))[:110])
+    check("a plain one-liner is untouched",
+          "0.8414" in str(rp("import math; print(math.sin(1))")),
+          str(rp("import math; print(math.sin(1))"))[:110])
+    check("a RUNTIME error is still reported as one, not as a parse failure",
+          "ZeroDivisionError" in str(rp("print(1/0)")), str(rp("print(1/0)"))[:110])
+    check("the REPL-style bare final expression still auto-prints",
+          str(rp("2 + 40")).strip() == "42", str(rp("2 + 40"))[:60])
+
     print("\nG-TOOLSAFETY: %s (%d/%d)" % ("PASS" if not FAIL else "FAIL",
                                           PASS, PASS + FAIL))
     if FAIL:

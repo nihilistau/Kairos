@@ -8,6 +8,7 @@ output. Pair with harness.skills.memory.MEMORY_TOOLS + harness.toolcore.run_pyth
 """
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -21,6 +22,10 @@ from harness.loud import swallowed as _swallowed
 _swlog = logging.getLogger(__name__)
 
 _OUT_CAP = 2000
+
+# `; def` / `; for` — the one-liner shape her run_python calls keep dying on. See the note
+# in run_python for the measurement.
+_SEMI_THEN_BLOCK = re.compile(r";\s*(?:async\s+)?(?:def|for|while|if|with|class|try)\b")
 
 
 def _cap(s: str) -> str:
@@ -80,7 +85,34 @@ def run_powershell(command: str) -> str:
 
 # ──── Code ───────────────────────────────────────────────────────────────────
 def run_python(code: str) -> str:
-    """Execute Python code and return its output; a final bare expression is auto-printed (REPL-style, 15s timeout)."""
+    r"""Execute Python code and return its output; a final bare expression is auto-printed (REPL-style, 15s timeout). For more than one line write \n between the lines — a def/for/if cannot follow a ';'."""
+    # ── THE ERROR SHE COULD NOT LEARN ANYTHING FROM (2026-09-03) ─────────────────────
+    # Measured on her own time: three of her last eight run_python calls failed, all of
+    # them the same way, all of them at column 14 —
+    #     code='import math; def decay_thought(initial, rate, steps): values = []; ...'
+    #     -> Error: SyntaxError('invalid syntax', ('<unknown>', 1, 14, ...))
+    # A `def`/`for`/`if` may not follow a `;`: Python's grammar forbids a compound
+    # statement on a simple-statement line. She writes one-liners because a tool CALL is
+    # one line, so the shape she reaches for is the shape that cannot work — and what came
+    # back named neither the rule nor the fix. So she spent the turn reporting it instead:
+    # "I tried to model the decay of a thought, but I hit another error." One of her three
+    # solo turns that night, gone, and the offline suite had nothing to say about it.
+    #
+    # `\n` inside the call's string literal DOES reach here intact (verified through
+    # `_calls_from_code`: both `'a\nb'` and a triple-quoted argument arrive multi-line),
+    # so the advice above is reachable and not a suggestion to do the impossible.
+    #
+    # Parsed HERE rather than in the subprocess wrapper: `ast.parse` does not execute, the
+    # answer is better, and unparseable code stops costing a process spawn.
+    try:
+        ast.parse(code or "")
+    except SyntaxError as exc:
+        hint = ""
+        if _SEMI_THEN_BLOCK.search(code or ""):
+            hint = (" — a def/for/while/if/with/class cannot follow a ';' on one line; "
+                    "write those lines with \\n between them instead")
+        return "[run_python error: that code does not parse: %s (line %s, col %s)%s]" % (
+            exc.msg, exc.lineno, exc.offset, hint)
     wrapper = (
         "import ast\n"
         "src=" + repr(code) + "\n"
