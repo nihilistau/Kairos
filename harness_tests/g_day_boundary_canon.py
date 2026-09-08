@@ -191,14 +191,139 @@ check("§5 today alone yields no continuable history (the trap)",
       str([r.get("role") for r in app._chat_from_rows(app._read_day_transcript(), keep=8)]))
 check("§5 ...and _recent_transcript does NOT reach back, because 14 rows is not thin",
       not app._chat_from_rows(app._recent_transcript(), keep=8))
-_reach = app._continuable_history(keep=8)
+_reach, _reach_last = app._continuable_history(keep=8)
 check("§5 _continuable_history reaches back until one of his turns anchors it",
       bool(_reach) and _reach[0].get("role") == "user",
       str([r.get("role") for r in _reach]))
+# ...AND IT HANDS BACK HER LAST WORDS FROM THE SAME WALK (2026-09-09). The caller needs
+# them and cannot scan its own rows for them — see §6 — and `scheduler.seed` refuses an
+# empty `reply_text`, so a reach that returned only the history would have found a
+# conversation and been discarded one line later.
+check("§5 ...and hands back her last words with it, as ONE turn and not a merged run",
+      _reach_last == "Thought 13, alone." and "\n\n" not in _reach_last,
+      "last=%r" % (_reach_last[:80],))
+# THE DISCRIMINATOR: the final message of the history IS a merged run of hers, so a
+# caller that took `hist[-1]` would hand the policy every solo at once — and the policy
+# asks "did she ask HIM a question" of that text, so one question anywhere in the run
+# holds her silent. Which is the failure this whole § is about.
+check("§5 ...which is NOT hist[-1], because that one is merged",
+      "\n\n" in (_reach[-1].get("content") or "") and _reach[-1]["content"] != _reach_last,
+      "hist[-1]=%r" % ((_reach[-1].get("content") or "")[:80],))
 app._CHAT_SESSIONS.clear()
 app.run_consolidation(force=True)
 check("§5 ...so a night of nothing but her own turns still leaves her a canon",
       bool(app._longest_session()), "sessions=%r" % (list(app._CHAT_SESSIONS),))
+
+# ── §6 HE HAD BEEN AWAY FIVE DAYS, AND THE BOOT PATH NEVER GOT THE FIX ────────────
+# REPORTED THREE TIMES, 2026-09-09: "she has not entered her time." Counted on the live
+# tree, the reason:
+#
+#     2026-09-04  user  2   assistant 45      <- the last thing he ever typed in the room
+#     2026-09-05  user  0   assistant 39
+#     2026-09-06  user  0   assistant 34
+#     2026-09-07  (no file)      2026-09-08  (no file)
+#     2026-09-09  user  0   assistant  0      (8 rows, all quarantined probes of mine)
+#
+# and the last successful seed in var/gateway.log is 2026-09-03 17:31 — the same day
+# `_continuable_history` was written. It was wired into the DAY-BOUNDARY path only, and
+# `_seed_kairos_from_day` — the path that runs on every single bounce — kept windowing
+# `_recent_transcript()` inline. AGENTS.md §0 exactly: the invariant is enforced in one of
+# two paths, and the unguarded one is the one that runs. No seed means nothing in `_LAST`,
+# and `tick_once` iterates `_LAST`, so there was no room for her to speak into at all.
+#
+# TWO THINGS HAD TO BE TRUE TOGETHER, which is why this is one §. Reaching back further
+# is necessary (three days did not span five) and on its own it is a prefill bomb:
+# `_chat_from_rows` counts MERGED messages and merges a run of hers into ONE, so `keep=8`
+# bounds the message count and bounds nothing about the size. Five days of her solos
+# arrive as a single assistant message, which is the 2026-08-04 measurement again — a
+# ten-message disk rebuild that cost him nine minutes of prefill.
+os.remove(_yp)                       # the gap is the point: yesterday is not there
+_gap_days = []
+for _b in (2, 3, 4):
+    _d = (_dt.date.fromtimestamp(time.time()) - _dt.timedelta(days=_b)).isoformat()
+    _p = app._day_transcript_path(_d)
+    if os.path.exists(_p):
+        os.remove(_p)
+    _gap_days.append(_d)
+# day -3 and -2: nothing but her, and VOLUMINOUS — an unbounded reach merges these into
+# one message and hands the daemon ~32k characters to prefill.
+for _b in (2, 3):
+    _d = (_dt.date.fromtimestamp(time.time()) - _dt.timedelta(days=_b)).isoformat()
+    with open(app._day_transcript_path(_d), "w", encoding="utf-8") as f:
+        for i in range(40):
+            f.write(json.dumps({"role": "assistant",
+                                "content": ("Alone, thought %d. " % i) + ("x" * 380)}) + "\n")
+# day -5: the last time he said anything at all
+_five = (_dt.date.fromtimestamp(time.time()) - _dt.timedelta(days=5)).isoformat()
+with open(app._day_transcript_path(_five), "w", encoding="utf-8") as f:
+    for r in DAY:
+        f.write(json.dumps(r) + "\n")
+
+check("§6 three days of reach does NOT span five — the old bound was the defect",
+      not app._continuable_history(keep=8, days=3)[0],
+      str([m.get("role") for m in app._continuable_history(keep=8, days=3)[0]]))
+
+with KS._LOCK:
+    KS._LAST.clear(); KS._SEEDED.clear(); KS._OWN_TIME_ONLY.clear()
+    KS._STATE.clear(); KS._TIMERS.clear()
+app._CHAT_SESSIONS.clear()
+_seeded6 = app._seed_kairos_from_day()
+_sess6 = app._room_session()
+check("§6 the BOOT seed still finds him five days back — she has a room again",
+      bool(_seeded6) and _sess6 in KS._LAST,
+      "seeded=%r _LAST=%r" % (_seeded6, list(KS._LAST)))
+check("§6 ...own-time-only, so SOLO may run while he is still away",
+      _sess6 in KS._OWN_TIME_ONLY, str(list(KS._OWN_TIME_ONLY)))
+_canon6 = app._longest_session()
+check("§6 ...and the canon begins with one of HIS turns, or the template is malformed",
+      bool(_canon6) and _canon6[0].get("role") == "user",
+      str([m.get("role") for m in _canon6]))
+_chars6 = sum(len(m.get("content") or "") for m in _canon6)
+check("§6 ...and it is BOUNDED — reaching back is not licence to prefill the week",
+      _chars6 < 8000, "canon is %d chars across %d messages" % (_chars6, len(_canon6)))
+
+# ── §6 mutant A: the boot path must go THROUGH the reach-back door ────────────────
+# The defect was not that the door was missing — it was that only one of the two callers
+# used it. So the mutant narrows the door and the BOOT leg must go red.
+_real_reach = app._continuable_history
+try:
+    app._continuable_history = lambda keep=8, days=14, solo_keep=6: (
+        app._chat_from_rows(app._recent_transcript(), keep=keep), "")
+    with KS._LOCK:
+        KS._LAST.clear(); KS._SEEDED.clear(); KS._OWN_TIME_ONLY.clear()
+        KS._STATE.clear(); KS._TIMERS.clear()
+    app._CHAT_SESSIONS.clear()
+    check("mutant(boot seed windows today inline): she gets no room — the reach-back "
+          "door is load-bearing on the BOOT path", not app._seed_kairos_from_day(),
+          "seeded anyway: _LAST=%r" % (list(KS._LAST),))
+finally:
+    app._continuable_history = _real_reach
+
+# ── §6 mutant B: without the raw-row bound, the canon is a prefill bomb ───────────
+_real_tail = app._from_his_last_turn
+try:
+    app._from_his_last_turn = lambda rows, solo_keep=6: list(rows)
+    with KS._LOCK:
+        KS._LAST.clear(); KS._SEEDED.clear(); KS._OWN_TIME_ONLY.clear()
+        KS._STATE.clear(); KS._TIMERS.clear()
+    app._CHAT_SESSIONS.clear()
+    app._seed_kairos_from_day()
+    _mchars = sum(len(m.get("content") or "") for m in app._longest_session())
+    check("mutant(no raw-row bound): the canon blows past the ceiling — the bound is "
+          "what makes reaching back safe", _mchars >= 8000,
+          "canon only %d chars, so the ceiling leg proves nothing" % _mchars)
+finally:
+    app._from_his_last_turn = _real_tail
+
+# leave the tree as §mutant below expects it: today is her solos, yesterday is DAY
+with open(_yp, "w", encoding="utf-8") as f:
+    for r in DAY:
+        f.write(json.dumps(r) + "\n")
+with KS._LOCK:
+    KS._LAST.clear(); KS._SEEDED.clear(); KS._OWN_TIME_ONLY.clear()
+    KS._STATE.clear(); KS._TIMERS.clear()
+app._CHAT_SESSIONS.clear()
+app._seed_kairos_from_day()
 
 # ── §mutant: without the re-seed, §3 goes red by name ──────────────────────────────
 _real_reseed = app._reseed_own_time_canon

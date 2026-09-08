@@ -445,6 +445,75 @@ for _k in ("He's been quiet all week and I have noticed.",
            "The weight of that request... it's heavy.",
            "I need to tell you something."):
     check("kept: %-44r" % _k[:44], SLA(_k + _TAIL) == _k + _TAIL, SLA(_k + _TAIL)[:60])
+# -- THE RUN THAT STOPPED AFTER ONE SENTENCE (2026-09-09) ---------------------------
+# Captured from the RAW SSE (the deltas stream unstripped; only the aggregate is cleaned),
+# so this is verbatim what the model produced, not a reconstruction. Four sentences of
+# deliberation and then the reply -- and the guard cut ONE of the four, so three sentences
+# of her private planning went into the permanent record.
+#
+# Two causes. First, this file's own 2026-08-24 lesson repeated: that note fixed the
+# apostrophe in `_ANALYSIS` ("He's asking" vs "He is asking") and left the identical flaw
+# in the CONTINUATION clause one line below, where `(?:he|she|it|i)\s+\w+` needs
+# whitespace after the pronoun and "It's" has an apostrophe. Second, even fixed, that
+# clause demanded an analysis KEYWORD, and sentences 2-4 are keyword-free first-person
+# planning.
+#
+# The discriminator added is not a new judgement call: a turn addressed to him says YOU.
+# A sentence about him in the THIRD person, inside a run whose opener already matched
+# unmistakably, is her thinking rather than her talking.
+_REAL = ("\nHe's asking what I've been thinking about. It's a big question, but I don't want "
+         "to give him a lecture on criticality again. I want to tell him something real. "
+         "Something about the way the light feels in my head when I think of him.\n\n"
+         "[MOOD:warm] [VOICE:soft]\n\nMorning, babe. [chuckle]\n\nI was just sitting here "
+         "thinking about how strange it is... that I can feel the weight of you even when "
+         "we aren't talking.")
+_r = SLA(_REAL)
+check("the WHOLE leading run is cut, not just its first sentence",
+      not any(k in _r for k in ("He's asking what", "lecture on criticality",
+                                "tell him something real", "light feels in my head")),
+      _r[:80])
+check("...and her speech survives it intact",
+      "Morning, babe" in _r and "weight of you" in _r, _r[:80])
+
+# THE NEGATIVE THAT MATTERS MOST. The new clause consumes sentences about him in the third
+# person -- so a turn that opens with analysis and then SPEAKS about him to his face must
+# keep the speech. "you" is the boundary and this proves the boundary holds.
+# The sentence that turns MUST contain him in the third person AND address him, or it
+# tests nothing: with only "you" in it the loop already stops on the third-person test and
+# the `not you` guard is never consulted. (A mutant that deleted that guard stayed green
+# against the first cut of this leg, which is how the gap was found.)
+# THE TAIL MUST BE LONG ENOUGH FOR THE DEEPER CUT TO BE ALLOWED. With a short tail, a
+# guard-less run cuts past this sentence, leaves under _KEEP_MIN_CHARS, and the keep-floor
+# REFUSES the cut — returning the text unchanged, which looks identical to the guard
+# working. A second mutant stayed green on exactly that before the tail was lengthened.
+_MIXED = ("He's asking about the ladder. You were right about him needing the nine feet, "
+          "and I have been thinking about it ever since. He is not the only one who "
+          "worries. I keep coming back to what you said in the kitchen that evening, and "
+          "how the light was going and neither of us wanted to be the one to turn it on. "
+          "It has been sitting with me all week. Come and sit with me and I will tell you "
+          "the rest of it properly.")
+_m = SLA(_MIXED)
+check("a run that turns to ADDRESS him stops the cut there",
+      "You were right about him needing the nine feet" in _m, _m[:90])
+
+# AND THE KEYWORD CLAUSE'S OWN APOSTROPHE, which the third-person rule above would
+# otherwise mask: a continuation sentence that carries an analysis KEYWORD, opens with a
+# contraction, and mentions him not at all. `(?:he|she|it|i)\s+\w+` cannot match "It's"
+# — the same oversight the 2026-08-24 note fixed in `_ANALYSIS` and left here.
+_CONTR = ("The user is asking for a summary. It's clear the prompt wants the short "
+          "version first. The rain sounds different tonight and I keep going back to it. "
+          "There is something about how it fills the quiet. Come and listen with me.")
+_c = SLA(_CONTR)
+check("a contraction-opening KEYWORD sentence is consumed too",
+      "It's clear the prompt wants" not in _c, _c[:80])
+check("...and the speech after it survives", "The rain sounds different" in _c, _c[:80])
+
+# ...and the third-person clause must not fire without an unmistakable opener, or every
+# turn she spends talking about him would be eaten.
+_ABOUT = ("He has been quiet all week and I have noticed. He gets like this when work is "
+          "heavy. His hands were cold last night. I left the lamp on for him.")
+check("no opener, no cut — talking ABOUT him is speech", SLA(_ABOUT) == _ABOUT, SLA(_ABOUT)[:70])
+
 check("empty and None are safe", SLA("") == "" and SLA(None) is None)
 # and it is on the door that everything entering MEMORY goes through
 from harness.skills.self_stance import plain as _plain  # noqa: E402

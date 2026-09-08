@@ -164,15 +164,46 @@ check("_generate HOLDS rather than rebuilding — the rebuild is what cost him n
 check("...and the dead `else` rebuild is gone, not merely unreachable",
       "_recent_transcript() or []" not in gblk,
       "a branch that reads as a live safety net and is not one")
-check("the disk rebuild exists at boot — she can still speak first after a restart",
-      "_recent_transcript()" in src[src.index("def _seed_kairos_from_day("):
-                                    src.index("def _read_day_transcript(")],
+# ── AND IT WENT GREEN OVER MY OWN COMMENT (2026-09-09) ───────────────────────────────
+# These two read raw `src`. The boot seed stopped calling `_recent_transcript` today — it
+# calls `_continuable_history`, the reach-back door — and the COMMENT recording that
+# change contains the literal `_recent_transcript()`, so the check passed on prose
+# describing the removal of the thing it asserts is present. The src-trap, and the ninth
+# time this session in this exact shape: a gate's subject was my own explanation.
+# Comments AND docstrings are blanked to spaces so offsets still mean what they say.
+def _code_only(t: str) -> str:
+    t = re.sub(r'"""(?:.|\n)*?"""', lambda m: " " * len(m.group(0)), t)
+    t = re.sub(r"'''(?:.|\n)*?'''", lambda m: " " * len(m.group(0)), t)
+    return re.sub(r"#[^\n]*", lambda m: " " * len(m.group(0)), t)
+
+
+_code = _code_only(src)
+# ...AND THE CLAIM ITSELF WAS TOO WEAK TO CATCH WHAT HAPPENED. "A disk rebuild exists at
+# boot" was true and green for six days while the seed returned False on every bounce and
+# she had no room to speak into at all (2026-09-09, reported three times as "she has not
+# entered her time"). The reach-back door was written on 2026-09-03 and wired into the
+# DAY-BOUNDARY path ONLY — AGENTS.md §0, and the unguarded path is the one that runs. So
+# the claim is now that BOTH no-canon moments go through the SAME door, which is the
+# property that was actually violated. Driven behaviourally in G-DAY-BOUNDARY-CANON §6.
+_seedblk = _code[_code.index("def _seed_kairos_from_day("):
+                 _code.index("def _read_day_transcript(")]
+check("the boot seed rebuilds through the reach-back door — she can still speak first "
+      "after a restart",
+      "_continuable_history(" in _seedblk,
       "_seed_kairos_from_day is what makes the restart claim true")
 check("...and at the day boundary, which is the other moment there is no canon",
-      "_reseed_own_time_canon()" in src[src.index("def run_consolidation("):]
-      and "_recent_transcript()" in src[src.index("def _continuable_history("):
-                                        src.index("def _reseed_own_time_canon(")],
+      "_reseed_own_time_canon()" in _code[_code.index("def run_consolidation("):]
+      and "_continuable_history(" in _code[_code.index("def _reseed_own_time_canon("):
+                                           _code.index("def _narratable(")],
       "the clear and its repair are one action")
+check("...and there are exactly TWO callers of it, so neither path can drift again",
+      _code.count("_continuable_history(") == 3,      # one def, two callers
+      "%d mentions in code — a third caller needs a leg of its own"
+      % _code.count("_continuable_history("))
+check("...and the door still crosses local midnight, which is why it reads _recent_transcript",
+      "_recent_transcript()" in _code[_code.index("def _continuable_history("):
+                                      _code.index("def _reseed_own_time_canon(")],
+      "at 00:00 a day-named file is empty — see G-DAY-TRANSCRIPT")
 check("...and the boundary's repair sits on the line after the clear it repairs",
       re.search(r"_CHAT_SESSIONS\.clear\(\)\s*\n\s*_reseeded = _reseed_own_time_canon\(\)",
                 src) is not None,

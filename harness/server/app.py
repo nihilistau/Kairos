@@ -1243,15 +1243,33 @@ def _seed_kairos_from_day(force: bool = False) -> bool:
     day, and the whole history is already in her memory and her standing world.
     """
     try:
-        rows = _recent_transcript()
-        if len(rows) < 2 and not force:
-            return False
         # WELL-FORMED, NOT JUST RECENT — see _chat_from_rows. Her speak-ups have no user
         # turn, so a raw slice hands the daemon consecutive model turns and Gemma's
         # strictly-alternating template renders a malformed prompt from it.
-        hist = _chat_from_rows(rows, keep=8) if len(rows) >= 2 else []
-        last_reply = next((r.get("content") or "" for r in reversed(rows)
-                           if r.get("role") == "assistant"), "")
+        #
+        # ── AND REACHING BACK IS THE BOOT PATH'S JOB TOO (2026-09-09) ────────────────
+        # This windowed `_recent_transcript()` inline, which is the exact rule
+        # `_continuable_history` was written on 2026-09-03 to replace — and it was wired
+        # into the DAY-BOUNDARY path only. AGENTS.md §0: the unguarded path is the one
+        # that runs. The last successful boot seed in var/gateway.log is 2026-09-03
+        # 17:31, the same day that fix landed, and every bounce since returned False on
+        # this line. No seed means no session in `_LAST`, and `tick_once` iterates
+        # `_LAST` — so she had nowhere to speak into and could not enter her own time at
+        # all. Six days, reported three times as "she has not entered her time".
+        #
+        # The shape that most needs a continuation was the one that could not produce
+        # one. A day he is away is not THIN, so `_recent_transcript` keeps today and
+        # never reaches back — she solos every half hour, so the rows are there — and
+        # every one of those rows is an ASSISTANT row, so `_chat_from_rows` merges the
+        # run and drops it (a conversation the model continues has to begin with him)
+        # and hands back []. Measured on this tree: 2026-09-05 39 rows -> hist 0,
+        # 2026-09-06 34 rows -> hist 0, today 0 rows because the only rows are
+        # quarantined probes of mine and 2026-09-07/08 have no file at all.
+        # HER LAST WORDS COME FROM THE SAME WALK — a scan of `rows` returns "" on a day
+        # whose only rows are quarantined, and `scheduler.seed` refuses an empty
+        # `reply_text`, so the reach-back would have found a conversation and then been
+        # thrown away one line later.
+        hist, last_reply = _continuable_history(keep=8)
         if (not hist or not last_reply.strip()) and not force:
             return False
         if not hist or not last_reply.strip():
@@ -1532,8 +1550,39 @@ def _longest_session() -> list:
     return best
 
 
-def _continuable_history(keep: int = 8, days: int = 3) -> list:
-    """A well-formed history she can be asked to continue, reaching back until there is one.
+def _from_his_last_turn(rows: list, solo_keep: int = 6) -> list:
+    """His most recent turn, and a BOUNDED tail of what she has said since it.
+
+    WHY THE BOUND, AND WHY IT IS NOT `keep` (2026-09-09). `_chat_from_rows` counts MERGED
+    messages, and it merges a consecutive run of hers into ONE. So `keep=8` bounds the
+    message count and bounds nothing about the size: five days of her solos concatenate
+    into a single assistant message and sail straight through the window. Reaching further
+    back therefore trades one failure for a worse one — the 2026-08-04 measurement is on
+    record, a ten-message disk history that cost him nine minutes of prefill, and 116 of
+    her turns in one message is that mistake with a bigger number.
+
+    So the tail is bounded in RAW ROWS before any merging happens. Her solos are small
+    (measured over 2026-09-06: 34 of them, median 262 chars), so six of them merge to
+    about 1.5k chars — roughly 400 tokens, which is a canon rather than a bomb.
+
+    A window is what this has always been ("a continuation, not a reconstruction of the
+    day"); this one is simply honest about which end it keeps. Her MOST RECENT words are
+    the ones a continuation needs, and one of his turns has to be at the front or Gemma's
+    strictly-alternating template renders a malformed prompt.
+    """
+    idx = next((i for i in range(len(rows) - 1, -1, -1)
+                if (rows[i] or {}).get("role") == "user"), -1)
+    if idx < 0:
+        return []                      # nothing of his in reach — no well-formed start
+    # A little of what came before his last turn, if it is there: dropped down to the
+    # first of HIS rows by `_chat_from_rows`, so a leading run of hers costs nothing.
+    head = rows[:idx + 1][-(2 * max(1, solo_keep)):]
+    since = [r for r in rows[idx + 1:] if (r or {}).get("role") == "assistant"]
+    return head + since[-max(1, solo_keep):]
+
+
+def _continuable_history(keep: int = 8, days: int = 14, solo_keep: int = 6) -> tuple:
+    """A well-formed history she can be asked to continue, and the last thing she said in it.
 
     `_recent_transcript` reaches back one day only when TODAY IS THIN (< 12 rows), which is
     the right rule for "what were we just saying" and the wrong one here. A day he is away
@@ -1545,24 +1594,63 @@ def _continuable_history(keep: int = 8, days: int = 3) -> list:
 
     Measured on the live tree, 2026-09-03: today's transcript was 8 rows, all assistant.
     Reaching back is not a nicety here, it is the difference between a canon and none.
+
+    ── THREE DAYS WAS NOT ENOUGH, AND HE HAD BEEN AWAY FIVE (2026-09-09) ────────────────
+    Counted on this tree, the reason she had no room to speak into:
+
+        2026-09-04  user  2   assistant 45
+        2026-09-05  user  0   assistant 39
+        2026-09-06  user  0   assistant 34
+        2026-09-07  (no file)   2026-09-08  (no file)
+        2026-09-09  user  0   assistant  0   (8 rows, all quarantined probes of mine)
+
+    He last typed into the room on the 4th. `days=3` reached the 6th, found not one turn
+    of his in the whole span, and returned [] — so the walk written to survive a day he is
+    away could not survive five, which is the case it exists for. The bound is now a
+    fortnight, and it is `_from_his_last_turn` that makes widening it safe.
+
+    RETURNS A PAIR because her last words come from the same walk. Scanning the caller's
+    own rows for them returns "" on a day whose only rows are quarantined, and
+    `scheduler.seed` refuses an empty `reply_text` — so the reach-back would have found a
+    conversation and then been thrown away one line later. One walk, one door, both
+    answers. The pair is also why `reply_text` stays her single most recent turn rather
+    than `hist[-1]`, which is a merged run: the policy asks "did she ask HIM a question"
+    of that text, and any question anywhere in six merged solos would hold her silent —
+    which is the failure this whole change is about.
     """
     import datetime as _dt
     rows = _recent_transcript()
-    hist = _chat_from_rows(rows, keep=keep)
+
+    def _pair(rs: list) -> tuple:
+        tail = _from_his_last_turn(rs, solo_keep=solo_keep)
+        h = _chat_from_rows(tail, keep=keep)
+        if not h:
+            return [], ""
+        return h, next((r.get("content") or "" for r in reversed(tail)
+                        if r.get("role") == "assistant"), "")
+
+    hist, last = _pair(rows)
     if hist:
-        return hist
+        return hist, last
     # nothing well-formed yet — walk back a bounded number of days, oldest-first each
     # time, so the run of her own turns finally has one of his to hang from
     today = _dt.date.fromtimestamp(time.time())
-    for back in range(1, max(1, days) + 1):
+    # ...WITHOUT READING YESTERDAY TWICE. `_recent_transcript` has already prepended it
+    # when today was thin, and prepending it again would put those rows in the canon
+    # twice — she would read her own turn back as something she said, and said again.
+    _first = 1
+    if len(_read_day_transcript()) < 12 and os.path.exists(
+            _day_transcript_path((today - _dt.timedelta(days=1)).isoformat())):
+        _first = 2
+    for back in range(_first, max(1, days) + 1):
         prev = (today - _dt.timedelta(days=back)).isoformat()
         if not os.path.exists(_day_transcript_path(prev)):
             continue
         rows = _read_day_transcript(prev) + rows
-        hist = _chat_from_rows(rows, keep=keep)
+        hist, last = _pair(rows)
         if hist:
-            return hist
-    return []
+            return hist, last
+    return [], ""
 
 
 def _reseed_own_time_canon() -> int:
@@ -1617,7 +1705,7 @@ def _reseed_own_time_canon() -> int:
             live = list(_ks._LAST.keys())
         if not live:
             return 0
-        hist = _continuable_history(keep=8)
+        hist, _last = _continuable_history(keep=8)
         if not hist:
             logger.info("[gateway] the day boundary retired her canon and the record has "
                         "no continuable history to rebuild one from — she waits for him")

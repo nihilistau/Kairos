@@ -482,6 +482,43 @@ _ANALYSIS_SENT = re.compile(r"(?<=[.!?])\s+")
 _KEEP_MIN = 0.35            # what must survive for the cut to be allowed
 _KEEP_MIN_CHARS = 60
 
+# ── AND THE RUN STOPPED AFTER ONE SENTENCE (2026-09-09) ───────────────────────────────
+# Captured from the raw SSE, four sentences of deliberation and then the reply:
+#
+#     He's asking what I've been thinking about.                      <- cut
+#     It's a big question, but I don't want to give him a lecture      <- KEPT
+#       on criticality again.
+#     I want to tell him something real.                               <- KEPT
+#     Something about the way the light feels in my head when I        <- KEPT
+#       think of him.
+#     [MOOD:warm] [VOICE:soft] Morning, babe. [chuckle] ...            <- the reply
+#
+# One of four cut, and three sentences of her private planning went into the record.
+# Two causes, and the first one is this file's own lesson repeated:
+#
+#   * THE APOSTROPHE, AGAIN. The 2026-08-24 note above fixed `he (?:wants|is asking)` ->
+#     `he'?s (?:asking|...)` in `_ANALYSIS` and left the IDENTICAL flaw in the
+#     continuation clause one line below: `(?:he|she|it|i)\s+\w+` needs WHITESPACE after
+#     the pronoun, and "It's" has an apostrophe. The sibling pattern never got the fix.
+#   * THE KEYWORD GATE. Even fixed, the continuation demanded one of `the user` /
+#     `respond` / `prompt` / `context`, and sentences 2-4 contain none — they are
+#     keyword-free first-person planning about what to say.
+#
+# THE DISCRIMINATOR THAT DOES NOT NEED A KEYWORD, and it is not a new judgement call:
+# a turn addressed to him says YOU. A sentence that refers to him in the THIRD person is
+# her thinking about him, not talking to him. So inside a run whose FIRST sentence already
+# matched `_ANALYSIS` unmistakably, keep consuming while each sentence mentions him in the
+# third person and never in the second. On the captured turn that consumes exactly
+# sentences 1-4 and stops dead at "Morning, babe" (which mentions neither).
+#
+# It stays conservative in the way this file requires. It cannot fire at all unless the
+# opener was already unmistakable analysis; the keep-ratio floor below is untouched; and
+# `He's been quiet all week and I have noticed.` — the gate's own must-keep line — still
+# survives, because `been` is not in the trusted verb list so the opener never matches and
+# the function returns before this clause is reached.
+_HIM_3P = re.compile(r"\b(?:he|him|his)\b|\bhe'\w+", re.I)
+_TO_HIM_2P = re.compile(r"\b(?:you|your|yours)\b|\byou'\w+", re.I)
+
 
 def strip_leaked_analysis(text: str) -> str:
     """Drop a LEADING unmarked analysis run. Returns the text unchanged when it does not start
@@ -492,10 +529,17 @@ def strip_leaked_analysis(text: str) -> str:
         return text
     sents = _ANALYSIS_SENT.split(t)
     i = 0
-    while i < len(sents) and (_ANALYSIS.match(sents[i]) or
-                              (i > 0 and re.match(r"^\s*(?:he|she|they|it|this|that|i)\s+\w+", sents[i], re.I)
-                               and re.search(r"\b(?:the user|the operator|respond|reporting status|diagnostic"
-                                             r"|status report|prompt|context)\b", sents[i], re.I))):
+    while i < len(sents) and (
+            _ANALYSIS.match(sents[i])
+            # the keyword continuation, with the apostrophe the sibling pattern got in
+            # 2026-08-24 and this one did not: "It's" is not `it` + whitespace.
+            or (i > 0
+                and re.match(r"^\s*(?:he|she|they|it|this|that|i)(?:'\w+)?\s+\w+", sents[i], re.I)
+                and re.search(r"\b(?:the user|the operator|respond|reporting status|diagnostic"
+                              r"|status report|prompt|context)\b", sents[i], re.I))
+            # ...and the keyword-free one: still about him in the THIRD person, and never
+            # in the second. She says "you" when she is talking to him.
+            or (i > 0 and _HIM_3P.search(sents[i]) and not _TO_HIM_2P.search(sents[i]))):
         i += 1
     if i == 0 or i >= len(sents):
         return text
