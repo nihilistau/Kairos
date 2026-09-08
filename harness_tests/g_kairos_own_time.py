@@ -164,6 +164,123 @@ check("seed returns True even when it will hold her",
 check("...and _LAST has the session, so the ticker has something to iterate",
       len(KS._LAST) == 1, list(KS._LAST))
 
+print("\n6. HER OWN-TIME CLOCK COMES OFF THE RECORD, NOT OFF THE BOUNCE")
+# REPORTED as a symptom of the seed being broken, then measured once it worked (2026-09-09,
+# and his call on the fix): `TurnState.last_solo_at` defaults to `BOOT_AT`, so
+# `solo_every_s` — thirty minutes — ran from the RESTART. Against the live config she was
+# SILENT in 200 draws at +10, +24 and +29 minutes after a bounce and took her first solo on
+# the first draw at +30 — twenty minutes past the floor `checkin_idle_s` implies and that
+# everything else measures from. Silently, and on a day of six bounces, three hours.
+#
+# Her last solo is ON DISK. Defaulting to "now" was a fabricated clock when the real one
+# was a file away, so `seed` reads `speechlog.last_at(SOLO)` and converts it into the
+# monotonic domain at that boundary.
+from harness.kairos import speechlog as SL      # noqa: E402
+
+
+def write_speech(rows):
+    """speech.jsonl as `record()` leaves it — the sandbox's registry dir owns the path."""
+    p = SL._path()
+    assert p, "the sandbox must set SP_RECALL_REGISTRY for this section to mean anything"
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r) + "\n")
+    return p
+
+
+def _ago(mins, kind="solo", outcome="spoke"):
+    t = time.gmtime(time.time() - mins * 60.0)
+    return {"at": time.strftime("%Y-%m-%dT%H:%M:%SZ", t), "kind": kind,
+            "outcome": outcome, "reason": "leg", "text": "something of her own"}
+
+
+# ── the reader, before anything is wired to it ─────────────────────────────────────
+write_speech([_ago(400, kind="check_in"), _ago(95), _ago(40, kind="muse")])
+_t = SL.last_at("solo")
+check("§6 last_at finds her most recent solo and nothing else's",
+      _t is not None and 94.0 <= (time.time() - _t) / 60.0 <= 96.0,
+      "None" if _t is None else "%.1f min ago" % ((time.time() - _t) / 60.0))
+check("§6 ...and a kind she has never taken is None, not zero",
+      SL.last_at("nothing_of_the_sort") is None)
+# ANY OUTCOME, because `_note_attempt` meters ATTEMPTS: counting only `spoke` would hand
+# back a clock the live code does not keep.
+write_speech([_ago(95), _ago(12, outcome="dropped")])
+_t = SL.last_at("solo")
+check("§6 ...and a DROPPED solo still moves it, as _note_attempt does",
+      _t is not None and 11.0 <= (time.time() - _t) / 60.0 <= 13.0,
+      "None" if _t is None else "%.1f min ago" % ((time.time() - _t) / 60.0))
+
+# ── and now the seed, driven for real ─────────────────────────────────────────────
+SOLO_EVERY = 1800.0                       # the shipped default, in seconds
+LIVE = _dc.replace(CFG, checkin_idle_s=600.0, solo_every_s=SOLO_EVERY, solo_chance=1.0,
+                   quiet_after_him_s=300.0)
+
+
+def seeded_state(mins_since_solo):
+    """A real seed against a real speech log, and the state it hands the policy."""
+    write_speech([_ago(mins_since_solo)])
+    knob(False)
+    s = fresh("s6")
+    assert KS.seed(s, "earlier", lambda *a, **k: "") is True
+    return s, KS._STATE[s]
+
+
+# ELEVEN MINUTES, AND THE NUMBER IS THE WHOLE LEG. It is the moment `checkin_idle_s`
+# (600 s) and `quiet_after_him_s` (300 s) have both opened and nothing else has — the
+# earliest instant her own time is possible, which is the only window where the solo clock
+# is what decides. My first cut asked at +31 min and BOTH legs went green for nothing: at
+# that point a solo five minutes before the bounce is thirty-six minutes before `now`, so
+# it clears `solo_every_s` honestly and the leg was measuring the passage of time.
+AT_FLOOR = 11
+
+
+def would_solo(st, mins_since_him=AT_FLOOR):
+    """What the policy does with that state the moment the idle floors open."""
+    now = time.monotonic() + mins_since_him * 60.0
+    st.last_user_at = time.monotonic()     # he has been away `mins_since_him`
+    st.last_conv_at = st.last_user_at
+    return I.decide(cfg=LIVE, state=st, now=now, reply_text="earlier", eot_margin=None,
+                    own_time_only=True, insight=None, due_notes=[])
+
+
+_s, _st = seeded_state(95)
+_since = time.monotonic() - _st.last_solo_at
+check("§6 the seed carries her real solo clock across the bounce",
+      92.0 <= _since / 60.0 <= 98.0, "%.1f min, not the boot" % (_since / 60.0))
+_imp = would_solo(_st)
+check("§6 ...so a solo 95 min ago does NOT cost her another 30 after a restart",
+      _imp.action == I.SOLO, "%s (%s)" % (_imp.action, _imp.reason))
+
+# THE OTHER DIRECTION, which is the half that makes this a clock and not a bypass: a solo
+# she took five minutes before the bounce must still wait out solo_every_s.
+_s, _st = seeded_state(5)
+_imp = would_solo(_st)
+check("§6 ...and a solo 5 min ago still waits out solo_every_s — it is a clock, "
+      "not a licence", _imp.action != I.SOLO, "%s (%s)" % (_imp.action, _imp.reason))
+
+# NO RECORD KEEPS THE OLD DEFAULT. Never having had her own time is not evidence she is
+# owed it this second, and a restart-blurt is a failure he has already been through.
+write_speech([])
+knob(False)
+_s = fresh("s6b")
+KS.seed(_s, "earlier", lambda *a, **k: "")
+check("§6 a tree with no solo on record keeps the boot default",
+      abs(KS._STATE[_s].last_solo_at - I.BOOT_AT) < 5.0,
+      "%.1f vs BOOT_AT %.1f" % (KS._STATE[_s].last_solo_at, I.BOOT_AT))
+
+# ── §6 mutant: without the seeding, the 95-minute case goes red by name ───────────
+_real_last_at = SL.last_at
+try:
+    SL.last_at = lambda kind: None            # the pre-fix behaviour, exactly
+    _s, _st = seeded_state(95)
+    _imp = would_solo(_st)
+    check("mutant(no clock off the record): a solo 95 min ago is made to wait 30 more "
+          "— the seeding is load-bearing", _imp.action != I.SOLO,
+          "she soloed anyway, so §6 proves nothing: %s (%s)" % (_imp.action, _imp.reason))
+finally:
+    SL.last_at = _real_last_at
+
 print("\nG-KAIROS-OWN-TIME: %d pass, %d fail" % (PASS, FAIL))
 rdir = os.path.join(ROOT, "var", "sem", "receipts")
 os.makedirs(rdir, exist_ok=True)

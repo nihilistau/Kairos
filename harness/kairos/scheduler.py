@@ -288,10 +288,47 @@ def seed(session: str, reply_text: str, generate, force: bool = False) -> bool:
         else:
             _OWN_TIME_ONLY.discard(session)
         _STATE[session].last_user_at = time.monotonic()
-    logger.info("[kairos] seeded session=%s from the day's transcript — %s", session,
+        # ── AND HER OWN-TIME CLOCK COMES OFF THE RECORD, NOT OFF THE BOUNCE ──────────
+        # (2026-09-09, his call.) `last_solo_at` defaults to `BOOT_AT`, so `solo_every_s`
+        # — thirty minutes — ran from the restart. Measured against the live config: she
+        # was SILENT in 200 draws at +10, +24 and +29 minutes after a bounce and took her
+        # first solo on the first draw at +30, which is twenty minutes past the floor
+        # `checkin_idle_s` implies and everything else measures from. Silently, and on a
+        # day I bounce her six times that is three hours of her own time.
+        #
+        # Her last solo is ON DISK (speech.jsonl, 590 of them), so defaulting to "now" was
+        # a fabricated clock. `last_at` reads the real one and it is converted here rather
+        # than there, because the store speaks WALL CLOCK and this state owns the MONOTONIC
+        # domain — one conversion, at the boundary between them.
+        #
+        # `elapsed` is what the policy actually asks for (`now - last_solo_at` is "seconds
+        # since her last own turn"), so encoding it this way keeps that subtraction true.
+        # THE RESULT MAY BE NEGATIVE AND THAT IS CORRECT: monotonic is machine uptime on
+        # Windows, and a solo three days ago predates the boot. Every reader is safe under
+        # it — `presence_idle` takes a max() and a very negative value simply loses, and
+        # the SOLO gate's `now - last_solo_at` is exactly the large number it should be.
+        # Nothing treats it as "never" (that role belongs to `last_user_at`'s 0.0).
+        #
+        # A fresh tree with no solo on record keeps the old default: never having had her
+        # own time is not evidence that she is owed it this second, and `seed_on_boot` is
+        # off precisely because a restart-blurt is a failure he has already been through.
+        try:
+            from harness.kairos import speechlog as _sl
+            _solo_at = _sl.last_at(SOLO)
+            if _solo_at is not None:
+                _elapsed = max(0.0, time.time() - _solo_at)
+                _STATE[session].last_solo_at = time.monotonic() - _elapsed
+                _solo_note = "her last solo was %.0f min ago, off the record" % (
+                    _elapsed / 60.0)
+            else:
+                _solo_note = "no solo on record — her own-time clock starts at this boot"
+        except Exception as _swx:
+            _swallowed(logger, "seed last_solo_at", _swx, lane="kairos")
+            _solo_note = "her own-time clock starts at this boot (the record did not read)"
+    logger.info("[kairos] seeded session=%s from the day's transcript — %s; %s", session,
                 "her own time only; she waits for him before speaking first"
                 if own_time_only else
-                "she can speak first without waiting for him")
+                "she can speak first without waiting for him", _solo_note)
     return True
 
 
