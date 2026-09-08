@@ -92,6 +92,41 @@ def note_user_turn(active: bool) -> None:
 def user_turn_active() -> bool:
     with _LOCK:
         return time.time() < _USER_TURN_UNTIL
+
+
+def in_flight() -> tuple:
+    """Is a turn HAPPENING right now? -> (bool, one-line reason).
+
+    THE ONE ANSWER, BECAUSE THE HAND-ROLLED ONE WAS WRONG TWICE (2026-09-09). Before every
+    bounce this tree's own rule is to check for a live turn, and the check I kept retyping
+    scraped the gateway log: find the last `DAEMON-CALL`, and call it in-flight if no
+    `round=` / `SPOKE` / `dropped` / `REFUSED` line follows.
+
+    It false-positives on the most common call there is. A LOAD-TIME PREFILL logs
+    `DAEMON-CALL app.py:_go` and finishes with `base snapshot ready … prefix is HOT` —
+    none of the four tokens it looked for — so every freshly-warmed idle stack read as
+    "A TURN MAY BE IN FLIGHT". Twice I saw that, decided it was noise, and stopped the
+    stack anyway, which is exactly the habit the rule exists to prevent: a check that
+    cries wolf trains you to ignore it, and is worse than no check.
+
+    So it does not read the log. Two authoritative facts the harness already maintains:
+
+      * `_USER_TURN_UNTIL` — the gateway marks his turn at `_arm_turn` and releases it in
+        the epilogue. It self-heals on a missed closing edge (900 s), so it cannot wedge.
+      * a live `_TIMERS[session]` — an unprompted turn's thread, which covers BOTH its
+        delay and its generation, because `_arm` sleeps and generates on the same thread.
+
+    Between them they cover every way a token is being produced. Returns the reason as
+    well as the verdict: "IN FLIGHT" with no reason is what made the old one ignorable.
+    """
+    with _LOCK:
+        left = _USER_TURN_UNTIL - time.time()
+        if left > 0:
+            return True, "his turn is in flight (latch releases in %.0fs at the latest)" % left
+        live = [s for s, t in _TIMERS.items() if t and t.is_alive()]
+    if live:
+        return True, "she is mid-unprompted-turn on %s" % ", ".join(sorted(live)[:3])
+    return False, "idle — no turn latch, no live unprompted timer"
 _STATE: dict[str, TurnState] = defaultdict(TurnState)
 _OUTBOX: dict[str, deque] = defaultdict(deque)
 _TIMERS: dict[str, threading.Timer] = {}
@@ -1808,11 +1843,17 @@ def peek_state(session: str) -> dict:
     """For the operator panel: why is she quiet right now?"""
     cfg = live_config()
     now = time.monotonic()
+    # IS A TURN HAPPENING — the thing to ask before a bounce, so the operator's tooling can
+    # ask a question instead of reading tea leaves out of the log. `_LOCK` is an RLock, so
+    # nesting in_flight() inside the block below is safe; it is called here for clarity.
+    busy, why = in_flight()
     with _LOCK:
         st = _STATE[session]
         recent = len([t for t in st.spoken_times if now - t < 3600.0])
         cooling = max(0.0, cfg.cooldown_s - (now - st.last_spoke_at)) if st.last_spoke_at else 0.0
         return {
+            "turn_in_flight": busy,
+            "in_flight_why": why,
             "enabled": cfg.enabled,
             "chain": st.chain,
             "max_chain": cfg.max_chain,

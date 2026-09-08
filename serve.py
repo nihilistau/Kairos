@@ -237,6 +237,73 @@ def load_profile(name: str) -> dict:
     return c
 
 
+def turn_in_flight(c=None, timeout: float = 3.0):
+    """Is she mid-turn right now? -> (bool, reason). Asks the GATEWAY, never the log.
+
+    THE RULE THIS TREE ALREADY HAD, AND THE CHECK THAT KEPT BREAKING IT (2026-09-09).
+    "Check for a live turn as its own step before every bounce" is a standing rule here,
+    and the check itself was a snippet retyped by hand each time: find the last
+    `DAEMON-CALL` in the gateway log and call it in-flight if no `round=` / `SPOKE` /
+    `dropped` / `REFUSED` line follows it.
+
+    That is wrong for the most common call there is. A LOAD-TIME PREFILL logs
+    `DAEMON-CALL app.py:_go` and completes with `base snapshot ready ... prefix is HOT` —
+    none of the four tokens the snippet looked for. So every freshly-warmed idle stack
+    reported "A TURN MAY BE IN FLIGHT". Twice in one session I read that, judged it noise,
+    and stopped the stack anyway. A check that cries wolf trains you to ignore it and is
+    worse than no check at all.
+
+    So the question goes to the component that KNOWS: `scheduler.in_flight()`, surfaced on
+    /v1/kairos/state as `turn_in_flight`, which is the union of the gateway's own turn
+    latch (self-healing, 900 s) and any live unprompted-turn thread.
+
+    FAILS OPEN, DELIBERATELY. No gateway means no turn: a stop must not be blocked because
+    the thing it is stopping is already gone. Anything else (a route that 404s on an older
+    build, a timeout) returns "unknown", and the caller warns rather than refusing — the
+    guard exists to stop an ACCIDENT, not to become a new way to be unable to stop her.
+    """
+    import json as _json
+    import urllib.error as _ue
+    import urllib.request as _ur
+    # The profile is PASSED, not read from a module global. The first cut used a `_c0`
+    # global set from three call sites, which is both this tree's least favourite shape and
+    # a SyntaxError the moment one of those sites assigns before the `global` line — caught
+    # by running it, because `ast.parse` accepts it and only `compile` rejects it.
+    try:
+        port = int((c or {}).get("serve", {}).get("gateway_port", 8800))
+    except Exception:
+        port = 8800
+    url = "http://127.0.0.1:%d/v1/kairos/state" % port
+    try:
+        d = _json.loads(_ur.urlopen(url, timeout=timeout).read().decode())
+    except _ue.URLError:
+        return False, "no gateway on :%d — nothing can be mid-turn" % port
+    except Exception as exc:
+        return None, "could not ask the gateway (%s)" % str(exc)[:60]
+    if "turn_in_flight" not in d:
+        return None, "this gateway does not report turn_in_flight (older build)"
+    return bool(d["turn_in_flight"]), str(d.get("in_flight_why") or "")
+
+
+def guard_live_turn(force: bool, c=None) -> None:
+    """Print the verdict and, unless forced, refuse to interrupt a turn in progress."""
+    busy, why = turn_in_flight(c)
+    if busy is None:
+        print("[kairos serve] live-turn check: UNKNOWN — %s (continuing)" % why)
+        return
+    if not busy:
+        print("[kairos serve] live-turn check: idle — %s" % why)
+        return
+    if force:
+        print("[kairos serve] live-turn check: IN FLIGHT — %s (--force: going anyway)" % why)
+        return
+    raise SystemExit(
+        "serve.py: a turn is in flight — %s\n"
+        "  Stopping now cuts it mid-generation. Wait for it, or pass --force.\n"
+        "  (This guard exists because the hand-rolled log check false-positived on every\n"
+        "   warmed idle stack, so its warnings got ignored and a turn got killed.)" % why)
+
+
 def build_env(c: dict) -> dict:
     """The ONE explicit profile→env mapping. Anything not mapped here does not exist."""
     paths, kv, mem = c["paths"], c["kv"], c["memory"]
@@ -1359,19 +1426,19 @@ def main() -> int:
     # THE ONE DOOR — it strips every unmapped SP_*, and it has no business being
     # laxer about its own argv than it is about the environment. Unknown flags
     # and a second profile name are now hard errors.
-    KNOWN_FLAGS = {"--stop", "--gateway-only", "--daemon-only"}
+    KNOWN_FLAGS = {"--stop", "--gateway-only", "--daemon-only", "--force"}
     pos = [a for a in sys.argv[1:] if not a.startswith("-")]
     bad = [a for a in sys.argv[1:] if a.startswith("-") and a not in KNOWN_FLAGS]
     if bad:
         raise SystemExit(
             "serve.py: unknown option(s): %s\n"
-            "  usage: python serve.py [profile] [--stop] [--gateway-only] [--daemon-only]\n"
+            "  usage: python serve.py [profile] [--stop] [--gateway-only] [--daemon-only] [--force]\n"
             "  the profile is POSITIONAL — `python serve.py companion`, not `--profile companion`."
             % " ".join(bad))
     if len(pos) > 1:
         raise SystemExit(
             "serve.py: more than one profile given: %s\n"
-            "  usage: python serve.py [profile] [--stop] [--gateway-only] [--daemon-only]" % " ".join(pos))
+            "  usage: python serve.py [profile] [--stop] [--gateway-only] [--daemon-only] [--force]" % " ".join(pos))
     if "--gateway-only" in sys.argv and "--daemon-only" in sys.argv:
         # --gateway-only was checked first, so this combination silently did a gateway
         # bounce — half of what was asked, with no word about the other half. This
@@ -1402,6 +1469,11 @@ def main() -> int:
                 _c = load_profile(pos[0])
             except Exception:
                 pass
+        # THE CHECK IS A STEP OF THE STOP NOW, not something the operator remembers. It was
+        # a rule and a retyped snippet, and it got skipped twice in one session by the
+        # person who wrote the rule (both times by chaining it into the same command as the
+        # stop, so the verdict was printed and stepped over in one breath).
+        guard_live_turn("--force" in sys.argv, _c)
         stop(_c)
         return 0
     if not pos:
@@ -1449,6 +1521,10 @@ def main() -> int:
             print("[kairos serve] WARNING: could not verify profile/model agreement "
                   "(profile=%r daemon=%r)" % (want or "?", running or "no daemon found"))
         print(f"[kairos serve] profile={name} (gateway-only bounce; daemon untouched)")
+        # EVERY PATH THAT STOPS A GATEWAY GETS THE CHECK, not just --stop. This is the
+        # bounce used most often, and killing the gateway mid-turn loses the generation
+        # exactly as --stop does.
+        guard_live_turn("--force" in sys.argv, c)
         stop_gateway_only(c["serve"]["gateway_port"])
         # ── APPEND, DO NOT TRUNCATE (2026-08-05) ────────────────────────────────
         # This was "w". Every restart erased the gateway log — and her unprompted
@@ -1594,6 +1670,9 @@ def main() -> int:
         report_tts(launch_tts(c, env), env)
         return 0
 
+    # A full launch stops whatever is running first, so it interrupts a turn just as
+    # readily. After a reboot there is no gateway and the guard fails open.
+    guard_live_turn("--force" in sys.argv, c)
     stop(c)
     if external:
         # THE ENGINE IS YOURS (2026-08-21, the engine-agnostic profile): the harness
