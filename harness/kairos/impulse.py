@@ -594,6 +594,37 @@ def decide(**kw) -> Impulse:
     return imp
 
 
+RESTATEMENT_DROP = 0.75
+
+
+def overlap_tokens(s: str) -> set:
+    """The content words a restatement is scored over: lowercased, longer than three.
+
+    LIFTED OUT OF `worth_saying` (2026-09-09), where it was a nested `toks`, so that
+    anything ELSE asking "how much of this did she already say" gets the same answer.
+    `tools/solo_topics.py` measures exactly that across her whole own-time history, and a
+    measurement tool with its own private notion of similarity answers a question nobody
+    is asking — it would report a number that is not the one the guard acts on, which is
+    two spellings of one rule and the bug this file's own history is mostly made of.
+    """
+    return {w for w in re.findall(r"[a-z0-9']+", (s or "").lower()) if len(w) > 3}
+
+
+def restatement_overlap(text: str, previous_reply: str) -> float:
+    """How much of THIS turn was already in the last one, 0.0 .. 1.0.
+
+    THE DENOMINATOR IS `text`, NOT THE UNION, and that asymmetry is deliberate: the
+    question is what fraction of what she is about to say is old, so a long previous reply
+    cannot dilute a short restatement into looking novel. Kept exactly as `worth_saying`
+    has computed it since the beginning — this is an extraction, not a revision.
+
+    0.0 when either side has no content words: no evidence of a restatement is not
+    evidence of one, and `worth_saying`'s empty-text case is handled before this.
+    """
+    a, b = overlap_tokens(text), overlap_tokens(previous_reply)
+    return (len(a & b) / len(a)) if a and b else 0.0
+
+
 def worth_saying(continuation: str, previous_reply: str) -> tuple[bool, str]:
     """LAST GATE, after she has already generated. Even a well-earned impulse can produce
     nothing worth hearing — and an unprompted message that adds nothing is worse than
@@ -626,14 +657,9 @@ def worth_saying(continuation: str, previous_reply: str) -> tuple[bool, str]:
             return False, "dropped: that is a recited memory, not a continuation of her thought"
 
     # near-restatement of the reply she just gave
-    def toks(s: str) -> set:
-        return {w for w in re.findall(r"[a-z0-9']+", s.lower()) if len(w) > 3}
-
-    a, b = toks(t), toks(previous_reply)
-    if a and b:
-        overlap = len(a & b) / len(a)
-        if overlap >= 0.75:
-            return False, f"dropped: {overlap:.0%} a restatement of what she just said"
+    overlap = restatement_overlap(t, previous_reply)
+    if overlap >= RESTATEMENT_DROP:
+        return False, f"dropped: {overlap:.0%} a restatement of what she just said"
 
     return True, ""
 
