@@ -105,8 +105,13 @@ def _hashed_hits(txt: str) -> list:
 _FALLBACK_TEXT = (".bat", ".c", ".cfg", ".cjs", ".conf", ".css", ".csv", ".cu", ".cuh",
                   ".env", ".gitignore", ".gradle", ".h", ".html", ".ini", ".java", ".js",
                   ".json", ".jsonl", ".jsx", ".kt", ".md", ".mjs", ".mts", ".pro",
-                  ".properties", ".py", ".rs", ".service", ".sh", ".sql", ".svg", ".toml",
-                  ".ts", ".tsx", ".txt", ".xml", ".yaml", ".yml")
+                  ".properties", ".ps1", ".py", ".rs", ".service", ".sh", ".sql", ".svg",
+                  ".toml", ".ts", ".tsx", ".txt", ".vbs", ".xml", ".yaml", ".yml")
+# ...AND ".ps1"/".vbs" ARRIVED HERE ONE STEP LATE (2026-09-09), which is the lag this
+# comment warns about, caught in the act. Adding them to the exporter's TEXT_EXT turned
+# G-KAIROS-SCRUB green HERE, where the exporter is readable, and left it RED inside the
+# export, where this tuple is all there is — a check strictest exactly where nobody can
+# fix it, which is the sentence directly above. Both copies, one commit, or neither.
 
 FORBIDDEN = list(_FALLBACK_FORBIDDEN)
 TEXT = tuple(_FALLBACK_TEXT)

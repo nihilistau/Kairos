@@ -151,6 +151,62 @@ over. In its log that reads as a clean `exit code 0` and looks nothing like a cr
 entry runs `/usr/local/bin/ha-keepalive`, which holds one process open forever and brings the
 stack up.
 
+**And the logon entry must WAIT, and then CHECK** (2026-09-09, reported as *"home assistant
+on wsl is not loading on start"*). The stack started perfectly and was unreachable, which is
+worse than not starting: every container reported healthy, Home Assistant listened on 8123,
+and nothing could talk to it in either direction. Measured at the boundary:
+
+| | started at logon | started by hand, ten minutes later |
+|---|---|---|
+| `wslinfo --networking-mode` | **`none`** | `mirrored` |
+| `ip -4 -o addr show` | `lo`, `docker0` *(linkdown)* — **no eth at all** | `eth1 10.0.0.150/24` |
+| `ping 10.0.0.1` | `Network is unreachable` | replies |
+| `http://10.0.0.150:8123` | refused | **HTTP 200** |
+
+Same config, same everything, a different moment. At logon, Windows networking and the
+Hyper-V switches are still settling — the event log shows a switch being created at
+15:34:18 and the distro's `init` starting about ten seconds later — so
+`networkingMode=mirrored` has nothing to mirror. **There is no fallback to NAT and no
+error.** WSL comes up with networking mode `none`, which is silent, total, and from inside
+the distro looks exactly like a working stack.
+
+So the Startup entry is now a thin launcher (`home-assistant-wsl.vbs`, a VBS only so no
+console flashes) over `harness/homeassistant/stack/ha-autostart.ps1`, which:
+
+1. **waits for the fact, not for a duration** — this host actually holding `10.0.0.150`
+   and the router answering. "Sleep 60" is a guess that is wrong on a slow boot and, when
+   it fails, fails the same silent way;
+2. **verifies what the distro got** — both `wslinfo --networking-mode` and the host address
+   really being on an interface, because `mirrored` with no `eth` is a state this has
+   already been seen in;
+3. **recycles the VM and retries** if it got nothing. `--shutdown`, not `--terminate`:
+   WSL2 runs one VM for every distro and `networkingMode` is a property of that VM, so
+   restarting this distro alone changes nothing. Guarded — if any other distro is running
+   it logs and refuses, because pulling those down is not the launcher's call;
+4. **writes `%LOCALAPPDATA%\HomeAssistant\autostart.log`**, because the original failure
+   was invisible.
+
+**Deploy it with `deploy-autostart.ps1`, never by hand.** The two files have *opposite*
+encoding requirements and each one fails silently the other way:
+
+- `ha-autostart.ps1` **needs a UTF-8 BOM.** The launcher invokes `powershell.exe`, which is
+  Windows PowerShell 5.1, and 5.1 reads a BOM-less file as cp1252 — so the em dashes this
+  repo writes become mojibake and the file does not parse. Under `-File` with a hidden
+  window that produces no output anywhere: PowerShell starts, dies before its first line,
+  and the log this fix exists to write is never created.
+- `home-assistant-wsl.vbs` **must not have one, and must be ASCII.** VBScript refuses a BOM
+  at the first character (`Invalid character` at `1,1`), so it cannot declare its own
+  encoding and therefore must not contain anything that needs declaring.
+
+Both rules are assertions in the deploy script, along with parsing the deployed worker
+**with 5.1 itself** — checking it under PowerShell 7, which reads BOM-less UTF-8 correctly,
+is what let the fault through in the first place. A check has to use the same reader as the
+caller.
+
+Note that `http://localhost:8123` does **not** work from this host and is not meant to:
+under mirrored networking the stack is reached at the host's own LAN address, which is what
+`[experimental] hostAddressLoopback=true` in `.wslconfig` is for.
+
 ### 2. The token
 
 In Home Assistant: your profile → **Security** → **Long-lived access tokens** → *Create*.
