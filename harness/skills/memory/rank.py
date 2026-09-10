@@ -482,11 +482,39 @@ _IDF_CACHE: list = []
 
 
 def _idf_table():
-    """({token: idf}, floor). Rebuilt when the row count changes. Never raises."""
+    """({token: idf}, floor). Rebuilt when the registry file changes. Never raises.
+
+    ── THE CACHE KEY COST AS MUCH AS THE CACHED VALUE (2026-09-11) ────────────────────
+    This read `rows = [r for r in _store._load() ...]` FIRST and then asked whether
+    `len(rows)` matched the cache — a full read and parse of the whole registry, to
+    decide whether a parse was still needed. `_evidence()` calls this once per candidate
+    row, and `_surprisal_of()` did the same thing through `_person_model()`, so one
+    recall re-parsed the registry once per candidate. MEASURED on the live 1,561-row
+    store, on the automatic per-turn injection path:
+
+        rows      full re-parses per recall      one recall
+         250                        ~470            0.97 s
+       1,561              145-479 (by query)     2.1-7.1 s
+       2,500                      ~3,900           56.7 s
+
+    Quadratic, in a store whose founding rule is that it only ever grows. It was seen
+    and not plotted: `spine.py:177` records "measured 2x 3.8 ms and growing with the
+    store" — that number is now off by roughly three orders of magnitude.
+
+    The key is `_store.registry_stamp()`: (path, mtime_ns, size), the same key
+    `semindex.load_cached` uses, and it is strictly BETTER than the row count it
+    replaces — a count cannot see a relabel, a `core` pin, or a reinforce that bumps
+    `mentions` and `last_seen`, none of which change how many rows there are. This
+    table was being served stale after every one of those.
+
+    Gate: G-RECALL-COST, which counts `_load` calls rather than milliseconds, because
+    the call count is what regressed and it does not depend on how fast the box is.
+    """
     try:
-        rows = [r for r in _store._load() if not r.get("lifecycle")]
-        if _IDF_CACHE and _IDF_CACHE[0] == len(rows):
+        stamp = _store.registry_stamp()
+        if _IDF_CACHE and _IDF_CACHE[0] == stamp:
             return _IDF_CACHE[1], _IDF_CACHE[2]
+        rows = [r for r in _store._load() if not r.get("lifecycle")]
         import collections
         import statistics
         n = max(1, len(rows))
@@ -500,7 +528,7 @@ def _idf_table():
         idf = {t: math.log((n + 1) / (c + 1)) for t, c in df.items()}
         occ = [idf[t] for ts in per_row for t in ts]
         floor = statistics.median(occ) if occ else 0.0
-        _IDF_CACHE[:] = [len(rows), idf, floor]
+        _IDF_CACHE[:] = [stamp, idf, floor]
         return idf, floor
     except Exception as exc:
         # AN EMPTY TABLE IS ALSO WHAT AN EMPTY STORE LOOKS LIKE, so this handler could hide
@@ -573,14 +601,21 @@ _PM_CACHE: list = []
 
 
 def _person_model():
-    """The model of him, rebuilt when the store changes. NEVER raises."""
+    """The model of him, rebuilt when the registry file changes. NEVER raises.
+
+    Same fix and same reason as `_idf_table` above: `len(_store._load())` is a whole-file
+    parse used as a cache key, and `_surprisal_of` calls this once per candidate row. The
+    stamp is also the more correct key — a reinforce bumps `mentions` without changing the
+    row count, and this model is built from exactly that kind of field, so the count key
+    was serving a stale PersonModel (and a stale `_SURP_CACHE` behind it) after every
+    reinforcement."""
     try:
-        n = len(_store._load())
-        if _PM_CACHE and _PM_CACHE[0] == n:
+        stamp = _store.registry_stamp()
+        if _PM_CACHE and _PM_CACHE[0] == stamp:
             return _PM_CACHE[1]
         from harness.model.person import PersonModel
         pm = PersonModel.from_registry()
-        _PM_CACHE[:] = [n, pm]
+        _PM_CACHE[:] = [stamp, pm]
         _SURP_CACHE.clear()
         return pm
     except Exception as _swx:

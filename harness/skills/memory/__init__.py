@@ -138,7 +138,15 @@ from harness.skills.memory.present import (                    # noqa: E402,F401
     DECLINE_MSG, _ATTR_STOP, attr_absent, SECRET_WITHHELD_NOTE,
     secret_withheld, _present_row)
 from harness.skills.memory.store import (                      # noqa: E402,F401
-    _reg_path, _load, _REG_LOCK, registry_lock, _save_all, _log)
+    _reg_path, _load, _REG_LOCK, registry_lock, _save_all, _log,
+    # THE MEMO AND ITS KEY (2026-09-11). On the door because G-MEMORY-PACKAGE's census
+    # requires every sibling name to be, and safely so: `_PARSE_CACHE` is mutated in
+    # place and never rebound, which is the property that keeps `mint._MINT_WORKER` off
+    # the door and would have made an alias here a permanent `None`. Named `_PARSE_*`
+    # and not `_CACHE`: `semindex` already owns that name and `g_self_model` patches it,
+    # so a second `_CACHE` in the package makes §5's owner-vs-alias check ambiguous
+    # about which module a mutant was aimed at.
+    registry_stamp, invalidate_cache, _PARSE_CACHE, _PARSE_LOCK)
 from harness.skills.memory.mint import (                       # noqa: E402,F401
     _MINT_Q, _MINT_LOCK, _mint_is_async, _CAPTURE_REFUSED, capture_status,
     eps_root, _mint_now, _mint_drain, _mint_later, mint_backlog, mint_drain_blocking)

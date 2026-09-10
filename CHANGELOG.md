@@ -1,5 +1,61 @@
 # Changelog
 
+## 0.8.18 — recall no longer re-reads the whole store once per candidate (2026-09-11)
+
+**If your fact store has grown, this is the release you want.** Every recall re-read and
+re-parsed the entire registry between 145 and 479 times. Measured on a 1,561-row store that
+is **2.1–7.1 seconds of pure Python per question**, on the automatic per-turn injection path —
+the one that runs whether or not she chose to remember anything. It is quadratic in the number
+of rows, and the founding rule guarantees the number of rows only goes up:
+
+    rows        full re-parses per recall        one recall
+     250                             ~470            0.97 s
+   1,561                     145–479 (by query)   2.1–7.1 s
+   2,500                           ~3,900           56.7 s
+
+Not a cold-cache artefact: asking the identical question again cost the same.
+
+`rank._idf_table()` and `rank._person_model()` used `len(store._load())` as their
+cache-validity key — a full read and parse of the whole file, performed in order to decide
+whether a parse was still needed. `_evidence()` calls the first once per candidate row and
+`_surprisal_of()` called the second once per candidate row, so the parse count scaled with
+candidates × rows.
+
+### The fix is the key, not a faster parser
+
+`store.registry_stamp()` → `(path, mtime_ns, size)`, which is the key `semindex.load_cached()`
+already used one module over. One rule, not two. `_load` memoises its parse on that stamp,
+`_save_all` invalidates it under the lock that already made the write safe, and both caches in
+`rank.py` key on the stamp instead of on a row count.
+
+The stamp is also **more correct** than the count it replaces. A relabel, a `core` pin, or a
+reinforcement that bumps `mentions` and `last_seen` changes no row count — so both caches were
+being served stale after every one of those, and the person model behind `_surprisal_of` is
+built from exactly those fields. Two different registries with equal row counts collided
+outright.
+
+After: **1–3 reads and 5–122 ms** on the same questions, and byte-identical output — 12
+queries plus `list_memories`, `live_rows` and `search_memories`, diffed against the tree before
+the change.
+
+`_load` still hands every caller rows it owns, because `commit_row`, `forget` and the
+reinforce branch all mutate what it returns before rewriting it. The memo therefore returns a
+row-wise copy with list values copied: 1.99 ms against a 10.89 ms re-read, where
+`copy.deepcopy` measured 16.58 ms — slower than the bug it would have been fixing.
+
+### `G-RECALL-COST` — the gate counts calls, not milliseconds
+
+Wall time is a property of your machine; the call count is what regressed and is the same
+number anywhere. Its second leg runs the same query against 4× the rows and requires the count
+not to move, which is the O(N) claim as a finite check. It runs in this repo's CI.
+
+**The fourth mutant passed the first version of that gate, 8/8**, and that is worth recording
+rather than quietly fixing: the leg meant to cover `_save_all`'s cache invalidation asserted
+that an ordinary write is visible to the next read — which the stamp already guarantees — so it
+held with the invalidation deleted and was testing nothing. It now constructs the one case the
+stamp is blind to: a rewrite of exactly the same byte count with mtime restored, so
+`(path, mtime_ns, size)` is unchanged and only the writer can know.
+
 ## 0.8.17 — remember() is a pipeline you can read in one screen (2026-09-02)
 
 `remember()` is the door every fact enters memory by — the tool, the per-turn capture, the
