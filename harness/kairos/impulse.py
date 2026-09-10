@@ -633,10 +633,30 @@ def worth_saying(continuation: str, previous_reply: str) -> tuple[bool, str]:
     So the continuation is DROPPED (never shown) when it is empty, a greeting, a
     re-introduction, or substantially a restatement of what she just said. She is allowed
     to decide, after thinking, that she had nothing after all. That is not a failure — it
-    is the system working."""
+    is the system working.
+
+    ...EXCEPT THAT IT ALSO IS NOT ALWAYS A DECISION, AND THIS BRANCH USED TO CLAIM IT WAS
+    (2026-09-11). The empty case returned "she had nothing to add after all" — a MOTIVE —
+    and measured over speech.jsonl on 2026-09-10, all 927 rows carrying that reason had
+    empty recorded text and 77% of every drop before 09-02 was one of them. They were not
+    her deciding anything: `_generate` returns "" when there is no canon to speak into, and
+    that empty string arrived here and was written up as her preference. For weeks the
+    instrument that exists to answer "why is she quiet" — the panel renders from it —
+    answered with her character while the truth was a fault, which is also what kept the
+    no-canon hold invisible until it was found from the other end on 2026-09-09.
+
+    THIS FUNCTION CANNOT TELL THE TWO APART, and that is the honest reason it now says
+    less. The nudge ends with "If you actually have nothing to add, say nothing at all",
+    so an empty generation is a legitimate decline BY DESIGN; and a held turn is an empty
+    generation too. Nothing in `continuation` or `previous_reply` separates them. So this
+    reports only what it can see — that no words came back — and the caller, which knows
+    whether there was a canon, names the cause (`scheduler._why_empty`). A pure function
+    inventing the difference would be the same mislabel with better prose."""
     t = (continuation or "").strip()
+    if not t:
+        return False, "no words came back"
     if len(t) < 2:
-        return False, "she had nothing to add after all"
+        return False, "one character came back, which is nothing to show"
 
     low = t.lower().lstrip("*_ (")
     for opener in ("hi", "hey", "hello", "sorry", "as i said", "as mentioned",

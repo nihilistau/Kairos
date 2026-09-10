@@ -333,7 +333,19 @@ def main(argv=None):
             if x[i]:
                 continue
             rr = (dec[i].get("reason") or "").lower()
-            c["EMPTY generation" if "nothing to add" in rr else
+            # BOTH VOCABULARIES, because the store is append-only (2026-09-11). The
+            # `len(t)<2` branch used to answer "she had nothing to add after all" for
+            # every empty generation -- a motive she had not chosen -- and 927 rows on
+            # disk still carry it and always will. The fix splits the new ones into a
+            # HELD turn and a real decline, so the buckets below keep the old label as
+            # its own row rather than folding it in: a pre-fix empty is genuinely
+            # unattributable, and quietly merging it with either new bucket would put a
+            # number on a question the old data cannot answer.
+            c["EMPTY: unattributable (pre-fix label)" if "nothing to add" in rr else
+              "EMPTY: held, no canon" if "no conversation to speak into" in rr else
+              "EMPTY: she chose silence" if "chose silence" in rr else
+              "EMPTY: canon unknown" if "no words came back" in rr else
+              "EMPTY: one character" if "one character came back" in rr else
               "restatement" if "restatement" in rr else
               "claimed an act" if "claimed" in rr else
               "sidecar" if "sidecar" in rr else

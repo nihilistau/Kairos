@@ -124,6 +124,59 @@ def main() -> int:
     check("a RESTATEMENT is DROPPED", not ok2, why2)
     check("a genuine new thought is KEPT", ok3)
 
+    # 8b. AND AN EMPTY GENERATION IS NOT A MOTIVE (2026-09-11) ────────────────────────
+    # This branch used to answer "she had nothing to add after all" — a decision she had
+    # not made. Measured over speech.jsonl on 2026-09-10: all 927 rows carrying that
+    # reason had EMPTY recorded text and they were 77% of every drop before 09-02. They
+    # were the no-canon hold (`_generate` returns "" when `_longest_session()` is empty)
+    # wearing her preference, and the same label had already hidden a different fault —
+    # inference_config.py records a byteexact refusal answering with an empty 200 and
+    # logging 'DROPPED: she had nothing to add after all :: '''. One string, three causes,
+    # and it is the instrument the panel renders for "why is she quiet".
+    #
+    # The nudge ends with "If you actually have nothing to add, say nothing at all", so an
+    # empty generation IS a legitimate decline by design — which is exactly why this pure
+    # function may not name a cause. It reports what it can see; the caller, which knows
+    # whether a canon existed, names the rest.
+    for empty in ("", "   ", None):
+        _ok, _why = worth_saying(empty, "I was saying the ocean is vast.")
+        check("an empty generation (%r) is DROPPED without claiming a motive" % (empty,),
+              (not _ok) and "nothing to add" not in _why and "no words came back" in _why,
+              _why)
+    _ok1c, _why1c = worth_saying("x", "prev")
+    check("...and one character is its own answer, not the same one",
+          (not _ok1c) and "one character" in _why1c, _why1c)
+
+    # THE CALLER'S HALF, driven through the real scheduler seam.
+    from harness.kairos import scheduler as _KS
+    _real_probe = _KS._CANON_OK
+    try:
+        _KS.set_canon_ok(lambda: False)
+        _held = _KS._why_empty("")
+        _KS.set_canon_ok(lambda: True)
+        _chose = _KS._why_empty("")
+        _KS.set_canon_ok(None)
+        _unknown = _KS._why_empty("")
+        check("a HELD turn is named as held, not as her preference",
+              "held" in _held and "no conversation" in _held, _held)
+        check("...and a real decline is named as her silence", "chose silence" in _chose, _chose)
+        check("...and they are DIFFERENT strings, or the split is decoration",
+              _held != _chose, "%r vs %r" % (_held, _chose))
+        check("with no probe it says UNKNOWN rather than guessing",
+              "unknown" in _unknown.lower(), _unknown)
+        # A PROBE THAT RAISES MUST NOT COST HER THE TURN. The first cut of this called
+        # `swallowed` with a kwarg that function does not take, so a raising probe would
+        # have thrown out of the drop path — a crash inside the code that exists to record
+        # why she was quiet. Found by driving this case rather than by reading it.
+        _KS.set_canon_ok(lambda: 1 / 0)
+        check("a probe that RAISES degrades to unknown instead of throwing",
+              "unknown" in _KS._why_empty("").lower())
+        # ...and it must not fire on a turn that DID produce words.
+        _KS.set_canon_ok(lambda: False)
+        check("a non-empty turn is left alone entirely", _KS._why_empty("she said this") == "")
+    finally:
+        _KS.set_canon_ok(_real_probe)
+
     # 9. the whole point: over a normal conversation she is silent almost always
     st = TurnState(last_user_at=0.0)
     # Ten ordinary FINISHED turns, on the model scale (median +13.10, min +8.96).

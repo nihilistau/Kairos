@@ -216,6 +216,49 @@ def set_warm_ok(fn) -> None:
     _WARM_OK = fn
 
 
+# app.py's "is there a conversation to speak into" — the ONE thing that separates her
+# choosing silence from a turn that was never really asked. See _why_empty.
+_CANON_OK = None
+
+
+def set_canon_ok(fn) -> None:
+    global _CANON_OK
+    _CANON_OK = fn
+
+
+def _why_empty(text: str) -> str:
+    """Why nothing came back. THE ONE PLACE THAT DECIDES (2026-09-11).
+
+    `worth_saying` reports only that no words came back, because it genuinely cannot tell
+    a decline from a fault: the nudge ends with "If you actually have nothing to add, say
+    nothing at all", so an empty generation is a legitimate refusal BY DESIGN — and
+    `_generate` returning "" on the no-canon hold is an empty generation too. Measured
+    2026-09-10: 927 rows had been filed as "she had nothing to add after all", every one
+    with empty text, 77% of all drops before 09-02, and they were the hold wearing her
+    motive.
+
+    The discriminator is app-side, so it arrives the way `_SEEDER` and `_WARM_OK` do. It
+    lives in ONE function called from every site rather than inline at each, because a
+    refinement copied to two call sites is this file's own §0 bug with a new subject.
+
+    Reports UNKNOWN rather than guessing when no probe is installed — a gate, a fresh
+    embedding, an old deployment. Naming a cause with no evidence for it is the mislabel
+    again, one layer up.
+    """
+    if (text or "").strip():
+        return ""
+    try:
+        canon = bool(_CANON_OK()) if _CANON_OK is not None else None
+    except Exception as exc:
+        _swallowed(logger, "_why_empty", exc, lane="kairos")
+        canon = None
+    if canon is False:
+        return "held: there was no conversation to speak into"
+    if canon is True:
+        return "she chose silence — the nudge invites it when she has nothing"
+    return "no words came back (canon unknown: a decline and a fault look alike)"
+
+
 def _warm_ok() -> bool:
     try:
         return bool(_WARM_OK()) if _WARM_OK is not None else True
@@ -1298,12 +1341,17 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
             # repeated the 05:02 one word for word; that is the restatement this rule exists for
             ok, why = worth_saying(text, _LAST_MODE_TEXT.get(session, "") or reply_text)
             if not ok:
+                why = _why_empty(text) or why      # a fault is not a preference
                 _speech.record(imp.action, _speech.DROPPED, why, text)
                 logger.info("[kairos] mode turn DROPPED: %s :: %r", why, _anon.say(text, 60))
                 return
         elif imp.action != REMIND and not (imp.action == MODE_TURN and _mode_meta and _mode_meta["reading"]):
             ok, why = worth_saying(text, reply_text)
             if not ok:
+                # A FAULT IS NOT A PREFERENCE (2026-09-11). `worth_saying` reports only
+                # that no words came back; this names the cause, because only out here is
+                # it knowable. See _why_empty.
+                why = _why_empty(text) or why
                 # RECORDED, not just logged. This drop is her voice going somewhere, and
                 # until now it went into an INFO line and was forgotten — so nobody could
                 # answer whether these rules are a backstop or a crutch, which

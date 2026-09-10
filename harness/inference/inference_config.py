@@ -102,6 +102,10 @@ class InferenceConfig:
         # Two lanes in harness/server/app.py DID pass it, via _bx_default(). Everything
         # else did not: the kairos CONTINUATION (which is why she stopped speaking
         # unprompted — "DROPPED: she had nothing to add after all :: ''", every time,
+        # (that LABEL was itself wrong and was fixed on 2026-09-11: an empty generation
+        # no longer claims a motive, and a held turn now says it was held. This entry is
+        # the FIRST recorded fault the old label hid; the no-canon hold was the second,
+        # and 927 rows deep. See harness/kairos/scheduler._why_empty.)
         # because the continuation was refused before it ever generated), reflection,
         # agency, task_loop and the CLI coder. The fix for the silent console was applied
         # to the two builders I was looking at, and the other five kept the bug — the same

@@ -5144,6 +5144,15 @@ def _run_stdlib(host: str, port: int) -> None:
                 _swallowed(logger, "_warm_for_presence", _swx, lane="server")
                 return _WARM.is_set()
         _ks.set_warm_ok(_warm_for_presence)
+        # ── AND THE THING THAT TELLS A DECLINE FROM A HOLD (2026-09-11) ──────────────
+        # `_generate` returns "" when `_longest_session()` is empty — the hold that stops
+        # her speaking into a windowed disk rebuild. That empty string reached the last
+        # gate and was recorded as "she had nothing to add after all": 927 rows, every one
+        # with empty text, 77% of all drops before 09-02. The scheduler cannot see this
+        # predicate and `worth_saying` is pure, so it arrives the same way the seeder and
+        # the warm gate do. Same expression the hold itself branches on, deliberately —
+        # two spellings of "is there a canon" is the bug this whole fix is about.
+        _ks.set_canon_ok(lambda: bool(_longest_session()))
         _seed_kairos_from_day()
         # What the LAST gateway flushed on its way down comes back to the queue that is
         # read — this boot is the re-entry point for mode=all/kill, where resume()
