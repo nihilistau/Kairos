@@ -27,6 +27,7 @@ import json
 import logging
 import os
 import threading
+import time
 from typing import List
 
 from harness.store_io import replace_atomic, rescue_stray_tmp
@@ -42,6 +43,57 @@ def _reg_path() -> str:
     return os.environ.get("SP_RECALL_REGISTRY", "")
 
 
+# ── A ROW'S NAME IS ITS PRIMARY KEY, AND IT WAS A MILLISECOND (2026-09-11) ────────────
+# `remember()` minted `ep_tool_{int(time.time() * 1000)}` and used the basename as the
+# row's `name`. That is not an identity, it is a clock reading — and the whole tree treats
+# it as a key:
+#
+#     store.commit_row   tombstones the rows named in `retired`, BY NAME
+#     __init__.py:240    by_name = {r["name"]: r for r in rows}     <- collisions vanish
+#     __init__.py:703    the same shape again
+#     rank._SURP_CACHE   keyed (name, ts)                           <- two rows, one entry
+#
+# MEASURED, replaying G-CONFLUENCE's 20-row corpus through the real writer:
+#
+#     Windows   20 rows in 0.14 s   20 distinct names   0 collisions
+#     Linux     20 rows in 0.009 s  9-13 distinct names  up to FOUR rows sharing one name
+#
+# Linux is ~15x faster per write, so several rows land inside one millisecond. Then a
+# legitimate supersession tombstones every row that happens to share the retired row's
+# name, and the receipt points at whatever wrote last. Observed, on her own lane:
+#
+#     DEAD  "I like the hour just before sunrise"   killed by: "My favourite soup is pea and ham"
+#     DEAD  "I feel quietly content tonight"        killed by: "Sam is terrified of open water"
+#
+# A fact about soup retiring a feeling about sunrise. The supersede LAW is correct and
+# refused all of these — `find_superseded` never proposed them; the tombstone was applied
+# by name to rows the law never named. An invariant enforced in the decision and not in
+# the application is enforced nowhere, which is §0 with a new hat on.
+#
+# Her live store is CLEAN — 1561 rows, 1561 distinct names — because her writes are spaced
+# by conversation on a slower machine. It is latent there and live on any faster box, in
+# any batch write, and in the public framework's Linux CI, which is where it surfaced.
+#
+# THE FIX IS A MONOTONIC NAME. The format is unchanged (`ep_tool_<integer>`, sortable, and
+# nothing in the tree parses the number back out — the references to it are docstrings and
+# CLI examples). Within one process it can never repeat. Across processes it still could,
+# but two processes writing this registry is already unsafe for a larger reason: `_REG_LOCK`
+# is in-process, so a second writer loses rows regardless. Single-writer is the standing
+# assumption and this fix keeps its scope.
+_NAME_LOCK = threading.Lock()
+_LAST_NAME_MS = [0]
+
+
+def new_row_name(prefix: str = "ep_tool_") -> str:
+    """A unique row identity. Monotonic within the process, never re-issued."""
+    with _NAME_LOCK:
+        ms = int(time.time() * 1000)
+        if ms <= _LAST_NAME_MS[0]:
+            ms = _LAST_NAME_MS[0] + 1
+        _LAST_NAME_MS[0] = ms
+    return "%s%d" % (prefix, ms)
+
+
 # ── THE PARSE IS MEMOISED, AND THE STAMP IS WHAT DECIDES (2026-09-11) ─────────────────
 # `registry_stamp` is the registry's identity as three cheap values. It exists because the
 # readers above this module were using `len(_load())` as their cache-validity key — a full
@@ -53,6 +105,8 @@ def _reg_path() -> str:
 # in-place rewrite inside one mtime tick is exactly how a stale cache served a dead vector
 # — and PATH is in it because two registries can hold the same number of rows, which is a
 # collision the old row-count key had and nothing was checking for.
+
+
 def registry_stamp(path: str = ""):
     """(path, mtime_ns, size) — is this the same registry, unchanged? Never raises."""
     p = path or _reg_path()
@@ -222,11 +276,28 @@ def commit_row(line: dict, retired: list) -> None:
     with _REG_LOCK:
         rows = _load()
         if retired:
-            names = {r.get("name") for r in retired}
+            # ── MATCHED ON MORE THAN THE NAME, AND COUNTED (2026-09-11) ──────────────
+            # This matched on `name` alone, and `name` was a millisecond — so on a fast
+            # machine a supersession tombstoned every row that happened to share the
+            # retired row's clock reading, including rows the supersede law had expressly
+            # refused to retire. `new_row_name` makes the name unique, which is the fix;
+            # this is the seatbelt. The extra fields cost nothing and cannot be wrong:
+            # `ts` and `text` are stamped once at write and no later path edits them
+            # (reinforce moves `mentions`/`last_seen`, never these).
+            keys = {(r.get("name"), r.get("ts"), r.get("text")) for r in retired}
+            hit = 0
             for r in rows:
-                if r.get("name") in names:
+                if (r.get("name"), r.get("ts"), r.get("text")) in keys:
                     r["lifecycle"] = 1                     # the engine reads THIS
                     r["superseded_by"] = line["name"]      # the audit trail reads these
                     r["superseded_at"] = line["ts"]
+                    hit += 1
+            if hit != len(retired):
+                # LOUD, NEVER FATAL: a fact she was told is not worth an exception in her
+                # mouth, but a tombstone count that disagrees with the ruling is exactly
+                # the thing that went unnoticed for the life of this file.
+                _log.error("[memory] commit_row tombstoned %d row(s) for a ruling that "
+                           "named %d — retired=%s", hit, len(retired),
+                           [r.get("name") for r in retired])
         rows.append(line)
         _save_all(rows)

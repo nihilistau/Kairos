@@ -1,5 +1,64 @@
 # Changelog
 
+## 0.8.20 — a row's name was a millisecond, and tombstones landed on the wrong rows (2026-09-11)
+
+**Upgrade if you write memories faster than one per millisecond — which, on Linux, is
+every batch write you have ever done.** This is a data-integrity fix on the one rule the
+store exists to keep.
+
+`remember()` minted the row's `name` as `ep_tool_{int(time.time() * 1000)}`. That is a
+clock reading, not an identity, and the framework keys on it everywhere: `commit_row`
+tombstones the rows a supersession retired **by name**, `memory/__init__` builds
+`{row["name"]: row}` lookups in two places (a collision silently drops a row), and the
+surprisal cache is keyed `(name, ts)`.
+
+Replaying the confluence corpus through the real writer:
+
+| | rows | wall | distinct names | collisions |
+|---|---|---|---|---|
+| Windows | 20 | 0.14 s | **20** | 0 |
+| Linux | 20 | 0.009 s | **9–13** | up to **four** rows sharing one name |
+
+So a legitimate supersession tombstoned every row that happened to share the retired row's
+millisecond:
+
+    DEAD  "I like the hour just before sunrise"   killed by: "My favourite soup is pea and ham"
+    DEAD  "I feel quietly content tonight"        killed by: "Sam is terrified of open water"
+
+A fact about soup retiring a feeling about sunrise. **The supersede law never proposed any
+of them** — it refused them correctly, and the tombstone was applied afterwards by a key the
+law had never consulted. An invariant enforced in the decision and not in the application is
+enforced nowhere.
+
+It was invisible on Windows because writes there are ~15× slower, and it surfaced the first
+time this repo's CI ran the suite on Linux at all.
+
+### What to do about an existing store
+
+Check it: if every row's `name` is distinct, nothing was ever mis-tombstoned and there is
+nothing to repair. Collisions cluster in bursts — imports, consolidations, anything that
+wrote several facts in a row without a human between them.
+
+### The fix
+
+`store.new_row_name()`, monotonic within the process and never re-issued. The format is
+unchanged (`ep_tool_<integer>`, still sortable), so existing rows, episode directories and
+`tools/memory/quarantine_rows.py --name …` all keep working. Cross-process collisions stay
+out of scope deliberately: the registry lock is in-process, so two writing processes lose
+rows for a larger reason — single-writer is the standing assumption.
+
+And the seatbelt, because the name fix should not be the only defence for a key this
+load-bearing: `commit_row` matches `(name, ts, text)` and **logs loudly when the number of
+rows it tombstoned disagrees with the number the ruling named**.
+
+`G-ROW-IDENTITY` (9/9) drives the real minter as fast as it will go — deliberately
+speed-sensitive in the safe direction, since a fixed sleep between writes is exactly what
+hid this — and separately **injects** a name collision to prove the tombstone still finds
+the right row.
+
+`g_confluence` is now 38/38 on Linux across five consecutive runs, where it had been 23–28/38
+and nondeterministic.
+
 ## 0.8.19 — CI runs the gate suite, which it had never done (2026-09-11)
 
 **This repo's GitHub Actions has been red on every push since the workflow landed on

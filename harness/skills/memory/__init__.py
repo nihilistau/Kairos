@@ -139,6 +139,7 @@ from harness.skills.memory.present import (                    # noqa: E402,F401
     secret_withheld, _present_row)
 from harness.skills.memory.store import (                      # noqa: E402,F401
     _reg_path, _load, _REG_LOCK, registry_lock, _save_all, _log,
+    new_row_name, _NAME_LOCK, _LAST_NAME_MS,
     # THE MEMO AND ITS KEY (2026-09-11). On the door because G-MEMORY-PACKAGE's census
     # requires every sibling name to be, and safely so: `_PARSE_CACHE` is mutated in
     # place and never rebound, which is the property that keeps `mint._MINT_WORKER` off
@@ -378,7 +379,11 @@ def remember(fact: str, source: str = "", *, kind: str = "", mem_class: str = ""
     # the process dies before the queue drains, the fact is still on disk — exactly as it already
     # was whenever the daemon happened to be unreachable.
     daemon = os.environ.get("SP_DAEMON_URL", "http://127.0.0.1:3000")
-    out_dir = os.path.join(eps_root(), f"ep_tool_{int(time.time() * 1000)}")
+    # THE NAME IS THE ROW'S PRIMARY KEY, so it comes from the module that owns row identity
+    # rather than from a clock reading here. `int(time.time() * 1000)` gave four rows one
+    # name on a fast machine and the tombstone went to whichever of them it found — see
+    # `store.new_row_name`'s header for the measurement.
+    out_dir = os.path.join(eps_root(), _store.new_row_name())
     out_dir = out_dir.replace("\\", "/")
     npos = 0
     minted = False
