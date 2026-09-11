@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.34 — one more engine knob reaches the door (2026-09-12)
+
+`serve.py` maps `SP_KV_PREFILL_DP4A` from `[decode].prefill_dp4a`, default false.
+
+Like `attn_v2` in the previous cut, it selects a path in the **upstream CUDA engine** and does
+nothing against an OpenAI-compatible endpoint. It is mapped anyway because the alternative is
+what it was before: reachable only by raw `getenv`, so `serve.py`'s strip made it impossible to
+arm *through the door*, impossible to test through the door, and invisible to every gate that
+reads the mapping. G-ONEDOOR's rule — an unmapped knob does not exist — is exactly for this.
+
+Upstream it stays off on a measurement rather than on caution: the fused Q4 path it selects is
+~18% slower than dequantise + `cublasSgemm` on that hardware, and it quantises activations to
+int8, which changes generated text at temperature 0.
+
 ## 0.8.33 — the one-door banner now proves what went through it (2026-09-12)
 
 `serve.py` strips every inherited `SP_*` so the profile is the authority, and `SP_PASSTHROUGH`

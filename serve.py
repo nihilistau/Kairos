@@ -839,6 +839,17 @@ def build_env(c: dict) -> dict:
         # layer, L1 99.1% -> 83.7%, compute 9.9% -> 78.6%. Parity relL2 8.15e-07 over all 30
         # layers, which is fp32 reduction-order noise and nothing else.
         "SP_G4_ATTN_V2": str(int(dec.get("attn_v2", 0) or 0)),
+        # SP_KV_PREFILL_DP4A — the batched prefill matmul as a FUSED Q4xint8 dp4a GEMM
+        # (gemm_q4b_dp4a_batched) instead of k_dequant_arena_q4b + cublasSgemm. Off, and
+        # MEASURED off rather than assumed: ~18% slower on this card and it quantises
+        # activations to int8, so at temperature 0 it changes her words. docs/OFF-BY-DEFAULT.md
+        # carries the numbers and the arming condition.
+        #
+        # Mapped even though it stays off, because the alternative is worse: it was reachable
+        # only by raw getenv, so serve.py's strip made it impossible to arm THROUGH THE DOOR
+        # and nothing recorded that it existed. G-ONEDOOR's rule is that an unmapped knob does
+        # not exist — this is what that rule is for.
+        "SP_KV_PREFILL_DP4A": b(dec.get("prefill_dp4a", False)),
         "SP_MOE_TIMING": b(dec.get("moe_timing", False)),
         # SP_MOE_PIN_STAGE — expert staging through a pinned ring instead of a pageable
         # cudaMemcpyAsync (which is not async at all: the driver blocks staging it through

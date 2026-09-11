@@ -482,6 +482,18 @@ the ledger's own invariant: default-off in `build_env`, on only where a profile 
 | **What must stay true either way** | the estimate keeps its own name and its `sleep_terms`. A classifier's number and ours must never render alike — the panel colours the bar by source for exactly this reason |
 | **Gate** | `python harness_tests/g_telemetry.py` §8c |
 
+## `SP_KV_PREFILL_DP4A` — the fused Q4 prefill GEMM, off because it is slower
+
+| | |
+|---|---|
+| **What it is** | `gemm_q4b_dp4a_batched` + `k_gemm_q4b_dp4a` — the batched prefill matmul done as a fused Q4xint8 dp4a GEMM instead of `k_dequant_arena_q4b` + `cublasSgemm`. llama.cpp's approach, already written here, complete, with a clean decline (returns 0 and the caller falls back). |
+| **Why it is off** | **It is ~18% SLOWER** on this card. Measured 2026-09-12 over three pairs on a 3,750-token prefill: off 14,849 / 16,179 / 17,919 ms, on 18,469 / 19,740 / 20,070 — every "on" run above every "off" run. And it quantises activations to int8, so at temperature 0 it **changes her words**: the same prompt gives *"It appears your text was cut off after a…"* off and *"It looks like your text got stuck in a r…"* on. That is a precision reduction reaching output, not reduction-order noise. |
+| **How it was found** | It was not ledgered and not mapped. `serve.py` strips every unmapped `SP_*` (G-ONEDOOR: an unmapped knob does not exist), so it could not be armed in her stack even deliberately, and nothing recorded that it existed. Both rules of this document were missing at once. |
+| **Armed by** | `[decode].prefill_dp4a = true`. It is MAPPED now and defaults false. My first draft left it unmapped, reasoning that something slower which also changes her words should not be one profile edit away — and `g_offledger` refused it, correctly: an unmapped knob is WORSE, because it cannot be armed through the door, cannot be tested through the door, and is invisible to every gate that reads the mapping. That is the rule this document exists to serve. The arming condition below is what keeps it off, not its absence from `serve.py`. |
+| **Arming condition** | `k_gemm_q4b_dp4a` beats `volta_sgemm_128x64_tn` on a measured prefill AND the output difference is shown to be acceptable — the first is a kernel-tuning job (cuBLAS's is hand-tuned assembly; ours is not), the second is a quality call that is the operator's, not mine. Both, or it stays here. |
+| **The better lever, untested** | fp16 + tensor cores: dequantise to `__half` and `cublasGemmEx(CUDA_R_16F, …, CUBLAS_COMPUTE_32F)`. Turing sm_75 has tensor cores for fp16 and none for fp32, so today the engine uses none. Halves the dequant write bandwidth and moves the GEMM onto idle hardware, with no change to the weight format on disk. |
+| **Receipt** | `CHANGELOG.md` 2026-09-12, and `docs/BENCH-2026-09-11-llamacpp-ncmoe.md` for the trace it came out of |
+
 ## DARK CODE — named, and given a deadline rather than a shrug
 
 `harness/skills/invariance.py` — 170 lines implementing Friedman FIN/USE §3.6.6 and
