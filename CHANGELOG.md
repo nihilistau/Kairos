@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.23 — the new floor gate named a path that only exists upstream (2026-09-11)
+
+`G-IMPORTS`'s floor legs, added in 0.8.22, read the workflow and the public `pyproject.toml`
+from `kairos-export/` — which is the **upstream staging directory**. It does not exist here;
+in this tree the same two files are `pyproject.toml` and `.github/workflows/gates.yml` at the
+root. The legs degraded quietly, but `G-SRC-TRAP` convicted the dangling names, which is
+exactly its job: *"a gate is allowed to skip what is absent; it is not allowed to name
+something that never existed."* 0.8.22 shipped with that red in it.
+
+Both locations are now read, each behind its own `os.path.exists`, so each tree checks the
+pair it actually has. They are written out as literal guarded reads rather than joined from
+a list on purpose: `G-SRC-TRAP` matches `open(os.path.join(ROOT, "a", "b"))` and exempts the
+same literals under an existence test, so building the path dynamically would have *evaded*
+the scan instead of satisfying it.
+
 ## 0.8.22 — the declared Python floor was never true: 3.11 is the minimum (2026-09-11)
 
 **BREAKING, in the sense that it stops being a lie: the minimum supported Python is now

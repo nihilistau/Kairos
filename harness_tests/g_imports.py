@@ -154,16 +154,42 @@ check("every unguarded top-level import in a root script resolves",
 # the launcher there. The matrix DID list 3.10 — and the suite never reached it, which is
 # the other half of the same story (see this gate's header). Holding the two files to each
 # other makes "we support X" and "we test X" one statement instead of two.
+def _read_floor(text):
+    _m = re.search(r'requires-python\s*=\s*"[^0-9]*([0-9]+\.[0-9]+)"', text)
+    return _m.group(1) if _m else ""
+
+
+def _read_matrix(text):
+    _m = re.search(r'^\s*python:\s*\[([^\]]*)\]', text, re.M)
+    return re.findall(r'"([0-9]+\.[0-9]+)"', _m.group(1)) if _m else []
+
+
+# ── THE PAIR SITS IN A DIFFERENT PLACE UPSTREAM AND DOWNSTREAM ────────────────────────
+# Upstream the workflow and the public pyproject are STAGED in `kairos-export/`, because
+# nothing is authored in the snapshot; downstream they are `pyproject.toml` and
+# `.github/workflows/gates.yml` at the root. The first cut read only the staging pair, so
+# inside the export it named two files that do not exist there — and `g_src_trap` convicted
+# it, which is the gate doing precisely its job ("a gate is allowed to skip what is absent;
+# it is not allowed to name something that never existed").
+#
+# Both branches are written out as literal, guarded reads rather than joined from a list:
+# `g_src_trap` matches `open(os.path.join(ROOT, "a", "b"))` and exempts the same literals
+# under `os.path.exists`, so a dynamic join would EVADE the scan instead of satisfying it.
+# Being visible to that gate is the point.
 _floor, _matrix = "", []
-try:
+if os.path.exists(os.path.join(ROOT, "kairos-export", "pyproject.toml")):
     with open(os.path.join(ROOT, "kairos-export", "pyproject.toml"), encoding="utf-8") as _f:
-        _m = re.search(r'requires-python\s*=\s*"[^0-9]*([0-9]+\.[0-9]+)"', _f.read())
-        _floor = _m.group(1) if _m else ""
+        _floor = _read_floor(_f.read())
+elif os.path.exists(os.path.join(ROOT, "pyproject.toml")):
+    with open(os.path.join(ROOT, "pyproject.toml"), encoding="utf-8") as _f:
+        _floor = _read_floor(_f.read())
+
+if os.path.exists(os.path.join(ROOT, "kairos-export", "gates.yml")):
     with open(os.path.join(ROOT, "kairos-export", "gates.yml"), encoding="utf-8") as _f:
-        _m = re.search(r'^\s*python:\s*\[([^\]]*)\]', _f.read(), re.M)
-        _matrix = re.findall(r'"([0-9]+\.[0-9]+)"', _m.group(1)) if _m else []
-except OSError:
-    pass
+        _matrix = _read_matrix(_f.read())
+elif os.path.exists(os.path.join(ROOT, ".github", "workflows", "gates.yml")):
+    with open(os.path.join(ROOT, ".github", "workflows", "gates.yml"), encoding="utf-8") as _f:
+        _matrix = _read_matrix(_f.read())
 
 if _floor and _matrix:
     check("CI tests the Python floor the packaging declares",
