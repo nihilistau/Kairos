@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kairos-companion"
-version = "0.8.18"   # keep in step with CHANGELOG.md — it read 0.1.0 through
+version = "0.8.19"   # keep in step with CHANGELOG.md — it read 0.1.0 through
                     # two releases (fixed 2026-08-25), then sat at 0.8.4 through
                     # 0.8.5 (fixed 2026-08-29): this comment is the tripwire
 description = "A local-first AI companion framework: durable, auditable memory that never deletes, unprompted speech with reasons, a room UI — against any OpenAI-compatible endpoint on one consumer GPU."
@@ -30,8 +30,20 @@ embeddings = ["sentence-transformers>=2.2"]  # real local embeddings
 # the export ships harness/mcp_server/ and the inbound bridge; the dependency was
 # declared in the source pyproject 2026-08-25 and this overlay missed it (2026-08-29)
 mcp = ["fastmcp>=3.0", "mcp>=1.20"]
+# THE TEN MODULES THAT NEED numpy, AND NOTHING SAID SO (2026-09-11). `harness/senses/`
+# {capture,gguf,vision}, `harness/sidecar/`{archive,rerank,tools} and `harness/voice/`
+# {dsp,ear,native,service} import numpy at module level, unguarded. It was declared
+# nowhere. THIS IS THE SAME DEFECT AS THE `mcp` ROW ABOVE, found the same way and one
+# audit later: the public CI installs the core, and had never once reached the gate suite
+# — it died at the import census on eleven modules, ten of them wanting numpy. Behind that
+# wall the offline sweep was 135 green / 4 skip / 9 RED, every red a missing optional
+# dependency rather than a broken rule. The 2026-08-31 audit fixed the instance it found
+# and did not ask the packaging what else it was not saying; `harness_tests/g_imports.py`
+# now asks, every run, so the next one cannot hide.
+media = ["numpy>=1.24"]         # her voice, her eye, and the sidecar archive
 all = ["httpx>=0.27", "flask>=3.0", "pyyaml>=6.0", "sentence-transformers>=2.2",
-       "fastmcp>=3.0", "mcp>=1.20"]
+       "fastmcp>=3.0", "mcp>=1.20",
+       "numpy>=1.24"]
 
 [project.scripts]
 harness = "harness.cli.main:main"

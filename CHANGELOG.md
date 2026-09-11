@@ -1,5 +1,65 @@
 # Changelog
 
+## 0.8.19 — CI runs the gate suite, which it had never done (2026-09-11)
+
+**This repo's GitHub Actions has been red on every push since the workflow landed on
+2026-09-01, and the offline suite has never run in it once.** The job dies at step 5 of 8,
+`every module imports`, about twenty seconds in — two steps before `tools/sweep.py`. The
+badge said "broken"; what it meant was "never started".
+
+Eleven of 163 modules fail to import on a core install: ten want `numpy`, one wants
+`fastmcp`.
+
+### numpy was an undeclared dependency
+
+`harness/senses/{capture,gguf,vision}`, `harness/sidecar/{archive,rerank,tools}` and
+`harness/voice/{dsp,ear,native,service}` import numpy at module level, unguarded, and
+nothing in `pyproject.toml` said so. **If you run the voice, the eye or the sidecar
+archive, you now want `pip install -e ".[media]"`** — and before this release you needed it
+without being told.
+
+It is the same defect as the `mcp` extra, whose own comment in that file states the rule:
+*"an undeclared dependency is a claim the packaging cannot keep."* That audit fixed the
+instance it found and did not ask the packaging what else it was not saying. There were ten
+more.
+
+### The check asserted more than the packaging promised
+
+It required every module to import, against an install that deliberately had almost nothing
+in it — so it could only ever be red. What ships now:
+
+* a module failing on a **declared-optional** dependency is fine when that extra is absent,
+  and still required to import when it is present
+* a module failing on anything else is a defect, **including a `ModuleNotFoundError` for a
+  distribution nothing declares**
+* the **core** never gets that exemption — zero third-party dependencies is what the README
+  promises you, so `skills/`, `model/`, `control/`, `kairos/`, `server/`, `tools/`,
+  `toolcore/` and `personality/` must import with nothing installed at all
+
+The optional set is read from `pyproject.toml`, not kept in the gate. A list in a gate is
+complete the day it is written, which is precisely how numpy survived.
+
+### Nine gates were red for an absent dependency, not a broken rule
+
+With the census bypassed the sweep here was **135 green / 4 skip / 9 RED**, and every red
+was a missing extra. They skip or omit only the affected legs now. The distinction that
+mattered: `g_secret` gets **42 checks** in before it reaches the sidecar and `g_marks_leak`
+**125** — skipping either wholesale to buy a green would take the **privacy gate** off the
+board in the environment you actually run.
+
+### Two installs, because there are two claims
+
+The `offline` job is now a matrix of `deps: [bare, all]` across Python 3.10 and 3.12. **bare**
+proves the zero-dependency core promise; **all** proves everything else, and is the only
+place a module importing an *undeclared* package can be caught — with nothing installed, its
+absence looks identical to an optional one's.
+
+`G-IMPORTS` is a gate you can run (`python harness_tests/g_imports.py`), not twenty lines of
+YAML nobody could run until a push.
+
+Sweeps after: **bare 170 green / 9 skip / 1 red**, **full 176 green / 3 skip / 1 red** — and
+the one red is excluded from this export.
+
 ## 0.8.18 — recall no longer re-reads the whole store once per candidate (2026-09-11)
 
 **If your fact store has grown, this is the release you want.** Every recall re-read and

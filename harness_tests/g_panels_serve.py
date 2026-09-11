@@ -37,6 +37,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _gate import check, finish, skip, utf8_stdout  # noqa: E402
+from _gate import missing_optional as _missing_optional  # noqa: E402
 import _src as _srcmod  # noqa: E402
 
 utf8_stdout()
@@ -70,6 +71,15 @@ def _absent(err) -> bool:
     anything is.
     """
     e = str(err or "").lower()
+    # ── AND A DECLARED-OPTIONAL DEPENDENCY IS ALSO THE WORLD (2026-09-11) ───────────
+    # `_aux_json` answered ok:false with "No module named 'numpy'" on any clone without
+    # the [media] extra, and this convicted it — so the panel census was red in the one
+    # environment it was written to certify. The split is not "is it an ImportError" but
+    # "does the PACKAGING say this is optional": a declared extra that is not installed
+    # is a state of a real tree, an UNDECLARED one is a claim the packaging cannot keep
+    # and must stay a failure. `_gate.missing_optional` reads pyproject for the answer.
+    if _missing_optional(err):
+        return True
     if any(x in e for x in ("nameerror", "attributeerror", "typeerror", "importerror")):
         return False                                   # ours, and it never fixes itself
     return any(x in e for x in ("no such file", "not found", "errno 2",

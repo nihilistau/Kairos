@@ -77,6 +77,10 @@ threading.Thread(target=srv.serve_forever, daemon=True).start()
 os.environ["SP_AUX_CHAT_URL"] = "http://127.0.0.1:%d" % PORT
 os.environ["SP_ENGINE_BASE_URL"] = "http://127.0.0.1:%d" % PORT
 
+# SIGHT IS THE SUBJECT AND SIGHT NEEDS numpy (2026-09-11). Skip, do not fail: a
+# fresh clone without the [media] extra has no sight to grade.
+from _gate import require as _require                              # noqa: E402
+_require("numpy", "G-SIGHT-BACKENDS", "media")
 import numpy as np                                 # noqa: E402
 from harness.tuning import registry as R           # noqa: E402
 from harness.skills import sight as S              # noqa: E402

@@ -57,6 +57,99 @@ def skip(reason: str, gate: str = "") -> None:
     sys.exit(2)
 
 
+# ── AN OPTIONAL DEPENDENCY IS ABSENT, WHICH IS NOT THE SAME AS A FAILURE ──────────────
+# (2026-09-11.) The public tree's CI installs the core and had never once reached the gate
+# suite: it died at the import census on eleven modules, ten wanting `numpy` and one
+# `fastmcp`. Behind that wall the sweep was 135 green / 4 skip / 9 RED, and every one of
+# the nine was a missing optional dependency rather than a broken rule.
+#
+# `gates.yml`'s own header already states the rule for the other axis of this — "If a gate
+# needs Windows, it should say so and skip (exit 2), not pass by luck" — and a gate whose
+# subject is an uninstalled optional extra is exactly that shape. So it is one helper here
+# rather than nine spellings of `try: import numpy` across the suite, which is the
+# two-copies bug in the place it would be least visible: a gate that mis-detects its own
+# subject goes QUIET, and a quiet gate reads identically to a passing one.
+#
+# TWO SHAPES, and the difference is the whole point. `require()` is for a gate whose ENTIRE
+# subject is the dependency (the sidecar gates, the sight gates) — it skips, exit 2.
+# `have()` is for a gate that does most of its work without it and reaches it late:
+# `g_secret` gets 42 checks in before line 271, and `g_marks_leak` 125 before line 455.
+# Skipping either of those wholesale to make CI green would take the privacy gate off the
+# board in the environment adopters actually run, which is worse than the red it fixes.
+# Those use `have()` + `omit()` and lose only the legs that genuinely cannot run.
+def have(mod: str) -> bool:
+    """Is an optional dependency importable? NEVER imports it — `find_spec` answers
+    without executing the module, so asking cannot itself be the thing that fails."""
+    import importlib.util
+    try:
+        return importlib.util.find_spec(mod) is not None
+    except (ImportError, ValueError, ModuleNotFoundError):
+        return False
+
+
+def require(mod: str, gate: str = "", extra: str = "") -> None:
+    """SKIP when the gate's whole subject is an absent optional dependency."""
+    if not have(mod):
+        skip("%s is not installed — this gate's subject is absent here "
+             '(pip install -e ".[%s]")' % (mod, extra or mod), gate)
+
+
+def omit(name: str, reason: str) -> None:
+    """A leg that cannot run here. Printed, counted in NEITHER column, and visible in the
+    log — because the failure mode of a partial run is that it reads exactly like a
+    complete one. `finish()` still refuses a run that asserted nothing at all."""
+    print("  --   %s   (not run: %s)" % (name, reason))
+
+
+# ── WHAT THE PACKAGING SAYS IS OPTIONAL, READ FROM THE PACKAGING ──────────────────────
+# A missing DECLARED-optional dependency is the world. A missing UNDECLARED one is us —
+# that is the whole of the 2026-08-31 pyproject finding ("an undeclared dependency is a
+# claim the packaging cannot keep"), and it is only a usable rule if something reads the
+# declaration. So this is derived from `pyproject.toml` rather than kept as a list here:
+# a list in a gate is complete on the day it is written, and the numpy gap survived one
+# audit precisely because that audit fixed the instance it found instead of asking the
+# packaging what else it was not saying.
+#
+# `tomllib` is 3.11+; the public CI floor is 3.10, so this is a small regex over the
+# `[project.optional-dependencies]` block rather than a parse. It only ever needs
+# distribution NAMES, which is the one part of a requirement string that is easy.
+_IMPORT_NAME = {"pyyaml": "yaml", "sentence-transformers": "sentence_transformers",
+                "pillow": "PIL", "protobuf": "google.protobuf"}
+
+
+def optional_dists(root: str = "") -> set:
+    """The import names of every dependency the packaging declares OPTIONAL."""
+    import re as _re
+    root = root or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    try:
+        with open(os.path.join(root, "pyproject.toml"), encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return set()
+    m = _re.search(r"^\[project\.optional-dependencies\]\s*$(.*?)(?=^\[|\Z)",
+                   text, _re.S | _re.M)
+    if not m:
+        return set()
+    out = set()
+    for raw in _re.findall(r'"([^"]+)"', m.group(1)):
+        name = _re.split(r"[<>=!~;\[\s]", raw.strip(), 1)[0].strip().lower()
+        if name:
+            out.add(_IMPORT_NAME.get(name, name.replace("-", "_")))
+    return out
+
+
+def missing_optional(err) -> str:
+    """If `err` is a ModuleNotFoundError for a DECLARED-optional dependency, the name.
+    Empty string otherwise — including for a module nothing declares, which is a real
+    defect and must stay one."""
+    import re as _re
+    m = _re.search(r"no module named ['\"]([\w.]+)", str(err or ""), _re.I)
+    if not m:
+        return ""
+    top = m.group(1).split(".")[0]
+    return top if top in optional_dists() else ""
+
+
 def finish(gate: str) -> None:
     """Print the tally and exit with the verdict. A gate that asserted NOTHING is a
     skip, not a pass — exit 2 — because a green with zero checks is the exact failure

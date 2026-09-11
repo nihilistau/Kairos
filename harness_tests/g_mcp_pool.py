@@ -53,6 +53,11 @@ def ok(cond, name, detail=""):
         print(f"  FAIL {name}   {detail}")
 
 
+# THE BRIDGE IS THE SUBJECT AND THE BRIDGE NEEDS fastmcp (2026-09-11) — a declared
+# optional extra. Absent, `list_tools` returns nothing and every leg below reads as a
+# broken pool rather than an uninstalled one.
+from _gate import require as _require       # noqa: E402
+_require("fastmcp", "G-MCP-POOL", "mcp")
 from harness.mcp_server import bridge, pool  # noqa: E402
 
 MARKER = "disk_free"   # the one bridged-only tool; see docs/MCP.md

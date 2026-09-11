@@ -268,22 +268,35 @@ print("\n7. THE SIXTH DOOR: deep_recall MASKS SECRET-SHAPED SENTENCES")
 # verbatim through the archive while every registry door declined it. Driven through the
 # REAL tool with the sidecar stubbed present and the archive returning a transcript
 # chunk that mixes an ordinary moment with a secret-bearing sentence.
-from harness.sidecar import tools as _ST
-from harness.sidecar import archive as _AR, client as _SC
-_old_av, _old_sr = _SC.available, _AR.search
-try:
-    _SC.available = lambda: True
-    _AR.search = lambda q, k=4: [{"day": "2026-08-01", "score": 0.55,
-                                  "text": ("We laughed about the storm that night. "
-                                           "My garage door code is 8812. "
-                                           "Then we made tea and talked till late.")}]
-    _out7 = _ST.deep_recall("the storm night")
-    check("the moment still returns", "laughed about the storm" in _out7, _out7[:120])
-    check("...but the secret-bearing SENTENCE is withheld, credential and all",
-          "8812" not in _out7 and "withheld" in _out7, _out7)
-    check("...and the sentences around it survive", "made tea" in _out7, _out7)
-finally:
-    _SC.available, _AR.search = _old_av, _old_sr
+#
+# ── THIS SECTION ONLY, NOT THE WHOLE GATE (2026-09-11) ────────────────────────────────
+# `harness/sidecar/archive.py` imports numpy at module level, so on a clone without the
+# [media] extra this import raised and took the gate down at section 7 — after six
+# sections and 42 green checks. In the public tree that meant the PRIVACY gate counted as
+# a hard failure in the only environment adopters actually run, and the six doors it
+# proves went unasserted rather than merely partially asserted. The sixth door is the one
+# that cannot run without numpy; the other five have nothing to do with it.
+from _gate import have as _have, omit as _omit   # noqa: E402
+if not _have("numpy"):
+    _omit("the sixth door (deep_recall over the archive)",
+          'numpy is not installed — pip install -e ".[media]"')
+else:
+    from harness.sidecar import tools as _ST
+    from harness.sidecar import archive as _AR, client as _SC
+    _old_av, _old_sr = _SC.available, _AR.search
+    try:
+        _SC.available = lambda: True
+        _AR.search = lambda q, k=4: [{"day": "2026-08-01", "score": 0.55,
+                                      "text": ("We laughed about the storm that night. "
+                                               "My garage door code is 8812. "
+                                               "Then we made tea and talked till late.")}]
+        _out7 = _ST.deep_recall("the storm night")
+        check("the moment still returns", "laughed about the storm" in _out7, _out7[:120])
+        check("...but the secret-bearing SENTENCE is withheld, credential and all",
+              "8812" not in _out7 and "withheld" in _out7, _out7)
+        check("...and the sentences around it survive", "made tea" in _out7, _out7)
+    finally:
+        _SC.available, _AR.search = _old_av, _old_sr
 
 os.unlink(_reg)
 print("\nG-SECRET  %d/%d" % (PASS, PASS + FAIL))

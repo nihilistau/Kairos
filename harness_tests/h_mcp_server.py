@@ -27,6 +27,10 @@ os.environ.pop("SP_RECALL_REGISTRY", None)  # keep the server leg registry-free
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _gate import sandbox as _sandbox  # noqa: E402
 _sandbox(os.path.basename(__file__))
+# fastmcp is the SUBJECT of this gate and a declared optional extra; absent, there is
+# nothing here to grade (2026-09-11).
+from _gate import require as _require  # noqa: E402
+_require("fastmcp", "H-MCP-SERVER", "mcp")
 # THE FIXTURE, NOT THE PRODUCTION CONFIG (2026-07-31). mcp_servers.json used to hold
 # this repo's own server, which is what leg B connected to. That entry was a loop —
 # every tool it exposes is already native and got shadowed — so production now holds

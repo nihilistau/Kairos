@@ -29,8 +29,22 @@ os.environ.setdefault("SP_MODEL_PATH", "models/your model.sp-model")   # the BAS
 # coverage gate blind to a whole tier is worse than none, because it certifies the
 # gap. The room's Tools panel is what surfaced it, which is the argument for
 # rendering a manifest rather than only asserting one.
-for _k in ("SP_SIGHT", "SP_DELEGATE", "SP_PERSONALITY", "SP_MCP_TOOLS", "SP_RESEARCH", "SP_AUX"):   # SP_AUX: deep_recall joins only when armed (2026-08-21)
+# SP_AUX arms deep_recall, which imports the sidecar archive, which imports numpy at
+# module level — so on a clone without the [media] extra, arming it asked describe()
+# to enumerate a tool that cannot be imported and took the whole census down before
+# its first check. The manifest rule is about DOCUMENTATION, not about the sidecar:
+# drop the one tool that cannot be here and grade the rest (2026-09-11).
+from _gate import have as _have, omit as _omit   # noqa: E402
+_AUX_OK = _have("numpy")
+for _k in ("SP_DELEGATE", "SP_PERSONALITY", "SP_MCP_TOOLS", "SP_RESEARCH") + (("SP_AUX", "SP_SIGHT") if _AUX_OK else ()):   # SP_AUX: deep_recall joins only when armed (2026-08-21)
     os.environ[_k] = "1"
+if not _AUX_OK:
+    # SIGHT IS THE SAME SHAPE AND WORSE: `sight_tools` SWALLOWS the ImportError and
+    # registers nothing, so arming SP_SIGHT without numpy does not raise — it produces
+    # an empty sight surface and the assertion below convicts the gate instead of the
+    # absence. A swallowed dependency is exactly why `loud.swallowed` logs.
+    _omit("deep_recall and the sight tools in the enumerated surface",
+          'numpy is not installed — pip install -e ".[media]"')
 # The research tools register only when xai.available() — i.e. when a key exists. This gate
 # lists tools, it never calls one; a placeholder in the env spelling (which wins over the
 # key FILE) makes the tool set the same on a machine with no key (the Kairos export).
@@ -102,7 +116,13 @@ for name, want in (("take_photo", "private"), ("take_screenshot", "private"),
 
 print("\n5. sight is armed-gated, and says so")
 sight = [r for r in d["tools"] if r["group"] == "sight"]
-ok(sight, "sight tools are present when SP_SIGHT=1", len(sight))
+if _AUX_OK:
+    ok(sight, "sight tools are present when SP_SIGHT=1", len(sight))
+else:
+    # SP_SIGHT was not armed above, so an empty sight group is the correct answer here
+    # rather than a missing one. The rule that still holds without numpy is the one
+    # below: whatever sight tools DO exist must name the knob that arms them.
+    _omit("sight tools are present when SP_SIGHT=1", "SP_SIGHT not armed: numpy absent")
 ok(all(r["arms"] == "SP_SIGHT" for r in sight),
    "every sight tool names the knob that arms it",
    [(r["name"], r["arms"]) for r in sight])

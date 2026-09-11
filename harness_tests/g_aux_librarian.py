@@ -164,6 +164,16 @@ from harness.skills import watch as W             # noqa: E402
 check("watch's judge pick reads the bridge", callable(getattr(W, "_watch_judge_armed", None)))
 
 print()
+# ── SECTIONS 3-7 NEED THE ARCHIVE, AND THE ARCHIVE NEEDS numpy (2026-09-11) ───────────
+# Sections 1-2 (the client, the settings section) are 28 checks that do not, and on a
+# clone without the [media] extra they were being thrown away with the rest. Report what
+# ran, name what did not, and exit on the tally rather than on an ImportError.
+from _gate import have as _have, omit as _omit   # noqa: E402
+if not _have("numpy"):
+    _omit("sections 3-7 (archive, rerank, silent librarian, candidate lane, her writing)",
+          'numpy is not installed — pip install -e ".[media]"')
+    finish("G-AUX-LIBRARIAN")
+
 print("3. THE ARCHIVE — her-conditioned queries, an index that knows what it was built with, a warm start")
 from harness.sidecar import archive as A          # noqa: E402
 import glob as _glob                              # noqa: E402

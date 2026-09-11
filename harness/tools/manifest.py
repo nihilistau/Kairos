@@ -93,7 +93,14 @@ FACTS: Dict[str, ToolFacts] = {
     "remember":            ToolFacts("memory", "write", note="facts about HIM"),
     "remember_about_self": ToolFacts("memory", "write", note="facts about HER — a separate store, never blended"),
     "recall":              ToolFacts("memory", "read"),
-    "deep_recall":         ToolFacts("memory", "read"),   # the sidecar archive (harness/sidecar/tools.py); live on her stack, undocumented until 2026-08-21 — G-ROOM-THINGS caught it
+    # ARMS WAS EMPTY AND THE TOOL IS ARMED (2026-09-11). `deep_recall` joins the surface
+    # only when SP_AUX is on — G-TOOL-MANIFEST's own header has said so since 2026-08-21 —
+    # but its row did not record the knob, so it was the one armed tool the manifest could
+    # not explain. Every other gated tool in this file declares `arms=`, and the census
+    # that excuses an unarmed row (`armed_off`) reads exactly this field: with it empty,
+    # a clone without the sidecar's extra saw deep_recall as a row describing a tool that
+    # does not exist. The row was right and incomplete, which is the harder kind to see.
+    "deep_recall":         ToolFacts("memory", "read", arms="SP_AUX"),   # the sidecar archive (harness/sidecar/tools.py); live on her stack, undocumented until 2026-08-21 — G-ROOM-THINGS caught it
     "list_memories":       ToolFacts("memory", "read"),
     "search_memories":     ToolFacts("memory", "read"),
     "count_memories":      ToolFacts("memory", "read"),

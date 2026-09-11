@@ -28,6 +28,21 @@ jobs:
       matrix:
         # 3.10 is the floor pyproject declares; 3.12 is what people actually have.
         python: ["3.10", "3.12"]
+        # ── TWO INSTALLS, BECAUSE THERE ARE TWO CLAIMS (2026-09-11) ──────────────────
+        # This job installed `.[http]` and then asserted that EVERY module imports —
+        # a stronger claim than the packaging makes, so it could only ever be red, and
+        # it was: from the day this workflow landed until 2026-09-11 the suite below it
+        # never ran once. Ten modules under senses/, voice/ and sidecar/ import numpy,
+        # which was declared nowhere.
+        #
+        #   bare  proves the README's promise — the CORE runs with zero third-party
+        #         dependencies — and lets a declared-optional extra be absent
+        #   all   proves everything else, and is the only place a module that imports an
+        #         UNDECLARED package can be caught, because with nothing installed its
+        #         absence looks the same as an optional one's
+        #
+        # Both, or the pair of claims is half-tested in whichever direction was cheaper.
+        deps: [bare, all]
     steps:
       - uses: actions/checkout@v4
 
@@ -35,37 +50,26 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: install (the harness core has zero third-party deps)
+      - name: install (${{ matrix.deps }})
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[http]"
+          if [ "${{ matrix.deps }}" = "bare" ]; then
+            pip install -e ".[http]"     # the core's own promise, nothing more
+          else
+            pip install -e ".[all]"      # every declared extra
+          fi
 
-      - name: every module imports
+      - name: every module imports (G-IMPORTS)
         # CHEAPEST REAL SIGNAL, AND IT RUNS FIRST. A syntax error or a bad import in one
         # file cannot fail a suite that never reaches it — and the sweep runs gates as
         # subprocesses, so an unimportable module shows up as one confusing red rather
         # than as itself.
-        run: |
-          python - <<'PY'
-          import importlib, os, sys
-          sys.path.insert(0, ".")
-          bad = []
-          mods = []
-          for here, dirs, files in os.walk("harness"):
-              dirs[:] = [d for d in dirs if d != "__pycache__"]
-              for fn in sorted(files):
-                  if fn.endswith(".py") and not fn.startswith("_"):
-                      mods.append(os.path.join(here, fn)[:-3].replace(os.sep, "."))
-          for m in mods:
-              try:
-                  importlib.import_module(m)
-              except Exception as exc:
-                  bad.append("%s: %s: %s" % (m, type(exc).__name__, exc))
-          print("imported %d/%d" % (len(mods) - len(bad), len(mods)))
-          for b in bad:
-              print("  FAIL", b)
-          sys.exit(1 if bad else 0)
-          PY
+        #
+        # IT IS A GATE NOW, NOT A HEREDOC (2026-09-11). As twenty lines of inline Python
+        # it was a rule nobody could run locally and nobody could see fail until a push —
+        # and it failed on every push for ten days. `g_imports.py` is the same census with
+        # the exemption the packaging actually declares, runnable with one command.
+        run: python harness_tests/g_imports.py
 
       - name: the five named in AGENTS.md
         # NAMED SEPARATELY from the sweep so a failure says WHICH door, in the log, without

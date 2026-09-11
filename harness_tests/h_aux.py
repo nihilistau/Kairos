@@ -47,6 +47,9 @@ def check(name, cond, detail=""):
         print("  FAIL %s   %s" % (name, detail))
 
 
+# THE AUX SIDECAR IS THE SUBJECT, and archive.py imports numpy at module level.
+from _gate import require as _require        # noqa: E402
+_require("numpy", "H-AUX", "media")
 from harness.sidecar import archive, client  # noqa: E402
 from harness.sidecar.tools import deep_recall  # noqa: E402
 
