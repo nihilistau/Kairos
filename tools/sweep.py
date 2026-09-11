@@ -81,7 +81,18 @@ def snapshot() -> dict:
 
 
 def run(g):
-    r = subprocess.run([sys.executable, g], cwd=ROOT, capture_output=True,
+    # ── `-u`, SO A GATE THAT DIES STILL SAYS WHAT IT GOT TO (2026-09-11) ─────────────
+    # Captured stdout is block-buffered, so a gate killed by a signal loses everything it
+    # printed. In CI a gate segfaulted (exit=-11) and the only surviving lines were the
+    # LOGGING ones — logging goes to stderr and is not held — so the report showed four
+    # INFO lines from the middle of the run and no verdict, and there was no way to tell
+    # whether the gate had finished its work and died on the way out or fallen over in the
+    # middle of it. Those are completely different bugs.
+    #
+    # Unbuffered costs nothing here (the child's output goes to a pipe either way) and it
+    # is the difference between a signal number and a location. Applies to every gate, not
+    # only the crashing one, because the next crash will be somewhere else.
+    r = subprocess.run([sys.executable, "-u", g], cwd=ROOT, capture_output=True,
                        text=True, encoding="utf-8", errors="replace", timeout=900)
     return g, r.returncode, ((r.stdout or "") + (r.stderr or ""))
 
@@ -92,20 +103,21 @@ def main() -> int:
                     help="diff her real stores around each gate (serial, slower)")
     ap.add_argument("--only", default="", help="substring filter on the gate path")
     # ── PARALLELISM COMES FROM THE MACHINE, NOT FROM A CONSTANT (2026-09-11) ─────────
-    # This was a flat 6 on every box. A GitHub-hosted runner has TWO vCPUs, so the public
-    # CI was running six gate subprocesses on two cores — and the sweep there went red on
-    # a DIFFERENT gate each attempt, once with exit=-11 (SIGSEGV), while every one of
-    # those gates passes alone and 143 of 144 passed in the same run. That is the
-    # signature this repo already has a name for: *"red in the parallel sweep but green
-    # alone = two gates racing"* — here over the host rather than over her stores.
+    # This was a flat 6 on every box. A number chosen for the operator's sixteen cores is
+    # the same number on a runner with four, which is what a hosted one actually reports
+    # (measured, not assumed — the first version of this comment guessed two).
     #
-    # Same rule as `g_store_writes` and `g_room_veto` one layer up: a verdict that moves
-    # with the machine is measuring the machine. A number chosen for the operator's
-    # sixteen cores is exactly that number on a runner with two.
+    # Capped at 6 rather than uncapped because these are gates, not a build: several drive
+    # real HTTP servers and temp stores, and the cap is what the operator's box has been
+    # running all along. `-j` still overrides for anyone who wants to push it.
     #
-    # Capped at 6 rather than uncapped because these are gates, not a build: several
-    # drive real HTTP servers and temp stores, and the cap is what the operator's box has
-    # been running all along. `-j` still overrides for anyone who wants to push it.
+    # THIS DID NOT FIX THE CI FLAKE, AND THE COMMENT THAT SAID IT WOULD IS GONE. It was
+    # written as a contention story — one job per run going red on a different gate, twice
+    # with SIGSEGV, "red in the parallel sweep but green alone". Then CI ran the suite at
+    # `-j 1` and a gate segfaulted anyway, with nothing else running. No contention theory
+    # survives that. The change is kept because deriving from the machine is right on its
+    # own terms; the explanation it shipped with was wrong and is not left standing.
+    # Where the evidence actually points is in CHANGELOG.md for 2026-09-11.
     _def_j = max(1, min(6, os.cpu_count() or 2))
     ap.add_argument("-j", type=int, default=_def_j,
                     help="parallel gates (default: min(6, cpu_count) = %d here)" % _def_j)

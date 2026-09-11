@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.8.29 — the sweep no longer loses a crashing gate's output (2026-09-11)
+
+`tools/sweep.py` runs each gate with `-u`. Captured stdout is block-buffered, so a gate
+killed by a signal lost everything it printed and the report showed only the logging lines
+that happen to go to stderr — no verdict, no location, and no way to tell whether the gate
+had finished its work and died on the way out or fallen over in the middle. Those are
+different bugs and the tool could not distinguish them.
+
+Context, for anyone seeing an `exit=-11` in their own CI: `PYTHONFAULTHANDLER=1` printed
+nothing here, which is itself a clue — faulthandler is torn down during interpreter
+finalization, so a fault after that point prints no stack. What the surviving output does
+show is that the crashing gates all stop on the same line, immediately after the turn
+epilogue, and that every failure has been in the bare-install job and none in the full one.
+
+The `-j` comment added in 0.8.26 has also been rewritten: it argued a contention theory that
+the serial run disproved, and it guessed at the runner's core count (it is four). The change
+itself stands — parallelism should come from the machine — but the reasoning it shipped with
+did not.
+
 ## 0.8.28 — the serial experiment ended, and CI dumps a stack now (2026-09-11)
 
 `-j 1` was an experiment and it returned a clean negative: serial, with nothing else
