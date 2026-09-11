@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.8.24 — a bridged tool was Windows-only, and Pillow was undeclared (2026-09-11)
+
+The three gates that skip in a bare install and had never executed anywhere until the `all`
+CI job existed. Three causes, one of which was hiding another.
+
+**`disk_free` could not run off Windows.** `drive: str = "D:"` with
+`shutil.disk_usage(drive + "\\")` is the operator's drive letter and a backslash separator,
+in a tool that ships. It now takes `os.path.abspath(os.sep)` — the filesystem root wherever
+it runs — and still accepts a drive or any path. **This is also why `g_mcp_pool` looked
+broken:** `disk_free` is its marker tool, so a tool throwing on every call made the session
+pool report reconnects and multi-second calls. The pool was right; the tool was not.
+
+**Pillow was an undeclared dependency in five unguarded places** (`skills/sight.py`,
+`skills/sight_vl.py`, `senses/vision.py`, `senses/capture.py`, `games/render.py`). If you use
+sight, the eye, or the games renderer you now want `pip install -e ".[media]"` — and before
+this release you needed it without being told. Third instance of that rule this week after
+numpy and tomllib, and the first the import census could not have caught: all five are inside
+functions, so the modules imported fine and it bit at call time.
+
+`G-IMPORTS` closes it with a static leg — every import at any depth, read with `ast`.
+**Guarded imports stay exempt**, which is deliberate: `voice/ear.py` wraps `openvino` in a
+`try:` and raises `EarUnavailable` with an install line, and that is the correct shape for an
+optional native backend rather than something to convict.
+
+One note for anyone bridging MCP servers: changing a tool's signature or docstring changes
+its fingerprint, and the bridge will refuse it until you accept the change with
+`tools/mcp_pin.py --accept <server> <tool>`. That is the rug-pull guard doing its job — the
+description is prompt, and a description that changes under you is the attack. It caught this
+change during development.
+
 ## 0.8.23 — the new floor gate named a path that only exists upstream (2026-09-11)
 
 `G-IMPORTS`'s floor legs, added in 0.8.22, read the workflow and the public `pyproject.toml`

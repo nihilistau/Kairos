@@ -44,6 +44,7 @@ OFFLINE. No GPU, no daemon, no network.
 """
 from __future__ import annotations
 
+import ast
 import importlib
 import os
 import re
@@ -52,7 +53,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from _gate import check, finish, have, optional_dists, utf8_stdout   # noqa: E402
+from _gate import (check, finish, have, optional_dists, required_dists,  # noqa: E402
+                   utf8_stdout)
 
 utf8_stdout()
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -122,8 +124,6 @@ check("the walk actually found the tree", len(mods) > 100, len(mods))
 # without running them. And only TOP-LEVEL `Import`/`ImportFrom` nodes count, which is not
 # a shortcut — an import inside a `try:` is a node of a `Try`, so the AST structure itself
 # encodes "guarded, and allowed to be absent" exactly as the author meant it.
-import ast  # noqa: E402
-
 _script_bad = []
 for _fn in sorted(f for f in os.listdir(ROOT) if f.endswith(".py")):
     try:
@@ -154,6 +154,77 @@ check("every unguarded top-level import in a root script resolves",
 # the launcher there. The matrix DID list 3.10 — and the suite never reached it, which is
 # the other half of the same story (see this gate's header). Holding the two files to each
 # other makes "we support X" and "we test X" one statement instead of two.
+# ── AND AN IMPORT DOES NOT HAVE TO BE AT MODULE LEVEL TO BE A DEPENDENCY ─────────────
+# (2026-09-11.) The walk above IMPORTS each module, so it only ever sees what a module
+# needs to load. `Pillow` is imported inside functions in five places — `sight_vl._data_url`,
+# `sight`, `vision`, `senses/capture`, `games/render` — so every module imported fine and
+# the dependency bit at CALL time instead: `ModuleNotFoundError: No module named 'PIL'`,
+# from a gate, on Linux, in a tree whose packaging had never heard of Pillow. Third
+# instance of the same rule this week after numpy and tomllib, and the first one the
+# runtime census structurally could not have caught.
+#
+# So this leg is STATIC: every import anywhere in the tree, at any depth, read with `ast`.
+# GUARDED IMPORTS ARE EXEMPT and that is the same rule as everywhere else here — an import
+# inside a `try:` is the author saying "this may be absent", and `harness/voice/ear.py`
+# does exactly that for `openvino`, raising `EarUnavailable` with an install line. That is
+# correct and must not be convicted. An UNGUARDED import of something the packaging does
+# not name is the defect.
+#
+# FIRST-PARTY IS DERIVED, NOT LISTED: a name that resolves to a file in this repo is ours.
+# `harness/skills/conversation_memory.py` imports `okf_mem` by bare name after putting
+# `tools/` on the path, and a hand-kept exemption list would have had to remember it.
+def _is_first_party(top: str) -> bool:
+    if top == "harness":
+        return True
+    for sub in ("", "tools", "gates", "harness_tests"):
+        if os.path.exists(os.path.join(ROOT, sub, top + ".py")):
+            return True
+        if os.path.isdir(os.path.join(ROOT, sub, top)):
+            return True
+    return False
+
+
+DECLARED = optional_dists(ROOT) | required_dists(ROOT)
+_undeclared = {}
+for _here, _dirs, _files in os.walk(os.path.join(ROOT, "harness")):
+    _dirs[:] = [d for d in _dirs if d != "__pycache__"]
+    for _fn in sorted(_files):
+        if not _fn.endswith(".py"):
+            continue
+        _fp = os.path.join(_here, _fn)
+        try:
+            with open(_fp, encoding="utf-8") as _f:
+                _tree = ast.parse(_f.read())
+        except Exception:                                       # noqa: BLE001
+            continue
+        _guarded = set()
+        for _node in ast.walk(_tree):
+            if isinstance(_node, ast.Try):
+                for _sub in ast.walk(_node):
+                    if isinstance(_sub, (ast.Import, ast.ImportFrom)):
+                        _guarded.add(id(_sub))
+        for _node in ast.walk(_tree):
+            _names = []
+            if isinstance(_node, ast.Import):
+                _names = [a.name for a in _node.names]
+            elif isinstance(_node, ast.ImportFrom) and _node.level == 0 and _node.module:
+                _names = [_node.module]
+            if id(_node) in _guarded:
+                continue
+            for _n in _names:
+                _top = _n.split(".")[0]
+                if (_top in sys.stdlib_module_names or _top in DECLARED
+                        or _is_first_party(_top)):
+                    continue
+                _undeclared.setdefault(
+                    _top, "%s:%d" % (os.path.relpath(_fp, ROOT).replace(os.sep, "/"),
+                                     _node.lineno))
+
+check("every third-party package the tree imports UNGUARDED is one the packaging declares",
+      not _undeclared,
+      sorted("%s (%s)" % (k, v) for k, v in _undeclared.items())[:6])
+
+
 def _read_floor(text):
     _m = re.search(r'requires-python\s*=\s*"[^0-9]*([0-9]+\.[0-9]+)"', text)
     return _m.group(1) if _m else ""

@@ -59,7 +59,11 @@ def leg_a_server() -> bool:
             armed_leak = {"run_python", "run_powershell", "run_shell"} & names
             t = await c.call_tool("get_time", {})
             time_txt = t.content[0].text
-            d = await c.call_tool("disk_free", {"drive": "C:"})
+            # PORTABLE, AND STILL EXERCISING THE ARGUMENT (2026-09-11). This passed the
+            # literal "C:", so on Linux the tool raised and the leg convicted the SERVER
+            # for a drive letter in the gate. `abspath(os.sep)` is the filesystem root
+            # wherever this runs, so the parameter is still driven rather than defaulted.
+            d = await c.call_tool("disk_free", {"drive": os.path.abspath(os.sep)})
             disk_txt = d.content[0].text
         async with Client(build_server(unsandboxed=True)) as c2:
             names2 = {t.name for t in await c2.list_tools()}

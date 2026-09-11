@@ -138,6 +138,31 @@ def optional_dists(root: str = "") -> set:
     return out
 
 
+def required_dists(root: str = "") -> set:
+    """The import names of every dependency the packaging declares REQUIRED."""
+    import re as _re
+    root = root or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    try:
+        with open(os.path.join(root, "pyproject.toml"), encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return set()
+    m = _re.search(r"^dependencies\s*=\s*\[(.*?)\]", text, _re.S | _re.M)
+    if not m:
+        return set()
+    out = set()
+    for raw in _re.findall(r'"([^"]+)"', m.group(1)):
+        name = _re.split(r"[<>=!~;\[\s]", raw.strip(), 1)[0].strip().lower()
+        if name:
+            out.add(_IMPORT_NAME.get(name, name.replace("-", "_")))
+    return out
+
+
+def declared_dists(root: str = "") -> set:
+    """Everything the packaging names at all — required or optional."""
+    return optional_dists(root) | required_dists(root)
+
+
 def missing_optional(err) -> str:
     """If `err` is a ModuleNotFoundError for a DECLARED-optional dependency, the name.
     Empty string otherwise — including for a module nothing declares, which is a real
