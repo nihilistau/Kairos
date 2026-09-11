@@ -91,7 +91,24 @@ def main() -> int:
     ap.add_argument("--audit", action="store_true",
                     help="diff her real stores around each gate (serial, slower)")
     ap.add_argument("--only", default="", help="substring filter on the gate path")
-    ap.add_argument("-j", type=int, default=6)
+    # ── PARALLELISM COMES FROM THE MACHINE, NOT FROM A CONSTANT (2026-09-11) ─────────
+    # This was a flat 6 on every box. A GitHub-hosted runner has TWO vCPUs, so the public
+    # CI was running six gate subprocesses on two cores — and the sweep there went red on
+    # a DIFFERENT gate each attempt, once with exit=-11 (SIGSEGV), while every one of
+    # those gates passes alone and 143 of 144 passed in the same run. That is the
+    # signature this repo already has a name for: *"red in the parallel sweep but green
+    # alone = two gates racing"* — here over the host rather than over her stores.
+    #
+    # Same rule as `g_store_writes` and `g_room_veto` one layer up: a verdict that moves
+    # with the machine is measuring the machine. A number chosen for the operator's
+    # sixteen cores is exactly that number on a runner with two.
+    #
+    # Capped at 6 rather than uncapped because these are gates, not a build: several
+    # drive real HTTP servers and temp stores, and the cap is what the operator's box has
+    # been running all along. `-j` still overrides for anyone who wants to push it.
+    _def_j = max(1, min(6, os.cpu_count() or 2))
+    ap.add_argument("-j", type=int, default=_def_j,
+                    help="parallel gates (default: min(6, cpu_count) = %d here)" % _def_j)
     a = ap.parse_args()
 
     gates = [g for g in offline_gates() if not a.only or a.only in g]

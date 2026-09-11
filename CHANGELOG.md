@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.26 — the sweep ran six gates on two cores (2026-09-11)
+
+`tools/sweep.py` took `-j` as a flat **6** on every machine. A GitHub-hosted runner has
+**two vCPUs**, so CI was running six gate subprocesses on two cores — and the sweep there
+went red on a *different* gate on each of two consecutive attempts of the same job, once
+with `exit=-11` (SIGSEGV), while 143 of 144 passed each time and every one of those gates
+passes alone.
+
+`-j` now defaults to `min(6, os.cpu_count())`. Capped rather than uncapped because several
+gates drive real HTTP servers and temp stores; `-j` still overrides.
+
+If you run this suite in CI, or on anything smaller than a workstation, this is the release
+that stops it flaking under its own parallelism.
+
+**Stated as a hypothesis:** both gates pass alone and neither was changed, so contention is
+the best explanation — but only several green runs prove it.
+
 ## 0.8.25 — the last CI red was the host's uptime (2026-09-11)
 
 `g_room_veto` was red in every CI job and green on a developer box, which is the shape of a
