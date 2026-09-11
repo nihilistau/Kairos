@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.27 — CI runs the sweep serially, as a diagnostic (2026-09-11)
+
+The `offline` jobs now run `tools/sweep.py -j 1` and print `os.cpu_count()` first. **This is
+a deliberate experiment, not a settled setting**, and the suite will be slower while it runs
+(2.2× here, for the same verdict).
+
+Why: one job per run has been failing with a different gate each time — twice with a
+SIGSEGV — while every one of those gates passes alone. Capping `-j` at
+`min(6, cpu_count())` did not stop it, and that change was made without ever seeing what
+`-j` resolved to on a runner. Serial removes parallelism entirely: several green runs say
+contention and we pick a number; a red run says look elsewhere.
+
+If you fork this and want the speed back, `-j` still takes whatever you give it.
+
 ## 0.8.26 — the sweep ran six gates on two cores (2026-09-11)
 
 `tools/sweep.py` took `-j` as a flat **6** on every machine. A GitHub-hosted runner has
