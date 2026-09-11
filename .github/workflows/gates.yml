@@ -23,6 +23,17 @@ on:
 jobs:
   offline:
     runs-on: ubuntu-latest
+    # ── A SIGNAL NUMBER IS NOT A BUG REPORT (2026-09-11) ──────────────────────────────
+    # One job per run has been dying with `exit=-11` — SIGSEGV — in a gate that passes
+    # alone, and the sweep can only report the signal. `PYTHONFAULTHANDLER=1` makes the
+    # interpreter dump the Python stack at the moment of the fault, so the next red names
+    # a file and a line instead of a number. Costs nothing when nothing crashes.
+    #
+    # It is set at JOB level rather than on the sweep step so it covers the named-five
+    # step and the store rules too: the crash has moved between gates, and there is no
+    # reason to assume it will stay inside the sweep.
+    env:
+      PYTHONFAULTHANDLER: "1"
     strategy:
       fail-fast: false
       matrix:
@@ -86,29 +97,24 @@ jobs:
           done
 
       - name: the whole offline suite
-        # ── RUNNING SERIAL ON PURPOSE, AS AN EXPERIMENT (2026-09-11) ────────────────
-        # Since the last real red was fixed, exactly ONE job per run fails, always a
-        # `bare` one, always with 143 green — and a DIFFERENT gate each time:
+        # ── CONTENTION WAS RULED OUT, AND THE SPEED CAME BACK (2026-09-11) ──────────
+        # This ran `-j 1` for one round as a deliberate experiment: one job per run was
+        # dying with a different gate each time, twice with SIGSEGV, and parallelism was
+        # the suspect. The echo it carried answered the other half — `cpu_count = 4` on a
+        # hosted runner, so the earlier cap took `-j` from 6 to 4 and barely moved.
         #
-        #     3.11 bare   g_pk2_memokf_v2_offline   exit=-11  (SIGSEGV)
-        #     3.11 bare   g_turn_epilogue           exit=1
-        #     3.12 bare   g_pk2_sse_v2_offline      exit=-11  (SIGSEGV)
+        # SERIAL STILL SEGFAULTED (`g_pk2_sse_v2_offline`, exit=-11, 83 s, nothing else
+        # running). No contention theory survives that, so the experiment is over and
+        # `-j` goes back to the derived default rather than costing 2.2x forever for a
+        # disproven cause. The negative is kept in the changelog, not in the workflow.
         #
-        # All three pass alone, repeatedly, on a developer box. That is the shape of
-        # contention rather than a defect in any of them, and `-j` defaulting to a flat
-        # 6 on a runner with a fraction of the cores was the first suspect — but capping
-        # it at `min(6, cpu_count())` did NOT stop it; the failing job just moved.
-        #
-        # So this is the diagnostic rather than another guess: `-j 1` removes parallelism
-        # entirely. Several green runs say contention, and the question becomes which
-        # number to keep; a red run says the cause is elsewhere and two of the three
-        # being SIGSEGV in the `g_pk2_*` family is the next thread. The echo is here
-        # because the previous change was made without ever seeing what `-j` actually
-        # resolved to on a runner, which is how a fix becomes a guess.
-        run: |
-          python -c "import os; print('runner cpu_count =', os.cpu_count())"
-          python tools/sweep.py --help | grep -E '^\s+-j' || true
-          python tools/sweep.py -j 1
+        # WHAT THE EVIDENCE ACTUALLY POINTS AT: all four failures have been in a `bare`
+        # job and none in `all`, across roughly ten `all` job-runs. The difference
+        # between those jobs is only which packages are installed, so the suspect is a
+        # fallback path taken when an optional extra is ABSENT — which is also why it
+        # never reproduces on a developer box, where they never are. PYTHONFAULTHANDLER
+        # at job level is there to turn the next one into a file and a line.
+        run: python tools/sweep.py
 
       - name: the store rules
         # The two that generalise past this repo: no store writer renames with a bare

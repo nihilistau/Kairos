@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.28 — the serial experiment ended, and CI dumps a stack now (2026-09-11)
+
+`-j 1` was an experiment and it returned a clean negative: serial, with nothing else
+running, still segfaulted (`g_pk2_sse_v2_offline`, `exit=-11`, 83 s). Contention is not the
+cause, so `-j` is back to the derived default and the suite is fast again. The diagnostic
+echo also settled a number worth knowing: a hosted runner reports **`cpu_count = 4`**.
+
+`PYTHONFAULTHANDLER=1` is now set on the `offline` job, so an interpreter-level crash prints
+a Python stack instead of only a signal number. It costs nothing when nothing crashes, and
+it is set at job level because the crash has already moved between gates.
+
+**If you run this suite in CI and see a gate die with `exit=-11`, that env var is how you
+find out where.** The remaining evidence here points at a code path taken only when an
+optional extra is absent: every failure so far has been in the bare-install job and none in
+the full one.
+
 ## 0.8.27 — CI runs the sweep serially, as a diagnostic (2026-09-11)
 
 The `offline` jobs now run `tools/sweep.py -j 1` and print `os.cpu_count()` first. **This is
