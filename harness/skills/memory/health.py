@@ -7,7 +7,8 @@ computations, and the hygiene decider disagreed with the report it was printed b
 
 Cached by FILE IDENTITY `(mtime_ns, size)`, not by mtime: an mtime-keyed cache in the
 semindex once served a dead vector, and the scan is O(n²) over live rows while the panel
-polls every 15 s.
+polls every 15 s. TWO files, since the semantic-coverage line landed — the registry and
+the semindex — because the key has to name every input the value is computed from.
 
 `compact_registry()` writes, so it takes the registry lock through `_store` — same module
 rule as everywhere else in this package.
@@ -20,6 +21,7 @@ import json
 import logging
 import os
 
+from harness.loud import swallowed as _sw
 from harness.skills.memory import store as _store
 # `_registry_health` reports the capture backlog beside the row counts.
 # FOUND BY G-SRC-TRAP §6, not by reading: the extraction stranded this name and the
@@ -31,11 +33,13 @@ _log = logging.getLogger("harness.memory")     # the same object; see store.py's
 
 
 # ──── MEM-OKF v2 §M3: registry hygiene (verify + compaction) ────────────────
-# CACHED BY FILE IDENTITY (mtime_ns, size) — the semindex cache-key lesson (an
-# mtime-keyed cache once served a dead vector; ns+size is the honest key). The health
-# scan is O(n²) over live rows and the operator panel polls /v1/memory every 15 s:
-# measured 129 ms per call at 165 rows BEFORE the token precompute, and still a whole
-# re-scan per poll after it, for a file that changes a few times an hour.
+# CACHED BY FILE IDENTITY (mtime_ns, size) OF EVERY FILE IT READS — the semindex
+# cache-key lesson (an mtime-keyed cache once served a dead vector; ns+size is the honest
+# key), and the registry is no longer the only input: the semantic-coverage line is
+# computed from the semindex, so that file's stamp is in the key too. The health scan is
+# O(n²) over live rows and the operator panel polls /v1/memory every 15 s: measured 129 ms
+# per call at 165 rows BEFORE the token precompute, and still a whole re-scan per poll
+# after it, for a file that changes a few times an hour.
 _HEALTH_CACHE: dict = {"key": None, "value": None}
 
 
@@ -50,7 +54,16 @@ def _registry_health():
         return None, "unconfigured"
     try:
         st = os.stat(p)
-        key = (p, st.st_mtime_ns, st.st_size)
+        # ── THE KEY COVERS EVERY FILE THE VALUE IS COMPUTED FROM (2026-09-11) ──────────
+        # It was the registry's stat alone, which was right while every number here came
+        # out of the registry. The semantic coverage below does not: it is computed from
+        # the SEMINDEX, and a backfill writes that file and not this one. Keyed on the
+        # registry only, a backfill of all 20 uncovered rows would leave the panel
+        # reporting 20 until the next time she remembered something — the cache serving a
+        # dead number, which is the exact failure this cache's own header cites from the
+        # semindex. A cache key names its inputs; this value now has two.
+        from harness.skills import semindex as _sx
+        key = (p, st.st_mtime_ns, st.st_size, _sx.index_stamp())
     except OSError:
         key = None
     if key is not None and _HEALTH_CACHE["key"] == key:
@@ -101,6 +114,36 @@ def _registry_health():
     if _cap.get("why"):
         stats["capture_refused"] = _cap["why"]
         stats["capture_skipped"] = _cap.get("n", 0)
+
+    # ── WHICH OF HER FACTS CAN BE FOUND BY MEANING, AND WHICH ONLY BY WORDS ───────────
+    # `unminted` above says the episode is missing. It does NOT say the fact is unfindable,
+    # and the two got read as one thing for weeks. A live row whose best vector is in a
+    # different space from the one queries land in is reachable by the lexical floor and
+    # nothing else — 0.12 recall@1 against 0.72 — and until now nothing on any surface said
+    # which rows those were. Twenty of hers, found with a throwaway script.
+    #
+    # THROUGH `semindex.coverage`, NOT BY REBUILDING ITS KEY HERE. The join is
+    # `(addr_of(text), ts)` with a model-precedence rule on top, and the first draft of
+    # this block open-coded both. That is §0 exactly: the day `_key` changes, the seam
+    # moves and this panel goes on reporting against the old rule — not an error, just a
+    # number that quietly stops being about anything. One owner, and it is the module that
+    # writes the index.
+    #
+    # semindex is imported, never the reverse: its first rule is that it cannot reach the
+    # registry, so the rows travel to it as an argument. The dependency runs one way and
+    # this is the direction.
+    try:
+        from harness.skills import semindex as _sx
+        cov = _sx.coverage(eps)
+        # Its own `live` count rides along on purpose. It filters on `text` where this
+        # function's `live` filters on `lifecycle`, so a row carrying only a `topic` is
+        # live here and absent there. That gap is real and small and belongs on the
+        # surface rather than papered over by picking one of the two to print.
+        stats["sem"] = cov
+    except Exception as exc:                                  # noqa: BLE001
+        # A REPORT, never a gate on her speech: an unreadable semantic index must not stop
+        # the registry from saying how it is.
+        _sw(_log, "_registry_health/sem", exc, lane="skills")
     status = "ok" if (malformed == 0 and exact_dups == 0) else "needs-compaction"
     if key is not None:
         _HEALTH_CACHE["key"], _HEALTH_CACHE["value"] = key, (stats, status)
@@ -123,6 +166,19 @@ def verify_registry() -> str:
            f"near_dups={s['near_dups']} unminted={s['unminted']} "
            f"no_provenance={s['no_provenance']} "
            f"-> {'OK' if status == 'ok' else 'NEEDS COMPACTION'}")
+    # The count, and then only the ones that are NOT findable — a line saying every fact is
+    # fine is a line nobody reads, and `unminted` already proved that a number can sit in
+    # this dict for months without reaching a surface.
+    sem = s.get("sem") or {}
+    if sem.get("live"):
+        out += (f"{os.linesep}  semantic: {sem['indexed']}/{sem['live']} indexed, "
+                f"queries in {sem['query_space']}")
+        if sem.get("unmatchable"):
+            spaces = ", ".join("%s=%d" % kv for kv in sorted(sem["by_space"].items()))
+            out += (f"{os.linesep}    {sem['unmatchable']} fact(s) CANNOT be matched by "
+                    f"meaning - their best vector is in another space, so recall reaches "
+                    f"them by words alone ({spaces}). semindex.backfill_aux() upgrades "
+                    f"them; an upgrade is an append and destroys nothing.")
     if s.get("capture_refused"):
         out += (f"{os.linesep}  KV MINT IS OFF - the engine refused /v1/capture: "
                 f"{s['capture_refused']}{os.linesep}"

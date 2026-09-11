@@ -119,6 +119,24 @@ def index_path() -> str:
     return os.environ.get("SP_SEM_INDEX", "")
 
 
+def index_stamp():
+    """(path, mtime_ns, size) — is this the same index, unchanged? Never raises.
+
+    For CALLERS who cache something derived from this file. `load_cached` does not use it
+    (it needs the tail anchor too, to catch a same-size rewrite inside one mtime tick),
+    but a caller memoizing a COVERAGE NUMBER has no other way to notice the index moved.
+    `_registry_health` caches on the registry's stat and now reports a number computed
+    from THIS file: without this in its key, a backfill that does not touch the registry
+    is invisible to the panel for as long as the registry stands still. Deliberately the
+    same shape as `store.registry_stamp` — one idea, one spelling."""
+    p = index_path()
+    try:
+        st = os.stat(p)
+        return (p, st.st_mtime_ns, st.st_size)
+    except OSError:
+        return (p, None, None)
+
+
 def enabled() -> bool:
     """Armed only when BOTH the flag and the path exist. Both are mapped in serve.py
     (G-ONEDOOR: an unmapped knob does not exist)."""
@@ -241,23 +259,12 @@ def load(models=KNOWN_MODELS) -> dict:
     if not p or not os.path.exists(p):
         return out
     rank = {m: i for i, m in enumerate(KNOWN_MODELS)}     # later in tuple = better
+    # THE PRECEDENCE RULE LIVES IN ONE PLACE (2026-09-11). `load_cached`'s incremental path
+    # folds an appended tail into an existing index, and it must apply exactly this rule or
+    # the two readers disagree about which vector a key holds — the two-copies bug, in the
+    # seam where it would be least visible. Both call `_fold`.
     with open(p, encoding="utf-8") as f:
-        for ln in f:
-            ln = ln.strip()
-            if not ln:
-                continue
-            try:
-                r = json.loads(ln)
-            except Exception as _swx:
-                _swallowed(_swlog, "load", _swx, lane="skills")
-                continue
-            if r.get("model") not in models:
-                continue
-            k = (r.get("addr", ""), r.get("ts", ""))
-            prev = out.get(k)
-            if prev is None or rank.get(r["model"], -1) >= rank.get(prev["model"], -1):
-                out[k] = r
-    return out
+        return _fold(out, f, models, rank)
 
 
 # ── mint (the ONLY writers, both silent-failure) ───────────────────────────────────────
@@ -311,25 +318,123 @@ def upgrade(out_dir: str, fact: str, ts: str) -> bool:
 
 
 # ── read-side: cached load + query embedding (S1 support) ────────────────────────────
-_CACHE = {"key": None, "idx": None}
+_CACHE = {"key": None, "idx": None, "size": 0, "anchor": b""}
+_ANCHOR = 512          # bytes of the old tail kept as proof the prefix did not move
+
+
+def _anchor_at(p: str, end: int) -> bytes:
+    """The last `_ANCHOR` bytes of the file's first `end` bytes. Cheap proof that what we
+    already parsed is still there, unchanged, and still ends where we think it does."""
+    if end <= 0:
+        return b""
+    try:
+        with open(p, "rb") as f:
+            f.seek(max(0, end - _ANCHOR))
+            return f.read(min(_ANCHOR, end))
+    except OSError:
+        return b""
+
+
+def _fold(idx: dict, lines, models, rank) -> dict:
+    """Fold rows into an index under load()'s rule: a later row wins when its model ranks
+    at least as high. Identical to the loop in `load`, factored out so the incremental
+    path cannot drift from the full one — two implementations of this precedence is the
+    bug this repo is named after."""
+    for ln in lines:
+        ln = ln.strip()
+        if not ln:
+            continue
+        try:
+            r = json.loads(ln)
+        except Exception as _swx:
+            _swallowed(_swlog, "_fold", _swx, lane="skills")
+            continue
+        if r.get("model") not in models:
+            continue
+        k = (r.get("addr", ""), r.get("ts", ""))
+        prev = idx.get(k)
+        if prev is None or rank.get(r["model"], -1) >= rank.get(prev["model"], -1):
+            idx[k] = r
+    return idx
 
 
 def load_cached(models=KNOWN_MODELS) -> dict:
-    """load(), memoized on (path, mtime, size). Size is in the key because an in-place
-    rewrite inside one mtime tick is exactly how a stale cache served a dead vector
-    during G-SEM-RANK's own bring-up — measure the thing, not the proxy."""
+    """load(), memoized on (path, models, mtime, size) — and APPENDS ARE NOT A REPARSE.
+
+    Size is in the key because an in-place rewrite inside one mtime tick is exactly how a
+    stale cache served a dead vector during G-SEM-RANK's own bring-up — measure the thing,
+    not the proxy.
+
+    ── ONE NEW VECTOR COST A 264 ms RE-READ OF THE WHOLE FILE (2026-09-11) ──────────────
+    The memo is invalidated by mtime, and `mint()` appends a row every time she remembers
+    anything. So the first recall after any write re-read and re-parsed the entire index —
+    **measured at 264 ms on the live 21.4 MB / 3,183-row file** — to learn about ONE
+    appended line. The same shape as `store._load`'s cache key this morning: an
+    invalidation that costs orders of magnitude more than the change it is tracking.
+    It grows with the store, and the store only ever grows.
+
+    THE FILE IS APPEND-ONLY, WHICH IS WHAT MAKES THE SHORTCUT SOUND. When the path and the
+    model set are unchanged, the file has GROWN, and the bytes ending the region we already
+    parsed are still byte-identical, then everything before that offset is what we already
+    folded and only the tail is new. `load()` is a left-to-right fold, so folding the prefix
+    and then the suffix gives the same index as folding the whole file — that is the proof,
+    and `_fold` is shared by both paths so the rule cannot drift between them.
+
+    ANY OTHER SHAPE FALLS BACK TO A FULL LOAD: a shrunken file, a rewrite that changed the
+    prefix, a different path, a different model set, or a cold process. So a compaction or
+    a hand-edit is read in full, which is the conservative direction.
+
+    WHY NOT COMPACT THE FILE INSTEAD, which is what was planned: best-row-per-key would
+    take 21.4 MB to 15.9 MB — 26%, not the "two thirds" the plan claimed, because the rows
+    it keeps are the BIGGEST ones. And it would destroy **966 `l5-512-v1` vectors**, which
+    `/v1/capture` refuses to regenerate on this model (ADR-013). Five megabytes is not
+    worth deleting evidence that cannot be remade, in a store whose first rule is that
+    nothing is. The re-parse was the real cost and this removes it without dropping a row.
+    """
     p = index_path()
+    rank = {m: i for i, m in enumerate(KNOWN_MODELS)}
     try:
         st = os.stat(p) if p and os.path.exists(p) else None
-        key = (p, st.st_mtime_ns, st.st_size) if st else (p, None, None)
+        key = (p, tuple(models), st.st_mtime_ns, st.st_size) if st else (p, tuple(models), None, None)
     except Exception as _swx:
         _swallowed(_swlog, "load_cached", _swx, lane="skills")
-        key = (p, None, None)
+        st, key = None, (p, tuple(models), None, None)
     with _LOCK:
-        if _CACHE["key"] == key and _CACHE["idx"] is not None:
+        # ── THE KEY ALONE HAD A HOLE, AND IT IS THE ONE THE DOCSTRING WORRIED ABOUT ────
+        # `(path, models, mtime_ns, size)` cannot see a rewrite that keeps the byte count
+        # inside one mtime tick — and file-time granularity is coarse enough that two
+        # consecutive writes MEASURE as the same `st_mtime_ns` (delta 0 ns, observed). So
+        # the key was identical, the stale index was served, and size being in the key did
+        # not help because size was what did not change. Pre-existing; found by the gate
+        # for the incremental path, which assumed the anchor covered it.
+        #
+        # The anchor is already read for the append check, so verifying it on the HIT path
+        # costs one 512-byte read against the 264 ms full parse it is standing in for. It
+        # catches any rewrite that disturbs the tail — which is every rewrite of a JSONL
+        # file that is written whole, including a compaction.
+        if (_CACHE["key"] == key and _CACHE["idx"] is not None
+                and (st is None or _anchor_at(p, st.st_size) == _CACHE.get("anchor"))):
             return _CACHE["idx"]
-        idx = load(models)
-        _CACHE.update(key=key, idx=idx, mu={})
+        prev = _CACHE.get("key")
+        grew = (st is not None and prev is not None and _CACHE.get("idx") is not None
+                and prev[0] == p and prev[1] == tuple(models)
+                and 0 < _CACHE.get("size", 0) < st.st_size
+                and _anchor_at(p, _CACHE["size"]) == _CACHE.get("anchor"))
+        idx = None
+        if grew:
+            try:
+                with open(p, "rb") as f:
+                    f.seek(_CACHE["size"])
+                    tail = f.read().decode("utf-8", "replace")
+                idx = _fold(dict(_CACHE["idx"]), tail.splitlines(), models, rank)
+            except Exception as _swx:
+                _swallowed(_swlog, "load_cached", _swx, lane="skills")
+                idx = None                      # any doubt at all: read the whole thing
+        if idx is None:
+            idx = load(models)
+        _CACHE.update(key=key, idx=idx, mu={},
+                      size=(st.st_size if st else 0),
+                      anchor=(_anchor_at(p, st.st_size) if st else b""))
         return idx
 
 
@@ -448,11 +553,46 @@ def _key(r) -> tuple:
 
 
 def coverage(registry_rows) -> dict:
-    idx = load()
+    """How many live facts the index holds — AND IN WHICH SPACE, because the space is the
+    capability.
+
+    `indexed`/`coverage` answer "has a vector at all". That is the question this function
+    was written for and the one G-SEM-INDEX grades, and it is NOT the question the panel
+    is asking. The seam compares SAME SPACE ONLY — `query_embed` returns its model tag
+    precisely so it can, since a cosine between two embedding spaces is noise with a
+    confidence interval — so a fact whose best vector sits in `hash256-v1` while queries
+    land in `aux-1024-v1` cannot be matched semantically AT ALL. It is reachable by the
+    lexical floor and nothing else, which the shootout measured at 0.12 recall@1 against
+    0.72 for the semantic path.
+
+    Measured on her live store the day this was written: 1,057 live facts, 1,037 carrying
+    an aux vector, 20 not. The old return value said coverage 1.0. Both numbers were true;
+    only one of them was the capability, and nothing surfaced the other — finding those 20
+    took a throwaway script.
+
+    `query_space` is the ARMED space (`aux_enabled()`, no I/O), not a promise about the
+    next query: if the sidecar is down `query_embed` drops to the hash floor and this
+    number inverts — the hash rows become the findable ones. It is the standing
+    configuration, which is what a coverage report is for; the live answer costs a
+    sidecar round-trip and belongs nowhere near a 15-second poll.
+
+    `load_cached`, not `load`: this is on the panel's 15-second poll now, and the loader it
+    replaces re-parsed the whole file every time — 303.8 ms against 0.2 ms unchanged on her
+    real 21.4 MB index. End to end this call measures 315 ms cold and 2.6 ms warm over
+    1,057 live rows, the difference being the per-row lookups, which are the work.
+    """
+    idx = load_cached()
     live = _live(registry_rows)
-    have = sum(1 for r in live if _key(r) in idx)
+    q = MODEL_AUX if aux_enabled() else MODEL_HASH
+    by_space: dict = {}
+    for r in live:
+        m = (idx.get(_key(r)) or {}).get("model") or "(none)"
+        by_space[m] = by_space.get(m, 0) + 1
+    have = len(live) - by_space.get("(none)", 0)
     return {"live": len(live), "indexed": have,
-            "coverage": round(have / len(live), 4) if live else None}
+            "coverage": round(have / len(live), 4) if live else None,
+            "query_space": q, "by_space": by_space,
+            "unmatchable": sum(n for m, n in by_space.items() if m != q)}
 
 
 def verify(registry_rows) -> list:

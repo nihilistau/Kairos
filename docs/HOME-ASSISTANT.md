@@ -170,7 +170,7 @@ Hyper-V switches are still settling — the event log shows a switch being creat
 error.** WSL comes up with networking mode `none`, which is silent, total, and from inside
 the distro looks exactly like a working stack.
 
-So the Startup entry is now a thin launcher (`home-assistant-wsl.vbs`, a VBS only so no
+So the launcher is a thin VBS (`home-assistant-wsl.vbs`, a VBS only so no
 console flashes) over `harness/homeassistant/stack/ha-autostart.ps1`, which:
 
 1. **waits for the fact, not for a duration** — this host actually holding `10.0.0.150`
@@ -183,8 +183,45 @@ console flashes) over `harness/homeassistant/stack/ha-autostart.ps1`, which:
    WSL2 runs one VM for every distro and `networkingMode` is a property of that VM, so
    restarting this distro alone changes nothing. Guarded — if any other distro is running
    it logs and refuses, because pulling those down is not the launcher's call;
-4. **writes `%LOCALAPPDATA%\HomeAssistant\autostart.log`**, because the original failure
+4. **writes `%USERPROFILE%\.wsl-ha\autostart.log`**, because the original failure
    was invisible.
+
+### And on 2026-09-11 it turned out none of that had ever run
+
+The fix above was correct and **fired exactly zero times.** After the next reboot Home
+Assistant was down again, in the identical state — distro up, `networking-mode = none`, no
+`eth`, every container healthy and unreachable — and the log written for precisely that
+moment was **empty**.
+
+Two causes, and both are about looking rather than reasoning.
+
+**1. There were two launchers, and I fixed the one that does not run.** The autostart on
+this machine is a *scheduled task*, `Home Assistant WSL autostart`, created 2026-08-29 with
+a logon trigger and a 15 s delay, pointing at `~\.wsl-ha\start-ha.vbs` — a one-liner that
+starts the distro and pins it with `sleep infinity`, waiting for nothing. I had put my work
+in the **Startup folder** instead. The evidence I had on 09-09 ("the distro is up at logon
+in mode `none`") was explained just as well by that task, and I never checked which. §0 in
+its purest form, inside my own fix.
+
+**2. The files were not where the system could see them.** Repointing the task was not
+enough: `wscript` then hung with an invisible modal *"Can not find script file"* for a path
+that existed. Made to run `dir` itself, the task — as the same user — lists
+`C:\Users\Sam\AppData\Local` and answers **File Not Found** for the `HomeAssistant`
+folder that every shell lists happily. Writes under `%LOCALAPPDATA%` from the tooling used
+to deploy are container-virtualised: real to the writer, absent to the system. That is why
+the 09-09 deployment *verified green* — every check ran inside the same view — and why the
+logon path never once worked.
+
+So everything lives in `~\.wsl-ha\` now, beside the task's own original launcher, because
+that directory was made outside all of it and the task can read it. And
+`deploy-autostart.ps1 -Verify` proves the mechanism by **running the scheduled task**, not
+the file: the 09-09 pass only ever showed that the launcher worked, never that anything
+called it.
+
+    task -> wscript -> home-assistant-wsl.vbs -> powershell 5.1 -> ha-autostart.ps1
+
+`~\.wsl-ha\start-ha.vbs` is still on disk and nothing points at it. The deploy warns about
+it every run; delete it when you are happy, or it will mislead the next reader.
 
 **Deploy it with `deploy-autostart.ps1`, never by hand.** The two files have *opposite*
 encoding requirements and each one fails silently the other way:

@@ -24,19 +24,44 @@ So the copy is done ONCE, here, with an explicit BOM, and then the deployed copy
 BY THE INTERPRETER THAT WILL ACTUALLY RUN IT before this script will call the job done.
 Testing it under pwsh 7 -- which reads BOM-less UTF-8 correctly -- is what let the fault
 through in the first place: the check has to use the same reader as the caller.
+
+AND IT OWNS THE SCHEDULED TASK, BECAUSE THAT IS WHAT ACTUALLY RUNS (2026-09-11). The
+2026-09-09 fix was correct and never fired once: it went into the Startup FOLDER, and the
+real autostart on this machine is a scheduled task, `Home Assistant WSL autostart`, created
+2026-08-29 with a logon trigger and a 15-second delay, pointing at
+`C:\Users\Sam\.wsl-ha\start-ha.vbs` -- a one-liner that starts the distro and pins it with
+`sleep infinity`, nothing more. After the next reboot the log written for exactly this
+moment was EMPTY, while the distro was up with `wslinfo --networking-mode = none` and every
+container healthy and unreachable: the identical failure, because the launcher I fixed is
+not the launcher that runs.
+
+I had the evidence on 09-09 and read it wrong. "The distro is up at logon in mode none" is
+explained just as well by that task as by the Startup entry, and I never checked which. So
+this script now OWNS the whole path -- files, task, and the removal of the other entry --
+because two launchers where one is believed is the shape of the original bug, and this time
+it was in my own fix.
+
+    powershell -NoProfile -ExecutionPolicy Bypass -File ...\deploy-autostart.ps1 -Verify
 #>
 [CmdletBinding()]
 param(
-    [switch] $NoRun          # deploy and verify parsing, but do not start the stack
+    [switch] $NoRun,         # deploy and verify parsing, but do not start the stack
+    [switch] $Verify,        # after deploying, RUN THE TASK -- the only end-to-end proof
+    [string] $TaskName = "Home Assistant WSL autostart"
 )
 
 $ErrorActionPreference = "Stop"
 
 $here    = Split-Path -Parent $MyInvocation.MyCommand.Path
-$dstDir  = "$env:LOCALAPPDATA\HomeAssistant"
+# ~/.wsl-ha AND NOT %LOCALAPPDATA%. The scheduled task cannot see AppData -- see the
+# header, and ha-autostart.ps1's $LogPath note, which carries the proof.
+$dstDir  = "$env:USERPROFILE\.wsl-ha"
 $dstPs1  = "$dstDir\ha-autostart.ps1"
+# THE LAUNCHER LIVES WITH THE WORKER NOW, not in the Startup folder. One directory, one
+# path, and the scheduled task is the only thing that points at it.
+$dstVbs  = "$dstDir\home-assistant-wsl.vbs"
 $startup = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
-$dstVbs  = "$startup\home-assistant-wsl.vbs"
+$oldVbs  = "$startup\home-assistant-wsl.vbs"
 $ps51    = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
 
 if (-not (Test-Path $dstDir)) { New-Item -ItemType Directory -Force -Path $dstDir | Out-Null }
@@ -101,22 +126,71 @@ Remove-Item $probeFile -ErrorAction SilentlyContinue
 $out | ForEach-Object { Write-Host "  $_" }
 if ($rc -ne 0) { throw "the deployed autostart does not parse under Windows PowerShell 5.1" }
 
-# ── 4. and prove the chain end to end, through the launcher Windows will use ───────
+# ── 4. THE SCHEDULED TASK IS THE AUTOSTART, so this owns it ───────────────────────
+# Only the ACTION is rewritten. The principal and trigger are left exactly as they are --
+# interactive, as the logged-on user, 15 s after logon -- because those are what make it
+# fire at all, and the race they create is handled inside ha-autostart.ps1 by waiting for
+# the network rather than by arguing with the delay.
+$existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+$action = New-ScheduledTaskAction -Execute "wscript.exe" -Argument "`"$dstVbs`""
+if ($existing) {
+    $wasPointingAt = ($existing.Actions | ForEach-Object { "$($_.Execute) $($_.Arguments)" }) -join "; "
+    Set-ScheduledTask -TaskName $TaskName -Action $action | Out-Null
+    Write-Host "task '$TaskName' repointed"
+    Write-Host "   was: $wasPointingAt"
+    Write-Host "   now: wscript.exe `"$dstVbs`""
+} else {
+    $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+    $trigger.Delay = "PT15S"
+    $set = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+                                        -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
+    $set.ExecutionTimeLimit = "PT0S"
+    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
+                           -Settings $set -Description "Brings Home Assistant up with Windows." | Out-Null
+    Write-Host "task '$TaskName' created"
+}
+$now = (Get-ScheduledTask -TaskName $TaskName).Actions |
+       ForEach-Object { "$($_.Execute) $($_.Arguments)" }
+if ($now -notmatch [regex]::Escape($dstVbs)) {
+    throw "the task still does not point at $dstVbs -- it points at: $now"
+}
+
+# ── 5. ONE LAUNCHER. Anything else that could start this stack is a path nobody reads ──
+if (Test-Path $oldVbs) {
+    Remove-Item $oldVbs -Force
+    Write-Host "removed the Startup-folder copy (it never ran, and a second path is the bug)"
+}
+$legacy = "$dstDir\start-ha.vbs"
+if (Test-Path $legacy) {
+    Write-Warning ("$legacy still exists. Nothing points at it now, but it is the launcher " +
+                   "that actually ran until 2026-09-11 and it starts the distro with no " +
+                   "network wait. Delete it once you are happy, or it will mislead the next reader.")
+}
+
+# ── 6. and prove it end to end THROUGH THE TASK, which is the only thing that runs ──
 if ($NoRun) { Write-Host "-NoRun: deployed and verified, not started"; exit 0 }
 
 $logPath = "$dstDir\autostart.log"
 $before  = if (Test-Path $logPath) { (Get-Item $logPath).LastWriteTime } else { [datetime]::MinValue }
-Write-Host "running the Startup entry via wscript, as Explorer does..."
-Start-Process wscript.exe -ArgumentList @("`"$dstVbs`"") -Wait
+if ($Verify) {
+    # THE PROOF THE 09-09 PASS DID NOT HAVE. Running the launcher by hand only ever showed
+    # that the launcher works; it could not show that anything CALLS it. Start-ScheduledTask
+    # exercises the real mechanism -- task -> wscript -> VBS -> powershell 5.1 -> worker.
+    Write-Host "starting the TASK (not the file) -- the mechanism, end to end..."
+    Start-ScheduledTask -TaskName $TaskName
+} else {
+    Write-Host "running the launcher directly (pass -Verify to exercise the task instead)..."
+    Start-Process wscript.exe -ArgumentList @("`"$dstVbs`"") -Wait
+}
 for ($i = 0; $i -lt 40; $i++) {
     Start-Sleep -Seconds 5
     if ((Test-Path $logPath) -and (Get-Item $logPath).LastWriteTime -gt $before) {
-        $tail = Get-Content $logPath -Tail 12
-        if ($tail -match "autostart end") { break }
+        if ((Get-Content $logPath -Tail 12) -match "autostart end") { break }
     }
 }
 if (-not (Test-Path $logPath) -or (Get-Item $logPath).LastWriteTime -le $before) {
-    throw "the launcher wrote nothing to $logPath -- the VBS -> PowerShell chain is broken"
+    throw ("nothing reached $logPath -- the chain is broken. If -Verify was used, the TASK " +
+           "did not run the launcher; otherwise the VBS -> PowerShell hop failed.")
 }
 Write-Host "--- $logPath ---"
 Get-Content $logPath -Tail 12 | ForEach-Object { Write-Host "  $_" }

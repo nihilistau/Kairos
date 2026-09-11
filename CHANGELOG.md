@@ -1,5 +1,79 @@
 # Changelog
 
+## 0.8.30 — `coverage: 1.0` does not mean "findable" (2026-09-11)
+
+Two changes to `harness/skills/semindex.py`. The second is the one to read.
+
+### Appending a vector no longer re-reads the whole index
+
+`load_cached()` was memoized on `(path, models, mtime_ns, size)`, and `mint()` appends a row
+every time the agent remembers anything — so **every write invalidated the memo**, and the
+next recall re-parsed the entire file to learn about one new line. On the store this was
+developed against that is **264 ms for a 21.4 MB / 3,183-row index**, on a cost that grows
+with the store and a store that only ever grows.
+
+The index is append-only, which is what makes the shortcut sound. When the path and the
+model set are unchanged, the file has grown, and the bytes ending the region already parsed
+are still byte-identical, then only the tail is new — `load()` is a left-to-right fold, so
+folding prefix-then-suffix gives the same index. Both paths share `_fold`, so the
+model-precedence rule cannot drift between them. Anything else — a shrunken file, a changed
+prefix, a different path or model set, a cold process — falls back to a full load.
+
+**Cold 303.8 ms, one appended row 8.3 ms, unchanged 0.2 ms.** If you run a large index, this
+is the change you will feel.
+
+It also closed a pre-existing hole the old docstring had already worried about: two
+consecutive writes can measure as **the same `st_mtime_ns` (delta 0 ns, observed)**, so a
+same-size rewrite inside one tick was invisible and size in the key did not help — size was
+what did not change. The tail anchor is verified on the cache-hit path now, which costs one
+512-byte read and catches any whole-file rewrite.
+
+Compaction was considered and declined: best-row-per-key measured **21.4 MB → 15.9 MB, 26%**,
+because the rows it keeps are the biggest, and it would drop vectors from a space the local
+backend can no longer regenerate. The re-parse was the real cost and this removes it without
+dropping a row.
+
+### `coverage()` now names the SPACE, because the space is the capability
+
+The recall seam compares **same space only** — `query_embed()` returns its model tag
+precisely so it can, since a cosine between two embedding spaces is noise with a confidence
+interval. `coverage()` answered *"has a vector at all"*, which is a different question: a
+fact indexed in `hash256-v1` while queries land in `aux-1024-v1` **cannot be matched by
+meaning at all.** It is reachable by the lexical floor and nothing else — 0.12 recall@1
+against 0.72 on the corpus that set the thresholds.
+
+On the store this was developed against: 1,057 live facts, coverage **1.0**, and twenty of
+them in the wrong space. Twenty facts semantically invisible, under a report that said
+everything was fine.
+
+`coverage()` returns `by_space`, `query_space` and `unmatchable` alongside the old fields,
+and `verify_registry()` — which the memory panel prints verbatim — names the count, the
+spaces, and `backfill_aux()` as the remedy. It says nothing when nothing is unfindable.
+
+**This matters more in Kairos than upstream**, because with a CPU sidecar armed the aux space
+is typically the only complete document space you have: anything minted while the sidecar was
+down sits in the hash floor and stays there silently. Check it with
+`verify_registry()`; fix it with `semindex.backfill_aux()`, which appends and destroys
+nothing.
+
+`query_space` is the **armed** space (`aux_enabled()`, no I/O), not a promise about the next
+query — if the sidecar is down, `query_embed()` drops to the hash floor and the number
+inverts. That is the standing configuration, which is what a coverage report is for; the
+live answer costs a round-trip and does not belong on a 15-second poll.
+
+`_registry_health()`'s cache also gained the semindex's stamp. It memoized on the registry's
+stat alone while now reporting a number computed from a different file, so a backfill — which
+writes the index and never the registry — would have been invisible to the panel until the
+next time anything was remembered.
+
+### And the gate ships
+
+`G-SEM-INCREMENTAL` (15/15) is new and **now included in the export**. It was being dropped
+by an exclusion glob, `harness_tests/g_sem_*.py`, that reads "the SEM scoreboard over a
+private corpus" — true of the thirteen gates that existed when it was written, and not a
+property of the name. Kairos ships `semindex.py`, so a semindex gate that needs no corpus
+grades code this tree actually runs. The thirteen are named individually now.
+
 ## 0.8.29 — the sweep no longer loses a crashing gate's output (2026-09-11)
 
 `tools/sweep.py` runs each gate with `-u`. Captured stdout is block-buffered, so a gate

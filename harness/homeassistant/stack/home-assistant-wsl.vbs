@@ -1,9 +1,25 @@
-' Starts Home Assistant with Windows. Deployed to the per-user Startup folder:
-'   %APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\home-assistant-wsl.vbs
+' Starts Home Assistant with Windows. Deployed BESIDE its worker:
+'   %USERPROFILE%\.wsl-ha\home-assistant-wsl.vbs
 '
-' A VBS only so nothing flashes a console window at logon. The work is in
-' ha-autostart.ps1 (deployed to %LOCALAPPDATA%\HomeAssistant\), because the work is now
-' more than one command and needs to be readable.
+' and called by the scheduled task "Home Assistant WSL autostart" (logon trigger, 15 s
+' delay). A VBS only so nothing flashes a console window at logon; the work is in
+' ha-autostart.ps1 next to it, because the work is more than one command.
+'
+' NOT UNDER %LOCALAPPDATA%, and that is not a preference. The task cannot SEE that
+' directory: made to run "dir" itself, as beast\sam, it lists C:\Users\Sam\AppData\Local
+' and answers "File Not Found" for the folder every shell of mine lists happily. Put here,
+' wscript found it on the first try. Deployed there, wscript popped an invisible modal
+' "Can not find script file" and hung forever, which is what a scheduled task does with an
+' error dialog and no desktop to show it on.
+'
+' IT USED TO LIVE IN THE STARTUP FOLDER, AND THAT IS WHY IT NEVER RAN (2026-09-11). The
+' 2026-09-09 fix was correct and fired exactly zero times: the autostart on this machine is
+' the scheduled task above, created 2026-08-29, and it pointed at a different file
+' entirely -- C:\Users\Sam\.wsl-ha\start-ha.vbs, a one-liner that starts the distro and
+' pins it with "sleep infinity" and waits for nothing. After the next reboot the log
+' written for exactly that moment was empty while the distro sat in networking mode "none"
+' with every container healthy and unreachable. Two launchers, one believed, and the wrong
+' one fixed. deploy-autostart.ps1 owns the task now, and removes the Startup-folder copy.
 '
 ' THIS FILE IS ASCII ONLY, DELIBERATELY. VBScript refuses a UTF-8 BOM at the first
 ' character ("Invalid character" at 1,1), so this file cannot declare its own encoding --
@@ -30,5 +46,5 @@
 ' Delete this file to stop Home Assistant starting with Windows.
 Dim shell, script
 Set shell = CreateObject("WScript.Shell")
-script = shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\HomeAssistant\ha-autostart.ps1"
+script = shell.ExpandEnvironmentStrings("%USERPROFILE%") & "\.wsl-ha\ha-autostart.ps1"
 shell.Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & script & """", 0, False

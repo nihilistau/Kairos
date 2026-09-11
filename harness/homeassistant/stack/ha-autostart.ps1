@@ -57,7 +57,16 @@ param(
     [string] $Gateway      = "10.0.0.1",
     [int]    $NetWaitSec   = 180,
     [int]    $Attempts     = 4,
-    [string] $LogPath      = "$env:LOCALAPPDATA\HomeAssistant\autostart.log",
+    # ── NOT UNDER %LOCALAPPDATA% (2026-09-11) ────────────────────────────────────
+    # The scheduled task that actually launches this CANNOT SEE that directory. Proven by
+    # making the task run `dir` itself: as beast\sam it lists C:\Users\Sam\AppData\Local
+    # and answers "File Not Found" for the HomeAssistant folder, while every shell I have --
+    # sandboxed or not -- lists the files happily. My tooling's writes under AppData are
+    # container-virtualised: real to me, absent to the system. That is why the 2026-09-09
+    # deployment verified green and then fired exactly zero times, and why the log written
+    # for precisely that failure was empty after the reboot. ~/.wsl-ha is his own directory,
+    # created outside all of that, and the task reads it -- which is how the bisect ended.
+    [string] $LogPath      = "$env:USERPROFILE\.wsl-ha\autostart.log",
     # TESTABILITY, and it is the only reason this switch exists: the failure mode is a boot
     # race that cannot be reproduced on demand, so the retry path would otherwise ship
     # having never run. With this set the first verification is forced to fail, which
