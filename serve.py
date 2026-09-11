@@ -445,8 +445,18 @@ def build_env(c: dict) -> dict:
               "shell:\n         %s" % (len(stripped), ", ".join(stripped)))
         print("         (to keep one deliberately: set SP_PASSTHROUGH=NAME1,NAME2)")
     if passthrough:
-        print("[serve] PASSTHROUGH (deliberate, unmapped, NOT from the profile): %s"
-              % ", ".join(passthrough))
+        # ── IT SAID "unmapped" WITHOUT CHECKING, AND THAT COST A NIGHT (2026-09-11) ──────
+        # This announced every REQUESTED name as a deliberate, unmapped passthrough. But the
+        # profile mapping below runs AFTER this, writes the same keys, and wins — so asking
+        # to pass through a name the profile also maps announced success and then silently
+        # handed the process the profile's value. `SP_MOE_TIMING=1` was announced here,
+        # arrived at the daemon as `SP_MOE_TIMING=0`, and I spent a diagnosis reading stale
+        # lines out of an append-only log believing the instrument was armed.
+        #
+        # The claim is checkable, so it is checked — at the END of build_env, where the
+        # mapping has already happened. `_passthrough_check` is called just before the
+        # return; this line only states the request.
+        print("[serve] PASSTHROUGH (requested): %s" % ", ".join(passthrough))
     if adopted:
         print("[serve] HOST KEYS adopted from the shell (secrets never live in a profile): %s"
               % ", ".join(adopted))
@@ -817,6 +827,18 @@ def build_env(c: dict) -> dict:
         # moe_topk_host picks experts on the HOST, so every layer does a router D2H +
         # cudaStreamSynchronize: 30 pipeline stalls per decoded token. Prints cumulative
         # sync / expert-loop / whole-branch ms every 300 syncs. Off = no clock calls.
+        # SP_G4_ATTN_V2 — the prefill attention kernel. 0 = the shipping one; 1 = v2, whose
+        # QK loop puts ONE WARP PER KEY (coalesced K reads, lanes split the head dim) and
+        # stages the query in shared instead of re-reading it from global per thread per
+        # iteration; 2 = PARITY, which runs both every layer and SERVES V1, so the diff is
+        # measured on a real prefill without her ever speaking v2's output.
+        #
+        # MAPPED HERE, not left to SP_PASSTHROUGH: a passthrough of a name the profile also
+        # maps loses to the mapping, silently, and that cost a whole diagnosis on 2026-09-11.
+        # Measured side by side under ncu, same inputs, same launch: 280 ms -> 42.85 ms per
+        # layer, L1 99.1% -> 83.7%, compute 9.9% -> 78.6%. Parity relL2 8.15e-07 over all 30
+        # layers, which is fp32 reduction-order noise and nothing else.
+        "SP_G4_ATTN_V2": str(int(dec.get("attn_v2", 0) or 0)),
         "SP_MOE_TIMING": b(dec.get("moe_timing", False)),
         # SP_MOE_PIN_STAGE — expert staging through a pinned ring instead of a pageable
         # cudaMemcpyAsync (which is not async at all: the driver blocks staging it through
@@ -1278,6 +1300,21 @@ def build_env(c: dict) -> dict:
     # only value that lets the default run — which is the whole point.
     for _k in [k for k, v in list(e.items()) if k.startswith("SP_") and v == ""]:
         del e[_k]
+
+    # ── DID THE PASSTHROUGH ACTUALLY SURVIVE THE MAPPING? ────────────────────────────────
+    # The banner above states the REQUEST. This is the receipt, and it is here because only
+    # here is the answer known: everything between has written the profile's values over `e`.
+    # A name the profile also maps loses, silently, and announcing it as "deliberate,
+    # unmapped" is the door lying about what went through it — G-ONEDOOR's whole subject.
+    for _name in passthrough:
+        _want = os.environ.get(_name)
+        _got = e.get(_name)
+        if _want is not None and _got != _want:
+            print("[serve] !! PASSTHROUGH OVERRIDDEN: %s=%r was requested and the profile "
+                  "mapped %s=%r — THE PROFILE WON. That name is not unmapped; set it in the "
+                  "profile instead." % (_name, _want, _name, _got))
+        elif _want is not None:
+            print("[serve] PASSTHROUGH held: %s=%r (unmapped by the profile)" % (_name, _got))
 
     # [debug] knobs (P5): optional taps, unset unless the profile arms them.
     dbg = c.get("debug", {})

@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.8.33 — the one-door banner now proves what went through it (2026-09-12)
+
+`serve.py` strips every inherited `SP_*` so the profile is the authority, and `SP_PASSTHROUGH`
+is the documented way to keep one deliberately. It announced each requested name as
+*"PASSTHROUGH (deliberate, **unmapped**, NOT from the profile)"* — **without checking whether
+it was unmapped.**
+
+The profile mapping runs *after* the passthrough loop and writes the same keys, so asking to
+pass through a name the profile also maps announced success and then silently handed the
+process the profile's value instead. Upstream this cost a whole diagnosis: `SP_MOE_TIMING=1`
+was announced at three consecutive boots and arrived at the engine as `SP_MOE_TIMING=0`, so an
+instrument read as armed and was dark, and the stale numbers still sitting in an append-only
+log got quoted as fresh measurements.
+
+The banner states the **request** now, and the receipt prints at the end of `build_env`, where
+the answer is actually known:
+
+    [serve] PASSTHROUGH held: SP_FOO='1' (unmapped by the profile)
+    [serve] !! PASSTHROUGH OVERRIDDEN: SP_BAR='1' was requested and the profile mapped
+            SP_BAR='0' — THE PROFILE WON. That name is not unmapped; set it in the
+            profile instead.
+
+If you have ever set `SP_PASSTHROUGH` for a knob the profile also owns, this is why it did
+nothing. G-ONEDOOR 28/28.
+
+Also in this cut: `serve.py` maps `SP_G4_ATTN_V2` from `[decode].attn_v2`. That knob selects a
+prefill/decode attention kernel in the **upstream CUDA engine** and does nothing against an
+OpenAI-compatible endpoint — it is here because a knob the source repo maps must be mapped in
+the same one door, not because this tree can use it.
+
 ## 0.8.32 — the `exit=-11` in CI was a daemon thread nobody ever asked to stop (2026-09-11)
 
 **If you have been seeing `exit=-11` from the offline suite, this is it, and it was never
