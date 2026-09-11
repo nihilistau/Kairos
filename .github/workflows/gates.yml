@@ -26,8 +26,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.10 is the floor pyproject declares; 3.12 is what people actually have.
-        python: ["3.10", "3.12"]
+        # THE FLOOR AND A CURRENT ONE. 3.11 is what pyproject declares (and declares
+        # truthfully since 2026-09-11 — it said 3.10 while serve.py imported tomllib,
+        # which is 3.11+, so the launcher could not start on the floor it advertised).
+        # 3.12 is what people actually have. Testing the floor is the point: it is the
+        # version a claim can be wrong about without anybody noticing.
+        python: ["3.11", "3.12"]
         # ── TWO INSTALLS, BECAUSE THERE ARE TWO CLAIMS (2026-09-11) ──────────────────
         # This job installed `.[http]` and then asserted that EVERY module imports —
         # a stronger claim than the packaging makes, so it could only ever be red, and

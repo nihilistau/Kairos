@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -109,6 +110,69 @@ check("every module imports, or names a declared-optional extra that is absent",
 check("...and the excuse is never available to the CORE",
       not core_broken, core_broken[:6])
 check("the walk actually found the tree", len(mods) > 100, len(mods))
+
+# ── AND THE ONE DOOR IS NOT UNDER harness/ (2026-09-11) ───────────────────────────────
+# This walked `harness/` and stopped, so `serve.py` — the script the README tells every
+# adopter to run — was covered by nothing. It has imported `tomllib` since it learned to
+# read a profile, and tomllib is 3.11+ while `requires-python` said 3.10: on the floor it
+# advertised, the launcher died at import before doing anything. Three gates went red on
+# 3.10 with one traceback between them, all of it `serve.py:26`.
+#
+# PARSED, NOT IMPORTED. These are scripts with side effects; `ast` reads their imports
+# without running them. And only TOP-LEVEL `Import`/`ImportFrom` nodes count, which is not
+# a shortcut — an import inside a `try:` is a node of a `Try`, so the AST structure itself
+# encodes "guarded, and allowed to be absent" exactly as the author meant it.
+import ast  # noqa: E402
+
+_script_bad = []
+for _fn in sorted(f for f in os.listdir(ROOT) if f.endswith(".py")):
+    try:
+        with open(os.path.join(ROOT, _fn), encoding="utf-8") as _f:
+            _tree = ast.parse(_f.read())
+    except Exception as _exc:                                   # noqa: BLE001
+        _script_bad.append("%s -> unparseable: %s" % (_fn, _exc))
+        continue
+    for _node in _tree.body:                                    # top level ONLY
+        _wanted = []
+        if isinstance(_node, ast.Import):
+            _wanted = [a.name for a in _node.names]
+        elif isinstance(_node, ast.ImportFrom) and _node.level == 0 and _node.module:
+            _wanted = [_node.module]
+        for _m in _wanted:
+            _top = _m.split(".")[0]
+            if _top in OPTIONAL and not have(_top):
+                continue                                        # a declared extra may be absent
+            if not have(_top):
+                _script_bad.append("%s -> %s" % (_fn, _m))
+
+check("every unguarded top-level import in a root script resolves",
+      not _script_bad, _script_bad[:6])
+
+# ── AND CI TESTS THE FLOOR, WHICH IS THE VERSION A CLAIM CAN BE WRONG ABOUT ───────────
+# The floor is the version nobody develops on, so it is the one a declaration can be false
+# about for months. It was: `requires-python` said 3.10 and nothing that ran could import
+# the launcher there. The matrix DID list 3.10 — and the suite never reached it, which is
+# the other half of the same story (see this gate's header). Holding the two files to each
+# other makes "we support X" and "we test X" one statement instead of two.
+_floor, _matrix = "", []
+try:
+    with open(os.path.join(ROOT, "kairos-export", "pyproject.toml"), encoding="utf-8") as _f:
+        _m = re.search(r'requires-python\s*=\s*"[^0-9]*([0-9]+\.[0-9]+)"', _f.read())
+        _floor = _m.group(1) if _m else ""
+    with open(os.path.join(ROOT, "kairos-export", "gates.yml"), encoding="utf-8") as _f:
+        _m = re.search(r'^\s*python:\s*\[([^\]]*)\]', _f.read(), re.M)
+        _matrix = re.findall(r'"([0-9]+\.[0-9]+)"', _m.group(1)) if _m else []
+except OSError:
+    pass
+
+if _floor and _matrix:
+    check("CI tests the Python floor the packaging declares",
+          _floor in _matrix, "requires-python >=%s, matrix %s" % (_floor, _matrix))
+    check("...and the floor is the LOWEST version in the matrix",
+          min(_matrix, key=lambda v: tuple(int(x) for x in v.split("."))) == _floor,
+          "requires-python >=%s, matrix %s" % (_floor, _matrix))
+else:
+    print("  --   the floor/matrix pair (no kairos-export/ here)")
 
 # WITH THE EXTRAS INSTALLED THERE IS NO EXCUSE AT ALL. On the operator's machine and in
 # the full CI job this is the strict form of the same rule, and it is the leg that catches

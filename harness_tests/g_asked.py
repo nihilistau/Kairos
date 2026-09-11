@@ -106,6 +106,39 @@ M.remember("My name is Kairos.", source="self")
 M.remember("I am a woman", source="self")
 M.set_author("user")
 
+# ── THE ORDER BETWEEN TWO OF HER OWN ROWS WAS LEFT TO THE CLOCK (2026-09-11) ──────────
+# `row["ts"]` has ONE-SECOND resolution, and section 4's "what is your name?" reaches both
+# of these through route two (the lane top-up), whose order is recency — `_select` sorts it
+# by `ts` descending. Written back to back they share a second, the sort is stable, and the
+# first one written wins. When the clock happens to tick between the two writes they are
+# genuinely a second apart and the LAST one wins, so the answer becomes "I am a woman" and
+# the leg goes red. PROVEN by forcing it: identical store, identical question, and the two
+# scores (1.121 / 1.046) simply trade rows —
+#
+#     back to back      -> 'My name is Kairos.'  1.121
+#     1.2 s apart       -> 'I am a woman'         1.121
+#
+# It is rare (it needs the boundary to fall inside two adjacent writes) and it is real: it
+# went red once in a loaded sweep and once in three solo runs, then passed 24 times running.
+# This is NOT what the section tests. Section 4 is about OWNERSHIP — asked about her, she
+# answers with herself and not with the cat — and both rows satisfy that; only the narrower
+# "...and it is the NAME row" leg turns on which of her two lines is newer.
+#
+# So the timestamps are pinned rather than left to the scheduler. This supplies no
+# precondition for the rule under test: every row still went in through the real
+# `remember()`, with its real admission, dedupe and supersede, and the only thing fixed here
+# is a fact about WHEN, which the store records at a resolution too coarse to distinguish
+# two writes in one conversation. A gate whose verdict depends on where a second boundary
+# fell is measuring the scheduler.
+_pin = {"I am a woman": "2026-07-01T10:00:00Z",          # she said this first
+        "My name is Kairos.": "2026-07-01T10:00:05Z"}   # ...and her name after it
+_rows = M._load()
+for _r in _rows:
+    _t = (_r.get("text") or "").strip()
+    if _t in _pin:
+        _r["ts"] = _r["last_seen"] = _r["first_seen"] = _pin[_t]
+M._save_all(_rows)
+
 
 # ── 1. THE PACKAGING IS NOT THE CLAIM ────────────────────────────────────────────────
 print("\n1. a fact wearing an imperative is stored as the fact")

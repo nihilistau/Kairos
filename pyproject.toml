@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kairos-companion"
-version = "0.8.21"   # keep in step with CHANGELOG.md — it read 0.1.0 through
+version = "0.8.22"   # keep in step with CHANGELOG.md — it read 0.1.0 through
                     # two releases (fixed 2026-08-25), then sat at 0.8.4 through
                     # 0.8.5 (fixed 2026-08-29): this comment is the tripwire
 description = "A local-first AI companion framework: durable, auditable memory that never deletes, unprompted speech with reasons, a room UI — against any OpenAI-compatible endpoint on one consumer GPU."
@@ -13,7 +13,16 @@ readme = "README.md"
 # control is CREATE_NO_WINDOW/taskkill/powershell and crashes uncaught on
 # POSIX. The harness itself is portable; the launcher is not, yet.
 classifiers = ["Operating System :: Microsoft :: Windows"]
-requires-python = ">=3.10"
+# 3.11, NOT 3.10 (2026-09-11). `serve.py` — the one door every adopter is told to
+# run — has imported `tomllib` since it learned to read a profile, and tomllib is
+# 3.11+. The declared floor was therefore never true: on 3.10 the launcher died at
+# import, before doing anything. Found when the public CI finally reached the gate
+# suite and three gates went red on 3.10 with one traceback between them. The rule
+# is the same one the `media` extra above was added for — the packaging may not
+# claim what the code cannot keep — so the declaration moves to meet the code
+# rather than the other way round. Widening back to 3.10 is a real option and a
+# separate decision: it costs a `tomli` dependency on the core path.
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "nihilistau" }]
 keywords = ["companion", "agent", "memory", "local-first", "llm", "openai-compatible", "lm-studio", "llama-cpp", "mcp"]

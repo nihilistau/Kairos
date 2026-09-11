@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.8.22 — the declared Python floor was never true: 3.11 is the minimum (2026-09-11)
+
+**BREAKING, in the sense that it stops being a lie: the minimum supported Python is now
+3.11.** If you are on 3.10 this package never worked — `serve.py`, the one command the
+README gives you, has imported `tomllib` (3.11+) since it learned to read a profile, so the
+launcher died at import on the floor `requires-python` advertised.
+
+It surfaced as three CI gates red on 3.10 and green on 3.12, with one traceback between
+them. `g_backend_seam` was only involved because it imports `serve.py`.
+
+Same class as the `media` extra in 0.8.19: *the packaging may not claim what the code cannot
+keep*. The declaration moves to meet the code rather than the other way round, and the CI
+matrix becomes `["3.11", "3.12"]`. Widening back to 3.10 is a real option and a separate
+decision — it costs a `tomli` dependency on the core path, which is why it is not smuggled
+in here. **If you need 3.10, say so and it can be done properly.**
+
+### `G-IMPORTS` grows the two legs that would have caught it
+
+The census walked `harness/` and stopped, so the launcher was covered by nothing.
+
+* **root scripts are parsed, not imported** — `ast` reads their top-level imports without
+  executing them, and only top-level `Import`/`ImportFrom` nodes count. An import inside a
+  `try:` is a node of a `Try`, so the AST structure itself encodes "guarded, and allowed to
+  be absent". Verified with a control: the same bad import, guarded, is not flagged.
+* **CI must test the floor the packaging declares**, and it must be the lowest version in
+  the matrix. The floor is the version nobody develops on, which is exactly why a claim can
+  be false about it for months.
+
+Run on Python 3.10 the gate now tells you `serve.py -> tomllib` instead of letting the
+launcher crash.
+
+### `g_asked` was flaky for a reason worth knowing
+
+`row["ts"]` has one-second resolution, and the lane top-up orders by recency. Two rows
+written back to back share a second and sort stably; if the clock ticks between them they
+are a second apart and the order flips. Forced on an identical store and question, the two
+scores simply trade rows. The affected gate's seeded timestamps are pinned now — but the
+underlying fact is worth knowing if you rank on recency: **the store cannot distinguish two
+writes inside one second.**
+
 ## 0.8.21 — two gates were measuring the machine, not the store (2026-09-11)
 
 The Linux CI reds that were *not* the row-identity bug. Both are instrument defects, both
