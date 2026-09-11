@@ -102,8 +102,41 @@ ALLOWED_ORPHANS = {
 # missing while its own knob is ON is still a failure, and still caught.
 armed_off = {name for name, f in M.FACTS.items()
              if getattr(f, "arms", None) and os.environ.get(f.arms, "0") != "1"}
-stale = sorted(set(d["orphan_rows"]) - ALLOWED_ORPHANS - armed_off)
+
+# ── AND A PROVIDER'S OWN PRECONDITION IS NOT AN ENV KNOB (2026-09-11) ─────────────────
+# The music tools register only when a music library actually EXISTS on disk
+# (`music.music_tools`: *"Absent unless a library actually exists — a tool that always
+# answers 'no music' is worse than one that is not there, because she keeps reaching."*).
+# On the operator's box `~/Music` is there and they register; on a CI runner it is not, so
+# all five rows read as documentation for tools that do not exist and this leg convicted
+# them. It surfaced the first time this suite ran on Linux.
+#
+# `arms="SP_MUSIC"` would be the WRONG fix and the tempting one. `armed_off` excuses a row
+# when its knob is not "1", and `SP_MUSIC` DEFAULTS ON (`os.environ.get("SP_MUSIC", "1")`)
+# — so an unset SP_MUSIC means the deck is armed and the LIBRARY is missing. The row would
+# then be excused for a reason that is not the true one, which is a green bought with a
+# false statement.
+#
+# So the gate asks the PROVIDER, which is the only thing that knows its own precondition,
+# and derives the names from `_specs()` rather than keeping a second copy of them here —
+# the same argument the `armed_off` comment above makes about hand-listed excuses.
+absent_by_provider = set()
+try:
+    from harness.skills import music as _music
+    if not _music.music_tools():
+        absent_by_provider = {getattr(s, "name", "") for s in _music._specs()}
+        _omit("the music deck in the enumerated surface",
+              "no music library at %s" % _music.DIR)
+except Exception as _exc:                                    # noqa: BLE001
+    print("  --   could not ask the music provider (%s)" % _exc)
+
+stale = sorted(set(d["orphan_rows"]) - ALLOWED_ORPHANS - armed_off - absent_by_provider)
 ok(not stale, "no manifest row describes a tool that does not exist", stale)
+# AND THE EXCUSE IS NOT A BLANKET ONE: whatever the provider DOES offer must still be
+# documented, so a row deleted while its tool lives is still caught.
+ok(not (absent_by_provider & {r["name"] for r in d["tools"]}),
+   "...and a provider that declines its tools really offers none of them",
+   sorted(absent_by_provider & {r["name"] for r in d["tools"]}))
 
 print("\n4. the dangerous things are LABELLED as dangerous")
 risk_of = {r["name"]: r["risk"] for r in d["tools"]}

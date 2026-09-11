@@ -204,15 +204,37 @@ def _reader():
 _rt = [threading.Thread(target=_reader, daemon=True) for _ in range(3)]
 for _t in _rt:
     _t.start()
-for _ in range(40):
+
+# ── THE WRITER STOPS WHEN THE READERS HAVE LOOKED, NOT AFTER A FIXED COUNT ────────────
+# (2026-09-11, the public tree's first Linux CI run.) This was a flat `for _ in range(40)`
+# and the leg below demanded >= 100 reads to prove the readers were really racing. That is
+# a fixed count resting on an assumption about how long forty writes take: on Windows they
+# take long enough for three 1 ms pollers to get past 100, and on Linux the whole loop
+# finishes in ~20 ms and the readers managed **54**. The gate then reported a failure of
+# the STORE for what was a property of the machine.
+#
+# A bigger number would have been the same bug with a bigger constant, and a `sleep()`
+# between writes would make the test weaker exactly where a fast machine makes it
+# interesting. So the writer now runs until BOTH conditions hold — at least the original
+# forty rewrites, and enough reads to mean something — with a wall-clock cap so a reader
+# thread that never got scheduled fails the leg instead of hanging it.
+_WRITES_MIN, _READS_MIN, _CAP_S = 40, 200, 20.0
+_t0 = time.time()
+_writes = 0
+while (_writes < _WRITES_MIN or _reads[0] < _READS_MIN) and time.time() - _t0 < _CAP_S:
     WD._write_wants(_rows)
+    _writes += 1
 _stop2.set()
 for _t in _rt:
     _t.join(timeout=5)
-check("forty rewrites, and no reader ever saw a torn want list",
-      not _seen_short, "short reads: %s of %d" % (sorted(set(_seen_short))[:6], _reads[0]))
-check("...and the readers were actually looking (>= 100 reads)",
-      _reads[0] >= 100, _reads[0])
+check("every rewrite, and no reader ever saw a torn want list",
+      not _seen_short, "short reads: %s of %d (%d rewrites)"
+      % (sorted(set(_seen_short))[:6], _reads[0], _writes))
+check("...the writer really rewrote it (>= %d times)" % _WRITES_MIN,
+      _writes >= _WRITES_MIN, _writes)
+check("...and the readers were actually looking (>= %d reads)" % _READS_MIN,
+      _reads[0] >= _READS_MIN, "%d reads in %.2fs over %d rewrites"
+      % (_reads[0], time.time() - _t0, _writes))
 # STRUCTURAL, for the pair by name — the behavioural leg above can only fail on a machine
 # where the threads happen to interleave, and "no reader saw it torn" is also what a gate
 # that never scheduled a reader would report.

@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.8.21 — two gates were measuring the machine, not the store (2026-09-11)
+
+The Linux CI reds that were *not* the row-identity bug. Both are instrument defects, both
+the same shape: **an assertion resting on an assumption about how fast the box is.** If you
+clone this repo and run the suite, these are the two that would have gone red on you for no
+fault of your tree.
+
+**`g_store_writes`** starts three 1 ms pollers, rewrites the want list forty times and
+demands `>= 100 reads` — the check that the readers were really racing the writer, because
+"no reader saw it torn" is also what a gate that never scheduled a reader would report. Good
+intent, fixed count: forty writes take long enough on Windows, and on Linux the loop
+finishes in ~20 ms and the readers managed 54. The writer now runs **until both conditions
+hold** — the original forty rewrites *and* enough reads to mean something — with a
+wall-clock cap so an unscheduled reader fails the leg instead of hanging it. It is a
+stronger test for it: the torn-write mutant now fails with 389 rewrites against 202 reads,
+where the old shape gave 40 against 54.
+
+**`g_tool_manifest`** convicted the five music rows as documentation for tools that do not
+exist. They exist — `music.music_tools()` declines to offer them unless a music library is
+actually on disk, which a CI runner has not got. `arms="SP_MUSIC"` would have been the
+tempting wrong fix: the excuse fires when a knob is not `"1"`, and **`SP_MUSIC` defaults
+on**, so an unset knob means the deck is armed and the *library* is missing — the row would
+have been excused for a reason that is not the true one. The gate asks the **provider**
+instead, and derives the tool names from it rather than keeping a copy. A second leg keeps
+the excuse narrow: whatever the provider does offer must still be documented, and a row for
+a genuinely deleted tool is still caught.
+
 ## 0.8.20 — a row's name was a millisecond, and tombstones landed on the wrong rows (2026-09-11)
 
 **Upgrade if you write memories faster than one per millisecond — which, on Linux, is
