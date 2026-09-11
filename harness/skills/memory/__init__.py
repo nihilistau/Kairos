@@ -150,7 +150,11 @@ from harness.skills.memory.store import (                      # noqa: E402,F401
     registry_stamp, invalidate_cache, _PARSE_CACHE, _PARSE_LOCK)
 from harness.skills.memory.mint import (                       # noqa: E402,F401
     _MINT_Q, _MINT_LOCK, _mint_is_async, _CAPTURE_REFUSED, capture_status,
-    eps_root, _mint_now, _mint_drain, _mint_later, mint_backlog, mint_drain_blocking)
+    eps_root, _mint_now, _mint_drain, _mint_later, mint_backlog, mint_drain_blocking,
+    # `mint_shutdown` is the one with a caller: `atexit`, installed when the worker starts.
+    # `mint_drain_blocking` is declared "gates and shutdown only" and has none in the tree —
+    # noted here rather than quietly re-exported beside a function that does.
+    mint_shutdown, _MINT_ATEXIT, _MINT_STOP, _MINT_JOIN_S)
 from harness.skills.memory.rank import (                       # noqa: E402,F401
     search_memories_ranked_rows, search_memories_ranked, _no_rare_word, _row_key,
     _alive, _IDF_CACHE, _idf_table, _evidence, _SURP_CACHE, _surprisal_of,

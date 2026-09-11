@@ -18,6 +18,7 @@ Extracted from `memory.py` on 2026-09-01, byte-identical.
 """
 from __future__ import annotations
 
+import atexit
 import json
 import logging
 import os
@@ -206,7 +207,15 @@ def _mint_drain():
     while True:
         item = _MINT_Q.get()
         try:
-            if item is None:
+            # THE FLAG IS CHECKED BEFORE THE ITEM, NOT ONLY VIA THE SENTINEL (2026-09-11).
+            # `put(None)` lands at the BACK of the queue, so a shutdown behind a backlog had
+            # to mint every pending episode before it could see the sentinel — measured at
+            # shutdown with 2 queued and a blackholed daemon, which is 120 s per item. The
+            # flag is read first, so a stop is felt at the next item rather than after the
+            # last one. What is left in the queue is ABANDONED on purpose: those rows stay
+            # `unminted`, which `verify_registry` already counts and reports, and a recorded
+            # backlog is strictly better than being killed mid-`_save_all`.
+            if item is None or _MINT_STOP.is_set():
                 return
             fact, out_dir = item
             daemon = os.environ.get("SP_DAEMON_URL", "http://127.0.0.1:3000")
@@ -240,13 +249,82 @@ def _mint_drain():
             _MINT_Q.task_done()
 
 
+# ── THE WORKER IS STOPPED ON PURPOSE, NOT KILLED BY THE INTERPRETER (2026-09-11) ───────
+# `_mint_drain` has always had a `None` sentinel that makes it return, and NOTHING EVER SENT
+# ONE. So every process that ever minted an episode exited with this thread still alive, and
+# CPython's finalization killed it wherever it happened to be — which can be inside
+# `urlopen`, or inside `_save_all` HOLDING `_REG_LOCK`, mid-write to her fact registry.
+#
+# WHAT POINTED HERE. The public CI has been failing intermittently with `exit=-11` (SIGSEGV)
+# since the suite first ran: a different gate each time, always AFTER that gate printed a
+# clean verdict, and with `PYTHONFAULTHANDLER=1` printing nothing — which places the fault
+# after faulthandler's own teardown, i.e. in interpreter finalization. Measured with an
+# atexit probe: all four gates that have crashed in CI leave `sp-mint` alive at exit, and
+# the gates that have never crashed leave no thread at all. The crashing population is
+# "gates that write memory", and which one dies is luck.
+#
+# HONEST ABOUT WHAT THIS IS. The correlation is 4/4 and the mechanism is textbook, but a
+# segfault in finalization is not something a gate can assert. What a gate CAN hold is the
+# property that makes it impossible — the worker is asked to stop and is joined — and that
+# is what G-MINT-SHUTDOWN grades. The proof of the crash itself is CI going quiet.
+#
+# The join is SHORT because the common case is the worker parked in `_MINT_Q.get()`, which
+# returns the instant the sentinel lands. It is not long enough for a capture already inside
+# `urlopen(timeout=120)`, and it deliberately is not: hanging her shutdown for two minutes to
+# close a race is a worse bug than the race. When it times out it says so, with the backlog
+# count, because "the thing we could not stop" is exactly what a later crash would need.
+_MINT_ATEXIT = [False]
+_MINT_JOIN_S = 5.0
+_MINT_STOP = threading.Event()
+
+
+def mint_shutdown(timeout: float = _MINT_JOIN_S) -> bool:
+    """Ask the mint worker to finish and wait for it. True if it stopped. Never raises.
+
+    Registered with `atexit` the first time a worker starts, and safe to call by hand from a
+    shutdown path. Idempotent: a worker that is already gone is an immediate True."""
+    w = _MINT_WORKER
+    if w is None or not w.is_alive():
+        return True
+    try:
+        _MINT_STOP.set()
+        _MINT_Q.put(None)
+        w.join(timeout)
+        if w.is_alive():
+            # The one case the flag cannot reach: a capture ALREADY inside
+            # `urlopen(timeout=120)`. A socket in flight cannot be interrupted from here, and
+            # hanging her shutdown for two minutes to close that window would be the worse
+            # bug. `g_capture_async` blackholes the daemon deliberately, so it is expected to
+            # print this — which is the point of printing it rather than exiting quietly.
+            _log.warning("[mint] worker still running after %.1fs at shutdown — %d episode(s) "
+                         "abandoned, and the one in flight cannot be interrupted. It is a "
+                         "daemon thread, so the interpreter will kill it wherever it is; if a "
+                         "crash follows this line, that is where.",
+                         timeout, _MINT_Q.qsize())
+            return False
+        return True
+    except Exception as _swx:
+        _sw(_log, "mint_shutdown", _swx, lane="skills")
+        return False
+
+
 def _mint_later(fact: str, out_dir: str) -> None:
     global _MINT_WORKER
     with _MINT_LOCK:
         if _MINT_WORKER is None or not _MINT_WORKER.is_alive():
+            # CLEARED BEFORE THE START, or a worker raised after a deliberate
+            # `mint_shutdown()` would read the stale flag and return on its first item —
+            # silently dropping every episode from then on. The flag means "the worker
+            # running right now should stop", not "minting is over".
+            _MINT_STOP.clear()
             _MINT_WORKER = threading.Thread(target=_mint_drain, name="sp-mint",
                                             daemon=True)
             _MINT_WORKER.start()
+            # Registered HERE, not at import: a process that never mints never installs a
+            # hook, and the flag keeps a restarted worker from stacking a second one.
+            if not _MINT_ATEXIT[0]:
+                atexit.register(mint_shutdown)
+                _MINT_ATEXIT[0] = True
     _MINT_Q.put((fact, out_dir))
 
 

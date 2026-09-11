@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.8.32 — the `exit=-11` in CI was a daemon thread nobody ever asked to stop (2026-09-11)
+
+**If you have been seeing `exit=-11` from the offline suite, this is it, and it was never
+your clone.** Since 0.8.26 these notes have carried an open question: a gate dying with
+SIGSEGV, a different one each time, always after it printed a clean verdict, with
+`PYTHONFAULTHANDLER=1` printing nothing. Timing and contention were both tried and both
+returned clean negatives — the suite ran at `-j 1`, nothing else running, and a gate
+segfaulted anyway.
+
+### The mechanism
+
+`PYTHONFAULTHANDLER` printing nothing was the clue rather than a dead end: faulthandler is
+torn down during **interpreter finalization**, so a fault past that point has nobody left to
+report it. Combined with "after the verdict" and "a different gate each time", that points at
+shutdown rather than at any gate. An `atexit` probe over the suite — atexit runs *before*
+daemon threads are killed, so it is the last moment the thread list means anything:
+
+    gates that HAVE crashed        4 of 4 leave `sp-mint` alive at exit
+    gates that have never crashed  4 of 5 leave no thread at all
+
+`_mint_drain` has always had a `None` sentinel that makes it return, and **nothing ever sent
+one**. So every process that minted an episode exited with that daemon thread still running,
+and CPython killed it wherever it happened to be — which can be inside `urlopen`, or inside
+`_save_all` **holding the registry lock, mid-write to the fact store.** The atomic
+tmp+replace is what stood between that and a damaged registry. The crashing population is
+"anything that writes memory"; which one dies is luck.
+
+### The fix
+
+`memory.mint_shutdown()` is registered with `atexit` the first time a worker starts — not at
+import, so a process that never mints carries no hook. It sets a stop flag, sends the
+sentinel, and joins with a bound.
+
+The flag is read **before each item** rather than only as a sentinel, because `put(None)`
+lands at the *back* of the queue: a shutdown behind a backlog previously had to mint every
+pending episode before it could see the sentinel. Queued work is now abandoned deliberately —
+those rows stay `unminted`, which `verify_registry()` already counts and prints, and a
+recorded backlog is strictly better than being killed mid-write.
+
+**What it does not fix, plainly:** a capture already inside `urlopen(timeout=120)` cannot be
+interrupted from another thread, and hanging shutdown for two minutes to close that window
+would be the worse bug. The contract is a bounded join and a loud line naming the backlog, so
+if a crash ever follows again, that line says where it was.
+
+**The honest limit:** a segfault in finalization is not something a test can assert. The
+correlation is 4/4 and the mechanism is textbook, but the proof is CI going quiet over the
+next several runs.
+
+`G-MINT-SHUTDOWN` (17/17) grades the property that makes it impossible — a process that
+minted reaches finalization with no worker alive — driven in a subprocess, because no run can
+observe its own exit. Three mutants, each red by name.
+
+Also noted: `mint_drain_blocking` is documented "gates and shutdown only" and has no callers
+anywhere in the tree.
+
 ## 0.8.31 — the day boundary is its own module, and the README answers "will it run?" (2026-09-11)
 
 ### `harness/server/day.py`
