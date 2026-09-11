@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.8.25 — the last CI red was the host's uptime (2026-09-11)
+
+`g_room_veto` was red in every CI job and green on a developer box, which is the shape of a
+gate measuring the machine rather than the rule.
+
+It fakes "he spoke N seconds ago" as `time.monotonic() - N`. **`monotonic()` is time since
+boot**, so a runner three minutes old reports ~180 and the largest age the gate fakes (840 s)
+lands at about −660. `body._seconds_since_he_spoke` treats `last_user_at <= 0.0` as "nothing
+can say", so the faked turn read as no session at all and nothing vetoed.
+
+The product guard is right and untouched: a real `last_user_at` is a monotonic reading taken
+at an actual turn, always positive and never near the sentinel. Only a test subtracting from
+the clock can manufacture a negative. The gate owns the clock now.
+
+**If you write a gate that fakes a past event against `monotonic()`, it will do this to you
+on a fresh machine.** The gate carries a short recipe for running any gate under a clock that
+lies about uptime, so this class is reproducible on demand instead of on your CI's
+scheduling. Measured with it: patch removed at 180 s uptime is the CI failure verbatim; patch
+removed at 20,000 s passes, which is why nobody saw it locally.
+
 ## 0.8.24 — a bridged tool was Windows-only, and Pillow was undeclared (2026-09-11)
 
 The three gates that skip in a bare install and had never executed anywhere until the `all`

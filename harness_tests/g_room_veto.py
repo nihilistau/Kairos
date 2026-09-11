@@ -68,6 +68,49 @@ def _state():
     return cand[0]()
 
 
+# ── THE FAKE TURN UNDERFLOWED A FRESHLY BOOTED MACHINE (2026-09-11) ──────────────────
+# `spoke()` fakes "he spoke N seconds ago" as `time.monotonic() - N`, which is the only
+# arithmetic that can mean that against a monotonic clock. On Linux `monotonic()` is time
+# SINCE BOOT, so on a CI runner that has been up three minutes the largest age this gate
+# fakes — `ROOM_VETO_S - 60`, i.e. 840 s — comes out at about **-660**. And
+# `body._seconds_since_he_spoke` reads:
+#
+#     last = max((st.last_user_at for st in _ks._STATE.values()), default=0.0)
+#     if last <= 0.0:
+#         return None            # <- 0.0 is the "nothing can say" sentinel
+#
+# ...so the faked turn read as NO SESSION, nothing vetoed, and "just inside the window
+# vetoes" went red. Red in all four CI jobs and green on this box, whose uptime happened to
+# be 11,470 s. On an even younger runner the 120 s case went too ("it reports roughly two
+# minutes -> None"), which is the same failure one check earlier.
+#
+# THE PRODUCT GUARD IS CORRECT AND IS NOT TOUCHED. A real `last_user_at` is a monotonic
+# reading taken at an actual turn, so it is always positive and never near the sentinel;
+# only a test subtracting from the clock can manufacture a negative. The defect is that
+# the gate's verdict depended on the host's uptime.
+#
+# So the gate OWNS THE CLOCK, the same way it already owns the store two blocks down. A
+# large base makes every age this gate fakes representable on any machine, and the offset
+# is applied to the real reading rather than frozen, so elapsed time still moves normally.
+#
+# REPRODUCIBLE ON ANY BOX, which is the point — a failure that needs GitHub's scheduling to
+# appear is one nobody can work on. Wrap the run in a clock that lies about uptime:
+#
+#     import runpy, sys, time
+#     _real = time.monotonic; _t0 = _real()
+#     time.monotonic = lambda: 180.0 + (_real() - _t0)     # a three-minute-old machine
+#     sys.path[:0] = ["harness_tests", "."]
+#     runpy.run_path("harness_tests/g_room_veto.py", run_name="__main__")
+#
+# MEASURED with exactly that: patch removed + 180 s -> "just inside the window vetoes" red,
+# the CI failure verbatim; patch removed + 20,000 s -> 21/21, which is why this box never
+# saw it; patch present + 180 s -> 21/21.
+_MONO_REAL = time.monotonic
+_MONO_BASE = 10_000_000.0          # far above any age this gate fakes
+_MONO_T0 = _MONO_REAL()
+time.monotonic = lambda: _MONO_BASE + (_MONO_REAL() - _MONO_T0)
+
+
 def spoke(seconds_ago):
     """Put a session in the scheduler as if he spoke `seconds_ago`. None clears it."""
     with ks._LOCK:
