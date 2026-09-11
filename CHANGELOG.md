@@ -45,8 +45,11 @@ would be the worse bug. The contract is a bounded join and a loud line naming th
 if a crash ever follows again, that line says where it was.
 
 **The honest limit:** a segfault in finalization is not something a test can assert. The
-correlation is 4/4 and the mechanism is textbook, but the proof is CI going quiet over the
-next several runs.
+correlation is 4/4 and the mechanism is textbook, but the proof can only be CI going quiet —
+and it did. **Four consecutive runs after the fix, 8 of 8 `bare` jobs green**, against the run
+immediately before, where 2 of 2 `bare` jobs died with `exit=-11` on two different gates.
+Every previous round had produced at least one. An intermittent fault can always be hiding at
+a lower rate, but this is the first time the suite has been green end to end on that runner.
 
 `G-MINT-SHUTDOWN` (17/17) grades the property that makes it impossible — a process that
 minted reaches finalization with no worker alive — driven in a subprocess, because no run can
