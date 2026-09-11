@@ -30,6 +30,13 @@ import cycle.
 
 So `_settle_turn` still calls `_append_day_turn` across a module edge. That is a real cost
 of stopping here rather than pretending the day boundary was part of this stage.
+
+**PAID, 2026-09-11 (Stage 4).** The day boundary is `harness/server/day.py` now — the whole
+seam, 19 functions, moved as one because it is one: appended to as a record, read back as
+history, consolidated and seeded at the boundary. The shim below still exists and is still
+lazy (day.py imports THIS module at module level, so the reverse must stay a call-time
+reach), but it crosses to the module that OWNS the record rather than into the gateway.
+`_session_transcript` is unchanged and still app.py's.
 """
 from __future__ import annotations
 
@@ -54,9 +61,11 @@ _MOOD_ROW = _state.MOOD_ROW
 # import back would be a cycle. This is the same shape panels.py uses and the same shape
 # `harness/skills/wardrobe.py` has always used to reach `_room_session`.
 def _append_day_turn(*a, **k):
-    """app.py's — the day boundary is a separate seam with its own other caller."""
-    from harness.server import app as _app
-    return _app._append_day_turn(*a, **k)
+    """day.py's — the day boundary is a separate seam with its own other caller, and as of
+    Stage 4 (2026-09-11) it is a separate MODULE. This used to reach into app.py, which was
+    the cost this file's header named; it now reaches the module that owns the record."""
+    from harness.server import day as _day
+    return _day._append_day_turn(*a, **k)
 
 
 def _session_transcript(*a, **k):

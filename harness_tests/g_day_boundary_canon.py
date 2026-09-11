@@ -282,12 +282,22 @@ _chars6 = sum(len(m.get("content") or "") for m in _canon6)
 check("§6 ...and it is BOUNDED — reaching back is not licence to prefill the week",
       _chars6 < 8000, "canon is %d chars across %d messages" % (_chars6, len(_canon6)))
 
+# ── THE MUTANTS PATCH day.py, NOT app.py (2026-09-11, Stage 4) ───────────────────
+# `_seed_kairos_from_day`, `run_consolidation` and the five selectors they call moved to
+# `harness/server/day.py`, so those call sites resolve `day.<name>`. app.py re-exports all
+# of them, so every READ above still works through `app.` — but a monkeypatch is not a
+# read: rebinding `app._continuable_history` would have left the alias in day.py pointing
+# at the real function, the mutant would have changed nothing, and the check would have
+# gone green while proving the opposite of what it says. G-TURN-EPILOGUE §10 asserts
+# `app.X is day.X` for these, which is what keeps the reads honest.
+from harness.server import day as _day  # noqa: E402
+
 # ── §6 mutant A: the boot path must go THROUGH the reach-back door ────────────────
 # The defect was not that the door was missing — it was that only one of the two callers
 # used it. So the mutant narrows the door and the BOOT leg must go red.
-_real_reach = app._continuable_history
+_real_reach = _day._continuable_history
 try:
-    app._continuable_history = lambda keep=8, days=14, solo_keep=6: (
+    _day._continuable_history = lambda keep=8, days=14, solo_keep=6: (
         app._chat_from_rows(app._recent_transcript(), keep=keep), "")
     with KS._LOCK:
         KS._LAST.clear(); KS._SEEDED.clear(); KS._OWN_TIME_ONLY.clear()
@@ -297,12 +307,12 @@ try:
           "door is load-bearing on the BOOT path", not app._seed_kairos_from_day(),
           "seeded anyway: _LAST=%r" % (list(KS._LAST),))
 finally:
-    app._continuable_history = _real_reach
+    _day._continuable_history = _real_reach
 
 # ── §6 mutant B: without the raw-row bound, the canon is a prefill bomb ───────────
-_real_tail = app._from_his_last_turn
+_real_tail = _day._from_his_last_turn
 try:
-    app._from_his_last_turn = lambda rows, solo_keep=6: list(rows)
+    _day._from_his_last_turn = lambda rows, solo_keep=6: list(rows)
     with KS._LOCK:
         KS._LAST.clear(); KS._SEEDED.clear(); KS._OWN_TIME_ONLY.clear()
         KS._STATE.clear(); KS._TIMERS.clear()
@@ -313,7 +323,7 @@ try:
           "what makes reaching back safe", _mchars >= 8000,
           "canon only %d chars, so the ceiling leg proves nothing" % _mchars)
 finally:
-    app._from_his_last_turn = _real_tail
+    _day._from_his_last_turn = _real_tail
 
 # leave the tree as §mutant below expects it: today is her solos, yesterday is DAY
 with open(_yp, "w", encoding="utf-8") as f:
@@ -326,15 +336,15 @@ app._CHAT_SESSIONS.clear()
 app._seed_kairos_from_day()
 
 # ── §mutant: without the re-seed, §3 goes red by name ──────────────────────────────
-_real_reseed = app._reseed_own_time_canon
+_real_reseed = _day._reseed_own_time_canon
 try:
-    app._reseed_own_time_canon = lambda: 0
+    _day._reseed_own_time_canon = lambda: 0
     write_day(DAY)
     app.run_consolidation(force=True)
     check("mutant(no re-seed): the canon is gone and she would hold — §3 is "
           "load-bearing", not app._longest_session(),
           "canon survived: %r" % (list(app._CHAT_SESSIONS),))
 finally:
-    app._reseed_own_time_canon = _real_reseed
+    _day._reseed_own_time_canon = _real_reseed
 
 finish("G-DAY-BOUNDARY-CANON")

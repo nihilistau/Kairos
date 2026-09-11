@@ -106,17 +106,27 @@ print("\n3. no session_id is required — the ROOM's path")
 # nothing for it; the durable write must not depend on that bookkeeping.
 check("_CHAT_SESSIONS is empty and the day is still four turns long",
       not A._CHAT_SESSIONS and len(A._longest_transcript()) == 4)
-src = _srcmod.pkg("harness", "server")
-# The claim is structural, so assert the structure and not a proxy for it: the durable
-# writer takes no session of any kind, so no client's optional bookkeeping can gate it.
-_sig = src[src.index("def _append_day_turn("):]
-_sig = _sig[:_sig.index(")")]
+src = _srcmod.pkg("harness", "server")     # package-scoped; §5 below still asks it things
+# ── ASKED OF THE OBJECTS, NOT OF A TEXT WINDOW (2026-09-11, Stage 4) ────────────────
+# Both of these used to slice `pkg("harness","server")` between literal markers, and the
+# day-boundary extraction broke them in the two ways G-SRC-TRAP names:
+#
+#   * the signature slice took the FIRST `def _append_day_turn(` in the concatenated
+#     package — which, once turn.py grew a `def _append_day_turn(*a, **k)` shim, could be
+#     the shim rather than the writer. It would have gone on passing while grading a
+#     forwarder, because `*a, **k` contains no "session" either. Wrong subject, green.
+#   * the body slice ran from `def _session_transcript(` to the next `\ndef `, so it
+#     depended on WHAT HAPPENS TO SIT AFTER that function. Stage 4 put app.py's day-boundary
+#     re-export block there, the window swallowed `_append_day_turn = _day._append_day_turn`,
+#     and an ASSIGNMENT read as a call. Wrong subject, red.
+#
+# `body()` is `inspect.getsource` on the resolved object, so both now ask the function the
+# claim is about and neither can be moved into being wrong.
 check("the durable writer takes no session argument at all",
-      "session" not in _sig, _sig)
-_body = src[src.index("def _session_transcript("):]
-_body = _body[:_body.index("\ndef ", 1)]
+      "session" not in _srcmod.body(A._append_day_turn).split(")")[0],
+      _srcmod.body(A._append_day_turn).split(")")[0])
 check("...and it is not called from the session-keyed store, which the room never fills",
-      "_append_day_turn" not in _body)
+      "_append_day_turn" not in _srcmod.body(A._session_transcript))
 
 print("\n4. DISK WINS over the in-memory copy")
 A._CHAT_SESSIONS["stale"] = [{"role": "user", "content": "one lonely turn"}]

@@ -62,6 +62,37 @@ and **[`LFM2.5-Embedding-350M-GGUF`](https://hf.co/LiquidAI/LFM2.5-Embedding-350
 CPU librarians (off by default). **[`Voxtral-Mini-4B-Realtime-2602`](https://hf.co/mistralai/Voxtral-Mini-4B-Realtime-2602)**
 if you want to talk to her out loud.
 
+### Will it run on my card?
+
+The reference machine is **one RTX 2060, 12 GB** — deliberately, because the interesting
+question is not whether a companion runs on an H100. Gemma-4-26B-A4B is a mixture of 128
+experts with top-8 routing, so **~4B parameters are active per token** out of 26B, and about
+10.6 GB streams from host memory onto the card. A *dense* 31B on the same hardware would
+cross 8–9 GB of PCIe every token for a 3–5 tok/s ceiling; the sparsity is the whole reason
+this is a conversation and not a batch job.
+
+Measured on that card, with the optional Rust + CUDA engine, before and after the work that
+made it liveable:
+
+| | before | after |
+|---|---|---|
+| prefill (expert-major) | 230 ms/tok | **8 ms/tok** |
+| decode (resident hot-expert cache) | ~6 tok/s | **23.8 tok/s** |
+| cold prefill, live gateway | 209 s | **25.5 s** |
+| warm prefill | 25.5 s | **~1.0 s** |
+| prewarm, 2,922 tok | 689 s | **29 s** |
+
+The one worth reading is the cache row: **33.4% of experts resident buys ~4×**, because MoE
+routing is skewed — capacity share is not hit rate.
+
+**Those are sp-daemon numbers, not a promise about your setup.** Kairos is engine-agnostic
+and most people will point it at LM Studio, `llama-server` or vLLM, where throughput is that
+server's business and not this framework's. What carries over is the shape of the problem:
+pick a sparse model, expect the first turn after a cold start to cost real seconds of
+prefill, and expect a dense model of the same total size to be much worse. The harness is
+built around those facts — the warm gate, the prefill budget and the unprompted loop's
+metering all exist because of them.
+
 ### She comes with a face
 
 `assets/avatar-default/` ships one outfit across all seven of the faces her `[MOOD:]` marks reach,
@@ -164,6 +195,32 @@ and what the hardware will and will not give you: [`docs/TELEMETRY.md`](docs/TEL
 > scope it with a firewall rule. That second one is a real decision about who can reach her;
 > `python tools/lan_bind.py --status` tells you whether your scoping is actually in place.
 
+## Where this sits, and what it is not
+
+There is a lot of good software next to this one and most of it is solving a different
+problem. The honest way to place Kairos is by the decisions it makes differently, not by a
+feature count — so this compares **stances**, and says what each stance costs.
+
+| | a chat front-end<br>(LM Studio, Open WebUI, SillyTavern) | an agent/memory framework<br>(LangChain, Letta/MemGPT, mem0) | **Kairos** |
+|---|---|---|---|
+| **what memory IS** | the conversation, plus what you paste | retrieved context — usually a vector store, often summarised forward | an **append-only ledger of facts**, each with speaker, source, time and status; the transcript is a separate durable record |
+| **forgetting** | delete a chat, it is gone | eviction, summarisation, re-embedding; the original is usually not kept | **tombstoned, never dropped.** `forget` retires a row and `provenance` still answers about it |
+| **who said it** | roles in a transcript | usually flattened at ingest | a first-class column, and an **inference may never retire an observation** — enforced by a committed verdict table, not a convention |
+| **speaking first** | never; you send, it replies | on a schedule or a trigger you write | a **named-reason idle loop** — continue, check-in, remind, solo, muse, presence modes — SILENT by default, every bound checked before the model is consulted |
+| **identity** | a system prompt you edit | a prompt plus tools | persona, traits curated **from evidence**, wardrobe and mood marks she emits and that actually move state |
+| **what proves it** | manual testing | unit tests | ~180 offline gates, each a named claim with a receipt, most with a mutant proving the check is load-bearing |
+
+**What it is not.** Not a model server — bring your own endpoint. Not a RAG framework for
+your documents; the memory here is about a *person*, and pointing it at a corpus is not what
+any of it was tuned for. Not multi-user: one companion, one person, loopback by default. Not
+a product — it is a working system with its reasoning written down, and the reasoning is
+most of the value.
+
+**The cost of these stances, stated plainly.** An append-only ledger grows and needs
+hygiene passes. A companion that speaks first can speak when you would rather it did not,
+which is why every bound is a knob and the default is silence. And a gate culture this dense
+is slow to change — that is the trade, and it is deliberate.
+
 ## What works, and what the custom engine adds
 
 Everything here runs engine-agnostically: memory with tombstones and verdicts, the recall seam,
@@ -171,11 +228,21 @@ unprompted speech (remind / solo / muse / check-in), personality marks, the ward
 the voice (xAI Ara with expressive tags, or a local chain), the ambient eye's quiet guard, the
 room and all its panels, the gate culture (`harness_tests/`).
 
-The optional **sp-daemon** backend (the Rust + CUDA engine in the source repo) adds what a
-generic endpoint cannot give: the raw stop-vs-continue margin that drives her *continue* and
-*expand* impulses, byte-exact decoding, residual vision/audio frames (sight and voice-in),
-engine-side episode minting and L5 embeddings, the prefix warm gate. Without it those degrade
-with a stated loss — see `docs/BACKENDS.md` and `docs/OFF-BY-DEFAULT.md` §12.
+The optional **sp-daemon** backend adds what a generic endpoint cannot give: the raw
+stop-vs-continue margin that drives her *continue* and *expand* impulses, byte-exact
+decoding, residual vision/audio frames (sight and voice-in), engine-side episode minting and
+L5 embeddings, the prefix warm gate. Without it those degrade with a stated loss — see
+`docs/BACKENDS.md` and `docs/OFF-BY-DEFAULT.md` §12.
+
+That engine is public too: **[`kairos-engine`](https://github.com/nihilistau/kairos-engine)**
+— the Rust + CUDA daemon these numbers were measured on, with the MoE expert cache, the
+expert-major prefill and the KV ring. It is a separate repo because it is a separate
+decision: Kairos is complete without it, and you should only reach for it once a generic
+endpoint is the thing in your way.
+
+```bash
+git clone --recurse-submodules https://github.com/nihilistau/kairos-engine engine
+```
 
 ## Read next
 
@@ -188,6 +255,7 @@ with a stated loss — see `docs/BACKENDS.md` and `docs/OFF-BY-DEFAULT.md` §12.
 | what proves it still works | [`gates/GATE-INDEX.md`](gates/GATE-INDEX.md) |
 | what is deliberately off, and what would turn it on | [`docs/OFF-BY-DEFAULT.md`](docs/OFF-BY-DEFAULT.md) |
 | the room | [`ui/README.md`](ui/README.md) |
+| the optional Rust + CUDA engine, and what it adds | [`kairos-engine`](https://github.com/nihilistau/kairos-engine) |
 
 - [`docs/LANES.md`](docs/LANES.md) — **the six ways a fact reaches her**, and which one
   yours belongs in. Two of the six have already been measured wrong; the receipts are in
@@ -201,7 +269,7 @@ with a stated loss — see `docs/BACKENDS.md` and `docs/OFF-BY-DEFAULT.md` §12.
 python harness_tests/g_claim.py && python harness_tests/g_durability.py && python harness_tests/g_memory_lifecycle.py && python harness_tests/g_backend_seam.py && python harness_tests/g_docs_true.py
 ```
 
-Those four are OFFLINE. The LIVE gates read `SP_GATEWAY_URL` / `SP_BOOT_GATEWAY` (default
+Those five are OFFLINE. The LIVE gates read `SP_GATEWAY_URL` / `SP_BOOT_GATEWAY` (default
 `http://127.0.0.1:8800`; the companion profile serves `:8810`, so set it) — `g_kairos_boot.py` is
 the acceptance run, and `gates/KAIROS-BOOT-<date>.md` holds the receipts.
 

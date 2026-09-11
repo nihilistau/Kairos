@@ -251,8 +251,15 @@ finally:
     ks.note_user_turn(False)     # clean up what the mutant deliberately leaked
 
 # ── §mutant (2): unarmed, her remember() lands in HIS lane ─────────────────────────
-_real_arm = app._arm_self_turn
-app._arm_self_turn = lambda nudge: None
+# PATCHED ON day.py, NOT app.py (2026-09-11, Stage 4). The seed path — `_generate` inside
+# `_seed_kairos_from_day`, which `captured["g"]` is — moved to `harness/server/day.py`, so
+# it resolves `day._arm_self_turn`, and patching app.py's alias of the same object would
+# have reached nobody. The three bindings (turn.py owns it; app.py and day.py alias it) are
+# asserted identical in §10 for exactly this reason: an alias that has drifted is a mutant
+# that silently proves nothing.
+from harness.server import day as _daymod  # noqa: E402
+_real_arm = _daymod._arm_self_turn
+_daymod._arm_self_turn = lambda nudge: None
 OTHER_LINE = "I keep a diary of small storms, apparently."
 
 
@@ -265,7 +272,7 @@ _patch_stream(selfish_stream2)
 try:
     captured["g"]("(another nudge)")
 finally:
-    app._arm_self_turn = _real_arm
+    _daymod._arm_self_turn = _real_arm
 row2 = next((json.loads(x) for x in open(os.environ["SP_RECALL_REGISTRY"],
                                          encoding="utf-8")
              if "diary of small storms" in x), None)
@@ -332,15 +339,33 @@ for _n in ("_settle_turn", "_arm_turn", "_arm_self_turn", "_disarm_self_turn",
           getattr(app, _n) is getattr(_turnmod, _n),
           "app.%s and turn.%s have drifted apart" % (_n, _n))
 
+# ── STAGE 4 (2026-09-11): AND THE DAY BOUNDARY IS ITS OWN MODULE ────────────────────
+# Same claim, same shape, one seam further out. These nineteen were app.py's; `day.py` owns
+# them now and app.py re-exports, so `app.X is day.X` is what "moved, not copied" means
+# here — a re-export cannot fake it and a second definition would fail it.
+#
+# `_arm_self_turn` and `_disarm_self_turn` appear in BOTH loops on purpose: turn.py owns
+# them, and app.py and day.py each alias them for call sites they each still have (app.py
+# 855 and 2012, day.py 415). Three bindings of one object is exactly the arrangement that
+# makes a monkeypatch reach nobody, so the identity is asserted rather than assumed — the
+# §mutant above patches day.py's, and it is only load-bearing while these agree.
+for _n in ("_append_day_turn", "_seed_kairos_from_day", "_read_day_transcript",
+           "_continuable_history", "_chat_from_rows", "run_consolidation",
+           "_day_key", "_quiet_for", "start_consolidation_ticker",
+           "_arm_self_turn", "_disarm_self_turn"):
+    check("§10 %-26s is ONE object, in day.py" % _n,
+          getattr(app, _n) is getattr(_daymod, _n),
+          "app.%s and day.%s have drifted apart" % (_n, _n))
+
 # ── THE LATCH IS A ONE-SHOT, AND THAT IS WHAT MAKES NINE CALLERS SAFE ───────────────
 # Two callers may both believe they own the epilogue: the worker thread's `finally` and an
 # early-exit `return`. Whoever arrives first pays; the second must be a no-op. Driven,
 # because this is the property the nine call sites rely on and no amount of reading the
 # source establishes it.
 _paid = []
-_real_append = app._append_day_turn
+_real_append = _daymod._append_day_turn
 try:
-    app._append_day_turn = lambda *a, **k: _paid.append(a[:2])
+    _daymod._append_day_turn = lambda *a, **k: _paid.append(a[:2])
     _latch = {}
     _turnmod._settle_turn("his words", "her words", latch=_latch,
                           capture=False, close_his_turn=False, marks=False, stances=False)
@@ -349,13 +374,16 @@ try:
                           capture=False, close_his_turn=False, marks=False, stances=False)
     _second = len(_paid)
 finally:
-    app._append_day_turn = _real_append
+    _daymod._append_day_turn = _real_append
 check("§10 the first owner of the latch pays the debts", _first == 1, _first)
 check("§10 ...and the second is a no-op, however many callers believe they own it",
       _second == _first, "%d -> %d" % (_first, _second))
-# AND THE SHIM IS REAL: turn.py reached app.py's `_append_day_turn` across the module
-# edge, which is the one dependency Stage 3 deliberately left pointing backwards.
-check("§10 the day-row debt is paid through the shim into app.py",
+# AND THE SHIM IS REAL: turn.py reaches `_append_day_turn` across a module edge. Stage 3
+# left that dependency pointing BACKWARDS into app.py and said so in writing; Stage 4
+# (2026-09-11) moved the day boundary into `day.py`, so it now points at the module that
+# owns the record. Still a shim, still lazy — day.py imports turn.py at module level, so
+# the reverse has to be a call-time reach — but no longer a reach into the gateway.
+check("§10 the day-row debt is paid through the shim into day.py",
       _paid and _paid[0][0] == "his words", _paid[:1])
 
 finish("G-TURN-EPILOGUE")

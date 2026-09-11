@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.8.31 — the day boundary is its own module, and the README answers "will it run?" (2026-09-11)
+
+### `harness/server/day.py`
+
+Stage 4 of the app.py split. **Nineteen functions, 947 lines, byte-identical**, out of
+`app.py` (5,263 → 4,284 lines) and into a module named after what they do. It is one seam: a
+turn is appended to the day record, the record is read back as history by eight selectors,
+and at the boundary it is consolidated and seeded into the next day.
+
+Stage 3 had left `turn.py`'s `_settle_turn` reaching back into the gateway for
+`_append_day_turn` and said so in writing rather than hiding it. That shim now points at the
+module that owns the record.
+
+If you have subclassed or imported these out of `harness.server.app`, **nothing breaks** —
+app.py re-exports all nineteen, and `G-TURN-EPILOGUE` §10 asserts `app.X is day.X` so a
+re-export cannot drift into a second copy.
+
+**Worth knowing if you write gates against this tree:** four of ours went red, all one
+class — a `monkeypatch` on `app.X` no longer reaching a call site that resolves `day.X`. The
+patch still *succeeds*; it just reaches nobody. If you patch gateway internals in your own
+tests, patch the module the call site lives in.
+
+A fifth red was more interesting and is a general warning about source-scraping assertions.
+One check took **the first** `def _append_day_turn(` in the concatenated package text — which,
+once `turn.py` grew a `def _append_day_turn(*a, **k)` forwarder, could be the *shim*. It
+would have gone on passing while grading the wrong function. Another sliced a text window
+from one `def` to the next and swallowed the new re-export block, reading an **assignment as
+a call**. Both ask `_src.body()` of the resolved object now. Assert over objects, not over
+text windows whose neighbours can move.
+
+### The README says what hardware this was measured on
+
+New sections, because "can I run this?" and "how is this different?" were both fair questions
+the front page did not answer:
+
+- **Will it run on my card** — the reference machine is one **RTX 2060, 12 GB**, with the
+  measured prefill/decode table (8 ms/tok prefill, 23.8 tok/s decode, 25.5 s cold prefill,
+  ~1.0 s warm) and the MoE arithmetic that makes it possible: ~4B active of 26B, ~10.6 GB
+  streaming from host. Stated as **sp-daemon numbers, not a promise about your endpoint** —
+  throughput on LM Studio or `llama-server` is that server's business.
+- **Where this sits, and what it is not** — a stance-by-stance comparison against chat
+  front-ends and agent/memory frameworks (what memory *is*, what forgetting *means*, who said
+  it, speaking first, what proves it), each with the cost of that stance. Plus what Kairos is
+  explicitly not: a model server, a document-RAG framework, or multi-user.
+- The optional Rust + CUDA engine is now **linked from the front page**
+  ([`kairos-engine`](https://github.com/nihilistau/kairos-engine)) rather than only from
+  `docs/BACKENDS.md`.
+
+Also: the pre-flight block said "those four are OFFLINE" above a list of five.
+
 ## 0.8.30 — `coverage: 1.0` does not mean "findable" (2026-09-11)
 
 Two changes to `harness/skills/semindex.py`. The second is the one to read.

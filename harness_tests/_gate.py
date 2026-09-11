@@ -344,7 +344,7 @@ def seed_avatar() -> str:
 
 # ── A TURN A GATE DROVE IS NOT THEIR CONVERSATION (2026-08-27) ───────────────────────
 # The gateway already quarantines any chat request that DECLARES itself synthetic
-# (app.py: `body.get("synthetic")` -> `_append_day_turn(synthetic=...)`), and
+# (app.py: `body.get("synthetic")` -> day.py's `_append_day_turn(synthetic=...)`), and
 # `_read_day_transcript` then excludes it from the 04:00 consolidation. Nothing is
 # deleted; `include_synthetic=True` reads it back.
 #
