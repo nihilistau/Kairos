@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.35 — `gemm_f16` reaches the door (2026-09-12)
+
+`serve.py` maps `SP_G4_GEMM_F16` from `[decode].gemm_f16`, default 0.
+
+Another **upstream CUDA engine** selector that does nothing against an OpenAI-compatible
+endpoint, mapped for the same reason as the last two: a knob reachable only by raw `getenv`
+cannot be armed through the door, cannot be tested through it, and is invisible to every gate
+that reads the mapping.
+
+Upstream it is armed, and on a receipt: Turing sm_75 has tensor cores for fp16 and none for
+fp32, so that engine's weight GEMM was running on the fp32 pipes while the tensor cores idled.
+Dequantising Q4 to `__half` and calling `cublasGemmEx` with an fp32 accumulator gave ~1.26× on
+a 3,750-token prefill with byte-identical output text.
+
 ## 0.8.34 — one more engine knob reaches the door (2026-09-12)
 
 `serve.py` maps `SP_KV_PREFILL_DP4A` from `[decode].prefill_dp4a`, default false.

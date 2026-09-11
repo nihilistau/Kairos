@@ -849,6 +849,16 @@ def build_env(c: dict) -> dict:
         # only by raw getenv, so serve.py's strip made it impossible to arm THROUGH THE DOOR
         # and nothing recorded that it existed. G-ONEDOOR's rule is that an unmapped knob does
         # not exist — this is what that rule is for.
+        # SP_G4_GEMM_F16 — the weight GEMM on TENSOR CORES. Turing sm_75 has them for fp16
+        # and none for fp32, so cublasSgemm (volta_sgemm_128x64_tn, 24.2% of GPU time) runs
+        # on the fp32 pipes while the tensor cores idle. 1 dequants Q4 straight to __half and
+        # calls cublasGemmEx(CUDA_R_16F, ..., CUBLAS_COMPUTE_32F) — operands fp16, accumulator
+        # and output fp32. 2 is PARITY: both run, fp32 is served.
+        #
+        # The accumulator stays fp32 deliberately: the only precision change is in the
+        # operands, not in the sum over `in`. Measured relL2 4.5e-04 against the fp32 path,
+        # which is fp16 operand precision and nothing more.
+        "SP_G4_GEMM_F16": str(int(dec.get("gemm_f16", 0) or 0)),
         "SP_KV_PREFILL_DP4A": b(dec.get("prefill_dp4a", False)),
         "SP_MOE_TIMING": b(dec.get("moe_timing", False)),
         # SP_MOE_PIN_STAGE — expert staging through a pinned ring instead of a pageable
