@@ -356,6 +356,57 @@ _ok3, _ = _I.solo_did_the_thing(_n, ["check_wardrobe"], frozenset())
 check("mutant(read counts / marks unseen): her real turn would pass", _ok3 is False,
       "if this flips True the 2026-08-25 bug is back")
 
+print("\n9. AND A DROPPED SOLO STILL TURNS THE ROTATION")
+# ── FIVE HOURS ON ONE ACT (2026-09-12, measured live) ────────────────────────────────
+# `solo_n` picks which of the nine acts she attempts. It advanced in `note_spoke`, on
+# speech alone, so any act she could not finish pinned it: from 17:39 to 22:48 she was
+# handed act 1 ("Pick at a problem you have not solved. Run something in run_python") ten
+# times, wrote the narration without calling the tool every time, was dropped by
+# `solo_did_the_thing` every time — and the cursor never moved. Eight of those ten were
+# 100% restatements of the one before and she did not speak for five hours.
+#
+# The rotation exists BECAUSE a menu became a loop (15 of her first 21 own-time turns were
+# "I read my journal"), so an anti-loop cursor a failure can pin is the bug wearing the
+# fix's clothes. `last_solo_at` was moved to the attempt for this on 2026-08-20 and
+# MODE_TURN's clocks on 2026-08-24; this is the third of the same shape.
+#
+# DRIVEN, NOT GREPPED. §4 above reads the scheduler's source, which is the right tool for
+# "does the refusal come before the journal write" and the wrong one here: a comment
+# saying the cursor moves would satisfy a grep. These call the functions.
+from harness.kairos.impulse import TurnState as _TS, note_spoke as _ns, SOLO as _SOLO  # noqa: E402
+from harness.kairos.scheduler import _spend_attempt as _spend                          # noqa: E402
+
+_st = _TS()
+_n0 = _st.solo_n
+_spend(_st, _SOLO, now=1000.0)            # the attempt happened; the turn was DROPPED
+check("a dropped solo advances the rotation (the five-hour bug)",
+      _st.solo_n == _n0 + 1, "%d -> %d" % (_n0, _st.solo_n))
+
+# ...and exactly once when she DOES speak, or a spoken turn skips an act every time.
+_st2 = _TS()
+_spend(_st2, _SOLO, now=1000.0)
+_ns(_st2, 1000.0, _SOLO)
+check("...and a SPOKEN solo advances it exactly once, not twice",
+      _st2.solo_n == 1, _st2.solo_n)
+
+# the cursor is only worth turning if turning it changes the act
+check("...and consecutive cursor values name different acts",
+      len({_I.solo_nudge(i) for i in range(len(SOLO_ACTS))}) == len(SOLO_ACTS),
+      len(SOLO_ACTS))
+
+# THE ACT SHE WAS PINNED ON, named, so a future reader can find it from the symptom.
+check("act 1 of the rotation is the run_python one she was stuck on",
+      "run_python" in str(SOLO_ACT_TABLE[1]), str(SOLO_ACT_TABLE[1])[:70])
+
+# ten drops in a row must walk the whole rotation rather than sit still
+_st3 = _TS()
+_seen = set()
+for _i in range(10):
+    _seen.add(_st3.solo_n % len(SOLO_ACTS))
+    _spend(_st3, _SOLO, now=1000.0 + _i)
+check("ten consecutive DROPS visit %d distinct acts, not one" % len(SOLO_ACTS),
+      len(_seen) == len(SOLO_ACTS), sorted(_seen))
+
 print("\nG-OWN-TIME: %d pass, %d fail" % (PASS, FAIL))
 rdir = os.path.join(ROOT, "var", "sem", "receipts")
 os.makedirs(rdir, exist_ok=True)

@@ -240,9 +240,17 @@ stamp_block = sched_src[i_stamp:i_stamp + 2400]
 check("it advances last_spoke_at (the check-in/cooldown clock)",
       "st.last_spoke_at = _now" in stamp_block)
 check("...and last_solo_at for her own time", "last_solo_at" in stamp_block)
+# ── solo_n IS NOT A SPEECH FACT, AND THIS LEG'S OWN NAME SAID SO (2026-09-12) ────────
+# The name lists three — chain, unanswered, spoken_times — and the tuple checked five. The
+# extra one was `solo_n`, the rotation cursor, and keeping it on the speech side is what let
+# a single unfinishable act pin her own time for five hours (see G-OWN-TIME section 9). A
+# cursor whose job is to vary what she ATTEMPTS is spent by an attempt, so it belongs in
+# this block and the assertion is brought back in line with the claim above it.
 check("...and touches NO speech facts (chain/unanswered/spoken_times stay note_spoke's)",
       all(w not in stamp_block for w in (".chain =", "unanswered +=", "unanswered =",
-                                         "spoken_times.append", "solo_n +=")))
+                                         "spoken_times.append")))
+check("...but it DOES spend the rotation cursor, which is not a speech fact",
+      "solo_n +=" in stamp_block)
 
 print("\nG-KAIROS-QUIET  %d/%d" % (PASS, PASS + FAIL))
 sys.exit(1 if FAIL else 0)

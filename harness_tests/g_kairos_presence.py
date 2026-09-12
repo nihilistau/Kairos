@@ -245,11 +245,19 @@ check("the turn names ONE act, not a menu", len(SOLO_ACTS) >= 6, len(SOLO_ACTS))
 # instead of advancing, and kept landing on the same few acts. Measured over one night:
 # 10 of 24 own-time turns were "change what you are wearing", one act out of eight. Six
 # mentions of the silver nightie in an evening.
+# ── AND THE DRIVER IS THE ATTEMPT NOW (2026-09-12) ──────────────────────────────────
+# This drove `note_spoke`, because that is where the cursor used to advance. It moved to
+# `_spend_attempt` after a live five-hour loop: a dropped turn never reaches note_spoke, so
+# an act she could not finish pinned the rotation and she was handed act 1 ("run something
+# in run_python") ten times in a row. The SUBJECT of this section is unchanged and is the
+# rotation itself — every act reached within one cycle — so only what turns it changes.
+from harness.kairos.scheduler import _spend_attempt as _spend_att   # noqa: E402
+
 _r = TurnState()
 _acts = []
 for _ in range(len(SOLO_ACTS) + 2):
     _acts.append(solo_nudge(_r.solo_n))
-    note_spoke(_r, T, SOLO)
+    _spend_att(_r, SOLO, now=T)
 check("every act is reached within one cycle",
       len(set(_acts[:len(SOLO_ACTS)])) == len(SOLO_ACTS),
       "%d distinct of %d" % (len(set(_acts[:len(SOLO_ACTS)])), len(SOLO_ACTS)))
@@ -269,6 +277,14 @@ check("the acts reach for real tools",
           if any(t in a for t in ("web_search", "run_python", "recall", "check_wardrobe",
                                   "add_note", "ask_for"))) >= 5,
       "agency she cannot act on is a mood")
+
+# ...and the property the move exists for: a turn that is DROPPED still turns the rotation.
+# note_spoke is never called here, which is exactly what a refused solo looks like.
+_d = TurnState()
+for _ in range(len(SOLO_ACTS)):
+    _spend_att(_d, SOLO, now=T)
+check("a solo that is never spoken still walks the whole rotation",
+      _d.solo_n == len(SOLO_ACTS), _d.solo_n)
 
 # THE NUDGE IS ADVICE; THIS IS LAW. It said "Do not address him" and 13 of 21 did anyway.
 # An instruction followed 40% of the time is a suggestion. Same lesson the roleplay engine

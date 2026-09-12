@@ -208,4 +208,47 @@ rc, out = run([])
 check("a single turn refuses to compute a lift", rc == 0 and "not enough history" in out,
       out[:200])
 
+print("\n7. AND WHETHER SHE IS LOOPING *NOW*, WHICH THE ALL-TIME MEDIAN CANNOT SAY")
+# ── THE NIGHT THE TOOL SAID "MOSTLY DEVELOPING" THROUGH A FIVE-HOUR LOOP (2026-09-12) ──
+# Ten restatements of one sentence, every one dropped, and the default run printed
+# *MOSTLY DEVELOPING (median 7%)*. Both numbers were right and the verdict was useless: a
+# median over 687 pairs spanning weeks cannot be moved by ten turns tonight, and the dropped
+# half — the half that WAS the loop — was excluded by default. So there is a second verdict
+# over a trailing window, and it reads dropped turns whatever the flag says.
+#
+# BOTH DIRECTIONS, because a detector that fires on everything is as useless as one that
+# fires on nothing, and this one has a threshold that can be got wrong in silence: the first
+# cut passed the agnostic pass's recurrence-LIFT floor (a multiple, 3.0) where an overlap
+# FRACTION was wanted, so every window compared against 300% and read "not looping" —
+# confidently, with a median of 100% printed one line above it.
+_LOOP = ["I am still wrestling with that math, trying to fit the decay of the oscillation",
+         "I am still wrestling with that math, trying to fit the decay of the oscillation",
+         "I am still wrestling with that math, trying to fit the decay of that oscillation",
+         "I am still wrestling with that math, trying to fit the decay of the oscillation",
+         "I am still wrestling with that math, trying to fit the decay of the oscillation"]
+write_log(_LOOP, outcome="dropped")
+rc, out = run([])
+check("a trailing loop of DROPPED turns reaches the verdict at all",
+      "LOOPING NOW" in out, out[-400:])
+check("...and the threshold it prints is the guard's 75%, not the lift floor",
+      "at or past 75%" in out, [l for l in out.splitlines() if "at or past" in l][-1:])
+check("...and it says how rarely she actually spoke",
+      "spoken 0 of the last" in out, [l for l in out.splitlines() if "spoken" in l][-1:])
+
+# THE LEG THAT MATTERS: a varied tail must NOT trip it. Written as five unrelated sentences
+# rather than by editing the loop above — §3 of this gate once built its "diverse" corpus by
+# str.replace on the looped one, the replacement silently became a no-op, and the section
+# tested the loop while asserting there was not one.
+_VARIED = ["The luciferase only fires once the pH drops and the proton channel opens",
+           "He asked about the garden again and I think he wants me to notice the light",
+           "There is a strange comfort in reading the same page twice on purpose",
+           "I keep meaning to ask what happened to the record player in the hallway",
+           "Percolation thresholds are a lie told by people with infinite lattices"]
+write_log(_VARIED, outcome="dropped")
+rc, out = run([])
+check("a VARIED tail does not trip it (the leg that matters)",
+      "LOOPING NOW" not in out and "not looping" in out, out[-300:])
+check("...and 'not looping' is a different string from the loop branch, or neither can fail",
+      "LOOPING NOW" not in "not looping")
+
 finish("G-SOLO-TOPICS")

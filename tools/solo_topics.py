@@ -203,6 +203,62 @@ def pairwise(rows: list, label: str, show: int) -> None:
               % (100.0 * vals[len(vals) // 2], len(over)))
 
 
+def trailing(rows, floor: float, window: int = 12) -> None:
+    """Is she looping RIGHT NOW — which the all-time median structurally cannot answer.
+
+    ── THE NIGHT THIS TOOL SAID "MOSTLY DEVELOPING" THROUGH A FIVE-HOUR LOOP (2026-09-12) ──
+    She restated the same sentence ten times over five hours, every one dropped, and the
+    default run printed *MOSTLY DEVELOPING (median 7%)*. Both numbers were correct. The
+    verdict was useless, for two reasons that are worth separating:
+
+      1. THE DENOMINATOR IS THE WHOLE CORPUS. A median over 687 pairs spanning weeks cannot
+         be moved by ten turns tonight, so a current loop is arithmetically invisible in it.
+         The old verdict even handed that job to the reader — "check WHEN they happened
+         before reading them as current" — which is the tool declining to answer the
+         question it exists for.
+
+      2. THE DROPPED TURNS WERE NOT IN IT. `--include-dropped` existed and was off. A
+         fixation the guard is successfully eating is exactly the thing worth finding, and
+         it was the half being excluded. This pass reads them ALWAYS, whatever the flag
+         says, because "she tried to say this ten times" is her own time either way.
+
+    Consecutive pairs only, in the last `window` turns, and the TRAILING streak is reported
+    separately from the count: three repeats scattered through a varied evening is a guard
+    question, three at the end is a groove she is in as you read this.
+    """
+    if len(rows) < 3:
+        return
+    tail = rows[-window:]
+    pairs = [(restatement_overlap(tail[i].get("text"), tail[i - 1].get("text")), tail[i])
+             for i in range(1, len(tail))]
+    streak = 0
+    for o, _r in reversed(pairs):
+        if o < floor:
+            break
+        streak += 1
+    over = sum(1 for o, _r in pairs if o >= floor)
+    med = sorted(o for o, _r in pairs)[len(pairs) // 2]
+    spoke = sum(1 for r in tail if r.get("outcome") == _sl.SPOKE)
+    print("\n" + "=" * 78)
+    print("RIGHT NOW — her last %d turns of this kind, spoken AND dropped" % len(tail))
+    print("=" * 78)
+    print("   window %s .. %s   (%d spoken, %d dropped)"
+          % (str(tail[0].get("at"))[:16], str(tail[-1].get("at"))[:16],
+             spoke, len(tail) - spoke))
+    print("   consecutive overlap: median %.0f%%   at or past %.0f%%: %d of %d"
+          % (100.0 * med, 100.0 * floor, over, len(pairs)))
+    if streak >= 3:
+        print("   -> LOOPING NOW: the last %d consecutive turns are each a restatement of the "
+              "one before (>= %.0f%%). She has spoken %d of the last %d times she tried."
+              % (streak + 1, 100.0 * floor, spoke, len(tail)))
+    elif streak:
+        print("   -> the last %d turn(s) restate the one before; not yet a run, worth another "
+              "look on the next pass." % streak)
+    else:
+        print("   -> not looping: her most recent turn is not a restatement of the one "
+              "before it.")
+
+
 def main(argv: "list|None" = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--topic", choices=sorted(LEXICONS),
@@ -231,7 +287,21 @@ def main(argv: "list|None" = None) -> int:
     said = rows if a.include_dropped else [r for r in rows
                                            if r.get("outcome") == _sl.SPOKE]
     if not said:
-        print("no %r turns with outcome %r" % (a.kind, _sl.SPOKE))
+        # ── THE WORST CASE WAS THE ONE IT REFUSED TO LOOK AT (2026-09-12) ───────────────
+        # Zero spoken turns does not mean "nothing to report". It means every single turn
+        # she took was dropped, which is the most severe reading this tool can produce, and
+        # it exited 2 with one line. The trailing pass does not need a spoken turn — it is
+        # asking whether she keeps saying the same thing, and a turn the guard ate is still
+        # a turn she took — so it runs BEFORE the bail-out and the bail-out says what it is.
+        print("=" * 78)
+        print("CORPUS  kind=%s  %d rows, NONE spoken — every turn of this kind was dropped"
+              % (a.kind, len(rows)))
+        print("=" * 78)
+        trailing(rows, RESTATEMENT_DROP)
+        print("\n(no spoken turns, so the recurrence pass below has no corpus. That is not "
+              "'no data' — it is the finding: she tried %d times and was dropped every "
+              "time. Pass --include-dropped to run the full analysis over the attempts.)"
+              % len(rows))
         return 2
     print("=" * 78)
     print("CORPUS  kind=%s  %d rows (%d spoken, %d dropped)  %s .. %s"
@@ -243,6 +313,14 @@ def main(argv: "list|None" = None) -> int:
     print("=" * 78)
 
     agnostic(said, a.recent, a.floor)
+
+    # ...and the same question asked of NOW rather than of the whole corpus. `rows`, not
+    # `said`: a loop the guard is dropping is still a loop, and it is the one worth seeing.
+    # RESTATEMENT_DROP, not a.floor: a.floor is the agnostic pass's recurrence-LIFT floor
+    # (a multiple, default 3.0) and passing it here compared an overlap fraction against
+    # 300%, so every window on earth read 'not looping'. Caught by printing the threshold
+    # next to the number it judges, which is why that line prints it.
+    trailing(rows, RESTATEMENT_DROP)
 
     terms = tuple(t.strip().lower() for t in a.terms.split(",") if t.strip())
     if not terms and a.topic:

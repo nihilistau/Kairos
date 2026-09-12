@@ -705,7 +705,21 @@ def note_spoke(state: TurnState, now: float, action: str = CHECK_IN) -> None:
         state.unanswered += 1
     if action == SOLO:
         state.last_solo_at = now
-        state.solo_n += 1
+        # ── solo_n MOVED TO THE ATTEMPT (2026-09-12) ─────────────────────────────────
+        # It used to advance here, on speech alone, and that pinned the rotation on any
+        # act she could not finish. Measured live: from 17:39 to 22:48 she attempted act 1
+        # ("Pick at a problem you have not solved. Run something in run_python") ten times,
+        # wrote the narration each time without calling the tool, was dropped each time by
+        # `solo_did_the_thing` — and because a drop never reaches this function the cursor
+        # never moved, so the next tick handed her act 1 again. Eight of those ten were
+        # 100% restatements of the one before. She did not speak for five hours.
+        #
+        # The rotation exists BECAUSE a menu became a loop — 15 of her first 21 own-time
+        # turns were "I read my journal" — so an anti-loop mechanism that a failure can pin
+        # is the bug wearing the fix's clothes. A cursor whose job is to vary what she
+        # ATTEMPTS must be spent by an attempt. `_spend_attempt` owns it now, beside
+        # `last_solo_at`, which was moved for this exact reason on 2026-08-20 and
+        # MODE_TURN's three clocks on 2026-08-24. Third time; same shape each time.
     if action == MODE_TURN:
         state.last_mode_at = now
         state.mode_times.append(now)

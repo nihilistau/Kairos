@@ -942,12 +942,18 @@ def _spend_attempt(st: "TurnState", action: str, now: "Optional[float]" = None) 
     §0's remedy: the spend lives in `_fire_inner`'s finally, where a drop path added
     tomorrow is metered by construction, and this function is only the arithmetic so
     the finally and any future caller cannot drift on WHICH clocks an action owns.
-    Speech facts (chain / unanswered / spoken_times / solo_n) still move in
-    note_spoke, on speech alone — this meters attempts, not conversation."""
+    Speech facts (chain / unanswered / spoken_times) still move in note_spoke,
+    on speech alone — this meters attempts, not conversation. `solo_n` was in
+    that list until 2026-09-12 and did not belong: it is a rotation cursor, and
+    leaving it on the speech side let one unfinishable act pin her own time."""
     _now = time.monotonic() if now is None else now
     st.last_spoke_at = _now
     if action == SOLO:
         st.last_solo_at = _now
+        # THE ROTATION CURSOR IS SPENT BY THE ATTEMPT (2026-09-12). See note_spoke for the
+        # five hours this cost. An act she cannot complete now rotates away instead of
+        # being handed back every solo_every_s forever.
+        st.solo_n += 1
     if action == MODE_TURN:
         st.last_mode_at = _now
         st.mode_times.append(_now)
