@@ -94,9 +94,12 @@ from 36.6 s to ~13.3 s and decode from 16.6 to 21.1 tok/s. Different prompt, dif
 different knobs; the decode figures differ between the two files for that reason and not
 because one of them is wrong.
 
-One pinned workload, measured once with every kernel armed and with `llama.cpp --n-cpu-moe`
-on the same row, is **owed and not yet done** — it needs the card, and until it exists treat
-each table as evidence about the work it names rather than as a single scoreboard.
+That pinned workload has **now been measured** (2026-09-12): one prompt, one sitting, every
+kernel armed, with `llama.cpp -ncmoe 8` on the same row. The engine's combined kernel win is
+**2.12×**, not the ~2.7× that stitching two traces implied — and prefill is now **1.16× faster**
+than `llama.cpp`, with decode **2.37× slower**, which is where the whole remaining gap now is.
+The table is in the engine README. It is still a different experiment from the tiering one
+above, and still not to be added to it.
 
 **Those are sp-daemon numbers, not a promise about your setup.** Kairos is engine-agnostic
 and most people will point it at LM Studio, `llama-server` or vLLM, where throughput is that
