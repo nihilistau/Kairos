@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.37 — the engine knobs are visible, and the door says which kernels ran (2026-09-12)
+
+`attn_v2`, `gemm_f16` and `attn_tile` were **absent** from `profiles/sp.toml`, not zero.
+`serve.py` strips every unmapped `SP_*`, so they could not be set from your shell either: the
+kernels the engine README publishes a measured table for could not be armed from this profile
+at all, and its numbers were unreproducible by anyone following Quick Start. Benchmarking that
+boot against llama.cpp measured the *older* kernels.
+
+They are named now, still `0`, each carrying its arming condition — set the knob to `2` first,
+which runs both paths and serves the **old** one while reporting the numerical difference on
+your own weights. `nan_probe` joins them: a NaN-bisection tool worth finding the day a residual
+goes non-finite. `serve.py` prints a line at boot whenever any of them is `0`.
+
+The performance table in the README is dated and scoped: it is the **memory-tiering** work of
+2026-09-08/09-10. The **kernel** work of 09-11/09-12 lives in the engine README and is a
+different experiment on the same card. They are not one scoreboard.
+
 ## 0.8.36 — the scrub learns a shape, and finds five things it did not know (2026-09-12)
 
 The export scrub knew two kinds of thing: a list of literal tokens, and a list of hashed ones.
