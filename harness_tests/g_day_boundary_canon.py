@@ -153,7 +153,9 @@ def _fake_stream(messages, config=None, mutate_messages=False, on_tool=None, **k
 
 try:
     agent.agent_chat_stream = _fake_stream
-    agent._arm_self_repeat_ban = lambda c, h: None
+    # **kw so the stub cannot go stale when the real signature grows — it gained
+    # `also=` on 2026-09-12 and this lambda was the one thing in the tree that broke.
+    agent._arm_self_repeat_ban = lambda c, h, **_kw: None
     _text, _gen = KS._LAST[sess]
     out = _gen("Say something of your own.")
 finally:

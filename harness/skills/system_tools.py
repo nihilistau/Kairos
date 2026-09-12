@@ -107,12 +107,37 @@ def run_python(code: str) -> str:
     try:
         ast.parse(code or "")
     except SyntaxError as exc:
-        hint = ""
-        if _SEMI_THEN_BLOCK.search(code or ""):
-            hint = (" — a def/for/while/if/with/class cannot follow a ';' on one line; "
-                    "write those lines with \\n between them instead")
-        return "[run_python error: that code does not parse: %s (line %s, col %s)%s]" % (
-            exc.msg, exc.lineno, exc.offset, hint)
+        # ── THE HINT DID NOT WORK, SO ACCEPT THE SHAPE (2026-09-12) ──────────────────
+        # 2026-09-03 added the explanation below and left the call failing. Nine days
+        # later, live: `import math; x = 1.0; for i in range(21): x *= …` — the same
+        # `; for`, the same wasted turn, and it was the ONE solo of that evening where she
+        # reached for the tool at all. She writes one-liners because a tool call IS one
+        # line; telling her the grammar forbids it does not change the shape she reaches
+        # for, and nine days of evidence say so.
+        #
+        # A `;` before a compound statement is UNAMBIGUOUS — there is no valid Python in
+        # which it means anything else — so it can only have been meant as a newline.
+        # Rewrite and re-parse. If that parses she gets her answer instead of a lecture;
+        # if it does not, she gets the original error and the original hint, unchanged.
+        _fixed = _SEMI_THEN_BLOCK.sub(lambda m: "\n" + m.group(0).lstrip("; \t"), code or "")
+        _ok = False
+        if _fixed != (code or ""):
+            try:
+                ast.parse(_fixed)
+                _ok = True
+            except SyntaxError:
+                _ok = False
+        if _ok:
+            _swlog.info("[run_python] read a ';' before a compound statement as a newline "
+                        "— see the 2026-09-12 note")
+            code = _fixed
+        else:
+            hint = ""
+            if _SEMI_THEN_BLOCK.search(code or ""):
+                hint = (" — a def/for/while/if/with/class cannot follow a ';' on one line; "
+                        "write those lines with \\n between them instead")
+            return "[run_python error: that code does not parse: %s (line %s, col %s)%s]" % (
+                exc.msg, exc.lineno, exc.offset, hint)
     wrapper = (
         "import ast\n"
         "src=" + repr(code) + "\n"

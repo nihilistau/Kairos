@@ -150,16 +150,37 @@ def main() -> int:
     check("...and its advertised description carries the multi-line rule she needs",
           _rp_spec is not None and "\\n" in (_rp_spec.description or ""),
           (_rp_spec.description if _rp_spec is not None else "")[:130])
+    # ── THE CONTRACT CHANGED: EXPLAINED -> ACCEPTED (2026-09-12) ────────────────────
+    # This asserted that her `; def` call is REFUSED and that the refusal names the rule.
+    # That was right on 2026-09-03 and the explanation did not work: nine days later, live,
+    # `import math; x = 1.0; for i in range(21): x *= …` — the same shape, and it was the
+    # ONE solo of that evening where she reached for the tool at all. She writes one-liners
+    # because a tool call IS one line, and a rule she is told nine days running does not
+    # change that. A `;` before a compound statement is unambiguous, so it is read as a
+    # newline now and she gets her answer. The refusal legs move to code that is genuinely
+    # broken, which is where a refusal still belongs.
     hers = ("import math; def decay_thought(initial, rate, steps): "
             "values = []; current = initial")
     r = str(rp(hers))
-    check("her real call is refused, not run", "does not parse" in r, r[:110])
-    check("...and the answer names the rule", "cannot follow a ';'" in r, r[:110])
+    check("her real `; def` call RUNS now instead of being explained at",
+          "does not parse" not in r, r[:110])
+    hers_for = "import math; x = 1.0; for i in range(3): x *= 0.9\nround(x, 6)"
+    r_for = str(rp(hers_for))
+    check("...and so does the `; for` she actually wrote on 2026-09-12",
+          "does not parse" not in r_for and "0.729" in r_for, r_for[:110])
+    # AND THE REFUSAL PATH IS STILL THERE, for code no rewrite can save. Without this leg
+    # the acceptance above could be "never refuse anything", which is not a fix.
+    broken = "x = (1 + "
+    rb = str(rp(broken))
+    check("genuinely unparseable code is still refused", "does not parse" in rb, rb[:110])
+    check("...and that refusal still names the rule when a ';' is involved",
+          "cannot follow a ';'" in str(rp("import math; def f(:")), str(rp("import math; def f(:"))[:110])
     # NOT `"\\n" in r` — the first cut asserted that and stayed GREEN under the mutant,
     # because the old message repr'd her source and something in it satisfied the
     # substring. A check the mutant survives is not measuring the fix (AGENTS.md §0).
     check("...and the fix, in words only the new message has",
-          "write those lines with" in r, r[:110])
+          "write those lines with" in str(rp("import math; def f(:")),
+          str(rp("import math; def f(:"))[:110])
     fixed = ("import math\ndef decay_thought(initial, rate, steps):\n"
              "    return initial * math.exp(-rate * steps)\n"
              "print(round(decay_thought(1.0, 0.5, 2), 4))")

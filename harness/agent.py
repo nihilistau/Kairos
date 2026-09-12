@@ -740,7 +740,7 @@ def invalidate_system_prefix(reason: str) -> int:
     return _SYS["version"]
 
 
-def _arm_self_repeat_ban(cfg, messages: List[dict]) -> None:
+def _arm_self_repeat_ban(cfg, messages: List[dict], also: "tuple|list" = ()) -> None:
     """SELF-REPEAT BAN (2026-07-12).
 
     The operator caught her returning three BYTE-IDENTICAL replies to three different
@@ -762,7 +762,19 @@ def _arm_self_repeat_ban(cfg, messages: List[dict]) -> None:
     because the console STREAMS — you cannot retract what is already on the screen.
 
     Armed here, in the one place both entry points converge. A guard wired into one of two
-    paths is a guard wired into neither; that mistake has been made four times today."""
+    paths is a guard wired into neither; that mistake has been made four times today.
+
+    ── `also`: THE TURNS THAT NEVER BECAME REPLIES (2026-09-12) ─────────────────────────
+    The seed is her assistant messages IN THE PROMPT, and an unprompted turn that was
+    DROPPED never becomes one — `on_spoke` is the only writer for her own time. So on the
+    night she restated the same sentence eight times running, every one refused, this guard
+    saw none of them: it is a parrot detector that cannot hear a parrot the moment another
+    rule eats it first. Same root as the rotation cursor that pinned her that night — a drop
+    leaves no trace — and the same remedy: the caller hands in what the canon does not hold.
+
+    They are banned but NOT put in the prompt. A refused turn is one she did not take, and
+    writing it into her context would be the invention `solo_did_the_thing` exists to stop;
+    this only says "do not say that again"."""
     if getattr(cfg, "self_repeat_ngram", None) is not None:
         return
     assistants = [m.get("content", "") for m in messages
@@ -798,6 +810,11 @@ def _arm_self_repeat_ban(cfg, messages: List[dict]) -> None:
             _swallowed(_agent_log, "_words_only", _swx, lane="harness")
             return t or ""
 
+    # A refused turn counts as "what she just said" for this purpose even though nothing
+    # heard it. Appended AFTER the prompt's replies so the most recent refusal is `prev`.
+    for _t in (also or ()):
+        if str(_t or "").strip():
+            assistants.append(str(_t))
     prev = _words_only(assistants[-1] if assistants else "")
     prev2 = _words_only(assistants[-2] if len(assistants) >= 2 else "")
     if prev and len(prev.split()) >= 5:

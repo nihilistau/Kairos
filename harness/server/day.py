@@ -322,6 +322,9 @@ def _seed_kairos_from_day(force: bool = False) -> bool:
             A list rather than a return value because the text is the return value and
             adding a tuple would break four call sites for one caller's benefit."""
             from harness.agent import _arm_self_repeat_ban, agent_chat_stream
+            # Tool calls that came back an error, for the speech ledger. A list because
+            # `called` is one and for the same reason: the text is the return value.
+            _failed: list = []
             from harness.inference import InferenceConfig as _IC
             # RE-READ, DO NOT REPLAY. This closed over `hist` — the eight rows as they
             # stood at seed time — so every impulse for the rest of the day generated from
@@ -399,14 +402,48 @@ def _seed_kairos_from_day(force: bool = False) -> bool:
             # the variation an unprompted remark needs, and the self-repeat ban below still
             # catches the parroting that temperature alone would not.
             c = _IC(max_tokens=120, **_UNPROMPTED_SAMPLING)
-            _arm_self_repeat_ban(c, h)
+            # ── WHAT SHE TRIED TO SAY AND WAS REFUSED (2026-09-12) ───────────────────
+            # The ban seeds from assistant messages in `h`, and a dropped unprompted turn
+            # never gets into `h` — `on_spoke` is the only writer for her own time. On
+            # 2026-09-12 she restated one sentence eight times in five hours, every one
+            # refused, and this guard saw none of them. The refusals come from the speech
+            # log, which is the only store that has them.
+            _also = []
+            try:
+                from harness.kairos import speechlog as _sl
+                for _r in reversed(_sl.rows(limit=40)):
+                    if _r.get("outcome") == _sl.DROPPED and (_r.get("text") or "").strip():
+                        _also.append(_r["text"])
+                    if len(_also) >= 2:
+                        break
+            except Exception as _swx:
+                _swallowed(logger, "self-repeat ban: recent refusals", _swx, lane="kairos")
+            _arm_self_repeat_ban(c, h, also=tuple(reversed(_also)))
             # BOTH STRIPPERS. `_say` was fixed an hour ago and these two were not — and
             # THIS is the path her unprompted turns come out of, so her own time was
             # still emitting raw marks into her journal and the outbox. One seam per
             # lane is not one seam.
             def _note(name, _args, _result):
+                # ── AND WHETHER IT WORKED (2026-09-12) ─────────────────────────────
+                # `called` is the evidence `solo_did_the_thing` rules on, and it is right
+                # that a FAILED call still satisfies it: she reached for the tool, and
+                # refusing her turn because our tool has a bug would punish her for it.
+                # But the turn was then recorded as a plain SPOKE, so the speech log —
+                # the instrument for "what is her own time actually doing" — could not
+                # tell "she ran it" from "she tried and it errored". Measured 2026-09-12:
+                # her one successful-looking solo of the evening was
+                # `run_python('import math; x = 1.0; for i in range(21): ...')` returning
+                # a parse error, narrated as "I tried to run a quick simulation", filed
+                # as a success. The name still goes in `called`; the failure goes beside
+                # it so the ledger can say which happened.
                 if called is not None:
                     called.append(name)
+                try:
+                    _r = str(_result or "")
+                    if _r.startswith("[") and "error" in _r[:40].lower():
+                        _failed.append("%s: %s" % (name, _r[1:80]))
+                except Exception as _swx:
+                    _swallowed(logger, "_note tool outcome", _swx, lane="kairos")
             # NOT strip_tags — the outbox feeds the room, and the room draws her chips
             # from these marks. See the note in `_say`.
             # HER TURN, HER LANE (2026-08-24 audit, A5): armed around the generation —
@@ -427,6 +464,12 @@ def _seed_kairos_from_day(force: bool = False) -> bool:
                 _canon.extend(h[_base_len:])
                 if not _canon or _canon[-1].get("role") != "assistant":
                     _canon.append({"role": "assistant", "content": _out})
+            # The tool FAILURES ride back on `called` under a reserved prefix. The guard
+            # lowercases and set-matches against tool NAMES and no tool is called
+            # `!failed:…`, so this can never satisfy an act — it only reaches the ledger,
+            # which is the thing that could not tell a working tool from a broken one.
+            if called is not None and _failed:
+                called.extend('!failed:' + f for f in _failed)
             return _out
 
         # ── THE SEED MUST *BE* A CONVERSATION, NOT WAIT FOR ONE (2026-08-05) ──────

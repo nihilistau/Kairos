@@ -1375,7 +1375,23 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
         # AND THE DENOMINATOR. A veto count with nothing to divide by is a number that
         # will be misread: twelve drops is excellent out of two hundred and catastrophic
         # out of thirteen. Both outcomes, one shape, so the ratio is computable.
-        _speech.record(imp.action, _speech.SPOKE, imp.reason, text)
+        # ── A TURN WHOSE TOOL ERRORED IS NOT A TURN THAT WORKED (2026-09-12) ────────
+        # `called` satisfies `solo_did_the_thing` whether the tool returned an answer or
+        # an error, and that is right: she reached for it, and refusing her turn for our
+        # bug would charge her for it. But the row then read as a plain SPOKE, so this
+        # ledger — the instrument for what her own time actually does — could not tell
+        # the two apart. Measured that night: her one successful-looking solo was
+        # run_python(…) returning a parse error, narrated as 'I tried to run a quick
+        # simulation', filed as a success. `_generate` sends the failures back on
+        # `called` under a reserved prefix; the reason carries the first one.
+        _reason = imp.reason
+        try:
+            _tf = [str(c)[8:] for c in (called or ()) if str(c).startswith('!failed:')]
+            if _tf:
+                _reason = '%s (tool errored: %s)' % (imp.reason, _tf[0][:80])
+        except Exception as _swx:
+            _swallowed(logger, 'speech.record tool-failure note', _swx, lane='kairos')
+        _speech.record(imp.action, _speech.SPOKE, _reason, text)
 
         with _LOCK:
             # THE ACTION MATTERS: only the things that asked him for something count
