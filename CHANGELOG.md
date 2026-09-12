@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.38 — the engine's owed benchmark is discharged, and the instrument ships (2026-09-12)
+
+The pinned workload this README called *owed* has been run: one prompt, one sitting, every
+kernel armed, `llama.cpp -ncmoe 8` on the same row. The engine's combined kernel win is
+**2.12×**, not the ~2.7× that stitching two traces implied — and the gap moved: prefill is now
+**1.16× faster** than `llama.cpp` and decode **2.37× slower**, depth-matched.
+
+`tools/bench_ab.py` and `tools/bench_split.py` are the harness that produced it. They default
+to the public `sp` profile so they run in a clone. A published measurement whose instrument is
+private is a claim, not a result.
+
 ## 0.8.37 — the engine knobs are visible, and the door says which kernels ran (2026-09-12)
 
 `attn_v2`, `gemm_f16` and `attn_tile` were **absent** from `profiles/sp.toml`, not zero.
