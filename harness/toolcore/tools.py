@@ -502,7 +502,34 @@ def _parse_tool_calls(text: str, known: Optional[set] = None) -> List[tuple]:
     fences whose calls name KNOWN tools — the reason-SFT model drifts to those fences."""
     calls: List[tuple] = []
     for block in _TOOLCODE_RE.findall(text):
-        calls.extend(_calls_from_code(block.strip().strip("`").strip()))
+        _blk = block.strip().strip("`").strip()
+        _got = _calls_from_code(_blk)
+        # ── SHE WRITES PYTHON WHERE A TOOL NAME GOES (2026-09-13) ────────────────────
+        # Measured, six trials out of six against her real day's context: the own-time act
+        # is "run something in run_python", and what she emits is a fence containing
+        # `print(...)`. `print` is not a tool, so the dispatcher answers "there is no tool
+        # called 'print'", she reports the failure — "I tried to run that decay model, but
+        # I forgot..." — and `solo_did_the_thing` sees `called=['print']` where it needed
+        # `run_python` and refuses the turn. She was never inventing the act. She was
+        # calling the wrong thing and telling the truth about what came back.
+        #
+        # A fence whose calls name NO known tool is not a tool call at all; it is Python,
+        # and there is exactly one thing to do with Python. Route the WHOLE BLOCK rather
+        # than the one call node, because `print(math.exp(-0.05 * t))` parses into a call
+        # whose argument is not a literal — the AST walk hands back `('print', [None], {})`
+        # and the code she meant is only in the block.
+        #
+        # Same argument as reading `; for` as a newline nine days after the hint failed:
+        # the shape she reaches for is the shape to accept. This is narrower than that one
+        # — it fires only when NOTHING in the fence is a tool, so a real call is never
+        # hijacked, and only when `run_python` is on the table for this turn.
+        if (_got and known and "run_python" in known
+                and not any(n in known for n, _a, _k in _got)):
+            logger.info("[toolcore] fence named no tool (%s) and parses as Python — "
+                        "running it as run_python", ", ".join(sorted({n for n, _a, _k in _got})))
+            calls.append(("run_python", [], {"code": _blk}))
+        else:
+            calls.extend(_got)
     if not calls:  # legacy <tool …>{json} fallback
         for name, raw in _TOOL_RE.findall(text):
             try:

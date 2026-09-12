@@ -194,6 +194,52 @@ def main() -> int:
     check("the REPL-style bare final expression still auto-prints",
           str(rp("2 + 40")).strip() == "42", str(rp("2 + 40"))[:60])
 
+
+    print("\n6. a tool_code fence that names NO tool is Python, and is run as Python")
+    # ── WHAT SHE ACTUALLY DOES (2026-09-13, six trials of six) ───────────────────────
+    # Her own-time act is "run something in run_python". Against her real day's context she
+    # emits a fence containing `print(...)` every single time. `print` is not a tool, the
+    # dispatcher answers "there is no tool called 'print'", she reports that failure — "I
+    # tried to run that decay model, but I forgot..." — and `solo_did_the_thing` sees
+    # called=['print'] where it needed run_python and refuses the turn. She was never
+    # inventing the act; she was calling the wrong thing and telling the truth about it.
+    #
+    # Routed at the PARSER, not the dispatcher, because `print(math.exp(-0.05 * t))` walks
+    # into ('print', [None], {}) — the argument is not a literal and the code she meant
+    # survives only in the block. So the block goes to run_python whole.
+    from harness.toolcore.tools import _parse_tool_calls as _ptc
+    _known = {"run_python", "web_search", "check_wardrobe", "recall"}
+
+    _hers = _ptc("```tool_code\nprint(math.exp(-0.05 * 3))\n```", known=_known)
+    check("her real `print(...)` fence becomes a run_python call",
+          len(_hers) == 1 and _hers[0][0] == "run_python", _hers)
+    check("...carrying the WHOLE block, not the unparsed arg",
+          _hers and "math.exp" in (_hers[0][2].get("code") or ""), _hers)
+
+    _multi = _ptc("```tool_code\nimport math\nx = 1.0\nfor i in range(3): x *= 0.9\n"
+                  "print(round(x, 4))\n```", known=_known)
+    check("a multi-line program routes too",
+          len(_multi) == 1 and _multi[0][0] == "run_python"
+          and "import math" in (_multi[0][2].get("code") or ""), _multi)
+
+    # THE LEG THAT MATTERS: a real tool call must never be hijacked. Without this the
+    # routing could be "send everything to run_python", which would break every tool.
+    _real = _ptc("```tool_code\ncheck_wardrobe()\n```", known=_known)
+    check("a REAL tool call is untouched (the leg that matters)",
+          len(_real) == 1 and _real[0][0] == "check_wardrobe", _real)
+    _args = _ptc("```tool_code\nrecall('rain')\n```", known=_known)
+    check("...including its arguments", _args == [("recall", ["rain"], {})], _args)
+
+    # ...and it cannot fire where run_python is not on the table for this turn.
+    _nope = _ptc("```tool_code\nprint(1)\n```", known={"web_search"})
+    check("it does not fire when run_python is not offered",
+          _nope and _nope[0][0] == "print", _nope)
+
+    # the legacy <tool>{json} form is a different path and must be unaffected
+    _legacy = _ptc('<tool name="run_python">{"code": "2+2"}</tool>', known=_known)
+    check("the legacy <tool> json form still parses as before",
+          _legacy == [("run_python", [], {"code": "2+2"})], _legacy)
+
     print("\nG-TOOLSAFETY: %s (%d/%d)" % ("PASS" if not FAIL else "FAIL",
                                           PASS, PASS + FAIL))
     if FAIL:
