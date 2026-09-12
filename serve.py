@@ -859,6 +859,21 @@ def build_env(c: dict) -> dict:
         # operands, not in the sum over `in`. Measured relL2 4.5e-04 against the fp32 path,
         # which is fp16 operand precision and nothing more.
         "SP_G4_GEMM_F16": str(int(dec.get("gemm_f16", 0) or 0)),
+        # SP_G4_MOE_OVERLAP — expert staging on a SECOND CUDA stream (2026-09-12). A miss
+        # copies while the previous expert computes, instead of the single stream making
+        # every transfer wait for the arithmetic in front of it and vice versa.
+        #
+        # Measured on a 3,720-token context, 127 decode steps, n=5 per arm: 8,106 -> 7,337 ms
+        # median, 1.078x on min/min, and the two ranges do not touch (worst ON 7,479 beats
+        # best OFF 7,836). Output byte-identical, which for a scheduling change is the
+        # correctness test rather than a bonus: same weights, same kernels, same order.
+        #
+        # NOT the 1.5-1.8x predicted from "kernels 15.1 s + copies 13.5 s, never overlapping".
+        # The trace says 35.7% of the copy time on the new stream now hides behind a kernel,
+        # and the ceiling is a routing dependency, not the scheduler: layer L+1's experts are
+        # not known until layer L has produced its output, so only a layer's own copies can
+        # be hidden behind its own compute.
+        "SP_G4_MOE_OVERLAP": str(int(dec.get("moe_overlap", 0) or 0)),
         "SP_KV_PREFILL_DP4A": b(dec.get("prefill_dp4a", False)),
         "SP_MOE_TIMING": b(dec.get("moe_timing", False)),
         # SP_MOE_PIN_STAGE — expert staging through a pinned ring instead of a pageable

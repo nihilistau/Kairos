@@ -124,6 +124,15 @@ eot_bias = 0.0                        # moot here (sp-only); kept so the schema 
 #   because that is a fault on hardware the author does not have.
 #
 # Upstream production runs attn_tile = 1024, attn_v2 = 1, gemm_f16 = 1 every day. The engine
+
+# Expert staging on a second CUDA stream, so a cache miss transfers while the previous expert
+# computes. Decode only (n_tok == 1); prefill is expert-major and already stages once.
+#   ARMING CONDITION. Needs the expert cache on (it stages into cache slots) and at least four
+#   times the active expert set in slots, or the prefetch evicts its own working set — the
+#   engine checks both and silently stays serial if either fails. Output must be BYTE-IDENTICAL
+#   with it on; a scheduling change that moves the text means an expert was computed against
+#   weights that had not landed. Measured 1.078x on decode upstream, ranges non-overlapping.
+moe_overlap = 0                       # SP_G4_MOE_OVERLAP
 # README's "Measured" table is those values; with the zeros below you are measuring the older
 # kernels, and comparing THAT to llama.cpp compares the wrong thing.
 attn_tile = 0                         # SP_G4_ATTN_TILE  — 1024 upstream; 0 is the flat kernel

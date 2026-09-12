@@ -37,6 +37,9 @@ DELAY, DURATION = 150, 75
 
 env = dict(B.serve.build_env(B.CFG))
 env.update(B.ARMS["on"])                       # the kernels that actually serve
+for _k in ("SP_G4_MOE_OVERLAP",):            # pass a knob straight through for an A/B trace
+    if os.environ.get(_k):
+        env[_k] = os.environ[_k]
 _sr = os.environ.get("SystemRoot") or os.environ.get("windir")
 if _sr:
     env.setdefault("SystemRoot", _sr)
