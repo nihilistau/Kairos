@@ -107,6 +107,38 @@ mcp_tools = true
 no_repeat_ngram = 0
 eot_bias = 0.0                        # moot here (sp-only); kept so the schema matches
 
+# -- THE ENGINE KERNELS ARE OFF HERE, AND THAT IS WHY THE README'S NUMBERS ARE NOT YOURS YET --
+# (2026-09-12) These three were ABSENT from this profile, not zero. `serve.py` strips every
+# unmapped SP_*, so a knob no profile names cannot be set from your shell either — which made
+# the kernels the engine README measures literally unreachable from the public door, and its
+# prefill/decode table unreproducible by anyone following Quick Start. A knob that does not
+# appear does not exist (AGENTS.md §0); it is named here so it can be found and argued with.
+#
+# They stay 0 because an unproven CUDA kernel should not arrive armed on hardware nobody has
+# run it on. That is a stance, not an accident, so it carries its arming condition:
+#
+#   ARMING CONDITION. Set the knob to 2 first. Mode 2 runs BOTH paths and serves the OLD one,
+#   printing the numerical difference on your weights — so it costs a slower prefill and can
+#   change nothing you read. If the relative L2 is in the range the engine README records
+#   (attention ~1e-06, fp16 GEMM ~1e-03), set it to 1. If it is not, say so in an issue,
+#   because that is a fault on hardware the author does not have.
+#
+# Upstream production runs attn_tile = 1024, attn_v2 = 1, gemm_f16 = 1 every day. The engine
+# README's "Measured" table is those values; with the zeros below you are measuring the older
+# kernels, and comparing THAT to llama.cpp compares the wrong thing.
+attn_tile = 0                         # SP_G4_ATTN_TILE  — 1024 upstream; 0 is the flat kernel
+attn_v2 = 0                           # SP_G4_ATTN_V2    — 1 upstream; 2 = parity, old served
+gemm_f16 = 0                          # SP_G4_GEMM_F16   — 1 upstream; 2 = parity, fp32 served
+prefill_dp4a = false                  # SP_KV_PREFILL_DP4A — measured ~18% SLOWER and it moves
+                                      # the text; off upstream too. Kept visible so nobody
+                                      # re-derives the same negative result.
+
+# A BISECTION TOOL, not a guard. A CUDA fault announces itself; a NaN rides the residual
+# forward in silence and the first thing that notices is far downstream with no idea where
+# it came from. Costs a D2H + sync per layer when armed.
+#   ARMING CONDITION. Arm it, run the failing prompt ONCE, read the layer it names, disarm.
+nan_probe = false                     # SP_G4_NAN_PROBE
+
 [tts]
 method = "xai"                        # her voice via the xAI API when a key file is present; local otherwise
 xai_voice = "ara"

@@ -72,7 +72,8 @@ cross 8–9 GB of PCIe every token for a 3–5 tok/s ceiling; the sparsity is th
 this is a conversation and not a batch job.
 
 Measured on that card, with the optional Rust + CUDA engine, before and after the work that
-made it liveable:
+made it liveable — **the memory-tiering work, 2026-09-08 to 09-10**, which is about where the
+weights live and how often a token has to cross PCIe:
 
 | | before | after |
 |---|---|---|
@@ -84,6 +85,18 @@ made it liveable:
 
 The one worth reading is the cache row: **33.4% of experts resident buys ~4×**, because MoE
 routing is skewed — capacity share is not hit rate.
+
+**That is not the same table as the engine's, and the two should not be added together.**
+[`kairos-engine`](https://github.com/nihilistau/kairos-engine)'s README carries a *later* and
+*separate* experiment — the CUDA **kernel** work of 2026-09-11/12, where coalescing the
+attention kernels and moving the weight GEMM onto fp16 tensor cores took a 3,750-token prefill
+from 36.6 s to ~13.3 s and decode from 16.6 to 21.1 tok/s. Different prompt, different date,
+different knobs; the decode figures differ between the two files for that reason and not
+because one of them is wrong.
+
+One pinned workload, measured once with every kernel armed and with `llama.cpp --n-cpu-moe`
+on the same row, is **owed and not yet done** — it needs the card, and until it exists treat
+each table as evidence about the work it names rather than as a single scoreboard.
 
 **Those are sp-daemon numbers, not a promise about your setup.** Kairos is engine-agnostic
 and most people will point it at LM Studio, `llama-server` or vLLM, where throughput is that

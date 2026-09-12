@@ -819,7 +819,7 @@ def build_env(c: dict) -> dict:
         # SP_G4_NAN_PROBE — a BISECTION TOOL, not a guard (2026-08-23). A CUDA fault
         # announces itself; a NaN rides the residual forward in silence and the first
         # thing that notices is something far downstream with no idea where it came
-        # from. Tthe operator's reports the first layer+stage where the residual goes non-finite.
+        # from. It reports the first layer+stage where the residual goes non-finite.
         # Costs a D2H + sync per layer when armed, so it is off and stays off: arm it,
         # run the failing thing once, read the layer, disarm.
         "SP_G4_NAN_PROBE": b(dec.get("nan_probe", False)),
@@ -1336,6 +1336,22 @@ def build_env(c: dict) -> dict:
                   "profile instead." % (_name, _want, _name, _got))
         elif _want is not None:
             print("[serve] PASSTHROUGH held: %s=%r (unmapped by the profile)" % (_name, _got))
+
+    # ── AND SAY WHEN THE MEASURED KERNELS ARE NOT THE ONES SERVING (2026-09-12) ────────
+    # The engine README's prefill/decode table is attn_v2=1 / gemm_f16=1 / attn_tile=1024.
+    # The public profile ships them 0 on purpose — an unproven CUDA kernel should not arrive
+    # armed on hardware nobody has run it on — but silence there means someone compares the
+    # OLD kernels to llama.cpp and concludes the README is dishonest. Same argument as the
+    # passthrough receipt directly above: the door states what actually went through it.
+    _off = [n for n, k in (("attn_v2", "SP_G4_ATTN_V2"), ("gemm_f16", "SP_G4_GEMM_F16"),
+                           ("attn_tile", "SP_G4_ATTN_TILE"))
+            if str(e.get(k, "0")) in ("0", "")]
+    if _off and e.get("SP_MODEL_PATH"):
+        print("[serve] engine kernels CONSERVATIVE: %s left at 0. The engine README's "
+              "prefill/decode numbers are measured with attn_v2=1, gemm_f16=1, "
+              "attn_tile=1024 — set them in [decode] (2 runs a parity check first and "
+              "serves the old path). Benchmarking this boot measures the older kernels."
+              % ", ".join(_off))
 
     # [debug] knobs (P5): optional taps, unset unless the profile arms them.
     dbg = c.get("debug", {})
