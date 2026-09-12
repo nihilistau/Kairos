@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.8.36 — the scrub learns a shape, and finds five things it did not know (2026-09-12)
+
+The export scrub knew two kinds of thing: a list of literal tokens, and a list of hashed ones.
+Both answer *is THIS token here*, so between them they knew exactly the leaks somebody had
+already found and written down.
+
+`patterns` in the export manifest is a rule instead: `[regex, why]`, and a drive-letter
+absolute path is one line that covers every path not yet invented. On its first run against
+this tree it caught five classes of machine-specific path that no list knew about — a model
+directory in a provenance field, a WSL install location in the Home Assistant instructions,
+and the Android NDK root across seven engine build scripts. All are placeholders in this
+publication now.
+
+`pattern_allow` and `pattern_skip` sit beside it and are part of the design, not an escape
+hatch: `C:\Program Files` is a vendor's default install root and telling you where to install
+something is documentation, while a fake drive path is a string a gate feeds its own path
+handling to prove the handling works. Refusing either would mean deleting the evidence to
+satisfy the scanner. Each exemption is written down with its reason.
+
+**If you are reading the git history of this repository, it was rewritten on 2026-09-12** to
+remove machine-absolute paths from old commits. The published tree at every tag is unchanged;
+only the bytes inside historical blobs differ.
+
 ## 0.8.35 — `gemm_f16` reaches the door (2026-09-12)
 
 `serve.py` maps `SP_G4_GEMM_F16` from `[decode].gemm_f16`, default 0.

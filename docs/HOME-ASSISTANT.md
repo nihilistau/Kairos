@@ -495,7 +495,7 @@ The stack therefore lives on a **data drive, with `--vhd-size` capped**, so Home
 cannot fill the system drive again:
 
 ```bash
-wsl --install Ubuntu-24.04 --name homeassistant --location F:\wsl\homeassistant --vhd-size 16GB --no-launch
+wsl --install Ubuntu-24.04 --name homeassistant --location <wsl>\homeassistant --vhd-size 16GB --no-launch
 ```
 
 USB radios (Zigbee, Z-Wave) need `usbipd-win` to attach the dongle to the distro before the

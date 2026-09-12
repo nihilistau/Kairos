@@ -23,13 +23,13 @@
   ],
   "models": {
     "your model": {
-      "source": "C:/Files/Models/Models/gemma-4-26b-a4b-it-qat-GGUF/config.json",
+      "source": "<models>/gemma-4-26b-a4b-it-qat-GGUF/config.json",
       "e": 2816,
       "audio": null,
       "audio_absent_reason": "config.json audio_config is null and the GGUF ships no audio tensors; mmproj-BF16.gguf is 355 v.* + 1 mm.*, vision only. This model cannot hear. Verified 2026-07-31.",
       "vision": {
         "kind": "vit_mmproj",
-        "mmproj": "C:/Files/Models/Models/gemma-4-26b-a4b-it-qat-GGUF/mmproj-BF16.gguf",
+        "mmproj": "<models>/gemma-4-26b-a4b-it-qat-GGUF/mmproj-BF16.gguf",
         "image_token": 258880,
         "boi_token": 255999,
         "eoi_token": 258882,

@@ -132,6 +132,21 @@ if os.path.exists(_MANIFEST) and os.path.exists(_EXPORTER):
         FORBIDDEN = sorted(set(_f) | set(_FALLBACK_FORBIDDEN))
         TEXT = tuple(sorted(set(_t) | set(_FALLBACK_TEXT)))
         _from_source = True
+    # ── AND THE NEEDLES, WHICH USED TO LIVE ONLY HERE (2026-09-12) ────────────────────
+    # `_FALLBACK_H` was the ONE copy, and this gate only ever looks at the Kairos target —
+    # so the engine export was scanned for `forbidden` and by nothing else. They are in both
+    # manifests now and the exporter enforces them, which is what closes that. Union, same
+    # rule as above: a needle this gate has always carried cannot be dropped by a manifest
+    # edit, and a needle the manifest adds is picked up without editing this file.
+    _n = list((_man.get("scrub", {}) or {}).get("needles") or _man.get("needles") or [])
+    if _n:
+        _seen = {(int(a), str(b)) for a, b in _FALLBACK_H}
+        for _ent in _n:
+            try:
+                _seen.add((int(_ent[0]), str(_ent[1])))
+            except (TypeError, ValueError, IndexError):
+                continue
+        _FALLBACK_H = tuple(sorted(_seen))
 
 print("1. NO FORBIDDEN TOKEN SURVIVES IN ANY TEXT FILE")
 hits = []

@@ -291,7 +291,7 @@ works?" is a question about the SYSTEM, not about one directory. Build them with
 | Gate | File | What it protects | Mode | Run |
 |---|---|---|---|---|
 | G-G4MOE-LOAD | `kairos-system-engine/tests/test_gemma4moe_load.c` | The your model `.sp-model` (arch_id 11) binds through `sp_model_to_gemma4_moe()` with no missing tensor, AND binds as an **autoregressive** model: `cfg.arch == SP_ARCH_GEMMA4_MOE`, `canvas_length == 0`, `self_cond_*`/`enc_layer_output_scale` absent. It shares its binder with DiffusionGemma (identical tensor graph) — so the thing worth gating is that the arch tag, which is what selects AR decode over the block-diffusion decoder, is right. Also asserts `attn_v` is NULL on **exactly** the global-attention layers (V:=K), not merely "on some". §2 asserts the guard FIRES by feeding the real dense reference artifact, per the "do not supply your own precondition" rule. | OFFLINE (no GPU, no daemon) | `./build-cpu/tests/test_gemma4moe_load.exe` |
-| G-DG-N1 | `kairos-system-engine/tests/test_diffgemma_load.c` | The N1a DiffusionGemma loader (arch_id 9). Pre-dates G-G4MOE-LOAD and shares its binder. Skips cleanly when the DG model is absent (it currently is — `C:/sp_models/` is empty). | OFFLINE | `./build-cpu/tests/test_diffgemma_load.exe` |
+| G-DG-N1 | `kairos-system-engine/tests/test_diffgemma_load.c` | The N1a DiffusionGemma loader (arch_id 9). Pre-dates G-G4MOE-LOAD and shares its binder. Skips cleanly when the DG model is absent (it currently is — `<models>/` is empty). | OFFLINE | `./build-cpu/tests/test_diffgemma_load.exe` |
 
 ### Tool calling & agency (harness e2e)
 
