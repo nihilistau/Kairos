@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.8.39 — her own time comes unstuck, and a dead feed gets said out loud (2026-09-15)
+
+Five behaviour changes shipped between 0.8.38 and this line without the number moving. That
+is the fourth time that has happened here, so this entry names all of them rather than only
+the new ones.
+
+**Her own time was stuck on one act for five hours.** The solo rotation cursor `solo_n`
+advanced in `note_spoke`, so it only turned on a turn she actually SPOKE — and a turn that
+was generated and then dropped left the cursor where it was, re-proposing the same act
+forever. It advances on the ATTEMPT now (`_spend_attempt`), which is the same rule the rest
+of the scheduler's clocks already follow: a generation that was spent is spent whether or not
+anyone heard it. Confirmed live afterwards — seven consecutive solos, seven spoken, rotation
+0 → 1 → 2 → 3 → 4.
+
+**She narrated the tool instead of calling it.** Three causes, all fixed: the self-repeat ban
+could not see a REFUSAL, so a refused line was eligible to be said again immediately; a tool
+that ERRORED left no trace in the ledger, so the next turn had no idea the last one had
+failed; and `run_python` rejected the one-liner shape she actually writes (`import x; x.go()`)
+on a syntax error rather than re-parsing it.
+
+**She was calling `print`.** A ```tool_code``` fence naming no known tool was reported to her
+as an unknown-tool error — but the contents parse as Python, because that is what they are.
+A fence that names no tool and parses as Python is now RUN as `run_python`, which is what she
+meant every time.
+
+**A feed that stopped now gets said, to the operator, once.** `heart_rate` stopped on
+2026-09-01 and the watch entirely on 2026-09-04, and it surfaced fourteen days later — with
+nothing broken. Stale readings never reach her (that rule is right and is unchanged), so a
+dead watch and a quiet afternoon looked identical from outside: both are silence. The rule
+had been enforced for exactly one audience. `harness/telemetry/liveness.py` answers the other
+question — not "what is his body doing" but "is the instrument on" — and `serve.py` prints it
+at boot, and prints **nothing** when the feeds are current. The whole-store threshold is
+measured rather than picked: normal gaps between rows top out near 1.7 h and every real
+outage is 9.2 h or longer, so six hours sits in the empty space between them. In hours and
+not days, because the outage that prompted this was 30 h across a midnight, which a
+day-granularity check calls "1 day" and ignores. New gate `G-TELEMETRY-LIVENESS`, 16/16,
+three mutants.
+
+**The build pointed at a directory a clone does not have.** `build-core-cpu.bat` and
+`build-wirecuda.bat` both spelled the math core `..\core`, which exists only in the source
+tree; in a clone it arrives as the submodule `lib/shannon-prime-system`. All three build
+scripts said so in their own comments and one of them enforced it, which is this repo's §0
+exactly. `scripts/env/resolve-core.bat` is the single answer now — it resolves the name that
+is correct in both layouts, and when neither exists it names **both** places it looked, because
+"cannot find ..\core" is unreadable to the one person who needs it, someone who never had a
+`..\core`.
+
 ## 0.8.38 — the engine's owed benchmark is discharged, and the instrument ships (2026-09-12)
 
 The pinned workload this README called *owed* has been run: one prompt, one sitting, every

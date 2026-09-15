@@ -4,9 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kairos-companion"
-version = "0.8.38"   # keep in step with CHANGELOG.md — it read 0.1.0 through
+version = "0.8.39"   # keep in step with CHANGELOG.md — it read 0.1.0 through
                     # two releases (fixed 2026-08-25), then sat at 0.8.4 through
                     # 0.8.5 (fixed 2026-08-29): this comment is the tripwire
+                    # and it is not working. FOURTH occurrence 2026-09-15: five
+                    # behaviour changes shipped between 0.8.38 and 0.8.39 with
+                    # the number untouched, caught by an outside audit rather
+                    # than here. A comment asking to be remembered is not a
+                    # mechanism; G-VERSION-STEP is, and it is the open ask.
 description = "A local-first AI companion framework: durable, auditable memory that never deletes, unprompted speech with reasons, a room UI — against any OpenAI-compatible endpoint on one consumer GPU."
 readme = "README.md"
 # WINDOWS-ONLY today, and honestly so (2026-08-29 audit): serve.py's process

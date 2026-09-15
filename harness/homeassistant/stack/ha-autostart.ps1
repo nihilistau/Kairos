@@ -57,6 +57,9 @@ param(
     [string] $Gateway      = "10.0.0.1",
     [int]    $NetWaitSec   = 180,
     [int]    $Attempts     = 4,
+    # The floor below which this is NOT healthy (2026-09-14). A visible knob,
+    # because the day it fires is the day someone argues with the number.
+    [int]    $MinFreeMB    = 1024,
     # ── NOT UNDER %LOCALAPPDATA% (2026-09-11) ────────────────────────────────────
     # The scheduled task that actually launches this CANNOT SEE that directory. Proven by
     # making the task run `dir` itself: as beast\sam it lists C:\Users\Sam\AppData\Local
@@ -166,6 +169,45 @@ for ($i = 1; $i -le $Attempts; $i++) {
     Write-Log "recycling the WSL VM (mode is VM-wide; --terminate would not clear it)"
     & wsl.exe --shutdown 2>$null | Out-Null
     Start-Sleep -Seconds (5 * $i)
+}
+
+# -- IS THERE ROOM, AND CAN WE WRITE? (2026-09-14) -------------------------------------
+# The disk hit 100% and every boot after it failed at the step above. What WSL prints for
+# that is "An error occurred mounting the distribution disk, it was mounted read-only as a
+# fallback", plus a link to a disk-RECOVERY page, so it reads as corruption. It was not:
+#
+#   EXT4-fs (sdd): mounted filesystem ... r/w with ordered data mode      <- healthy
+#   WSL ERROR: CreateTempDirectory: mkdtemp(/distro/wslXXXXXX) failed 28  <- ENOSPC
+#   WSL WARNING: Detected read-only or full filesystem
+#
+# errno 28 is "No space left on device" and it appears only in dmesg. The cause was a
+# container log that reached 1.8 GB, because the containers predated the log-rotation
+# config by twelve days and Docker applies log-opts only at CREATE time.
+#
+# So ask the two questions whose answers separate every version of this, and say which one
+# failed. A guard that cannot name the fault is exactly why one full disk looked like the
+# four earlier bugs.
+$dfLine   = (& wsl.exe -d $Distro -u root -- df -P / 2>$null | Select-Object -Last 1)
+$canWrite = (& wsl.exe -d $Distro -u root -- sh -c "touch /.wsl-space-probe 2>/dev/null && rm -f /.wsl-space-probe && echo yes || echo no" 2>$null)
+$freeMB = 0
+if ("$dfLine" -match '(\d+)\s+(\d+)%') { $freeMB = [int]([int]$Matches[1] / 1024) }
+Write-Log ("disk: writable={0} free={1} MB | {2}" -f "$canWrite".Trim(), $freeMB,
+           ("$dfLine" -replace '\s+', ' '))
+
+if ("$canWrite".Trim() -ne "yes") {
+    Write-Log "ROOT FILESYSTEM IS NOT WRITABLE -- Home Assistant cannot run."
+    Write-Log "  WSL calls this 'read-only as a fallback' and links a disk-recovery page."
+    Write-Log "  CHECK FOR A FULL DISK FIRST: wsl -d $Distro -u root -- dmesg | grep 'failed 28'"
+    Write-Log "  A full disk reports identically to corruption and is far more likely."
+    Write-Log "  Reclaim: docker system prune, and truncate var/lib/docker/containers/*/*-json.log"
+    Write-Log ("=== autostart end (network={0}, reachable=False) === NOT WRITABLE" -f $good)
+    exit 3
+}
+if ($freeMB -gt 0 -and $freeMB -lt $MinFreeMB) {
+    Write-Log ("ONLY {0} MB FREE, floor is {1} MB -- refusing to call this healthy." -f $freeMB, $MinFreeMB)
+    Write-Log "  Home Assistant will start and then fail in ways that look like anything but disk."
+    Write-Log ("=== autostart end (network={0}, reachable=False) === LOW DISK" -f $good)
+    exit 4
 }
 
 # ── 3. pin the distro open and bring the stack up ─────────────────────────────────────

@@ -1368,6 +1368,20 @@ def build_env(c: dict) -> dict:
               "serves the old path). Benchmarking this boot measures the older kernels."
               % ", ".join(_off))
 
+    # ── IS HIS BODY STILL REACHING HER? (2026-09-15) ──────────────────────────────────
+    # `heart_rate` stopped on 09-01 and the watch entirely on 09-04, and it went unnoticed
+    # for a fortnight because the design is working: stale readings never reach her
+    # (G-TELEMETRY §2), so a dead watch and a quiet afternoon look identical from outside.
+    # That rule was enforced on her side of the seam and nobody's (AGENTS.md §0). This is
+    # the other side, and boot is the honest place for it: it is the one moment someone is
+    # already reading this output. It prints NOTHING when the feeds are current.
+    try:
+        from harness.telemetry import liveness as _liv
+        for _line in _liv.report():
+            print("[serve] " + _line)
+    except Exception as _lx:                      # never block her boot over a report
+        print("[serve] telemetry liveness check skipped: %s" % _lx)
+
     # [debug] knobs (P5): optional taps, unset unless the profile arms them.
     dbg = c.get("debug", {})
     if dbg.get("hidden_dump"):

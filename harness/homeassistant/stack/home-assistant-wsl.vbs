@@ -47,4 +47,18 @@
 Dim shell, script
 Set shell = CreateObject("WScript.Shell")
 script = shell.ExpandEnvironmentStrings("%USERPROFILE%") & "\.wsl-ha\ha-autostart.ps1"
-shell.Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & script & """", 0, False
+
+' IT REPORTED SUCCESS WHILE THE WORKER DIED (2026-09-14). The third argument was False
+' -- do not wait -- so wscript returned 0 the instant it had LAUNCHED powershell, and the
+' scheduled task recorded Last Result 0 no matter what happened next. Measured that
+' morning: the task said 0, the log stopped four seconds in, and Home Assistant was down.
+' The worker has always exited 1 correctly on failure; nothing was listening.
+'
+' That is what made one fault look like the same bug five times: every different cause --
+' the Startup folder, the encoding, the network race, a full disk -- surfaced identically,
+' as a task that claims it worked. True now: wait for the worker and hand its code back,
+' so 'did it work' is answerable from the task history without reading a log.
+Dim rc
+rc = shell.Run("powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden " & _
+               "-File """ & script & """", 0, True)
+WScript.Quit rc
