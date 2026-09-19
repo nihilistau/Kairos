@@ -118,16 +118,41 @@ check("at least one cancel path logs its reason before returning",
       "a client disconnect would vanish from the log entirely")
 
 print("\n5. THE LOG LINE IS STILL ONE KEY=VALUE SPLIT (the reader's contract)")
-m = re.search(r'"KAIROS: turn ended[^"]*"', src)
-check("the terminal line still exists", m is not None)
-if m:
-    lit = m.group(0)
+# THERE ARE TWO "KAIROS: turn ended" LITERALS: the terminal one and the cancel one added so a
+# client disconnect is labelled rather than absent. Taking the FIRST match grabbed the cancel
+# line, which carries no first-step margin, and the leg below failed on correct code -- the
+# same class of self-inflicted red as g_kv_tap matching a forward declaration. Pick the
+# terminal literal by its own text, and assert the cancel one separately.
+lits = re.findall(r'"KAIROS: turn ended[^"]*"', src)
+check("both the terminal and the cancel line exist", len(lits) >= 2,
+      "found %d; a cancel with no line of its own is a turn that vanishes from the log" % len(lits))
+term = [l for l in lits if "more to say" in l]
+check("the terminal line is identifiable", len(term) == 1,
+      "cannot tell the two apart, so this section would guard whichever came first")
+if term:
+    lit = term[0]
     check("eot_margin= and n_gen= are still present and unspaced",
           "eot_margin={:.3}" in lit and "n_gen={}" in lit,
           "tools/eot_calibrate.py parses these with a regex, not a JSON load")
     check("finish_reason= carries no space before its value",
           "finish_reason={}" in lit,
           "a space would break the key=value split every reader uses")
+    # THE SECOND OPERATING POINT. `eot_margin` is overwritten each step, so it answers "would
+    # she stop HERE". `eot_margin_first` is captured once and never overwritten, so it answers
+    # "would she start talking" -- the question a speak-or-silent policy consults BEFORE she
+    # says anything. Measured live: a turn that self-stopped at n_gen=2 read -8.584 at the
+    # first step and +4.080 at the last. One variable holding both would report the terminal
+    # value on short turns and look like agreement.
+    check("the first-step margin is on the line too", "eot_margin_first={:.3}" in lit,
+          "without it the log answers only one of the two operating points")
+
+print("\n5b. THE FIRST-STEP MARGIN IS CAPTURED ONCE, NOT OVERWRITTEN")
+check("it is written under a step==0 guard",
+      re.search(r"kairos_steps\s*==\s*0\s*\{\s*kairos_margin_first", code) is not None,
+      "an unguarded assignment makes it a duplicate of the terminal margin")
+check("the step counter advances",
+      re.search(r"kairos_steps\s*\+=\s*1", code) is not None,
+      "without the increment the guard is always true and the LAST step wins instead")
 
 if os.path.exists(TOOL):
     print("\n6. THE READER KNOWS THE FIELD IS COMING")
