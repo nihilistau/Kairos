@@ -588,6 +588,12 @@ body.resizing, body.resizing * { user-select: none !important; cursor: inherit; 
 /* The stage moved into the dock, so the chat gets the room back. */
 .desktop .chat { padding-left: 0; max-width: 1100px; margin: 0 auto; }
 .stage { display: none; }
+/* CHAT IN A WINDOW FLOWS, it is not positioned (2026-09-23). `.chat` is
+   `position: absolute; inset: 0` from when it WAS the page. In a window `.body` is not
+   positioned, so the containing block became `.win` and the chat laid itself over the
+   title bar: same box as the window, measured, and every drag and all three lights
+   landed on the conversation instead. Filling the body is what inset:0 meant here. */
+.win .chat { position: relative; inset: auto; height: 100%; max-width: none; margin: 0; }
 
 /* ── THE TASKBAR ──────────────────────────────────────────────────────────── */
 .taskbar {
