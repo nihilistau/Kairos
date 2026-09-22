@@ -28,7 +28,11 @@ const MOODS = {
 }
 const PHASE_DIM = { night: 0.55, dawn: 0.85, day: 1.0, dusk: 0.8 }
 
-export default function Backdrop2D({ room }) {
+/* `className` (2026-09-23): the same weather, in a frame. `.backdrop` is
+ * `position: fixed; inset: 0` — right for the room's full-bleed paint and wrong for a
+ * copy of it living inside a window, so the windowed view passes `rv-canvas` instead.
+ * The painting code never learns which it is; only the box changes. */
+export default function Backdrop2D({ room, className = 'backdrop' }) {
   const ref = useRef(null)
   const state = useRef({ blobs: [], t: 0, w: 0, h: 0 })
   const live = useRef(room)
@@ -123,13 +127,25 @@ export default function Backdrop2D({ room }) {
     }
     document.addEventListener('visibilitychange', vis)
 
+    /* IT MUST REFIT ITS OWN BOX, not the viewport's (2026-09-23). `window.resize` is
+     * the only signal this had, which is correct while it IS the viewport and useless
+     * inside a window the operator can drag by the corner: the canvas would keep its
+     * first size and stretch. ResizeObserver watches the element itself, so both uses
+     * are right for the same reason instead of one being right by coincidence. */
+    let ro = null
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => resize())
+      ro.observe(cv)
+    }
+
     return () => {
       running = false
       cancelAnimationFrame(raf)
+      if (ro) ro.disconnect()
       window.removeEventListener('resize', resize)
       document.removeEventListener('visibilitychange', vis)
     }
   }, [])
 
-  return <canvas ref={ref} className="backdrop" aria-hidden="true" />
+  return <canvas ref={ref} className={className} aria-hidden="true" />
 }

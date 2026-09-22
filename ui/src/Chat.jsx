@@ -3,6 +3,7 @@ import * as api from './api.js'
 import { extractTags, moodOf, traitHue, forSpeech } from './room/tags.js'
 import { When } from './room/When.jsx'
 import * as speech from './room/speech.js'
+import * as roomMood from './room/roomMood.js'
 
 /* CHAT — the centre of the room.
  *
@@ -42,7 +43,14 @@ function Marks({ marks }) {
   )
 }
 
-export default function Chat({ onMood }) {
+/* SHE REPORTS HER MOOD TO A STORE, NOT TO A PARENT (2026-09-23). This took an
+ * `onMood` prop and handed every `[MOOD:]` read up to `Room`, which fed the backdrop
+ * and the Portrait. That wire only works while Chat is a CHILD of Room, and it is a
+ * window now — mounted by the registry, which passes no props. `roomMood` is the same
+ * module-level-store idiom as `windowManager`, so the room reads her live mood from
+ * one place whether this window is open, minimised or closed. */
+export default function Chat() {
+  const onMood = roomMood.set
   const [turns, setTurns] = useState([])
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)

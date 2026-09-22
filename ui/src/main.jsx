@@ -1,9 +1,8 @@
-import React, { useSyncExternalStore, useRef } from 'react'
+import React, { useSyncExternalStore, useRef, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import * as wm from './windowManager.js'
 import { APPS, byId, DOCK_HIDDEN_DEFAULT } from './appRegistry.jsx'
 import * as dockPrefs from './dockPrefs.js'
-import Chat from './Chat.jsx'
 import { usePoll } from './apps/panel.jsx'
 import * as api from './api.js'
 import Renderer from './room/Renderer.jsx'
@@ -11,6 +10,8 @@ import Clock from './room/Clock.jsx'
 import Presence from './room/Presence.jsx'
 import Portrait from './room/Portrait.jsx'
 import Down from './room/Down.jsx'
+import DeskIcons from './room/DeskIcons.jsx'
+import * as roomMood from './room/roomMood.js'
 import Anon, { AnonChip } from './room/Anon.jsx'
 import { useState } from 'react'
 import './room.css'
@@ -120,30 +121,38 @@ function Win({ w }) {
     window.addEventListener('mouseup', up)
   }
 
+  // A MAXIMISED WINDOW TAKES ITS BOX FROM CSS, not from the store: `.maxed` pins it to
+  // the desktop's edges, so it stays right when the browser is resized without anything
+  // having to recompute and write a new box.
   return (
     <div ref={el}
-         className={'win' + (drag.current ? ' dragging' : '')}
-         style={{ left: w.x, top: w.y, width: w.w, height: w.h, zIndex: w.z }}
+         className={'win' + (drag.current ? ' dragging' : '') + (w.max ? ' maxed' : '')}
+         style={w.max ? { zIndex: w.z } : { left: w.x, top: w.y, width: w.w, height: w.h, zIndex: w.z }}
          onMouseDown={() => wm.focus(w.appId)}>
       {/* CONTROLS ON THE RIGHT (2026-08-21, his ask), title leading — the dots ARE
           the controls, not decoration next to them: red closes, amber minimises. A
           row of ornaments beside real buttons is the thing that makes a skin feel
           like a costume. (They opened on the left, executive_suite style, for the
           room's first three weeks.) */}
-      <div className="bar" onMouseDown={onDown}>
+      <div className="bar" onMouseDown={onDown}
+           onDoubleClick={(e) => { if (!e.target.closest('button')) wm.maximize(w.appId) }}>
         <span className="ic">{app.icon}</span>
         <span className="ti">{app.title}</span>
         {/* THE TITLE CHIP (2026-08-21): a glance at state/provider, registry-declared
             (titleChips.jsx), mounted only while the window is open. Never a control. */}
         {app.TitleChip ? <app.TitleChip /> : null}
         <span className="lights">
-          <span className="lt lt-green" title="focused" />
+          {/* THREE LIGHTS, THREE CONTROLS (2026-09-23). The green one was an ornament
+              labelled "focused" and did nothing; it is maximise now, which is what the
+              hand already expects of it. */}
+          <button className="lt lt-green" onClick={() => wm.maximize(w.appId)}
+                  title={w.max ? 'restore' : 'maximise'} />
           <button className="lt lt-amber" onClick={() => wm.minimize(w.appId)} title="minimise" />
           <button className="lt lt-red" onClick={() => wm.close(w.appId)} title="close" />
         </span>
       </div>
       <div className="body"><PanelBoundary title={app.title}><Body /></PanelBoundary></div>
-      {DIRS.map(d => (
+      {w.max ? null : DIRS.map(d => (
         <div key={d} className={'grip g-' + d} onMouseDown={onResize(d)} />
       ))}
     </div>
@@ -252,11 +261,9 @@ function Room() {
   // HER LIVE MOOD beats the polled one. The pulse reads persona.md, which only
   // changes when the curator writes; her [MOOD:] mark in the current reply is what
   // she is feeling RIGHT NOW, and that is what the room should be wearing.
-  const [live, setLive] = useState({ mood: null, thinking: false })
+  const live = useSyncExternalStore(roomMood.subscribe, roomMood.get)
   const [armed, setArmed] = useState(false)
   const [downMode, setDownMode] = useState('')
-  const onMood = (mood, thinking) =>
-    setLive(v => ({ mood: mood ?? v.mood, thinking: thinking ?? false }))
   const mood = live.mood || pulse?.her?.mood
   const shown = { ...(pulse || {}), her: { ...(pulse?.her || {}), mood } }
   /* ── THE SHELL, RE-LAID-OUT (2026-08-02) ────────────────────────────────────────
@@ -277,79 +284,44 @@ function Room() {
      second timer is a second idea of whether it is on. `.an-on` puts a rule around
      the whole room — see Anon.jsx for why one small indicator is not enough. */
   const anon = pulse && pulse.anon
+
+  /* THE ROOM OPENS WITH THE CONVERSATION IN IT (2026-09-23). Chat used to be painted
+     into the desktop unconditionally; as a window it would be absent on every load,
+     because the window manager keeps no state across a reload. Opening it on mount
+     restores what he had — and only when nothing else is open, so this can never fight
+     a session that already has windows up. */
+  useEffect(() => {
+    if (wm.getWindows().length === 0) {
+      const c = byId('chat')
+      if (c) wm.open('chat', c)
+    }
+  }, [])
+
   return (
     <div className={"room" + (anon && anon.on ? " an-on" : "")}>
       <Renderer kind="2d" pulse={shown} />
 
-      <aside className="dock">
-        <div className="dock-brand">
-          <div className="dock-mark">◈</div>
-          <div className="dock-name">KAIROS</div>
-        </div>
-        <div className="dock-rule" />
-        <div className="dock-apps">
-          {/* HIS DOCK (2026-08-21): the registry says what exists; dockPrefs says
-              what earns a slot — live, per browser, edited in the apps launcher.
-              Pinned rows (the launcher itself) cannot be hidden: it is the way
-              back to everything else. */}
-          {APPS.filter(a => a.pinned || !dockHidden.has(a.id)).map(a => (
-            <button key={a.id} title={a.blurb}
-                    className={'dock-app' + (open.has(a.id) ? ' active' : '')}
-                    onClick={() => (open.has(a.id) ? wm.minimize(a.id) : wm.open(a.id, a))}>
-              <span className="dock-ic">{a.icon}</span>
-              <span className="dock-lb">{a.title}</span>
-            </button>
-          ))}
-        </div>
-        {/* SHE IS NOT A CONTACT CHIP. A 46px circle at the foot of the dock threw
-            away the portrait — the chains, the city behind her, everything below the
-            jaw. She is on the canvas now, in <Portrait>, at the size and place he puts
-            her. What is left here is only a way back to her if she is dragged off. */}
-        {/* ── STOPPING HER (2026-08-06) ────────────────────────────────────────
-            At the foot of the dock, separated and red, because it is the one control
-            here that ends things. NOT in the taskbar, which is clicked constantly.
-
-            TWO STEPS, AND THE MODE IS THE CONFIRM. One click only arms it; the second
-            click both chooses what to stop and confirms it. No modal and nothing to
-            type — a misclick costs an extra click, not her evening. */}
-        <Anon anon={anon} refresh={beat.refresh} />
-        <div className="sd-wrap">
-          {!armed ? (
-            <button className="sd-btn" title="stop her, or the whole stack"
-                    onClick={() => setArmed(true)}>
-              <span className="dock-ic">⏻</span>
-              <span className="dock-lb">shut down</span>
-            </button>
-          ) : (
-            <div className="sd-confirm">
-              <button className="sd-opt" title="stop her; the room stays up"
-                      onClick={() => { api.shutdown('her', true); setDownMode('her'); setArmed(false) }}>
-                her only
-              </button>
-              <button className="sd-opt" title="stop everything, including this room"
-                      onClick={() => { api.shutdown('all', true); setDownMode('all'); setArmed(false) }}>
-                everything
-              </button>
-              <button className="sd-opt sd-kill"
-                      title="stop now — discards a reply in flight and any message she has not shown you"
-                      onClick={() => { api.shutdown('kill', false); setDownMode('all'); setArmed(false) }}>
-                kill
-              </button>
-              <button className="sd-opt sd-cancel" onClick={() => setArmed(false)}>cancel</button>
-            </div>
-          )}
-        </div>
-      </aside>
+      {/* THE DOCK IS GONE (2026-09-23, his ask): "move the room icons from a side bar
+          on the left so that they are actual free desktop like icons". The apps are
+          loose on the desktop now (DeskIcons). What lived in that rail and is NOT an
+          app moved to the taskbar rather than becoming an icon — Off the record and
+          shut down are controls, and a control that can be dragged behind a window is
+          a control you cannot find when you need it. */}
 
       <main className="desktop">
         {downMode ? <Down mode={downMode} onBack={() => setDownMode('')} /> : null}
-        <Chat onMood={onMood} />
+        {/* ICONS FIRST so every window stacks above them — the desktop is the thing
+            windows sit ON, and an icon that can cover a panel is not a desktop. */}
+        <DeskIcons />
         <Portrait mood={mood} thinking={live.thinking} />
         {windows.map(w => <Win key={w.appId} w={w} />)}
       </main>
 
       <footer className="taskbar">
         <div className="tb-left">
+          {/* THE BRAND CAME DOWN WITH THE DOCK. It is a mark, not a control, so it sits
+              where the other glanced-at things live. */}
+          <span className="tb-brand" title="KAIROS"><b>◈</b> KAIROS</span>
           <a className="tb-console" href="/index.html"
              title="the original console — still here, unchanged">console</a>
           {/* A MINIMISED WINDOW MUST HAVE A WAY BACK. It had none: minimise removed it
@@ -366,6 +338,61 @@ function Room() {
           })}
         </div>
         <div className="tb-right">
+          <Anon anon={anon} refresh={beat.refresh} />
+
+          <div className="sd-wrap">
+
+            {!armed ? (
+
+              <button className="sd-btn" title="stop her, or the whole stack"
+
+                      onClick={() => setArmed(true)}>
+
+                <span className="dock-ic">⏻</span>
+
+                <span className="dock-lb">shut down</span>
+
+              </button>
+
+            ) : (
+
+              <div className="sd-confirm">
+
+                <button className="sd-opt" title="stop her; the room stays up"
+
+                        onClick={() => { api.shutdown('her', true); setDownMode('her'); setArmed(false) }}>
+
+                  her only
+
+                </button>
+
+                <button className="sd-opt" title="stop everything, including this room"
+
+                        onClick={() => { api.shutdown('all', true); setDownMode('all'); setArmed(false) }}>
+
+                  everything
+
+                </button>
+
+                <button className="sd-opt sd-kill"
+
+                        title="stop now — discards a reply in flight and any message she has not shown you"
+
+                        onClick={() => { api.shutdown('kill', false); setDownMode('all'); setArmed(false) }}>
+
+                  kill
+
+                </button>
+
+                <button className="sd-opt sd-cancel" onClick={() => setArmed(false)}>cancel</button>
+
+              </div>
+
+            )}
+
+          </div>
+
+
           {/* A RUNNING SCENE CHANGES WHO SHE IS, so it belongs where he cannot miss it.
               Found 2026-08-03: a 'penthouse' scene had been live for 17 beats, surviving
               every restart by design, and he did not know — every reply read as noir bar

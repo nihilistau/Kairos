@@ -34,6 +34,8 @@ import Research from './apps/Research.jsx'
 import Search from './apps/Search.jsx'
 import Voice from './apps/Voice.jsx'
 import Apps from './apps/Apps.jsx'
+import Chat from './Chat.jsx'
+import RoomView from './room/RoomView.jsx'
 import { VoiceChip, SearchChip, ResearchChip, WardrobeChip, StageChip,
          MusicChip, GamesChip, RoomChip, PresenceChip, AuxChip, SensesChip } from './apps/titleChips.jsx'
 
@@ -55,6 +57,24 @@ import { VoiceChip, SearchChip, ResearchChip, WardrobeChip, StageChip,
  * TITLE CHIPS: `TitleChip` is a tiny component the window chrome renders beside
  * the title — a glance at state/provider (titleChips.jsx). Optional per app. */
 export const APPS = [
+  /* CHAT IS A WINDOW (2026-09-23, his ask). It was a fixed div in the middle of the
+     desktop — the one thing there that could not be moved, once the icons came out of
+     the dock and everything else was draggable. `dock: false` because it opens itself
+     on a fresh browser (main.jsx) and an icon for the thing already on screen is
+     clutter; the launcher can put one on the desktop if he wants it back.
+
+     `css: 'chat'` claims the prefix room.css has used for the conversation since the
+     shell was built — G-ROOM-CSS wants one owner per name, and this is the owner. */
+  { id: 'chat', title: 'chat', icon: '💬', w: 560, h: 560, Component: Chat, css: 'chat', dock: false,
+    blurb: 'the conversation — her and him, the only thing in this room with contrast' },
+  /* THE ROOM'S WEATHER, FRAMED. The full-bleed backdrop stays exactly as it was; this
+     is a second render of the same `describeRoom` output with the reading written
+     underneath. Closing it costs a view, never the ambience. */
+  /* AN ICON BY DEFAULT, unlike chat: chat opens itself, so an icon for it is clutter,
+     but this one has no other way in and the launcher is a poor place to hide the
+     thing he asked to be a window. */
+  { id: 'roomview', title: 'the view', icon: '◱', w: 520, h: 420, Component: RoomView, css: 'rv',
+    blurb: "the room's weather in a frame — phase, her mood, whether anyone is about" },
   { id: 'apps', title: 'apps', icon: '⊞', w: 480, h: 520, Component: Apps, css: 'ap',
     pinned: true,
     blurb: 'every window there is, and which of them live in this dock — change it live' },
