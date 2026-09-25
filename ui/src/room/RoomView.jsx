@@ -1,7 +1,6 @@
-import { useSyncExternalStore } from 'react'
 import Backdrop2D from './Backdrop2D.jsx'
 import { describeRoom } from './describe.js'
-import * as roomMood from './roomMood.js'
+import { useMood } from './useMood.js'
 import { usePoll } from '../apps/panel.jsx'
 import * as api from '../api.js'
 
@@ -23,20 +22,17 @@ import * as api from '../api.js'
  */
 export default function RoomView() {
   const beat = usePoll(api.pulse, 5000)
-  const live = useSyncExternalStore(roomMood.subscribe, roomMood.get)
   const pulse = beat.data
-  // HER LIVE MOOD BEATS THE POLLED ONE, the same precedence the shell uses: the pulse
-  // reads persona.md and only moves when the curator writes; her [MOOD:] mark in the
-  // reply on screen is what she is feeling now.
-  const mood = live.mood || pulse?.her?.mood
-  const shown = { ...(pulse || {}), her: { ...(pulse?.her || {}), mood } }
+  // THE SHELL'S PRECEDENCE, not a copy of it: room/moodTheme.js decides for both.
+  const m = useMood(pulse)
+  const shown = { ...(pulse || {}), her: { ...(pulse?.her || {}), mood: m.word } }
   const room = describeRoom(shown)
 
   return (
     <div className="rv-wrap">
       <div className="rv-stage">
         <Backdrop2D room={room} className="rv-canvas" />
-        {live.thinking ? <div className="rv-think">she is thinking</div> : null}
+        {m.thinking ?<div className="rv-think">she is thinking</div> : null}
       </div>
       <div className="rv-read">
         <span className="rv-k">phase</span><span className="rv-v">{room.phase}</span>

@@ -1,0 +1,98 @@
+/* tokens.css — THE ONLY PLACE A COLOUR IS WRITTEN DOWN (2026-09-24).
+ *
+ * Three layers, read top to bottom: palette → roles → scale. Components read roles.
+ * Below them, the LEGACY ALIASES: every name room.css and the apps used before this file
+ * existed, pointed at a role, so an app that has not been migrated keeps rendering.
+ * Stage 6 of the redesign deletes the aliases; G-ROOM-TOKENS' ratchet counts toward it.
+ *
+ * `--mood-h` / `--mood-glow` are DEFAULTS. room/moodTheme.js writes the live values on
+ * <html> — nothing else may (spec §3).
+ */
+@property --mood-h { syntax: '<number>'; inherits: true; initial-value: 210; }
+
+:root {
+  /* surfaces, darkest first */
+  --surface-0: #070a0f;
+  --surface-1: #0c1119;
+  --surface-2: #111824;
+  --surface-3: #172131;
+
+  /* text. --text-3 was #5f7187 in the spec's first draft: 3.2:1 on surface-3, which
+     fails AA for the 11px captions it exists for. */
+  --text-1: #e3ebf4;
+  --text-2: #9aabbd;
+  --text-3: #7a8ca6;
+
+  /* hairlines — named `hair`, not `line`: `--line` is a legacy alias below until stage 6 */
+  --hair: rgba(160, 190, 220, .10);
+  --hair-strong: rgba(160, 190, 220, .18);
+
+  /* roles */
+  --accent: #46d9e6;
+  --accent-rgb: 70, 217, 230;     /* COMMA triple: rgba(var(--accent-rgb), .2) is valid */
+  --accent-dim: #1d5a63;
+  --warm: #e8b64c;                /* his words */
+  --warm-rgb: 232, 182, 76;
+  --ok: #4ad98a;
+  --warn: #f59e0b;
+  --err: #e2685b;
+  --idle: #4a5568;
+  --an: #a78bfa;                  /* off the record — its own colour, never the error red */
+  --private: #c96ce0;
+  --read: #4ad98a; --write: #e8b64c; --world: #46d9e6; --machine: #e2685b;
+
+  /* her mood (defaults — moodTheme.js owns the live values) */
+  --mood-h: 210;
+  --mood-glow: .4;
+
+  /* type */
+  --font-ui: 'Inter Variable', 'Segoe UI Variable', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'Cascadia Mono', Consolas, monospace;
+  --font-voice: 'Source Serif 4 Variable', Georgia, 'Iowan Old Style', serif;
+  --fs-11: 11px; --fs-12: 12px; --fs-13: 13px; --fs-15: 15px; --fs-18: 18px; --fs-22: 22px;
+
+  /* space, 4px grid */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-7: 28px; --sp-8: 32px;
+
+  /* radii */
+  --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-pill: 999px;
+
+  /* elevation: a drop shadow plus a 1px inner top highlight — depth without blur */
+  --el-1: 0 2px 8px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .04);
+  --el-2: 0 18px 50px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .04);
+  --el-3: 0 24px 64px rgba(0, 0, 0, .65), inset 0 1px 0 rgba(255, 255, 255, .05);
+
+  /* motion */
+  --dur-fast: 120ms; --dur-base: 200ms; --dur-slow: 320ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-spring: cubic-bezier(.34, 1.36, .64, 1);
+
+  /* layout */
+  --tb-h: 46px;
+
+  /* ── LEGACY ALIASES — delete in stage 6 ─────────────────────────────────── */
+  --bg: var(--surface-0);
+  --panel: var(--surface-2);
+  --line: var(--hair);
+  --ink: var(--text-1);
+  --muted: var(--text-3);
+  --cyan: var(--accent);
+  --cyan-dim: var(--accent-dim);
+  --gold: var(--warm);
+  --off: var(--idle);
+  --es: var(--accent);
+  /* WAS `6 182 212`, space-separated, used as rgba(var(--es-rgb), a) fifty times — a
+     mixed syntax that is invalid at computed-value time. Every one of those rules has
+     been silently discarded since e1285c0 (2026-08-02): borders fell to currentColor,
+     backgrounds to transparent. A comma triple makes them all apply, as written. */
+  --es-rgb: var(--accent-rgb);
+  --es-glow: rgba(var(--accent-rgb), .45);
+  --es-amber: var(--warn);
+  --es-red: var(--err);
+  --es-green: var(--ok);
+  --es-ink: var(--text-1);
+  --es-dim: var(--text-3);
+  --es-900: var(--surface-0);
+  --es-800: var(--surface-2);
+}

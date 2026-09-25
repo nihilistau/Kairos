@@ -1,18 +1,12 @@
-/* room.css — the palette is the console's, on purpose.
+/* room.css — the room's panels. Every colour comes from kit/tokens.css.
  * The room is additive, not a replacement, and something that looks like a
  * different product implies the old pages are deprecated. They are not. */
-:root {
-  --bg: #06080c; --panel: #0b0f16; --line: #16202e;
-  --ink: #c8d6e5; --muted: #5d7086;
-  --cyan: #46d9e6; --cyan-dim: #1d5a63; --gold: #e8b64c;
-  --ok: #4ad98a; --off: #4a5568; --err: #e2685b;
-  --an: #a78bfa;   /* off the record — its own colour, never the error red */
-  --read: #4ad98a; --write: #e8b64c; --world: #46d9e6;
-  --machine: #e2685b; --private: #c96ce0;
-}
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink);
-  font: 13px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace; }
+body { margin: 0; background: var(--surface-0); color: var(--text-1);
+  font: 400 var(--fs-13)/1.5 var(--font-ui);
+  font-feature-settings: 'cv11', 'ss01';   /* Inter's straight-sided 1 and open digits */
+  -webkit-font-smoothing: antialiased; }
+code, kbd, samp, pre { font-family: var(--font-mono); }
 button, textarea, input { font: inherit; color: inherit; }
 
 .room { height: 100vh; display: flex; flex-direction: column; }
@@ -198,7 +192,7 @@ header { background: color-mix(in srgb, var(--panel) 78%, transparent);
   text-transform: lowercase; margin-bottom: 3px; }
 .journal .entry.now .lab { color: var(--gold); }
 .journal .entry p { margin: 0; line-height: 1.65; color: var(--ink);
-  font-family: Georgia, "Iowan Old Style", serif; font-size: 13.5px; }
+  font-family: var(--font-voice); font-size: 13.5px; }
 .journal .entry.now p { color: #dfe9f5; }
 .journal .foot { margin-top: 14px; font-size: 10px; font-style: italic; }
 
@@ -525,20 +519,6 @@ body.resizing, body.resizing * { user-select: none !important; cursor: inherit; 
    layout. Panels, the chat log and every app's own classes are untouched: the point
    was to move the furniture, not to rewrite the rooms.
    ═════════════════════════════════════════════════════════════════════════════ */
-:root {
-  --es:        #06b6d4;
-  --es-rgb:    6 182 212;
-  --es-glow:   rgba(6, 182, 212, .45);
-  --es-amber:  #f59e0b;
-  --es-red:    #ef4444;
-  --es-green:  #22c55e;
-  --es-ink:    #c0c8d8;
-  --es-dim:    #6b7280;
-  --es-900:    #0a0c14;
-  --es-800:    #14171f;
-  --dock-w:    92px;
-  --tb-h:      52px;
-}
 
 .room { background: #02030a; color: var(--es-ink); }
 .room header { display: none; }            /* the dock and the taskbar replace it */

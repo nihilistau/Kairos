@@ -11,9 +11,13 @@ import Presence from './room/Presence.jsx'
 import Portrait from './room/Portrait.jsx'
 import Down from './room/Down.jsx'
 import DeskIcons from './room/DeskIcons.jsx'
-import * as roomMood from './room/roomMood.js'
+import { useMood } from './room/useMood.js'
+import { applyMood } from './room/moodTheme.js'
 import Anon, { AnonChip } from './room/Anon.jsx'
 import { useState } from 'react'
+import './kit/fonts.js'
+import './kit/tokens.css'
+import './kit/kit.css'
 import './room.css'
 
 /* THE ROOM — the shell.
@@ -258,14 +262,13 @@ function Room() {
   // enough that the clock never looks stopped.
   const beat = usePoll(api.pulse, 5000)
   const pulse = beat.data
-  // HER LIVE MOOD beats the polled one. The pulse reads persona.md, which only
-  // changes when the curator writes; her [MOOD:] mark in the current reply is what
-  // she is feeling RIGHT NOW, and that is what the room should be wearing.
-  const live = useSyncExternalStore(roomMood.subscribe, roomMood.get)
+  // HER MOOD, decided in ONE place (room/moodTheme.js): her live [MOOD:] mark beats the
+  // polled one. The shell writes it onto <html> so every surface reads the same hue.
+  const m = useMood(pulse)
+  useEffect(() => { applyMood(document.documentElement, m) }, [m.word, m.hue, m.glow, m.thinking])
   const [armed, setArmed] = useState(false)
   const [downMode, setDownMode] = useState('')
-  const mood = live.mood || pulse?.her?.mood
-  const shown = { ...(pulse || {}), her: { ...(pulse?.her || {}), mood } }
+  const shown = { ...(pulse || {}), her: { ...(pulse?.her || {}), mood: m.word } }
   /* ── THE SHELL, RE-LAID-OUT (2026-08-02) ────────────────────────────────────────
    * Was a top header carrying the brand, every app button, presence and status in one
    * wrapping row — which is why the app list wrapped onto two lines and the desktop
@@ -313,7 +316,7 @@ function Room() {
         {/* ICONS FIRST so every window stacks above them — the desktop is the thing
             windows sit ON, and an icon that can cover a panel is not a desktop. */}
         <DeskIcons />
-        <Portrait mood={mood} thinking={live.thinking} />
+        <Portrait mood={m.word} thinking={m.thinking} />
         {windows.map(w => <Win key={w.appId} w={w} />)}
       </main>
 

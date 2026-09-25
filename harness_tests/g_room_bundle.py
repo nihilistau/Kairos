@@ -59,8 +59,19 @@ for ext in (".js", ".css"):
                                      [os.path.basename(x) for x in B.get(ext, [])]))
 idx_built = open(os.path.join(out, "index.html"), encoding="utf-8").read() if os.path.exists(os.path.join(out, "index.html")) else ""
 idx_comm = open(os.path.join(ROOT, "console", "room", "index.html"), encoding="utf-8").read()
-check("console/room/index.html names the committed assets",
-      all(os.path.basename(c) in idx_comm for c in committed), [os.path.basename(c) for c in committed])
+# FONTS (2026-09-26, stage 0): the self-hosted woff2 files are named by the stylesheet,
+# not by index.html, so "named" means named by either. Their bytes are not compared;
+# their names are content-hashed, so the built and committed NAME SETS matching is the
+# byte check for them, and it also catches a stale font left behind or one never added.
+css_comm = "".join(open(p, encoding="utf-8").read() for p in C.get(".css", []))
+check("every committed asset is named by console/room/index.html or the committed css",
+      all(os.path.basename(c) in idx_comm + css_comm for c in committed),
+      [os.path.basename(c) for c in committed
+       if os.path.basename(c) not in idx_comm + css_comm])
+check("the built asset names are exactly the committed asset names",
+      sorted(map(os.path.basename, built)) == sorted(map(os.path.basename, committed)),
+      {"only built": sorted(set(map(os.path.basename, built)) - set(map(os.path.basename, committed))),
+       "only committed": sorted(set(map(os.path.basename, committed)) - set(map(os.path.basename, built)))})
 shutil.rmtree(out, ignore_errors=True)
 
 print("\nPANEL CONTRACTS — the class the House crash lived in (2026-08-29 audit)")

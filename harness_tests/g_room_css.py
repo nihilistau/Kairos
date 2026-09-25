@@ -82,8 +82,11 @@ SHARED_FAMILIES = {
     "st":  "shared:knobs",        # home app: settings
     "rsc": "shared:looks",        # home app: research
     "tc":  "shared:titlechips",   # no home app — window chrome furniture
+    # THE KIT (2026-09-24, the redesign): every shared visual part — chip, button,
+    # field, tabs, row, state, orb, icon — rendered by ui/src/kit/ and nowhere else.
+    "ui":  "shared:kit",          # no home app
 }
-SHARED_MODULES = {"panel", "knobs", "looks", "titlechips"}
+SHARED_MODULES = {"panel", "knobs", "looks", "titlechips", "kit"}
 
 
 def family_of(c: str):
@@ -154,6 +157,12 @@ for p in [os.path.join(UI, "main.jsx"), os.path.join(UI, "Chat.jsx")] + \
          sorted(glob.glob(os.path.join(UI, "room", "*.jsx"))):
     shell |= classes_in(io.open(p, encoding="utf-8").read())
 owners["shell"] = shell
+kit = set()
+for p in sorted(glob.glob(os.path.join(UI, "kit", "*.jsx"))):
+    kit |= classes_in(io.open(p, encoding="utf-8").read())
+owners["shared:kit"] = kit
+check("the kit renders at least one ui- class (it is not an empty owner)",
+      any(c.startswith("ui-") for c in kit), sorted(kit)[:5])
 used_by = collections.defaultdict(set)
 for o, cs in owners.items():
     for c in cs:

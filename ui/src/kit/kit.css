@@ -1,0 +1,125 @@
+/* kit.css — the `ui-` family. Reads only tokens.css roles. */
+
+/* CURSORS. Every one falls back to a system keyword: a browser that refuses the image
+   shows the right system cursor, never the wrong custom one. Hotspots in px at 32px. */
+:root {
+  --cur-arrow: url('./cursors/arrow.svg') 7 5, default;
+  --cur-hand: url('./cursors/hand.svg') 14 7, pointer;
+  --cur-grab: url('./cursors/grab.svg') 16 16, grab;
+  --cur-grabbing: url('./cursors/grabbing.svg') 16 16, grabbing;
+  --cur-text: url('./cursors/text.svg') 16 16, text;
+  --cur-move: url('./cursors/move.svg') 16 16, move;
+  --cur-ns: url('./cursors/ns.svg') 16 16, ns-resize;
+  --cur-ew: url('./cursors/ew.svg') 16 16, ew-resize;
+  --cur-nwse: url('./cursors/nwse.svg') 16 16, nwse-resize;
+  --cur-nesw: url('./cursors/nesw.svg') 16 16, nesw-resize;
+  --cur-no: url('./cursors/no.svg') 16 16, not-allowed;
+  --cur-busy: url('./cursors/busy.svg') 7 5, progress;
+}
+html, body { cursor: var(--cur-arrow); }
+button, a, [role="tab"], summary, label[for], select { cursor: var(--cur-hand); }
+input, textarea, [contenteditable="true"] { cursor: var(--cur-text); }
+button:disabled, [aria-disabled="true"] { cursor: var(--cur-no); }
+html.mood-thinking body { cursor: var(--cur-busy); }
+
+/* SELECTION AND SCROLLBARS — on every window, so they are part of the look. */
+::selection { background: hsl(var(--mood-h) 70% 50% / .32); color: var(--text-1); }
+* { scrollbar-width: thin; scrollbar-color: rgba(var(--accent-rgb), .28) transparent; }
+
+/* ICONS */
+.ui-ic { display: inline-block; flex: none; vertical-align: -3px; }
+.ui-ic-d { stroke: hsl(var(--mood-h) 80% 70%); transition: stroke 2.4s var(--ease-out); }
+.ui-ic-missing { border: 1px dashed var(--text-3); border-radius: 4px; }
+
+/* CHIP */
+.ui-chip { display: inline-flex; align-items: center; gap: 5px; height: 20px;
+  padding: 0 8px; border-radius: var(--r-pill); font: 400 var(--fs-11)/1 var(--font-ui);
+  white-space: nowrap; border: 1px solid var(--hair-strong);
+  background: rgba(160, 190, 220, .06); color: var(--text-2); }
+.ui-chip-btn { cursor: var(--cur-hand); }
+.ui-chip-btn:hover { border-color: rgba(var(--accent-rgb), .45); color: var(--text-1); }
+.ui-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.ui-tone-accent { color: var(--accent); border-color: rgba(var(--accent-rgb), .32);
+  background: rgba(var(--accent-rgb), .10); }
+.ui-tone-ok { color: var(--ok); border-color: rgba(74, 217, 138, .32); background: rgba(74, 217, 138, .08); }
+.ui-tone-warn { color: var(--warn); border-color: rgba(245, 158, 11, .35); background: rgba(245, 158, 11, .08); }
+.ui-tone-err { color: var(--err); border-color: rgba(226, 104, 91, .35); background: rgba(226, 104, 91, .08); }
+.ui-tone-an { color: var(--an); border-color: rgba(167, 139, 250, .38); background: rgba(167, 139, 250, .10); }
+.ui-tone-mood { color: hsl(var(--mood-h) 80% 76%); border-color: hsl(var(--mood-h) 70% 60% / .30);
+  background: hsl(var(--mood-h) 60% 50% / .12); }
+
+/* BUTTON */
+.ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 30px; padding: 0 12px; border-radius: var(--r-sm); font: 500 var(--fs-12)/1 var(--font-ui);
+  border: 1px solid var(--hair-strong); background: rgba(160, 190, 220, .05); color: var(--text-1);
+  transition: background var(--dur-fast), border-color var(--dur-fast), transform var(--dur-fast); }
+.ui-btn:hover:not(:disabled) { background: rgba(160, 190, 220, .10); border-color: rgba(var(--accent-rgb), .35); }
+.ui-btn:active:not(:disabled) { transform: translateY(1px); }
+.ui-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px hsl(var(--mood-h) 70% 60% / .6); }
+.ui-btn:disabled { opacity: .45; }
+.ui-btn-sm { height: 24px; padding: 0 9px; font-size: var(--fs-11); }
+.ui-btn-icon { width: 30px; padding: 0; }
+.ui-btn-sm.ui-btn-icon { width: 24px; }
+.ui-btn-primary { background: var(--accent); border-color: transparent; color: #04262b; }
+.ui-btn-primary:hover:not(:disabled) { background: #6be3ec; border-color: transparent; }
+.ui-btn-ghost { background: transparent; border-color: transparent; color: var(--text-2); }
+.ui-btn-ghost:hover:not(:disabled) { color: var(--text-1); background: rgba(160, 190, 220, .07); border-color: transparent; }
+.ui-btn-danger { color: var(--err); border-color: rgba(226, 104, 91, .35); background: transparent; }
+.ui-btn-danger:hover:not(:disabled) { background: rgba(226, 104, 91, .12); border-color: rgba(226, 104, 91, .6); }
+
+/* FIELD */
+.ui-field { height: 32px; padding: 0 10px; border-radius: var(--r-sm); width: 100%;
+  font: 400 var(--fs-13)/1.4 var(--font-ui); color: var(--text-1);
+  background: var(--surface-1); border: 1px solid var(--hair-strong);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast); }
+.ui-field::placeholder { color: var(--text-3); }
+.ui-field:focus { outline: none; border-color: hsl(var(--mood-h) 60% 60% / .55);
+  box-shadow: 0 0 0 3px hsl(var(--mood-h) 70% 55% / .14); }
+.ui-field-area { height: auto; min-height: 64px; padding: 8px 10px; resize: vertical; }
+.ui-field-select { padding-right: 26px; }
+
+/* TABS */
+.ui-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--hair); }
+.ui-tab { height: 32px; padding: 0 12px; background: none; border: none; color: var(--text-2);
+  font: 500 var(--fs-12)/1 var(--font-ui); box-shadow: inset 0 -2px 0 transparent;
+  transition: color var(--dur-fast), box-shadow var(--dur-base); }
+.ui-tab:hover { color: var(--text-1); }
+.ui-tab-on { color: var(--text-1); box-shadow: inset 0 -2px 0 hsl(var(--mood-h) 70% 65%); }
+
+/* ROW */
+.ui-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px;
+  padding: 6px 10px; text-align: left; font: 400 var(--fs-13)/1.4 var(--font-ui);
+  color: var(--text-1); background: none; border: none; border-bottom: 1px solid var(--hair); }
+.ui-row-btn:hover { background: rgba(160, 190, 220, .05); }
+.ui-row-lead { flex: none; color: var(--text-2); }
+.ui-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ui-row-meta { flex: none; font: 400 var(--fs-11)/1 var(--font-mono); color: var(--text-3); }
+.ui-row-trail { flex: none; display: flex; gap: 4px; }
+
+/* STATE */
+.ui-state { display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: var(--sp-6) var(--sp-4); text-align: center; color: var(--text-2); }
+.ui-state-t { font: 500 var(--fs-13)/1.3 var(--font-ui); color: var(--text-1); }
+.ui-state-b { font-size: var(--fs-12); max-width: 42ch; line-height: 1.55; }
+.ui-state-error .ui-state-t { color: var(--err); }
+.ui-spin { width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--hair-strong); border-top-color: hsl(var(--mood-h) 80% 70%);
+  animation: ui-spin .9s linear infinite; }
+@keyframes ui-spin { to { transform: rotate(360deg); } }
+
+/* ORB */
+.ui-orb { width: 10px; height: 10px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle at 35% 35%, hsl(var(--mood-h) 90% 82%), hsl(var(--mood-h) 80% 55%));
+  box-shadow: 0 0 calc(6px + 8px * var(--mood-glow)) hsl(var(--mood-h) 90% 60% / .75);
+  animation: ui-breathe 6s ease-in-out infinite; }
+.ui-orb-think { animation-duration: 1.4s; }
+@keyframes ui-breathe { 0%, 100% { transform: scale(.85); opacity: .75; } 50% { transform: scale(1.1); opacity: 1; } }
+
+/* THE MOOD GLIDES — @property makes --mood-h interpolable (tokens.css). */
+html { transition: --mood-h 2.4s var(--ease-out); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-orb, .ui-spin { animation: none; }
+  html { transition: none; }
+  .ui-ic-d, .ui-btn, .ui-field, .ui-tab { transition: none; }
+}

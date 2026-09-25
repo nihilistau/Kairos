@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.8.40 — the room gets a design system, and fifty rules that never applied now do (2026-09-26)
+
+Three changes to the room shipped since 0.8.39; this line names all of them.
+
+**The dock is gone; the icons are loose and the canvas is a window.** The apps sit on the
+desktop as free icons (double-click opens, drag places, the position persists per browser).
+The brand, off-the-record and shut down moved to the taskbar rather than becoming icons. The
+window manager gained maximise (the green light and a double-click on the bar), chat and the
+room's view open as ordinary windows, and her live mood reaches the room through a small
+module store instead of a prop that only worked while chat was the page.
+
+**The chat window lay over its own title bar.** `.chat` was `position: absolute; inset: 0`,
+written when chat was the whole page; inside a window it covered the bar, so it could not be
+dragged and none of its lights worked. It flows inside the window body now.
+
+**The room gets a design system (redesign stage 0).** `ui/src/kit/tokens.css` is the only
+place a colour is written; every older variable is an alias onto a role. `--es-rgb` was
+`6 182 212` and was used fifty times as `rgba(var(--es-rgb), .16)` — mixed comma and space
+syntax, invalid at computed-value time, so all fifty declarations were discarded and every
+window border drew `currentColor` grey. It is a comma triple now, and the borders and tints
+apply as written. Also visible: a lighter cyan accent throughout, a taskbar 6px shorter,
+self-hosted fonts (Inter for the room, JetBrains Mono for machine text, Source Serif 4 for her
+words; only the subsets a page uses are fetched), twelve themed cursors with system
+fallbacks, and her mood decided in one module (`room/moodTheme.js`) with one reader of the
+live value. New gate G-ROOM-TOKENS: text contrast at least 4.5:1 on every surface, the mood
+precedence driven under node, a raw-colour ratchet that may only fall, and every
+`rgba(var(--x), a)` resolving to a comma triple.
+
 ## 0.8.39 — her own time comes unstuck, and a dead feed gets said out loud (2026-09-15)
 
 Five behaviour changes shipped between 0.8.38 and this line without the number moving. That

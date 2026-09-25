@@ -498,9 +498,13 @@ export const MOODS = {
    "wistful; naughty" both missed and became `quiet` — a calm face over a reply that was
    neither. Strip the punctuation she leads with, then take the FIRST of a compound: when
    she says two things at once the first is the one she reached for. */
-export const moodOf = (name) =>
-  MOODS[String(name || '').toLowerCase().replace(/^[\s:;,.+-]+/, '').split(/[,;+/\s]/)[0]]
-  || MOODS.quiet
+/* ONE NORMALISER (2026-09-24). moodOf's face lookup and the room's colour both need
+   "which word did she mean", and a second spelling of that regex would be a second
+   answer the day someone edits one of them. */
+export const moodWord = (name) =>
+  String(name || '').toLowerCase().replace(/^[\s:;,.+-]+/, '').split(/[,;+/\s]/)[0]
+
+export const moodOf = (name) => MOODS[moodWord(name)] || MOODS.quiet
 
 /** Trait chips get a colour family so a glance reads them, not a wall of grey. */
 export const TRAIT_HUE = {
