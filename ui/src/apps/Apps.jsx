@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { APPS, DOCK_HIDDEN_DEFAULT } from '../appRegistry.jsx'
 import * as dock from '../dockPrefs.js'
+import { Icon } from '../kit/icons.jsx'
 
 /* APPS — the launcher, and the dock's own switchboard (2026-08-21, his ask:
  * "an icon on the side bar that brings up a panel containing icons to
@@ -26,7 +27,7 @@ export default function Apps() {
         <label key={a.id} className="ap-row">
           <input type="checkbox" checked={!hidden.has(a.id)}
                  onChange={() => dock.toggle(a.id, DOCK_HIDDEN_DEFAULT)} />
-          <span className="ap-ic">{a.icon}</span>
+          <span className="ap-ic"><Icon name={a.icon} size={16} /></span>
           <span className="ap-ti">{a.title}</span>
           <span className="ap-blurb">{a.blurb}</span>
         </label>

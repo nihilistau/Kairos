@@ -217,6 +217,37 @@ for fam, mod in SHARED_FAMILIES.items():
                 grown.append((o, c))
 check("no app coins a new name in a shared family", not grown, grown)
 
+print("\n4c. a `ui-` rule is written in kit/kit.css and nowhere else")
+# §4b reads JSX, so it could not see a STYLESHEET: `.ui-sneaky { ... }` appended to
+# room.css stayed green (final review, 2026-09-26). A second author of a ui- rule is a
+# second stylesheet for one part — the .led ambiguity again. Every CSS selector naming
+# a `.ui-*` class outside kit.css fails, unless it is listed here.
+# ALLOWED: contextual COLOUR only — a surface tinting the kit part it hosts, never
+# restyling its shape. Shrink-only; each entry is (file relative to ui/src, selector).
+UI_RULE_ALLOWED = {
+    ("room/shell.css", ".tb-brand .ui-ic"),   # the brand mark is drawn in --accent
+}
+KIT_CSS = os.path.normcase(os.path.join(UI, "kit", "kit.css"))
+ui_rules, css_read = [], 0
+for p in sorted(glob.glob(os.path.join(UI, "**", "*.css"), recursive=True)):
+    if os.path.normcase(os.path.abspath(p)) == KIT_CSS:
+        continue
+    css_read += 1
+    rel = os.path.relpath(p, UI).replace(os.sep, "/")
+    body = re.sub(r"/\*.*?\*/", "", io.open(p, encoding="utf-8").read(), flags=re.S)
+    for pre in re.findall(r"([^{}]+)\{", body):
+        for sel in pre.split(","):
+            sel = " ".join(sel.split())
+            if re.search(r"\.ui-[\w-]", sel) and (rel, sel) not in UI_RULE_ALLOWED:
+                ui_rules.append((rel, sel))
+check("the leg read stylesheets besides kit.css", css_read >= 2, css_read)
+check("no stylesheet outside kit/kit.css writes a .ui-* rule", not ui_rules, ui_rules)
+stale_ui = sorted(a for a in UI_RULE_ALLOWED
+                  if not os.path.isfile(os.path.join(UI, a[0]))
+                  or a[1] not in " ".join(re.sub(r"/\*.*?\*/", "", io.open(
+                      os.path.join(UI, a[0]), encoding="utf-8").read(), flags=re.S).split()))
+check("no stale allowance — every listed ui- selector still exists", not stale_ui, stale_ui)
+
 print("\n5. the grandfather table is a ratchet, not a permission slip")
 check("it has not grown", len(GRANDFATHERED) <= GRANDFATHERED_MAX,
       "%d > %d" % (len(GRANDFATHERED), GRANDFATHERED_MAX))

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import * as api from '../api.js'
+import { Icon } from '../kit/icons.jsx'
 
 /* OFF THE RECORD — the switch, and the two places it has to be visible.
  *
@@ -9,7 +10,7 @@ import * as api from '../api.js'
  * THE DANGEROUS DIRECTION IS THE QUIET ONE. A private mode you forget you left ON costs
  * an evening of her memory; a private mode you forget you turned OFF costs the privacy
  * you asked for. Both are the same bug — the switch not looking like its state — so it
- * is drawn three times over: the dock button, a taskbar chip that only exists while it
+ * is drawn three times over: the taskbar button, a taskbar chip that only exists while it
  * is on, and a red rule around the whole room (`.an-on` in room.css). None of those is
  * decoration; a mode with one small indicator is a mode that gets misread.
  *
@@ -50,8 +51,8 @@ export default function Anon({ anon, refresh }) {
               title={on
                 ? 'she is still her; nothing is being written down. click to start keeping the evening again'
                 : 'off the record — she stays entirely herself, but no memory, journal, transcript or receipt is written until you turn it off or restart'}>
-        <span className="dock-ic">{on ? '🕶' : '👤'}</span>
-        <span className="dock-lb">{on ? 'off the record' : 'anonymous'}</span>
+        <Icon name={on ? 'anonOn' : 'anon'} size={15} />
+        <span className="an-lb">{on ? 'Off the record' : 'Anonymous'}</span>
       </button>
       {held ? <div className="an-receipt" onClick={() => setHeld('')}>{held}</div> : null}
     </div>

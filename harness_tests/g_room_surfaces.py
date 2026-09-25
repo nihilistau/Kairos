@@ -186,13 +186,13 @@ check("...and a failed source is named rather than swallowed",
 print("\n7. THE WINDOW IS REGISTERED, WITH AN ICON")
 reg = src("ui", "src", "appRegistry.jsx")
 check("`agency` is an app", "id: 'agency'" in reg)
-check("...with its own icon", "icon: '◈'" in reg)
+check("...with its own icon, a drawn glyph", "icon: 'agency'" in reg)
 check("...and its own CSS prefix", "css: 'ag'" in reg)
 # It has to actually be in the bundle he loads, or this is all source that never ran.
 built = [f for f in os.listdir(os.path.join(ROOT, "console", "room", "assets"))
          if f.endswith(".js")]
 blob = "".join(src("console", "room", "assets", f) for f in built)
-check("...and it is in the built bundle", "her own time" in blob, built)
+check("...and it is in the built bundle", "Her own time" in blob, built)
 
 print("\nG-ROOM-SURFACES: %d pass, %d fail" % (PASS, FAIL))
 rdir = os.path.join(ROOT, "var", "sem", "receipts")

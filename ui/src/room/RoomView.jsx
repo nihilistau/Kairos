@@ -32,7 +32,7 @@ export default function RoomView() {
     <div className="rv-wrap">
       <div className="rv-stage">
         <Backdrop2D room={room} className="rv-canvas" />
-        {m.thinking ?<div className="rv-think">she is thinking</div> : null}
+        {m.thinking ? <div className="rv-think">she is thinking</div> : null}
       </div>
       <div className="rv-read">
         <span className="rv-k">phase</span><span className="rv-v">{room.phase}</span>

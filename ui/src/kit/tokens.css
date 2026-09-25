@@ -31,13 +31,26 @@
   --accent: #46d9e6;
   --accent-rgb: 70, 217, 230;     /* COMMA triple: rgba(var(--accent-rgb), .2) is valid */
   --accent-dim: #1d5a63;
+  --accent-hover: #6be3ec;
+  --on-accent: #04262b;           /* ink drawn ON a cyan fill (the send button) */
   --warm: #e8b64c;                /* his words */
   --warm-rgb: 232, 182, 76;
   --ok: #4ad98a;
+  --ok-rgb: 74, 217, 138;
   --warn: #f59e0b;
+  --warn-rgb: 245, 158, 11;
   --err: #e2685b;
+  --err-rgb: 226, 104, 91;
+  --on-err: #170403;              /* ink drawn ON a red fill (the stop button) */
+  /* the dark ink drawn on the green/amber/red window lights */
+  --lt-ink-max: #0b3a20; --lt-ink-min: #4a3306; --lt-ink-close: #4a120d;
+  /* an UNFOCUSED window's bar, and its three lights while they are grey. The grey was
+     #3a4658, 1.81:1 on that bar; a control wants 3:1 (WCAG 1.4.11) — this is 3.34:1. */
+  --bar-idle: #131b28;
+  --lt-idle: #606e84;
   --idle: #4a5568;
   --an: #a78bfa;                  /* off the record — its own colour, never the error red */
+  --an-rgb: 167, 139, 250;
   --private: #c96ce0;
   --read: #4ad98a; --write: #e8b64c; --world: #46d9e6; --machine: #e2685b;
 

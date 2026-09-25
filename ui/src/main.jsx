@@ -11,6 +11,8 @@ import Presence from './room/Presence.jsx'
 import Portrait from './room/Portrait.jsx'
 import Down from './room/Down.jsx'
 import DeskIcons from './room/DeskIcons.jsx'
+import { Icon } from './kit/icons.jsx'
+import { Orb } from './kit/parts.jsx'
 import { useMood } from './room/useMood.js'
 import { applyMood } from './room/moodTheme.js'
 import Anon, { AnonChip } from './room/Anon.jsx'
@@ -19,6 +21,7 @@ import './kit/fonts.js'
 import './kit/tokens.css'
 import './kit/kit.css'
 import './room.css'
+import './room/shell.css'
 
 /* THE ROOM — the shell.
  *
@@ -57,10 +60,18 @@ class PanelBoundary extends React.Component {
   }
 }
 
-function Win({ w }) {
+function Win({ w, focused }) {
   const app = byId(w.appId)
   const drag = useRef(null)
   const el = useRef(null)
+  // FRESH for one beat after mount, so `win-in` plays once and then gets out of the
+  // way. Hooks sit above the early return below: a hook after it would change the
+  // hook count the moment a window is minimised, and React would throw.
+  const [fresh, setFresh] = useState(true)
+  useEffect(() => { const t = setTimeout(() => setFresh(false), 260); return () => clearTimeout(t) }, [])
+  // DRAGGING IS STATE, not a read of the ref: the ref clears on mouseup without a render,
+  // so the class (and the grabbing cursor) stayed on the bar until something else drew.
+  const [dragging, setDragging] = useState(false)
   // SPRING, not snap. A window that jumps to its position reads as a div; one that
   // settles reads as an object. The easing lives in CSS so dragging stays exact —
   // a transition on transform during a drag makes the window lag the cursor, which
@@ -71,6 +82,7 @@ function Win({ w }) {
   const onDown = (e) => {
     if (e.target.closest('button')) return
     drag.current = { x: e.clientX, y: e.clientY, ox: w.x, oy: w.y }
+    setDragging(true)
     wm.focus(w.appId)
     const move = (ev) => {
       if (!drag.current) return
@@ -81,6 +93,7 @@ function Win({ w }) {
     }
     const up = () => {
       drag.current = null
+      setDragging(false)
       window.removeEventListener('mousemove', move)
       window.removeEventListener('mouseup', up)
     }
@@ -130,7 +143,8 @@ function Win({ w }) {
   // having to recompute and write a new box.
   return (
     <div ref={el}
-         className={'win' + (drag.current ? ' dragging' : '') + (w.max ? ' maxed' : '')}
+         className={'win' + (focused ? ' win-focus' : '') + (fresh ? ' win-in' : '')
+                    + (dragging ? ' dragging' : '') + (w.max ? ' maxed' : '')}
          style={w.max ? { zIndex: w.z } : { left: w.x, top: w.y, width: w.w, height: w.h, zIndex: w.z }}
          onMouseDown={() => wm.focus(w.appId)}>
       {/* CONTROLS ON THE RIGHT (2026-08-21, his ask), title leading — the dots ARE
@@ -140,7 +154,7 @@ function Win({ w }) {
           room's first three weeks.) */}
       <div className="bar" onMouseDown={onDown}
            onDoubleClick={(e) => { if (!e.target.closest('button')) wm.maximize(w.appId) }}>
-        <span className="ic">{app.icon}</span>
+        <span className="ic"><Icon name={app.icon} size={15} /></span>
         <span className="ti">{app.title}</span>
         {/* THE TITLE CHIP (2026-08-21): a glance at state/provider, registry-declared
             (titleChips.jsx), mounted only while the window is open. Never a control. */}
@@ -150,9 +164,15 @@ function Win({ w }) {
               labelled "focused" and did nothing; it is maximise now, which is what the
               hand already expects of it. */}
           <button className="lt lt-green" onClick={() => wm.maximize(w.appId)}
-                  title={w.max ? 'restore' : 'maximise'} />
-          <button className="lt lt-amber" onClick={() => wm.minimize(w.appId)} title="minimise" />
-          <button className="lt lt-red" onClick={() => wm.close(w.appId)} title="close" />
+                  title={w.max ? 'Restore' : 'Maximise'} aria-label={w.max ? 'Restore' : 'Maximise'}>
+            <svg width="7" height="7" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M1.5 1.5h5v5h-5z" /></svg>
+          </button>
+          <button className="lt lt-amber" onClick={() => wm.minimize(w.appId)} title="Minimise" aria-label="Minimise">
+            <svg width="7" height="7" viewBox="0 0 8 8" stroke="currentColor" strokeWidth="1.4"><path d="M1.5 4h5" /></svg>
+          </button>
+          <button className="lt lt-red" onClick={() => wm.close(w.appId)} title="Close" aria-label="Close">
+            <svg width="7" height="7" viewBox="0 0 8 8" stroke="currentColor" strokeWidth="1.4"><path d="M2 2l4 4M6 2 2 6" /></svg>
+          </button>
         </span>
       </div>
       <div className="body"><PanelBoundary title={app.title}><Body /></PanelBoundary></div>
@@ -196,11 +216,14 @@ function Status() {
   }
 
   const prof = sys.data && sys.data.profile
+  const said = busy ? (busy === 'restart' ? 'restarting…' : 'bouncing…')
+    : h.error ? 'gateway unreachable' : d.warm ? 'warm' : d.ok ? 'warming…' : '…'
   return (
     <div className="status">
-      <span className={'led ' + (on ? (d.warm ? 'ok' : 'warm') : 'off')} />
-      <span>{busy ? (busy === 'restart' ? 'restarting…' : 'bouncing…')
-             : h.error ? 'gateway unreachable' : d.warm ? 'warm' : d.ok ? 'warming…' : '…'}</span>
+      {/* the light is NAMED: at phone width the word beside it is hidden (shell.css) */}
+      <span className={'led ' + (on ? (d.warm ? 'ok' : 'warm') : 'off')}
+            role="img" title={'gateway: ' + said} aria-label={'gateway: ' + said} />
+      <span>{said}</span>
       {prof ? <span className="st-prof" title="the profile this stack was launched with">{prof}</span> : null}
       {!busy && sys.data && sys.data.restartable ? (
         ask ? (
@@ -255,6 +278,10 @@ function SceneChip() {
 
 function Room() {
   const windows = useSyncExternalStore(wm.subscribe, wm.getWindows)
+  // FOCUS IS THE TOP WINDOW THAT IS SHOWING. The manager already orders by z; the room
+  // only has to say which one is on top so the chrome can say so too.
+  const focusedId = windows.filter(w => !w.minimized)
+    .reduce((top, w) => (!top || w.z > top.z ? w : top), null)?.appId
   const open = new Set(windows.filter(w => !w.minimized).map(w => w.appId))
   useSyncExternalStore(dockPrefs.subscribe, dockPrefs.getVersion)
   const dockHidden = dockPrefs.hiddenSet(DOCK_HIDDEN_DEFAULT)
@@ -266,6 +293,18 @@ function Room() {
   // polled one. The shell writes it onto <html> so every surface reads the same hue.
   const m = useMood(pulse)
   useEffect(() => { applyMood(document.documentElement, m) }, [m.word, m.hue, m.glow, m.thinking])
+  // THE TASKBAR'S MIDDLE SCROLLS (shell.css) — at 375px only two window buttons fit, and a
+  // clipped one was a minimised window with no way back. Keep the focused one in view.
+  const mid = useRef(null)
+  useEffect(() => {
+    const box = mid.current, b = box && box.querySelector('.tb-win-on')
+    if (!b) return
+    // rects, not offsetLeft: the button's offsetParent is the fixed taskbar, not this box
+    const br = b.getBoundingClientRect(), mr = box.getBoundingClientRect()
+    if (br.left < mr.left) box.scrollLeft -= mr.left - br.left
+    else if (br.right > mr.right) box.scrollLeft += br.right - mr.right
+  }, [focusedId, windows.length])
+  const wheel = (e) => { const box = mid.current; if (box && e.deltaY) box.scrollLeft += e.deltaY }
   const [armed, setArmed] = useState(false)
   const [downMode, setDownMode] = useState('')
   const shown = { ...(pulse || {}), her: { ...(pulse?.her || {}), mood: m.word } }
@@ -276,12 +315,11 @@ function Room() {
    *
    * Now: a LEFT DOCK of apps (icon over label, an active rail on the open ones), the
    * desktop between, and a TASKBAR along the bottom holding the things you glance at
-   * rather than press — clock, her presence, gateway health, and a pin per minimised
-   * window. Same components, same endpoints, same window manager; only the furniture
+   * rather than press — clock, her presence, gateway health, and a button per open
+   * window (2026-09-26: every window, not only minimised ones). Same components, same endpoints, same window manager; only the furniture
    * moved. Modelled on CosySim's executive_suite kit, which is where the operator wants
    * this to end up in 3D.
    */
-  const minimized = windows.filter(w => w.minimized)
   /* OFF THE RECORD (2026-08-23) rides the PULSE the shell already beats on, rather
      than a poll of its own: the switch has to be visible everywhere at once, and a
      second timer is a second idea of whether it is on. `.an-on` puts a rule around
@@ -317,43 +355,67 @@ function Room() {
             windows sit ON, and an icon that can cover a panel is not a desktop. */}
         <DeskIcons />
         <Portrait mood={m.word} thinking={m.thinking} />
-        {windows.map(w => <Win key={w.appId} w={w} />)}
+        {windows.map(w => <Win key={w.appId} w={w} focused={w.appId === focusedId} />)}
       </main>
 
       <footer className="taskbar">
         <div className="tb-left">
           {/* THE BRAND CAME DOWN WITH THE DOCK. It is a mark, not a control, so it sits
               where the other glanced-at things live. */}
-          <span className="tb-brand" title="KAIROS"><b>◈</b> KAIROS</span>
-          <a className="tb-console" href="/index.html"
-             title="the original console — still here, unchanged">console</a>
-          {/* A MINIMISED WINDOW MUST HAVE A WAY BACK. It had none: minimise removed it
-              from the desktop and the only route back was the dock button, which is
-              easy to read as "it closed". */}
-          {minimized.map(w => {
+          <span className="tb-brand" title="Kairos">
+            <Icon name="brand" size={16} /><span className="tb-brand-t">KAIROS</span>
+          </span>
+          <a className="tb-console" href="/index.html" title="The original console — still here, unchanged">
+            <Icon name="console" size={15} />Console
+          </a>
+          <span className="tb-sep" />
+        </div>
+        {/* EVERY WINDOW HAS A BUTTON, not only minimised ones: the taskbar is how you find
+            a window that is under another one, and how you get a minimised one back.
+            Clicking the FOCUSED window's button minimises it — every desktop's taskbar
+            does this, and it gives minimise a second, larger target. */}
+        <div className="tb-mid" ref={mid} onWheel={wheel}>
+          {windows.map(w => {
             const a = byId(w.appId)
-            return a ? (
-              <button key={w.appId} className="tb-pin" title={'restore ' + a.title}
-                      onClick={() => wm.open(w.appId, a)}>
-                <span>{a.icon}</span>{a.title}
+            if (!a) return null
+            const on = w.appId === focusedId
+            return (
+              <button key={w.appId}
+                      className={'tb-win' + (on ? ' tb-win-on' : '') + (w.minimized ? ' tb-win-min' : '')}
+                      title={a.title} aria-current={on ? 'true' : undefined}
+                      onClick={() => (on ? wm.minimize(w.appId) : wm.open(w.appId, a))}>
+                <Icon name={a.icon} size={16} /><span className="tb-win-t">{a.title}</span>
               </button>
-            ) : null
+            )
           })}
         </div>
         <div className="tb-right">
+          {/* A RUNNING SCENE CHANGES WHO SHE IS, so it belongs where he cannot miss it.
+              Found 2026-08-03: a 'penthouse' scene had been live for 17 beats, surviving
+              every restart by design, and he did not know — every reply read as noir bar
+              fiction and it was indistinguishable from her personality having changed.
+              Persisting the scene is right; resuming it silently is not. */}
+          <AnonChip anon={anon} />
+          <SceneChip />
+          <LookingChip pulse={pulse} />
+          {/* HER MOOD, NAMED. The one place it is always written down (spec §3). */}
+          <span className="tb-mood" title={m.known ? 'her mood' : 'her mood — a word with no colour on file'}
+                role="status" aria-label={'her mood: ' + m.word + (m.thinking ? ', thinking' : '')}>
+            <Orb thinking={m.thinking} /><span className="tb-mood-t">{m.word}{m.thinking ? ' · thinking' : ''}</span>
+          </span>
+          <Presence pulse={shown} />
+          <Status />
           <Anon anon={anon} refresh={beat.refresh} />
 
           <div className="sd-wrap">
 
             {!armed ? (
 
-              <button className="sd-btn" title="stop her, or the whole stack"
+              <button className="sd-btn" title="Stop her, or the whole stack"
 
                       onClick={() => setArmed(true)}>
 
-                <span className="dock-ic">⏻</span>
-
-                <span className="dock-lb">shut down</span>
+                <Icon name="power" size={14} /><span>Shut down</span>
 
               </button>
 
@@ -395,17 +457,6 @@ function Room() {
 
           </div>
 
-
-          {/* A RUNNING SCENE CHANGES WHO SHE IS, so it belongs where he cannot miss it.
-              Found 2026-08-03: a 'penthouse' scene had been live for 17 beats, surviving
-              every restart by design, and he did not know — every reply read as noir bar
-              fiction and it was indistinguishable from her personality having changed.
-              Persisting the scene is right; resuming it silently is not. */}
-          <AnonChip anon={anon} />
-          <SceneChip />
-          <LookingChip pulse={pulse} />
-          <Presence pulse={shown} />
-          <Status />
           <Clock pulse={pulse} />
         </div>
       </footer>

@@ -58,7 +58,6 @@ export default function Presence({ pulse }) {
       <div className={'her-light' + (warm ? ' warm' : '')}
            title={warm ? 'she is here' : 'still waking up'} />
       <div className="her-state">
-        {her.mood ? <span className="mood">{her.mood}</span> : null}
         {her.voice ? <span className="voice">{her.voice}</span> : null}
       </div>
       {note ? <div className="note" key={note.id}>{note.text}</div> : null}

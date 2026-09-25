@@ -41,10 +41,11 @@ html.mood-thinking body { cursor: var(--cur-busy); }
 .ui-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .ui-tone-accent { color: var(--accent); border-color: rgba(var(--accent-rgb), .32);
   background: rgba(var(--accent-rgb), .10); }
-.ui-tone-ok { color: var(--ok); border-color: rgba(74, 217, 138, .32); background: rgba(74, 217, 138, .08); }
-.ui-tone-warn { color: var(--warn); border-color: rgba(245, 158, 11, .35); background: rgba(245, 158, 11, .08); }
-.ui-tone-err { color: var(--err); border-color: rgba(226, 104, 91, .35); background: rgba(226, 104, 91, .08); }
-.ui-tone-an { color: var(--an); border-color: rgba(167, 139, 250, .38); background: rgba(167, 139, 250, .10); }
+.ui-tone-ok { color: var(--ok); border-color: rgba(var(--ok-rgb), .32); background: rgba(var(--ok-rgb), .08); }
+.ui-tone-warn { color: var(--warn); border-color: rgba(var(--warn-rgb), .35); background: rgba(var(--warn-rgb), .08); }
+/* the err tint is .06, not .08: at .08 its text measured 4.47:1 over --surface-3 (G-ROOM-TOKENS leg 1) */
+.ui-tone-err { color: var(--err); border-color: rgba(var(--err-rgb), .35); background: rgba(var(--err-rgb), .06); }
+.ui-tone-an { color: var(--an); border-color: rgba(var(--an-rgb), .38); background: rgba(var(--an-rgb), .10); }
 .ui-tone-mood { color: hsl(var(--mood-h) 80% 76%); border-color: hsl(var(--mood-h) 70% 60% / .30);
   background: hsl(var(--mood-h) 60% 50% / .12); }
 
@@ -60,12 +61,12 @@ html.mood-thinking body { cursor: var(--cur-busy); }
 .ui-btn-sm { height: 24px; padding: 0 9px; font-size: var(--fs-11); }
 .ui-btn-icon { width: 30px; padding: 0; }
 .ui-btn-sm.ui-btn-icon { width: 24px; }
-.ui-btn-primary { background: var(--accent); border-color: transparent; color: #04262b; }
-.ui-btn-primary:hover:not(:disabled) { background: #6be3ec; border-color: transparent; }
+.ui-btn-primary { background: var(--accent); border-color: transparent; color: var(--on-accent); }
+.ui-btn-primary:hover:not(:disabled) { background: var(--accent-hover); border-color: transparent; }
 .ui-btn-ghost { background: transparent; border-color: transparent; color: var(--text-2); }
 .ui-btn-ghost:hover:not(:disabled) { color: var(--text-1); background: rgba(160, 190, 220, .07); border-color: transparent; }
-.ui-btn-danger { color: var(--err); border-color: rgba(226, 104, 91, .35); background: transparent; }
-.ui-btn-danger:hover:not(:disabled) { background: rgba(226, 104, 91, .12); border-color: rgba(226, 104, 91, .6); }
+.ui-btn-danger { color: var(--err); border-color: rgba(var(--err-rgb), .35); background: transparent; }
+.ui-btn-danger:hover:not(:disabled) { background: rgba(var(--err-rgb), .12); border-color: rgba(var(--err-rgb), .6); }
 
 /* FIELD */
 .ui-field { height: 32px; padding: 0 10px; border-radius: var(--r-sm); width: 100%;
@@ -85,12 +86,19 @@ html.mood-thinking body { cursor: var(--cur-busy); }
   transition: color var(--dur-fast), box-shadow var(--dur-base); }
 .ui-tab:hover { color: var(--text-1); }
 .ui-tab-on { color: var(--text-1); box-shadow: inset 0 -2px 0 hsl(var(--mood-h) 70% 65%); }
+.ui-tab:focus-visible { outline: none; border-radius: var(--r-sm);
+  box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px hsl(var(--mood-h) 70% 60% / .6); }
 
 /* ROW */
 .ui-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px;
   padding: 6px 10px; text-align: left; font: 400 var(--fs-13)/1.4 var(--font-ui);
   color: var(--text-1); background: none; border: none; border-bottom: 1px solid var(--hair); }
 .ui-row-btn:hover { background: rgba(160, 190, 220, .05); }
+/* a clickable row's main button fills the row beside its trail — never around it */
+.ui-row-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+  padding: 0; margin: 0; text-align: left; font: inherit; color: inherit;
+  background: none; border: none; border-radius: var(--r-sm); }
+.ui-row-main:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--mood-h) 70% 60% / .6); }
 .ui-row-lead { flex: none; color: var(--text-2); }
 .ui-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ui-row-meta { flex: none; font: 400 var(--fs-11)/1 var(--font-mono); color: var(--text-3); }

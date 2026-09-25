@@ -200,13 +200,29 @@ bad_profiles = [f for f in os.listdir(os.path.join(ROOT, "profiles")) if f.start
     if os.path.isdir(os.path.join(ROOT, "profiles")) else []
 check("no source-only profiles (agent*.toml)", not bad_profiles, bad_profiles)
 check("profiles/companion.toml ships", os.path.exists(os.path.join(ROOT, "profiles", "companion.toml")))
+def _keyish(fn: str) -> bool:
+    """The ONE owner of the key-file rule: does this file NAME look like a stored secret?"""
+    # A stylesheet is code, not a credential store: `ui/src/kit/tokens.css` (design tokens) tripped this in the stage-0 export (2026-09-26).
+    if fn.lower().endswith((".py", ".md", ".jsx", ".js", ".css")):
+        return False                                  # code and docs may be ABOUT secrets
+    return bool(re.search(r"(secret|token|\.env$|api[_-]?key|\.pem$|\.key$)", fn, re.I))
+
+
+# The rule proves itself on NAMES before it is trusted on the tree: a pure-predicate check,
+# so a fix that loosens it (skip anything named "token") goes red here by name, and a revert
+# of the stylesheet exemption goes red on tokens.css — without planting files in a target.
+_KEYISH_CASES = (("token.json", True), ("secrets.toml", True), ("api_key.txt", True),
+                 (".env", True), ("id.pem", True), ("server.key", True),
+                 ("engine.token", True), ("tokens.css", False), ("tokens.py", False),
+                 ("README.md", False), ("style.css", False))
+_miss = ["%s -> %s (want %s)" % (n, _keyish(n), w) for n, w in _KEYISH_CASES if _keyish(n) != w]
+check("the key-file rule classifies its own cases (%d)" % len(_KEYISH_CASES), not _miss, _miss)
+
 keyish = []
 for dp, dns, fns in os.walk(ROOT):
     dns[:] = [d for d in dns if d not in (".git", "node_modules", "var", "persona")]
     for fn in fns:
-        if fn.endswith((".py", ".md", ".jsx", ".js")):
-            continue                                  # code and docs may be ABOUT secrets
-        if re.search(r"(secret|token|\.env$|api[_-]?key|\.pem$|\.key$)", fn, re.I):
+        if _keyish(fn):
             keyish.append(os.path.relpath(os.path.join(dp, fn), ROOT))
 check("no key/secret-shaped files", not keyish, keyish)
 check("persona-template/ ships and persona/ is gitignored",

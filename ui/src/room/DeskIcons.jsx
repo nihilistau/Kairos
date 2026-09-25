@@ -3,6 +3,7 @@ import * as wm from '../windowManager.js'
 import * as deskIcons from '../deskIcons.js'
 import * as dockPrefs from '../dockPrefs.js'
 import { APPS, DOCK_HIDDEN_DEFAULT } from '../appRegistry.jsx'
+import { Icon } from '../kit/icons.jsx'
 
 /* DESK ICONS — the apps, loose on the desktop, where he puts them.
  *
@@ -116,7 +117,7 @@ export default function DeskIcons() {
                   /* KEYBOARD IS NOT AN AFTERTHOUGHT: a double-click is unreachable
                      from the keyboard, so Enter opens the selected icon. */
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); wm.open(app.id, app) } }}>
-            <span className="dsk-ic">{app.icon}</span>
+            <span className="dsk-tile"><Icon name={app.icon} size={26} /></span>
             <span className="dsk-lb">{app.title}</span>
           </button>
         )

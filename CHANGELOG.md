@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.8.42 — the room's tint follows the mood; fixes from the review of the redesign's first stages (2026-09-26)
+
+* **The backdrop tint follows the mood.** `.room::after` read a variable only a descendant
+  set, so it always fell back to hue 200; it reads the live `--mood-h` now and lives in
+  `ui/src/room/shell.css`.
+* **Taskbar at phone width:** the window list scrolls sideways and keeps the focused
+  window's button in view, so a minimised window is always reachable. The focused button
+  carries `aria-current`; the mood pill and the gateway light have accessible names.
+* **Windows:** the `dragging` class clears on mouseup (it was read from a ref). Idle
+  title-bar lights meet 3:1 against their bar (`--lt-idle` on `--bar-idle`); a minimised
+  window's taskbar title uses `--text-3` instead of opacity.
+* **Kit:** `Tabs` moves focus with the selection and handles Home/End, with a visible focus
+  ring; a clickable `Row` no longer nests its trail buttons inside a button. `kit.css`
+  reads role tokens (`--on-accent`, `--accent-hover`, and the new `--err-rgb`/`--warn-rgb`)
+  instead of repeating their values; the error chip's tint is lighter so its text clears
+  4.5:1 on every surface. Reduced motion also stops the backdrop pulse and two transitions.
+* **Gates:** G-ROOM-TOKENS checks ink-on-fill, status colours on every surface, idle lights,
+  and each chip tone's text on its own composited tint; its ratchet and triple legs fail when
+  they count nothing; the raw-colour baseline fell 291 to 272. G-ROOM-CSS fails a `.ui-*`
+  rule written in any stylesheet outside `kit/kit.css`.
+
+## 0.8.41 — the room's shell, redrawn (2026-09-26)
+
+Stage 1 of the room redesign: the shell's chrome (desktop, windows, taskbar, portrait) moved
+out of `room.css` into `ui/src/room/shell.css` and was rebuilt on the stage-0 kit.
+
+* **Drawn icons replace emoji** in the app registry, desk tiles, window bars, taskbar and the
+  Apps launcher; every registry `icon:` names a glyph in `kit/icons.jsx`. Window titles are
+  sentence case.
+* **Focus is visible.** The top non-minimised window gets `win-focus` (tinted by the mood
+  hue); the others dim. The three title-bar lights have accessible names and show their
+  glyphs on hover, inked by tokens rather than inline hex.
+* **The taskbar lists every open window**, not only minimised ones; clicking the focused
+  window's button minimises it. A mood pill (orb plus word) sits in the row, and so does the
+  clock, which was absolutely positioned outside it. The right-hand group was taller than the
+  46px bar (63px) and now fits (28px). At narrow widths labels are shed before buttons.
+* **Chat text by role:** user lines in the UI face, assistant lines in the serif, event lines
+  in mono. A leftover `padding-left: 250px` on `.chat` had narrowed the composer inside the
+  chat window to 122px; it is removed.
+* New role tokens `--accent-hover`, `--on-accent`, `--on-err`, `--ok-rgb`, `--an-rgb`,
+  `--lt-ink-max/min/close`. The raw-colour ratchet in G-ROOM-TOKENS fell from 308 to 291, and
+  the gate gained its icon leg: every icon a real glyph, no emoji, sentence-case titles.
+
 ## 0.8.40 — the room gets a design system, and fifty rules that never applied now do (2026-09-26)
 
 Three changes to the room shipped since 0.8.39; this line names all of them.
