@@ -1430,6 +1430,11 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
             #
             # The gateway owns the transcript, not the scheduler — so it registers a
             # writer here. One hook, called at the one point every impulse converges on.
+            # ONE ID FOR ONE LINE (2026-09-27): the day row and the outbox message are the
+            # same words, and a tab that restored the day must be able to tell when the
+            # outbox hands it a line it already shows (drain() now rescues late queues).
+            _own = {"oid": "o%x%04x" % (int(time.time() * 1000), random.getrandbits(16)),
+                    "why": imp.reason}
             if _ON_SPOKE is not None:
                 try:
                     # THE KIND RIDES ALONG (2026-08-25, the operator's call): a presence-mode turn
@@ -1439,9 +1444,12 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
                     # memories). One-arg fallback for a registered writer that predates
                     # the kind.
                     try:
-                        _ON_SPOKE(text, imp.action)
+                        _ON_SPOKE(text, imp.action, _own)
                     except TypeError:
-                        _ON_SPOKE(text)
+                        try:
+                            _ON_SPOKE(text, imp.action)
+                        except TypeError:
+                            _ON_SPOKE(text)
                 except Exception as exc:
                     logger.warning("[kairos] could not record what she said: %s", exc)
             if imp.action == MODE_TURN and _mode_meta:
@@ -1457,6 +1465,7 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
                 "margin": margin,
                 "notes": [n.get("id") for n in (notes or [])],
                 "at": time.time(),
+                "oid": _own["oid"],
             })
 
         # HER OWN TIME GOES IN HER OWN JOURNAL. Written only AFTER it survived
@@ -1805,6 +1814,13 @@ def cancel_timers() -> int:
 # hours covers an evening's bounce and not a night's absence.
 UNDELIVERED_SHELF_S = 4 * 3600.0
 
+# A session is a reader while it polls; the room polls every 4 s, so 30 s of silence is a
+# closed tab, not a slow one (drain()). LATE_S: a rescued line older than this arrives
+# silent — on the page, not in his ears.
+_POLLED: dict[str, float] = {}
+ORPHAN_AFTER_S = 30.0
+LATE_S = 60.0
+
 
 def reload_undelivered() -> dict:
     """Bring what flush() preserved back to the queue that is read. The missing half of
@@ -1895,13 +1911,45 @@ def drain(session: str) -> list[dict]:
     were away" sat in a queue nobody would ever drain. This is the incident
     _session_of's docstring records ("she spoke, correctly, into a session nobody was
     listening to"), reintroduced by the session_id fix. The merge lives HERE, in the
-    seam both clients share, so neither client has to know the seed queue exists."""
+    seam both clients share, so neither client has to know the seed queue exists.
+
+    ...AND SO IS EVERY QUEUE WHOSE READER HAS GONE (2026-09-27, his report: "what she has
+    been saying during her own time has not shown up until i refresh the page"). Her own
+    time speaks into the session of whoever last spoke to her, and every room tab is its
+    own session — so a tab that closed took her whole night with it: 13 lines under a
+    test tab from the afternoon while his tab polled an empty queue. "default" was one
+    no-owner queue; a closed tab's is another. A session is a reader while it polls (the
+    room polls every 4 s); one silent for ORPHAN_AFTER_S has no reader, and its queue goes
+    to the tab that is still here. A line that has not waited ORPHAN_AFTER_S yet stays
+    home even in a session that never polled — the tab that asked may not have polled
+    yet. What is rescued LATE arrives silent (`speak` False, `late` True): it is on the
+    page, but thirteen lines voiced at once is not company. "default" keeps its old
+    delivery, voice and all — its lines were written for the first reader to arrive."""
+    now = time.time()
     with _LOCK:
+        _POLLED[session] = now
         out = list(_OUTBOX[session])
         _OUTBOX[session].clear()
-        if session != "default" and _OUTBOX["default"]:
-            out = list(_OUTBOX["default"]) + out
-            _OUTBOX["default"].clear()
+        if session != "default":
+            rescued = []
+            for s, q in _OUTBOX.items():
+                if s == session or not q:
+                    continue
+                if s != "default":
+                    last = _POLLED.get(s)
+                    if last is None:
+                        if now - float(q[0].get("at") or now) < ORPHAN_AFTER_S:
+                            continue
+                    elif now - last < ORPHAN_AFTER_S:
+                        continue
+                    for m in q:
+                        if now - float(m.get("at") or now) > LATE_S:
+                            m["speak"] = False
+                            m["late"] = True
+                rescued.extend(q)
+                q.clear()
+            if rescued:
+                out = sorted(rescued + out, key=lambda m: float(m.get("at") or 0))
     return out
 
 

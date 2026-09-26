@@ -158,7 +158,8 @@ def _day_transcript_path(day: str = "") -> str:
 
 def _append_day_turn(user_text: str, final: str,
                      synthetic: "str|None" = None,
-                     acts: "list|None" = None) -> None:
+                     acts: "list|None" = None,
+                     own: "dict|None" = None) -> None:
     """Append this turn to today's durable transcript.
 
     THE DAY MUST OUTLIVE THE PROCESS. The consolidator reads the day's conversation to
@@ -246,13 +247,18 @@ def _append_day_turn(user_text: str, final: str,
         # the stream. The turn's collector hands them here, trimmed at the writer so a
         # verbose tool result cannot bloat the record; readers ignore unknown keys.
         _aacts = {"acts": acts[:12]} if acts else {}
+        # HER OWN TIME SAYS SO (2026-09-27): `own` is set only by the unprompted epilogue.
+        # The room restores the flag, the kind and the reason as the same chip a live
+        # own-time line wears, and `oid` matches the outbox message it was also sent as.
+        _aown = ({"unprompted": True, **{k: own[k] for k in ("oid", "kind", "why")
+                                         if own.get(k)}} if own is not None else {})
         with open(p, "a", encoding="utf-8") as f:
             if user:
                 f.write(json.dumps({"role": "user", "content": user, "at": _at,
                                     **_extra}) + "\n")
             if rec:
                 f.write(json.dumps({"role": "assistant", "content": rec, "at": _at,
-                                    **_extra, **_amark, **_aacts}) + "\n")
+                                    **_extra, **_amark, **_aacts, **_aown}) + "\n")
     except Exception as exc:
         logger.warning("[gateway] could not append the day transcript: %s", exc)
 

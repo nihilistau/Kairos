@@ -88,7 +88,8 @@ def _settle_turn(human_text: str, reply_text: str, *, record: bool = True,
                  marks: bool = True, capture: bool = True, close_his_turn: bool = True,
                  stances: bool = True, synthetic: "str|None" = None,
                  acts: "list|None" = None,
-                 latch: "Dict[str, Any]|None" = None) -> list:
+                 latch: "Dict[str, Any]|None" = None,
+                 own: "Dict[str, Any]|None" = None) -> list:
     """Every debt a finished turn owes the rest of the system, in ONE function, because
     the list kept being re-implemented as trailing inline code with bypasses (2026-08-24
     audit, B1/B2/A4). The native SSE path had FIVE exits that skipped all of it — the
@@ -148,7 +149,7 @@ def _settle_turn(human_text: str, reply_text: str, *, record: bool = True,
             logger.warning("[gateway] capture skipped: %s", exc)
     text = (reply_text or "").strip()
     if record and text:
-        _append_day_turn(human_text, reply_text, synthetic=synthetic, acts=acts)
+        _append_day_turn(human_text, reply_text, synthetic=synthetic, acts=acts, own=own)
     receipts: list = []
     if marks and text:
         try:
@@ -210,7 +211,8 @@ def _settle_turn(human_text: str, reply_text: str, *, record: bool = True,
     return receipts
 
 
-def _on_her_own_words(text: str, kind: "str|None" = None) -> None:
+def _on_her_own_words(text: str, kind: "str|None" = None,
+                      own: "Dict[str, Any]|None" = None) -> None:
     """The unprompted turn's epilogue — registered as scheduler.on_spoke, the one point
     every impulse that actually SPEAKS converges on (post-veto, so a dropped turn moves
     nothing). It used to be a bare _append_day_turn, so on ~60 unprompted turns a day
@@ -247,7 +249,13 @@ def _on_her_own_words(text: str, kind: "str|None" = None) -> None:
         _settle_turn("", text, capture=False, close_his_turn=False,
                      record=False, stances=False, synthetic=_syn)
     else:
-        _settle_turn("", text, capture=False, close_his_turn=False, synthetic=_syn)
+        # THE ROW SAYS SHE SPOKE FIRST (2026-09-27, "refreshing the page drops most
+        # chips"): the room restores `unprompted` from each day row and no writer ever set
+        # it, so every own-time line came back as an ordinary reply. `own` carries the
+        # outbox message's id and reason, so a restored tab also knows the line when the
+        # outbox hands it over again.
+        _settle_turn("", text, capture=False, close_his_turn=False, synthetic=_syn,
+                     own={**(own or {}), "kind": kind})
 
 
 def _finish_openai_turn(body: Dict[str, Any], human_text: str, text: str) -> None:

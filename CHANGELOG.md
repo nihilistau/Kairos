@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.8.48 — her own time reaches the open tab, and keeps its chip after a refresh (2026-09-27)
+
+* **Her own-time lines appear without a refresh.** An unprompted turn is queued under the
+  session of whoever last spoke to her, and every room tab is its own session, so a tab that
+  had closed kept her lines while the open tab polled an empty queue. `scheduler.drain()` now
+  treats a session as a reader only while it polls (`ORPHAN_AFTER_S`, 30 s; the room polls
+  every 4 s) and hands a queue with no reader to the tab that is still polling, merged in the
+  order she spoke. A line rescued more than `LATE_S` (60 s) after she said it arrives silent
+  (`speak: false`, `late: true`): shown, not voiced, so a night's backlog is not read out at
+  once. A line under 30 s old stays with its own session even if that tab has not polled yet.
+  The `default` queue keeps its old delivery.
+* **A refresh keeps the own-time chip.** The room restored `unprompted` from each day row, and
+  no writer set it, so every own-time line came back as an ordinary reply. Rows written by the
+  unprompted epilogue now carry `unprompted`, `kind`, `why` and `oid`; the room restores the
+  same chip the live line wore. `oid` is shared with the outbox message, and the room waits
+  for the day restore before its first poll, so a rescued line it already shows is not added
+  twice.
+* **Gate:** G-OUTBOX-READER (new, 22 checks, four mutants red by name).
+
 ## 0.8.47 — the room redesign finished: Games, Wardrobe and Chat on the kit, the aliases deleted, zero colour literals (2026-09-27)
 
 Stage 6 of the room redesign, and the last. No server code changed.

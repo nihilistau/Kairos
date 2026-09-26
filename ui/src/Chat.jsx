@@ -225,6 +225,13 @@ export default function Chat() {
   /* HER VOICE (2026-08-21): the cursor into the reply that has already been handed to
      the speaker, so each sentence is spoken ONCE, the moment it completes. */
   const spoken = useRef(0)
+  /* THE DAY FIRST, THEN THE OUTBOX (2026-09-27). The gateway now hands a tab the lines
+     queued for tabs that closed, and those lines are in the day transcript too. So the
+     poller waits for the restore (or it would fill the log first and the restore, which
+     only writes into an EMPTY log, would drop the evening), and skips any line whose id
+     the log already shows. */
+  const dayIn = useRef(false)
+  const oids = useRef(new Set())
   const [voice, setVoice] = useState(speech.state())
   useEffect(() => speech.onChange(setVoice), [])
 
@@ -246,6 +253,7 @@ export default function Chat() {
       try {
         const d = await api.day()
         if (!alive || !d?.rows?.length) return
+        d.rows.forEach(r => { if (r.oid) oids.current.add(r.oid) })
         setTurns(h => h.length ? h : d.rows.map(r => ({
           role: r.role, content: r.content || '', at: r.at, restored: true,
           // the writer files her marks as metadata beside the cleaned text, so a
@@ -257,9 +265,12 @@ export default function Chat() {
           events: Array.isArray(r.acts) && r.acts.length ? r.acts : undefined,
           // a lone assistant row is one she spoke unprompted; say so, as live ones do
           unprompted: r.role === 'assistant' && r.unprompted ? true : undefined,
+          // ...wearing the chip it wore live: which kind of own time, and why
+          kind: r.kind, why: r.why, oid: r.oid,
         })))
         scroll()
       } catch (_) { /* gateway down: an empty log is all there is to show */ }
+      finally { dayIn.current = true }
     })()
     return () => { alive = false }
   }, [])
@@ -400,9 +411,12 @@ export default function Chat() {
     let alive = true
     const tick = async () => {
       if (!alive || busy || abort.current) return   // never interleave with a live stream
+      if (!dayIn.current) return                     // the day restore lands first
       try {
-        const { messages } = await api.kairosOutbox()
-        if (!alive || !messages?.length) return
+        const got = await api.kairosOutbox()
+        const messages = (got.messages || []).filter(m => !(m.oid && oids.current.has(m.oid)))
+        messages.forEach(m => { if (m.oid) oids.current.add(m.oid) })
+        if (!alive || !messages.length) return
         /* HER OWN-TIME TURNS WEAR THE SWITCH TOO (2026-08-29 audit): send() stamps
            otr and this poller did not, so turns she SPOKE during a private hour sat
            unstamped and were re-sent as history forever after the switch went off —
@@ -415,7 +429,7 @@ export default function Chat() {
           // `at` is the scheduler's own stamp, not the moment the poll happened to
           // notice. She may have spoken three minutes before this tick drained it, and
           // showing the drain time would put her words at the wrong point in his evening.
-          kind: m.kind, mode: m.mode, speak: m.speak, why: m.reason, at: m.at,
+          kind: m.kind, mode: m.mode, speak: m.speak, why: m.reason, at: m.at, oid: m.oid,
         }))])
         const last = messages[messages.length - 1]
         const mk = extractTags(last.text).marks.filter(m => m.kind === 'mood')

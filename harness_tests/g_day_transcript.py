@@ -208,8 +208,10 @@ call = _handler.find("_settle_turn(_human, final_text")
 check("the turn is written from his words", call > 0,
       "the epilogue no longer settles with _human")
 check("...bound before anything is stapled onto the message list", 0 < bind < call)
+# The anchor stops at the two words it is about: it carried the whole argument list and
+# went red the day the writer gained `own=` (2026-09-27) — the §199 lesson, again.
 check("...and the epilogue's day write passes them through verbatim",
-      "_append_day_turn(human_text, reply_text, synthetic=synthetic, acts=acts)" in src)
+      "_append_day_turn(human_text, reply_text," in src)
 for marker, what in (("Quietly, you also remember", "the recall note"),
                      ("note_for_question(user_text)", "the silence note")):
     at = _handler.find(marker)
