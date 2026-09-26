@@ -91,12 +91,6 @@ h3:first-child, h4:first-child { margin-top: 0; }
 .r-private { color: var(--private); } .dot.r-private { background: var(--private); }
 .r-off { color: var(--off); }
 
-.note, .mem { border-bottom: 1px solid #101823; padding: 6px 0; }
-.note.done .t, .mem.gone { color: var(--off); text-decoration: line-through; }
-.note .t, .mem .t { color: var(--ink); }
-.note .b { color: var(--muted); font-size: 11px; }
-.meta { display: flex; gap: 9px; font-size: 10px; color: var(--muted); margin-top: 2px; }
-.meta .cat { color: var(--cyan); }
 .obs { display: flex; gap: 10px; padding: var(--sp-1) 0; border-bottom: 1px dotted var(--hair); }
 .obs .when { color: var(--accent); min-width: 40px; }
 
@@ -211,19 +205,30 @@ main { display: block; }
 }
 
 /* memory: class and owner read at a glance */
-.mem .cls { padding: 0 6px; border-radius: 99px; font-size: 9px;
-  border: 1px solid var(--line); }
-.c-identity { color: #e8b64c } .c-relationship { color: #c96ce0 }
-.c-preference { color: #4ad98a } .c-event { color: #46d9e6 }
-.c-private-secret { color: #e2685b }
+.mem-row { border-bottom: 1px solid var(--hair); padding: 6px 0; }
+.mem-row.gone { color: var(--text-3); text-decoration: line-through; }
+.mem-t { display: block; width: 100%; padding: 0; margin: 0; text-align: left; font: inherit;
+  color: var(--text-1); background: none; border: none; border-radius: var(--r-sm); overflow-wrap: anywhere; }
+.mem-t:hover { background: var(--hover-tint); }
+.mem-t:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--mood-h) 70% 60% / .6); }
+.mem-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--sp-2); margin-top: 2px;
+  font-size: var(--fs-11); color: var(--text-3); }
+.mem-acts { margin-left: auto; display: flex; gap: 2px; }
+.mem-cls { padding: 0 6px; border-radius: var(--r-pill); font-size: var(--fs-11); line-height: 18px;
+  border: 1px solid var(--hair-strong); }
+.mem-c-identity { color: var(--warm); } .mem-c-relationship { color: var(--private); }
+.mem-c-preference { color: var(--ok); } .mem-c-event { color: var(--accent); }
+.mem-c-private-secret { color: var(--err); }
 /* the three commonest classes had NO rule — 555 of 622 live chips rendered colourless
    (2026-08-29 audit); the chip that exists to distinguish rows distinguished nothing */
-.c-fact { color: #9fb6c9 } .c-feeling { color: #e07a9a }
-.c-self-narrative { color: #8fd0b0 }
-.mem .w-self { color: var(--cyan) } .mem .w-user { color: var(--gold) }
-.mem .sal { display: inline-block; width: 34px; height: 3px; border-radius: 2px;
-  background: #ffffff12; overflow: hidden; }
-.mem .sal i { display: block; height: 100%; background: var(--cyan-dim); }
+.mem-c-fact { color: var(--text-2); } .mem-c-feeling { color: var(--feeling); }
+.mem-c-self-narrative { color: var(--self-narrative); }
+/* an inference must never look like testimony: dimmer ink, and italic */
+.mem-c-st-inferred, .mem-c-st-disputed { color: var(--text-2); font-style: italic; }
+.mem-w-self { color: var(--accent); } .mem-w-user { color: var(--warm); }
+.mem-sal { display: inline-block; width: 34px; height: 3px; border-radius: 2px;
+  background: var(--hair-strong); overflow: hidden; }
+.mem-sal i { display: block; height: 100%; background: var(--accent-dim); }
 
 @media (prefers-reduced-motion: reduce) {
   .mark.mood, .avatar .think circle { animation: none }
@@ -237,45 +242,45 @@ main { display: block; }
    Colour carries the KIND (--h per section and per row), weight carries the
    STATUS. A dropped row is dimmed and struck rather than removed, because the
    store tombstones and the UI must not imply otherwise. */
-.ledger .lgr-health { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-  padding: 7px 10px; margin-bottom: 10px; border-radius: 8px;
-  background: #ffffff06; border: 1px solid #ffffff10; font-size: 11px; }
-.ledger .lgr-health .good { color: #7fdca4; font-weight: 600; }
-.ledger .lgr-health .bad  { color: #ff8f8f; font-weight: 600; }
-.ledger .lgr-health .warn { color: #e8c877; }
+.lgr-health { display: flex; gap: var(--sp-2); align-items: center; flex-wrap: wrap;
+  padding: 7px 10px; margin-bottom: 10px; border-radius: var(--r-md);
+  background: var(--hover-tint); border: 1px solid var(--hair); font-size: var(--fs-11); }
+.lgr-bar { display: flex; gap: var(--sp-2); align-items: center; flex-wrap: wrap; margin-bottom: var(--sp-2); }
+.lgr-count { margin-left: auto; }
 
 .lgr-sec { margin: 14px 0 6px; }
-.lgr-sec > h4 { margin: 0 0 6px; font-size: 12px; letter-spacing: .04em;
+.lgr-sec > h4 { margin: 0 0 6px; font-size: var(--fs-12); letter-spacing: .04em;
   text-transform: uppercase; color: hsl(var(--h) 70% 72%); }
-.lgr-sec > h4 .muted { text-transform: none; letter-spacing: 0; margin-left: 8px;
-  font-weight: 400; font-size: 11px; }
+.lgr-sec > h4 .muted { text-transform: none; letter-spacing: 0; margin-left: var(--sp-2);
+  font-weight: 400; font-size: var(--fs-11); }
 
 .lgr { border: 1px solid hsl(var(--h) 45% 50% / .22); border-left: 3px solid hsl(var(--h) 70% 58% / .75);
-  border-radius: 7px; background: hsl(var(--h) 40% 50% / .05); margin: 5px 0; overflow: hidden; }
-.lgr-head { display: flex; align-items: center; gap: 8px; padding: 7px 10px; cursor: pointer; }
+  border-radius: var(--r-sm); background: hsl(var(--h) 40% 50% / .05); margin: 5px 0; overflow: hidden; }
+.lgr-head { display: flex; align-items: center; gap: var(--sp-2); width: 100%; padding: 7px 10px;
+  text-align: left; font: inherit; color: inherit; background: none; border: none; }
 .lgr-head:hover { background: hsl(var(--h) 50% 55% / .09); }
-.lgr-mark { color: hsl(var(--h) 80% 70%); font-size: 12px; }
-.lgr-title { flex: 1; font-size: 12.5px; }
-.lgr-pin { color: #e8c877; font-size: 11px; }
-.lgr-owner { font-size: 10px; opacity: .5; text-transform: uppercase; letter-spacing: .05em; }
-.lgr.done .lgr-title { opacity: .55; }
-.lgr.dropped { opacity: .42; }
-.lgr.dropped .lgr-title { text-decoration: line-through; }
-.lgr.doing { box-shadow: inset 2px 0 0 hsl(var(--h) 90% 65%); }
+/* INSET: .lgr clips its overflow, so an outer ring would be cut off */
+.lgr-head:focus-visible { outline: none; box-shadow: inset 0 0 0 2px hsl(var(--mood-h) 70% 60% / .6); }
+.lgr-mark { color: hsl(var(--h) 80% 70%); font-size: var(--fs-12); }
+.lgr-title { flex: 1; min-width: 0; font-size: 12.5px; color: var(--text-1); }
+.lgr-pin { color: var(--warm); font-size: var(--fs-11); }
+.lgr-owner { font-size: var(--fs-11); color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
+.lgr-s-done .lgr-title { color: var(--text-3); }
+.lgr-s-dropped { opacity: .42; }
+.lgr-s-dropped .lgr-title { text-decoration: line-through; }
+.lgr-s-doing { box-shadow: inset 2px 0 0 hsl(var(--h) 90% 65%); }
 
-.lgr-body { padding: 2px 10px 10px; border-top: 1px solid #ffffff0c; }
-.lgr-txt { margin: 8px 0; font-size: 12px; line-height: 1.5; white-space: pre-wrap; opacity: .88; }
+.lgr-body { padding: 2px 10px 10px; border-top: 1px solid var(--hair); }
+.lgr-txt { margin: var(--sp-2) 0; font-size: var(--fs-12); line-height: 1.5; white-space: pre-wrap; color: var(--text-1); }
 .lgr-refs { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
-.lgr-refs code { font-size: 10.5px; padding: 2px 6px; border-radius: 4px;
-  background: #ffffff0d; color: #a9c4dd; }
-.lgr-ctl { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 8px; }
-.lgr-ctl .lgr-when { margin-left: auto; font-size: 10px; opacity: .4; }
-.lgr-chk { display: flex; align-items: center; gap: 4px; font-size: 11px; opacity: .75; }
-.lgr-in { width: 100%; margin: 6px 0; padding: 6px 8px; font: inherit; font-size: 12px;
-  color: inherit; background: #00000038; border: 1px solid #ffffff18; border-radius: 5px;
-  resize: vertical; }
-.lgr-in:focus { outline: none; border-color: hsl(var(--h) 70% 55% / .6); }
-.lgr.adding { border-style: dashed; padding: 8px 10px; }
+.lgr-refs code { font: 400 var(--fs-11)/1.4 var(--font-mono); padding: 2px 6px; border-radius: 4px;
+  background: var(--hover-tint); color: var(--text-2); overflow-wrap: anywhere; }
+.lgr-ctl { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: var(--sp-2); }
+.lgr-when { margin-left: auto; font-size: var(--fs-11); color: var(--text-3); }
+.lgr-chk { display: flex; align-items: center; gap: 4px; font-size: var(--fs-11); color: var(--text-2); }
+.lgr-in { margin: 6px 0; }
+.lgr-sel { width: auto; }
+.lgr-adding { border-style: dashed; padding: var(--sp-2) 10px; }
 
 /* ── STAGE (stg-) ────────────────────────────────────────────────────────────
    The rung's hue runs cool-to-hot with the level, so where you are on the ladder
@@ -599,30 +604,24 @@ main { display: block; }
    by nothing, so the board was a thing she could write and he could only read. Four
    controls because they mean four things — edit, done (reversible), retire
    (tombstone), restore (the undo without which a tombstone is a delete). */
-.bd-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.bd-count { margin-left: auto; font-size: 10px; color: var(--off); }
-.bd-btn { background: transparent; border: 1px solid var(--line); color: var(--muted);
-  padding: 2px 9px; border-radius: 5px; cursor: pointer; font-size: 11px; }
-.bd-btn:hover:not(:disabled) { border-color: var(--cyan-dim); color: var(--ink); }
-.bd-btn:disabled { opacity: .4; cursor: default; }
-.bd-btn.on { color: var(--ok); border-color: #4ad98a4d; }
-.bd-btn.bd-add, .bd-btn.bd-save { color: var(--cyan); border-color: var(--cyan-dim); }
-.bd-btn.bd-danger:hover:not(:disabled) { color: var(--err); border-color: #e2685b4d; }
-.bd-acts { display: flex; gap: 6px; margin-top: 5px; }
-.bd-form { border: 1px solid var(--line); border-radius: 6px; padding: 8px;
-  margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px;
-  background: #0b0f1699; }
-.bd-in { background: #060a10; border: 1px solid var(--line); color: var(--ink);
-  border-radius: 4px; padding: 4px 7px; font-size: 12px; width: 100%; }
-.bd-in:focus { outline: none; border-color: var(--cyan-dim); }
-.bd-area { min-height: 46px; resize: vertical; }
-.bd-frow { display: flex; gap: 6px; }
-.bd-sel { flex: 0 0 108px; }
-.bd-due { flex: 1 1 auto; }
-.bd-retired { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 8px; }
-.bd-head { font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
-  color: var(--off); margin-bottom: 6px; }
-.note.gone .t { color: var(--off); text-decoration: line-through; }
+.bd-bar { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-2); }
+.bd-count { margin-left: auto; }
+.bd-err { margin-bottom: var(--sp-2); }
+.bd-note { border-bottom: 1px solid var(--hair); padding: 6px 0; }
+.bd-t { color: var(--text-1); overflow-wrap: anywhere; }
+.bd-done .bd-t, .bd-gone .bd-t { color: var(--text-3); text-decoration: line-through; }
+.bd-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--sp-2); margin-top: 2px;
+  font-size: var(--fs-11); color: var(--text-3); }
+.bd-b { color: var(--text-3); font-size: var(--fs-11); margin-top: 2px; }
+.bd-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+.bd-form { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; padding: var(--sp-2);
+  border: 1px solid var(--hair-strong); border-radius: var(--r-md); background: var(--surface-1); }
+.bd-frow { display: flex; flex-wrap: wrap; gap: 6px; }
+.bd-sel { flex: 0 0 120px; width: auto; }
+.bd-due { flex: 1 1 160px; width: auto; }
+.bd-retired { margin-top: var(--sp-3); border-top: 1px dashed var(--hair-strong); padding-top: var(--sp-2); }
+.bd-head { font-size: var(--fs-11); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3);
+  margin-bottom: 6px; }
 
 /* ── HER OWN TIME ─────────────────────────────────────────────────────────────
    A record, not a workspace: nothing in this panel is editable, because a record
@@ -879,31 +878,30 @@ button.sty-line:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--m
 .su-id:hover { text-decoration: underline; }
 
 /* ── memory: re-filing a row (2026-08-23) ─────────────────────────────────────────── */
-/* The panel was read-only; these are the controls that let him act from it. Scoped
-   under .mem so nothing here can reach another window (G-ROOM-CSS 4). */
-.mem-tools { display: flex; gap: 6px; margin: 6px 0 10px; }
-.mem-tools input { flex: 1; min-width: 0; }
-.mem .t { cursor: pointer; }
-.mem-open { outline: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
-.mem .mem-edit { margin-left: auto; font-size: 9px; opacity: .7; }
-.mem-edit-box { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-                margin: 6px 0 2px; font-size: 10px; }
-.mem-edit-box label { display: flex; gap: 4px; align-items: center; opacity: .8; }
-.mem-edit-box select { font-size: 10px; }
-.mem .c-kind { opacity: .75; }
+/* The panel was read-only; these are the controls that let him act from it. Prefixed
+   mem- so nothing here can reach another window (G-ROOM-CSS 4). */
+.mem-bar { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-2); }
+.mem-tabs { flex: 1 1 220px; min-width: 0; }
+.mem-tools { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.mem-q, .mem-add { flex: 1 1 160px; min-width: 0; width: auto; }
+.mem-open { outline: 1px solid var(--hair-strong); border-radius: var(--r-sm); padding: 4px 6px; }
+.mem-edit-box { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center;
+                margin: 6px 0 2px; font-size: var(--fs-11); }
+.mem-lbl { display: flex; gap: 4px; align-items: center; color: var(--text-2); }
+.mem-sel { width: auto; height: 26px; font-size: var(--fs-11); }
+.mem-txt { flex: 1 1 220px; min-width: 160px; width: auto; }
 
 /* ── why does she believe it: the read side of provenance (2026-08-25) ────────────── */
-/* Two rules only, because the tell here is TYPOGRAPHIC and not decorative: a retired
+/* The tell here is TYPOGRAPHIC and not decorative: a retired
    support is struck through exactly the way a retired row is in the list above, so the
    sentence "this conclusion is standing on two things that are no longer true" is a
    thing he SEES rather than a thing he has to work out. */
-.mem-why { margin: 6px 0 2px; padding: 6px 8px; font-size: 10px;
-           border-left: 2px solid var(--line); }
-.why-head { display: flex; gap: 6px; align-items: baseline; opacity: .75; margin: 2px 0 6px; }
-.why-row { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; }
-.why-row.gone { color: var(--off); text-decoration: line-through; }
-.why-row.dep { opacity: .85; }
-.mem .c-st-inferred, .mem .c-st-disputed { opacity: .7; font-style: italic; }
+.mem-why { margin: 6px 0 2px; padding: 6px var(--sp-2); font-size: var(--fs-11);
+           border-left: 2px solid var(--hair-strong); }
+.mem-why-head { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; color: var(--text-2); margin: 2px 0 6px; }
+.mem-why-row { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; }
+.mem-why-row.gone { color: var(--text-3); text-decoration: line-through; }
+.mem-why-dep { color: var(--text-2); }
 
 /* ── decisions: what is waiting on him (2026-08-23) ───────────────────────────────── */
 .dec-bar { display: flex; gap: var(--sp-2); align-items: center; flex-wrap: wrap; margin-bottom: var(--sp-2); }
@@ -949,59 +947,50 @@ button.sty-line:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--m
 /* ── body: his heart and his movement (2026-08-26) ─────────────────────────────────── */
 /* The tail is the feature, so the tail gets the ink: each reading is its own pill and the
    newest one is brighter, which is what makes a rise read as a rise at a glance. */
-.tel-hers { display: flex; gap: 8px; align-items: baseline; padding: 8px 10px; margin: 2px 0 10px;
-            border-left: 2px solid var(--accent, #7aa2f7); background: rgba(122,162,247,.06);
-            border-radius: 0 6px 6px 0; }
-.tel-hers-k { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; opacity: .6;
-              white-space: nowrap; }
-.tel-hers-v { font-size: 12px; font-style: italic; }
+.tel-hers { display: flex; gap: var(--sp-2); align-items: baseline; padding: var(--sp-2) 10px; margin: 2px 0 10px;
+  border-left: 2px solid var(--accent); background: rgba(var(--accent-rgb), .06);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0; }
+.tel-hers-k { font-size: var(--fs-11); text-transform: uppercase; letter-spacing: .08em; color: var(--text-3);
+  white-space: nowrap; }
+.tel-hers-v { font-size: var(--fs-12); font-style: italic; color: var(--text-1); }
 .tel-live { display: flex; gap: 10px; flex-wrap: wrap; }
-.tel-card { flex: 1 1 180px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
-.tel-k { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; opacity: .6; }
-.tel-big { font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.tel-big em { font-size: 11px; font-style: normal; opacity: .5; margin-left: 4px; }
-.tel-sub { font-size: 10px; opacity: .7; margin-top: 3px; }
+.tel-card { flex: 1 1 180px; border: 1px solid var(--hair-strong); border-radius: var(--r-md); padding: var(--sp-2) 10px; }
+.tel-k { font-size: var(--fs-11); text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); }
+.tel-big { font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--text-1); }
+.tel-big em { font-size: var(--fs-11); font-style: normal; color: var(--text-3); margin-left: 4px; }
+.tel-sub { font-size: var(--fs-11); color: var(--text-2); margin-top: 3px; }
 .tel-tail { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; margin-top: 5px; }
-.tel-beat { font-size: 11px; font-variant-numeric: tabular-nums; padding: 1px 6px;
-            border-radius: 99px; border: 1px solid var(--line); opacity: .65; }
-.tel-beat.now { opacity: 1; font-weight: 600; }
-.tel-trend { font-size: 10px; opacity: .75; margin-left: 2px; }
-.tel-tail.t-climbing .tel-beat.now { border-color: #e0af68; color: #e0af68; }
-.tel-tail.t-falling  .tel-beat.now { border-color: #7aa2f7; color: #7aa2f7; }
+.tel-beat { font: 400 var(--fs-11)/1.4 var(--font-mono); font-variant-numeric: tabular-nums; padding: 1px 6px;
+  border-radius: var(--r-pill); border: 1px solid var(--hair-strong); color: var(--text-2); }
+.tel-beat-now { color: var(--text-1); font-weight: 600; }
+.tel-trend { font-size: var(--fs-11); color: var(--text-2); margin-left: 2px; }
+.tel-tail-climbing .tel-beat-now { border-color: var(--warn); color: var(--warn); }
+.tel-tail-falling .tel-beat-now { border-color: var(--accent); color: var(--accent); }
 .tel-states { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
-.tel-pill { font-size: 10px; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--line); }
-.tel-pill.p-on { border-color: #9ece6a; color: #9ece6a; }
-.tel-pill.p-off, .tel-pill.p-sleep { opacity: .6; }
-.tel-why { font-size: 10px; opacity: .6; margin: 8px 0 2px; font-style: italic; }
-.tel-hist-head { display: flex; gap: 6px; align-items: baseline; margin: 14px 0 6px;
-                 font-size: 10px; text-transform: uppercase; letter-spacing: .08em; opacity: .7; }
-.tel-hist-head button { font-size: 9px; padding: 1px 7px; }
-.tel-hist-head button.on { outline: 1px solid var(--line); }
-.tel-series { display: flex; gap: 8px; align-items: center; padding: 3px 0; }
-.tel-series-k { font-size: 10px; width: 74px; opacity: .75; }
-.tel-series-n { font-size: 9px; opacity: .45; }
-.tel-spark { width: 260px; height: 44px; }
-.tel-spark polyline { fill: none; stroke: var(--accent, #7aa2f7); stroke-width: 1.4;
-                      vector-effect: non-scaling-stroke; }
-.tel-spark text { font-size: 7px; fill: currentColor; opacity: .45; }
-.tel-spark-empty { font-size: 10px; opacity: .45; width: 260px; }
+.tel-why { font-size: var(--fs-11); color: var(--text-3); margin: var(--sp-2) 0 2px; font-style: italic; }
+.tel-hist-head { display: flex; gap: var(--sp-2); align-items: center; flex-wrap: wrap; margin: 14px 0 6px; }
+.tel-hist-k { font-size: var(--fs-11); text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); }
+.tel-hist-tabs { min-width: 0; }
+.tel-hist-n { font-size: var(--fs-11); color: var(--text-3); }
+.tel-series { display: flex; gap: var(--sp-2); align-items: center; padding: 3px 0; }
+.tel-series-k { flex: none; font-size: var(--fs-11); width: 74px; color: var(--text-2); }
+.tel-series-n { flex: none; font-size: var(--fs-11); color: var(--text-3); }
+/* the spark gives way at phone width instead of widening the window (spec §6: no sideways scroll) */
+.tel-spark { flex: 1 1 auto; min-width: 0; max-width: 260px; height: 44px; }
+.tel-spark polyline { fill: none; stroke: var(--accent); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.tel-spark text { font-size: 7px; fill: var(--text-3); }
+.tel-spark-empty { flex: 1 1 auto; max-width: 260px; font-size: var(--fs-11); color: var(--text-3); }
 
 /* ── the sleep readout: a number that has to show its working ─────────────────────── */
 .tel-sleep { margin-top: 6px; }
-.tel-sleep-bar {
-  height: 4px; border-radius: 2px; overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
-}
+.tel-sleep-bar { height: 4px; border-radius: 2px; overflow: hidden; background: var(--hair); }
 .tel-sleep-bar i { display: block; height: 100%; border-radius: 2px; }
 /* THE COLOUR CARRIES THE PROVENANCE. A measured reading and our own guess must not look
    alike at a glance, because the glance is all this panel usually gets. */
-.tel-sleep-bar i.src-watch      { background: #6ee7b7; }
-.tel-sleep-bar i.src-classifier { background: #7dd3fc; }
-.tel-sleep-bar i.src-inferred   { background: #6b7280; }
-.tel-terms {
-  margin: 4px 0 0; padding-left: 14px;
-  font-size: 11px; line-height: 1.45; color: var(--dim, #8b8b8b);
-}
+.tel-src-watch { background: var(--ok); }
+.tel-src-classifier { background: var(--accent); }
+.tel-src-inferred { background: var(--text-3); }
+.tel-terms { margin: 4px 0 0; padding-left: 14px; font-size: var(--fs-11); line-height: 1.45; color: var(--text-2); }
 .tel-terms li { list-style: '· '; }
 
 /* ── the house: a beachhead panel, three states and a link ────────────────────────── */

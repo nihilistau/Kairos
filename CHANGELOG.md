@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.8.46 — four dense windows on the kit: Body, Board, Ledger, Memory (2026-09-26)
+
+Stage 5 of the room redesign. No server code changed.
+
+* **Four windows on the kit:** Body, Board, Ledger and Memory draw kit Chips, Buttons,
+  fields and `State`. Their sentences about the assistant, and every memory row, are
+  unchanged.
+  * **Body:** the history window is the kit's Tabs, so arrow keys and Home/End move it.
+    The wearer's states are chips (on wrist ok). At phone width the sparkline gives way
+    instead of widening the window. Loading history is the kit's loading state, whose
+    spinner stops under reduced motion.
+  * **Board:** retire is danger, "put it up" the one primary, an edit's save secondary.
+    "retired (N)" reports `aria-pressed`. The category is a quiet chip. A done title uses
+    `--text-3` (it used a colour below AA). A refused write is an err chip.
+  * **Ledger:** the gates' health is chips (red err, green ok, stale warn), each red gate
+    an err chip. The bar is a button, a pressed toggle and a count chip, not a `.chips`
+    row. A row's head is a button with `aria-expanded`, so a keyboard opens it. Status
+    classes are `lgr-s-*`.
+  * **Memory:** whose rows is the kit's Tabs. The core and retired counts are chips (they
+    were buttons with no handler). A row's text is a button with `aria-expanded`; the star
+    is a pressed toggle named "core"; why and re-file report `aria-expanded`. Add is the
+    one primary. Class marks are 11px. New role tokens: `--feeling`, `--self-narrative`.
+* **Gates:** G-ROOM-KIT leg 12 (68 checks; 317 total) renders each view with fixtures, ends
+  with a `.chips` census (only Games still draws one, so the global rule stays) and a scan
+  for 48 retired classes. G-ROOM-CSS's grandfather table is empty. G-ROOM-TOKENS measures
+  the new text roles on every surface, and the colour-literal ratchet fell from 186 to 147.
+* **Known:** a refused history read in Body still shows the loading state indefinitely.
+
 ## 0.8.45 — eight more windows on the kit; the music chip no longer blanks the room (2026-09-26)
 
 Stage 4 of the room redesign. No server code changed.

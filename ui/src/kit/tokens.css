@@ -58,6 +58,10 @@
   --an-rgb: 167, 139, 250;
   --private: #c96ce0;
   --private-rgb: 201, 108, 224;  /* COMMA triple, for rgba(var(--private-rgb), a) */
+  /* two of Memory's class colours (redesign stage 5). The others are roles already:
+     identity --warm, relationship --private, preference --ok, event --accent, a secret --err */
+  --feeling: #e07a9a;
+  --self-narrative: #8fd0b0;
   --read: #4ad98a; --write: #e8b64c; --world: #46d9e6; --machine: #e2685b;
 
   /* her mood (defaults — moodTheme.js owns the live values) */

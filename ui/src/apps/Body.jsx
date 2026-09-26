@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { usePoll, Body as PanelBody } from './panel.jsx'
 import * as api from '../api.js'
+import { Chip, State, Tabs } from '../kit/parts.jsx'
 
 /* BODY — his heart, his movement, and what she is reading off them (2026-08-26).
  *
@@ -43,14 +44,137 @@ function Tail({ vals, trend, unit }) {
   if (!vals || vals.length < 2) return null
   const arrow = trend === 'climbing' ? '↑' : trend === 'falling' ? '↓' : '·'
   return (
-    <div className={'tel-tail t-' + (trend || 'steady')}>
+    <div className={'tel-tail tel-tail-' + (trend || 'steady')}>
       {vals.map((v, i) => (
-        <span key={i} className={'tel-beat' + (i === vals.length - 1 ? ' now' : '')}>
+        <span key={i} className={'tel-beat' + (i === vals.length - 1 ? ' tel-beat-now' : '')}>
           {typeof v === 'number' ? (Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(2)) : String(v)}
         </span>
       ))}
       <span className="tel-trend">{arrow} {trend}{unit ? ' ' + unit : ''}</span>
     </div>
+  )
+}
+
+/* The window's body, split out so G-ROOM-KIT leg 12 can render it with a fixture. The
+ * poll and the history fetch stay in the default export. His states are kit Chips — on
+ * wrist ok with a still dot, the rest quiet. The history window is the kit's Tabs: it was
+ * four bare buttons, one of them `on`, a single-select filter in all but name. Her
+ * sentence, and every other sentence here, is verbatim. */
+export function BodyView({ d, hours, setHours, hist, err }) {
+  if (d.ok === false) return <State kind="error">{d.error}</State>
+  const o = d.observed || {}, f = d.facts || {}
+  const hasBody = Object.keys(o).length > 0
+  return (
+    <>
+      {/* WHAT SHE IS READING. Empty is a real answer and says so. */}
+      <div className="tel-hers">
+        <span className="tel-hers-k">she reads</span>
+        {d.she_reads
+          ? <span className="tel-hers-v">{d.she_reads}</span>
+          : <span className="tel-hers-v muted">
+              {'nothing — ' + (d.why || 'no fresh readings, so she is told nothing')}
+            </span>}
+      </div>
+
+      {!hasBody ? (
+        <State kind="empty">
+          No readings yet. The watch agent posts to <code>/v1/telemetry/ingest</code>.
+        </State>
+      ) : (
+        <>
+          <div className="tel-live">
+            <div className="tel-card">
+              <div className="tel-k">heart{d.resting ? ` · resting ${d.resting}` : ''}</div>
+              <div className="tel-big">
+                {o.heart_rate != null ? Math.round(o.heart_rate) : '—'}
+                <em>bpm</em>
+              </div>
+              <Tail vals={o.heart_rate_tail} trend={f.hr_trend} />
+              {f.hr_swing ? <div className="tel-sub">swing {f.hr_swing} bpm</div> : null}
+            </div>
+
+            <div className="tel-card">
+              <div className="tel-k">movement</div>
+              <div className="tel-big">
+                {f.movement != null ? f.movement : '—'}
+                <em>rad/s</em>
+              </div>
+              <Tail vals={o.movement_tail} trend={null} />
+              {f.movement_word ? <div className="tel-sub">{f.movement_word}</div> : null}
+            </div>
+
+            <div className="tel-card">
+              <div className="tel-k">state</div>
+              <div className="tel-states">
+                {o.on_body ? (
+                  <Chip tone={o.on_body === 'on' ? 'ok' : 'neutral'} dot={o.on_body === 'on'}>
+                    {o.on_body === 'on' ? 'on wrist' : 'off wrist'}
+                  </Chip>
+                ) : null}
+                {f.asleep === true ? <Chip>{'asleep' + (f.crude ? '?' : '')}</Chip> : null}
+                {f.awake_by_wrist ? <Chip>just looked at it</Chip> : null}
+                {o.sleep_stage ? <Chip>{o.sleep_stage}</Chip> : null}
+                {o.motion ? <Chip>{o.motion}</Chip> : null}
+              </div>
+
+              {/* THE NUMBER, AND WHERE IT CAME FROM — never the number alone.
+                  A percentage with no provenance is the most confident-looking thing
+                  on the panel and the least accountable, so the source is rendered
+                  beside it every time: the watch measured it, a classifier decided
+                  it, or we guessed. Only the last one is ours. */}
+              {typeof f.sleep_confidence === 'number' ? (
+                <div className="tel-sleep">
+                  <div className="tel-sleep-bar">
+                    <i style={{ width: Math.max(2, f.sleep_confidence) + '%' }}
+                       className={'tel-src-' + (f.sleep_source || 'inferred')} />
+                  </div>
+                  <div className="tel-sub">
+                    {Math.round(f.sleep_confidence) + '% asleep'
+                      + (f.sleep_source === 'watch' ? ' — the watch measured it'
+                        : f.sleep_source === 'classifier' ? ' — a sleep classifier said so'
+                        : ' — our own reading, not a measurement')}
+                  </div>
+                  {/* Every term that produced the number. This is the part that
+                      makes the number arguable, which is the point of showing it. */}
+                  {(f.sleep_terms || []).length ? (
+                    <ul className="tel-terms">
+                      {f.sleep_terms.map((t, i) => <li key={i}>{t}</li>)}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          {d.why ? <div className="tel-why">{d.why}</div> : null}
+        </>
+      )}
+
+      <div className="tel-hist-head">
+        <span className="tel-hist-k">history</span>
+        <div className="tel-hist-tabs">
+          <Tabs value={hours} label="history window" onChange={setHours}
+                tabs={[1, 6, 24, 168].map(h => ({ id: h, label: h < 24 ? h + 'h' : (h / 24) + 'd' }))} />
+        </div>
+        {d.health ? (
+          <span className="tel-hist-n">
+            {d.health.samples + ' samples · ' + d.health.days + ' day(s)'
+              + (d.health.malformed ? ` · ${d.health.malformed} malformed` : '')}
+          </span>
+        ) : null}
+      </div>
+      {err ? <State kind="error">{err}</State> : null}
+      {hist && hist.ok ? (
+        hist.kinds.length === 0
+          ? <State kind="empty">nothing recorded in this window.</State>
+          : hist.kinds.map(k => (
+              <div key={k} className="tel-series">
+                <div className="tel-series-k">{KIND_LABEL[k] || k}</div>
+                <Spark points={hist.series[k]} />
+                <div className="tel-series-n">{hist.series[k].length + ' min'}</div>
+              </div>
+            ))
+      ) : <State kind="loading">reading history…</State>}
+    </>
   )
 }
 
@@ -75,121 +199,7 @@ export default function Body() {
 
   return (
     <div className="pad">
-      <PanelBody state={s}>{d => {
-        if (d.ok === false) return <p className="err">{d.error}</p>
-        const o = d.observed || {}, f = d.facts || {}
-        const hasBody = Object.keys(o).length > 0
-        return (
-          <>
-            {/* WHAT SHE IS READING. Empty is a real answer and says so. */}
-            <div className="tel-hers">
-              <span className="tel-hers-k">she reads</span>
-              {d.she_reads
-                ? <span className="tel-hers-v">{d.she_reads}</span>
-                : <span className="tel-hers-v muted">
-                    nothing — {d.why || 'no fresh readings, so she is told nothing'}
-                  </span>}
-            </div>
-
-            {!hasBody ? (
-              <p className="muted">
-                No readings yet. The watch agent posts to <code>/v1/telemetry/ingest</code>.
-              </p>
-            ) : (
-              <>
-                <div className="tel-live">
-                  <div className="tel-card">
-                    <div className="tel-k">heart{d.resting ? ` · resting ${d.resting}` : ''}</div>
-                    <div className="tel-big">
-                      {o.heart_rate != null ? Math.round(o.heart_rate) : '—'}
-                      <em>bpm</em>
-                    </div>
-                    <Tail vals={o.heart_rate_tail} trend={f.hr_trend} />
-                    {f.hr_swing ? <div className="tel-sub">swing {f.hr_swing} bpm</div> : null}
-                  </div>
-
-                  <div className="tel-card">
-                    <div className="tel-k">movement</div>
-                    <div className="tel-big">
-                      {f.movement != null ? f.movement : '—'}
-                      <em>rad/s</em>
-                    </div>
-                    <Tail vals={o.movement_tail} trend={null} />
-                    {f.movement_word ? <div className="tel-sub">{f.movement_word}</div> : null}
-                  </div>
-
-                  <div className="tel-card">
-                    <div className="tel-k">state</div>
-                    <div className="tel-states">
-                      {o.on_body ? <span className={'tel-pill p-' + o.on_body}>
-                        {o.on_body === 'on' ? 'on wrist' : 'off wrist'}</span> : null}
-                      {f.asleep === true ? <span className="tel-pill p-sleep">
-                        asleep{f.crude ? '?' : ''}</span> : null}
-                      {f.awake_by_wrist ? <span className="tel-pill">just looked at it</span>
-                        : null}
-                      {o.sleep_stage ? <span className="tel-pill">{o.sleep_stage}</span> : null}
-                      {o.motion ? <span className="tel-pill">{o.motion}</span> : null}
-                    </div>
-
-                    {/* THE NUMBER, AND WHERE IT CAME FROM — never the number alone.
-                        A percentage with no provenance is the most confident-looking thing
-                        on the panel and the least accountable, so the source is rendered
-                        beside it every time: the watch measured it, a classifier decided
-                        it, or we guessed. Only the last one is ours. */}
-                    {typeof f.sleep_confidence === 'number' ? (
-                      <div className="tel-sleep">
-                        <div className="tel-sleep-bar">
-                          <i style={{ width: Math.max(2, f.sleep_confidence) + '%' }}
-                             className={'src-' + (f.sleep_source || 'inferred')} />
-                        </div>
-                        <div className="tel-sub">
-                          {Math.round(f.sleep_confidence)}% asleep
-                          {f.sleep_source === 'watch' ? ' — the watch measured it'
-                            : f.sleep_source === 'classifier' ? ' — a sleep classifier said so'
-                            : ' — our own reading, not a measurement'}
-                        </div>
-                        {/* Every term that produced the number. This is the part that
-                            makes the number arguable, which is the point of showing it. */}
-                        {(f.sleep_terms || []).length ? (
-                          <ul className="tel-terms">
-                            {f.sleep_terms.map((t, i) => <li key={i}>{t}</li>)}
-                          </ul>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-                {d.why ? <div className="tel-why">{d.why}</div> : null}
-              </>
-            )}
-
-            <div className="tel-hist-head">
-              <span>history</span>
-              {[1, 6, 24, 168].map(h => (
-                <button key={h} className={hours === h ? 'on' : ''} onClick={() => setHours(h)}>
-                  {h < 24 ? h + 'h' : (h / 24) + 'd'}
-                </button>
-              ))}
-              {d.health ? <span className="muted">
-                {d.health.samples} samples · {d.health.days} day(s)
-                {d.health.malformed ? ` · ${d.health.malformed} malformed` : ''}
-              </span> : null}
-            </div>
-            {err ? <p className="err">{err}</p> : null}
-            {hist && hist.ok ? (
-              hist.kinds.length === 0
-                ? <p className="muted">nothing recorded in this window.</p>
-                : hist.kinds.map(k => (
-                    <div key={k} className="tel-series">
-                      <div className="tel-series-k">{KIND_LABEL[k] || k}</div>
-                      <Spark points={hist.series[k]} />
-                      <div className="tel-series-n">{hist.series[k].length} min</div>
-                    </div>
-                  ))
-            ) : <p className="muted">reading history…</p>}
-          </>
-        )
-      }}</PanelBody>
+      <PanelBody state={s}>{d => <BodyView d={d} hours={hours} setHours={setHours} hist={hist} err={err} />}</PanelBody>
     </div>
   )
 }

@@ -23,6 +23,10 @@ Legs, each shown red against a mutant before it was trusted (GATE-INDEX lists th
      each window's pure view rendered with fixtures; kit parts, words verbatim; closes
      with a scan that no stage-4 render draws, and room.css no longer styles, a class the
      stage retired.
+  12. (stage 5) APPS — Body, Board, Ledger, Memory: the dense windows' pure views
+     rendered with fixtures; kit parts, her memories and every sentence verbatim; closes
+     with a scan that no stage-5 render draws, and room.css no longer styles, a class the
+     stage retired.
 
 Offline. Needs node and ui/node_modules (esbuild, react, react-dom); exit 2 without them.
 """
@@ -1127,7 +1131,7 @@ print("   .chips is still drawn by: %s — its rule stays until the last of them
       % (", ".join(_chips_users) or "nobody"))
 RETIRED_S4 |= {"sty-lane", "sty-k"}
 
-# ── leg 11's retired scan — keep this block last, directly above finish(GATE) ──
+# ── leg 11's retired scan — keep this block last in leg 11 (leg 12 follows) ──
 _drawn4 = set()
 for s in ALL_HTML:
     for cls in re.findall(r'class="([^"]*)"', s):
@@ -1136,5 +1140,339 @@ check("no stage-4 window draws a class it retired", bool(RETIRED_S4) and not _dr
 _room_now = re.sub(r"/\*.*?\*/", "", io.open(os.path.join(ROOT, "ui/src/room.css"), encoding="utf-8").read(), flags=re.S)
 _written4 = sorted(c for c in RETIRED_S4 if re.search(r"\." + re.escape(c) + r"(?![\w-])", _room_now))
 check("...and room.css styles none of them", not _written4, _written4)
+
+print("\n12. APPS — Body, Board, Ledger, Memory: the dense windows draw kit parts (views rendered with fixtures)")
+# Each block below adds the classes its window retired to RETIRED_S5; the scan at the end
+# of the leg (kept LAST) proves no render draws them and room.css styles none of them.
+# A name another window still draws (now, sal, gone, note, good/bad/warn, chips) is NOT
+# retired here — its block checks that ITS window stopped drawing it instead.
+RETIRED_S5: set = set()
+_css5 = lambda: re.sub(r"/\*.*?\*/", "", io.open(os.path.join(ROOT, "ui/src/room.css"), encoding="utf-8").read(), flags=re.S)
+
+d = render(r"""
+import * as B from '../ui/src/apps/Body.jsx'
+const noop = () => {}
+const now = { she_reads: 'his heart is climbing — 72, 81, 94', why: 'fresh from the watch, 40 s old', resting: 58,
+  observed: { heart_rate: 94.4, heart_rate_tail: [72, 81, 94], movement_tail: [0.12, 0.31],
+              on_body: 'on', sleep_stage: 'light', motion: 'still' },
+  facts: { hr_trend: 'climbing', hr_swing: 22, movement: 0.31, movement_word: 'barely moving',
+           asleep: true, crude: true, awake_by_wrist: true, sleep_confidence: 64.2, sleep_source: 'watch',
+           sleep_terms: ['heart under resting + 5', 'no movement for 20 min'] },
+  health: { samples: 1200, days: 3, malformed: 2 } }
+const hist = { ok: true, kinds: ['heart_rate', 'gyro_rms'],
+               series: { heart_rate: [ { avg: 70 }, { avg: 80 }, { avg: 75 } ], gyro_rms: [ { avg: 0.1 } ] } }
+const V = B.BodyView
+const bv = (p) => V ? html(h(V, { d: now, hours: 6, setHours: noop, hist, err: '', ...p })) : 'NO VIEW'
+const out = {
+  tel: bv({}),
+  tel_day: bv({ hours: 24 }),
+  tel_quiet: bv({ d: { she_reads: '', why: '', observed: {}, facts: {} } }),
+  tel_bad: bv({ d: { ok: false, error: 'telemetry store unreadable' } }),
+  tel_nohist: bv({ hist: null }),
+  tel_histerr: bv({ hist: null, err: 'TypeError: Failed to fetch' }),
+  tel_none: bv({ hist: { ok: true, kinds: [], series: {} } }),
+}
+""")
+check("the body probe rendered", "_error" not in d, d.get("_error", ""))
+g = lambda k: grab(d, k)
+# BODY — his heart, his movement, and what she is reading off them
+check("her sentence leads, verbatim — the one place he sees what she was handed",
+      "tel-live" in g("tel") and g("tel").find("she reads") < g("tel").find("tel-live")
+      and "his heart is climbing — 72, 81, 94" in g("tel"))
+check("told nothing says so, and why, in one sentence",
+      "nothing — no fresh readings, so she is told nothing" in g("tel_quiet"))
+check("the tail is readings, not an average: the newest marked, the rise named on the tail",
+      re.search(r'class="tel-tail tel-tail-climbing"><span class="tel-beat">72</span><span class="tel-beat">81</span>'
+                r'<span class="tel-beat tel-beat-now">94</span>', g("tel")) is not None)
+check("his states are chips: on wrist ok with a dot, the rest quiet — words verbatim",
+      re.search(r'ui-tone-ok"><span class="ui-chip-dot"></span><span class="ui-chip-t">on wrist<', g("tel")) is not None
+      and all(re.search(r'ui-tone-neutral"><span class="ui-chip-t">' + re.escape(w) + '<', g("tel"))
+              for w in ("asleep?", "just looked at it", "light", "still")))
+check("the sleep number shows its source: the bar coloured by it, the sentence saying it",
+      'class="tel-src-watch"' in g("tel") and "64% asleep — the watch measured it" in g("tel")
+      and "no movement for 20 min" in g("tel"))
+check("the history window is the kit's Tabs, named, the chosen span selected",
+      'role="tablist" aria-label="history window"' in g("tel") and g("tel").count('role="tab"') == 4
+      and re.search(r'aria-selected="true"[^>]*>6h<', g("tel")) is not None
+      and re.search(r'aria-selected="true"[^>]*>1d<', g("tel_day")) is not None)
+check("the store's health in one line, verbatim", "1200 samples · 3 day(s) · 2 malformed" in g("tel"))
+check("each kind a sparkline, its minutes counted; too few points says so",
+      g("tel").count("<polyline") == 1 and "not enough yet" in g("tel") and ">3 min<" in g("tel"))
+check("no readings yet is the kit's empty state, its words verbatim",
+      "ui-state-empty" in g("tel_quiet") and "No readings yet. The watch agent posts to" in g("tel_quiet")
+      and "<code>/v1/telemetry/ingest</code>" in g("tel_quiet"))
+check("an unreadable store is the kit's error state, verbatim",
+      "ui-state-error" in g("tel_bad") and "telemetry store unreadable" in g("tel_bad"))
+check("history loading, failing and empty are the kit's states, verbatim",
+      "ui-state-loading" in g("tel_nohist") and "reading history…" in g("tel_nohist")
+      and "ui-state-error" in g("tel_histerr") and "TypeError: Failed to fetch" in g("tel_histerr")
+      and "ui-state-empty" in g("tel_none") and "nothing recorded in this window." in g("tel_none"))
+_tel_btns = re.findall(r"<button[^>]*>", g("tel"))
+check("Body writes nothing — its only buttons are the history tabs",
+      len(_tel_btns) == 4 and all('role="tab"' in b for b in _tel_btns), _tel_btns)
+check("no bare now, on or err class is drawn — the grandfathered `now` left with this window",
+      "tel-hers" in g("tel")
+      and not any(re.search(r'class="[^"]*(?<![\w-])(now|on|err)(?![\w-])', g(k)) for k in ("tel", "tel_bad", "tel_histerr")))
+RETIRED_S5 |= {"tel-pill", "p-on", "p-off", "p-sleep", "t-climbing", "t-falling", "t-steady",
+               "src-watch", "src-classifier", "src-inferred"}
+
+d = render(r"""
+import * as D from '../ui/src/apps/Board.jsx'
+const noop = () => {}
+const notes = [ { id: 'n1', title: 'call the plumber', body: 'the kitchen tap', category: 'reminder', author: 'him',
+                  ts: '2026-09-25T09:00:00', due_at: '2026-09-27T10:00:00' },
+                { id: 'n2', title: 'read about tides', category: 'idea', author: 'her', ts: '2026-09-24T21:00:00', done: true } ]
+const retired = [ { id: 'n0', title: 'the old list', category: 'task', author: 'him', ts: '2026-09-01T08:00:00' } ]
+const blank = { title: '', body: '', category: 'note', due: '' }
+const V = D.BoardView
+const bv = (p) => V ? html(h(V, { d: { notes, retired }, busy: '', err: '', setErr: noop, editing: '', setEditing: noop,
+                                   draft: null, setDraft: noop, showRetired: false, setShowRetired: noop,
+                                   write: noop, refresh: noop, ...p })) : 'NO VIEW'
+const out = {
+  bd: bv({}),
+  bd_retired: bv({ showRetired: true }),
+  bd_draft: bv({ draft: blank }),
+  bd_both: bv({ draft: blank, editing: 'n1' }),
+  bd_empty: bv({ d: { notes: [], retired: [] } }),
+  bd_err: bv({ err: 'a note needs a title' }),
+  bd_busy: bv({ busy: '{"id":"n1","done":true}' }),
+}
+""")
+check("the board probe rendered", "_error" not in d, d.get("_error", ""))
+g = lambda k: grab(d, k)
+# BOARD — what either of them wants kept in view, with his hands on it
+check("each note is its own bd- row: title, category chip, author, when — no bare legacy class",
+      g("bd").count('class="bd-note') == 2 and re.search(r'ui-chip-t">reminder<', g("bd")) is not None
+      and 'class="bd-who">him<' in g("bd") and 'class="when' in g("bd") and 'class="bd-due-at"' in g("bd")
+      and not re.search(r'class="[^"]*(?<![\w-])(note|t|meta|cat|who|due|b|done|gone|on|err)(?![\w-])', g("bd") + g("bd_retired")))
+check("a done note is marked done, and its button says what it will do",
+      'class="bd-note bd-done"' in g("bd")
+      and re.search(r'class="ui-btn ui-btn-secondary[^"]*">not done<', g("bd")) is not None
+      and re.search(r'class="ui-btn ui-btn-secondary[^"]*">done<', g("bd")) is not None)
+check("four controls that mean four things: edit ghost, done, retire in danger, put it back",
+      len(re.findall(r'class="ui-btn ui-btn-ghost[^"]*">edit<', g("bd"))) == 2
+      and len(re.findall(r'class="ui-btn ui-btn-danger[^"]*">retire<', g("bd"))) == 2
+      and re.search(r'class="ui-btn ui-btn-secondary[^"]*">put it back<', g("bd_retired")) is not None)
+check("nothing is primary until he is putting a note up — then 'put it up' is the one",
+      "ui-btn-" in g("bd") and "ui-btn-primary" not in g("bd") and g("bd_draft").count("ui-btn-primary") == 1
+      and re.search(r'ui-btn-primary[^"]*">put it up<', g("bd_draft")) is not None)
+check("an edit open beside the add form still leaves one primary — an edit saves in secondary",
+      g("bd_both").count("ui-btn-primary") == 1
+      and re.search(r'class="ui-btn ui-btn-secondary[^"]*">save<', g("bd_both")) is not None)
+check("the form's fields are kit fields, each named by its own words",
+      all(('aria-label="%s"' % w) in g("bd_draft") for w in
+          ("what to keep in view", "anything more (optional)", "category",
+           "when? &quot;friday&quot;, &quot;in an hour&quot; (optional)"))
+      and "ui-field-area" in g("bd_draft") and "ui-field-select" in g("bd_draft")
+      and 'aria-label="due 2026-09-27T10:00 — type to change"' in g("bd_both"))
+check("the retired toggle says whether it is pressed; the list opens under its heading",
+      re.search(r'aria-pressed="false"[^>]*>retired \(1\)<', g("bd")) is not None
+      and re.search(r'aria-pressed="true"[^>]*>retired \(1\)<', g("bd_retired")) is not None
+      and "retired — kept, not deleted" in g("bd_retired") and 'class="bd-note bd-gone"' in g("bd_retired"))
+check("the count is a chip", re.search(r'ui-chip-t">2 on the board<', g("bd")) is not None)
+check("an empty board is the kit's empty state, verbatim",
+      "ui-state-empty" in g("bd_empty") and "the board is empty" in g("bd_empty"))
+check("a refused write is an err chip, verbatim",
+      "ui-tone-err" in g("bd_err") and "a note needs a title" in g("bd_err"))
+_bd_wait = re.findall(r'<button([^>]*)>(?:edit|not done|done|retire)</button>', g("bd_busy"))
+check("while a write is in flight every row control waits",
+      len(_bd_wait) == 6 and all('disabled=""' in a for a in _bd_wait), _bd_wait)
+check("room.css no longer styles Board's bare .note (Presence's lives in shell.css)",
+      re.search(r"\.note(?![\w-])", _css5()) is None)
+RETIRED_S5 |= {"bd-btn", "bd-add", "bd-save", "bd-danger", "bd-in", "bd-area", "cat", "due", "b"}
+
+d = render(r"""
+import * as L from '../ui/src/apps/Ledger.jsx'
+const noop = () => {}
+const health = { total: 140, note: 'receipts of past runs', receipts: [
+  { name: 'g_room_kit', ok: true, kind: 'gate' }, { name: 'g_sweep_x', ok: false, fail: 3, kind: 'gate' },
+  { name: 'g_old', ok: true, stale: true, kind: 'gate' }, { name: 'm_speed', ok: false, kind: 'measurement' } ] }
+const green = { total: 140, receipts: [ { name: 'g_room_kit', ok: true, kind: 'gate' } ] }
+const led = { kinds: ['plan', 'parked', 'noticed', 'idea', 'risk'], counts: { dropped: 1 },
+  kind_blurb: { plan: 'what is being built', noticed: 'seen in passing, not touched' },
+  entries: [
+    { id: 'e1', kind: 'plan', status: 'doing', title: 'stage 5 of the room', owner: 'claude', pinned: true,
+      updated: 1790380000, body: 'Body, Board, Ledger, Memory', refs: ['docs/superpowers/plans/x.md'] },
+    { id: 'e2', kind: 'noticed', status: 'open', title: 'a gate prints mojibake', owner: 'him', updated: 1790300000 },
+    { id: 'e3', kind: 'idea', status: 'dropped', title: 'a second clock', owner: 'her', updated: 1790200000 },
+    { id: 'e4', kind: 'someday', status: 'open', title: 'a row of an unknown kind', owner: 'him', updated: 1790100000 } ] }
+const H = L.HealthView, V = L.LedgerView, R = L.LedgerRow
+const lv = (p) => V ? html(h(V, { d: led, showDropped: false, setShowDropped: noop, adding: null, setAdding: noop, act: noop, ...p })) : 'NO VIEW'
+const row = (p) => R ? html(h(R, { e: led.entries[0], onSave: noop, onDrop: noop, onRestore: noop, ...p })) : 'NO ROW'
+const out = {
+  hl: H ? html(h(H, { d: health })) : 'NO VIEW',
+  hl_green: H ? html(h(H, { d: green })) : 'NO VIEW',
+  lg: lv({}), lg_dropped: lv({ showDropped: true }),
+  lg_add: lv({ adding: { kind: 'noticed', title: '', body: '' } }),
+  row_open: row({ startOpen: true }),
+  row_edit: row({ startEdit: true }),
+  row_gone: row({ e: led.entries[2], startOpen: true }),
+}
+""")
+check("the ledger probe rendered", "_error" not in d, d.get("_error", ""))
+g = lambda k: grab(d, k)
+# LEDGER — the plan, the parked, and everything noticed and not touched
+check("the gates' health is chips: red in err with each failing gate named, stale in warn",
+      re.search(r'ui-tone-err"><span class="ui-chip-dot"></span><span class="ui-chip-t">1 red<', g("hl")) is not None
+      and re.search(r'ui-tone-err" title="3 failing"><span class="ui-chip-t">g_sweep_x<', g("hl")) is not None
+      and re.search(r'ui-tone-warn"><span class="ui-chip-t">1 stale<', g("hl")) is not None)
+check("all green is an ok chip; a measurement pads neither number",
+      re.search(r'ui-tone-ok"><span class="ui-chip-dot"></span><span class="ui-chip-t">140 green<', g("hl_green")) is not None
+      and "m_speed" not in g("hl"))
+check("the age is said, verbatim — receipts, not a live verdict", "last recorded runs, not a live verdict" in g("hl"))
+check("no bare good/bad/warn is drawn — the health's literal colours left with them",
+      "ui-chip" in g("hl") and not re.search(r'class="[^"]*(?<![\w-])(good|bad|warn)(?![\w-])', g("hl") + g("hl_green")))
+check("the bar is not a .chips row: add a kit button, dropped a pressed toggle, the count a chip",
+      'class="chips"' not in g("lg") and re.search(r'class="ui-btn ui-btn-secondary[^"]*">\+ add<', g("lg")) is not None
+      and re.search(r'aria-pressed="false"[^>]*>1 dropped<', g("lg")) is not None
+      and re.search(r'aria-pressed="true"[^>]*>1 dropped<', g("lg_dropped")) is not None
+      and re.search(r'ui-chip-t">3 shown<', g("lg")) is not None)
+check("a dropped row is hidden until asked for, and struck when shown — never gone",
+      "a second clock" not in g("lg") and "a second clock" in g("lg_dropped")
+      and 'class="lgr lgr-s-dropped"' in g("lg_dropped"))
+check("status reads in a prefixed class, never a bare one",
+      'class="lgr lgr-s-doing"' in g("lg")
+      and not re.search(r'class="lgr (open|doing|done|dropped)"', g("lg") + g("lg_dropped")))
+check("a kind the panel does not know still shows, under other, its words verbatim",
+      "rows whose kind the panel does not know — they are still yours" in g("lg") and "a row of an unknown kind" in g("lg"))
+check("a row's head is a disclosure button that says whether it is open",
+      '<button type="button" class="lgr-head" aria-expanded="false"' in g("lg")
+      and '<button type="button" class="lgr-head" aria-expanded="true"' in g("row_open"))
+check("an open row: edit ghost, remove in danger with its promise verbatim, the refs",
+      re.search(r'class="ui-btn ui-btn-ghost[^"]*">edit<', g("row_open")) is not None
+      and re.search(r'title="tombstoned, not deleted — it stays in the file" class="ui-btn ui-btn-danger[^"]*">remove<', g("row_open")) is not None
+      and "<code>docs/superpowers/plans/x.md</code>" in g("row_open"))
+check("a dropped row offers restore, not remove",
+      re.search(r'class="ui-btn ui-btn-secondary[^"]*">restore<', g("row_gone")) is not None and ">remove<" not in g("row_gone"))
+check("the add form: fields named by their own words, add the window's one primary",
+      all(('aria-label="%s"' % w) in g("lg_add") for w in
+          ("what is it, in one line", "why it matters, and what would settle it", "kind"))
+      and g("lg_add").count("ui-btn-primary") == 1 and re.search(r'ui-btn-primary[^"]*">add<', g("lg_add")) is not None)
+check("editing: kit fields named, the pin a checkbox, save and cancel kit buttons — no primary (add owns it)",
+      all(('aria-label="%s"' % w) in g("row_edit") for w in ("title", "body", "kind", "status"))
+      and 'type="checkbox"' in g("row_edit") and "ui-btn-primary" not in g("row_edit")
+      and re.search(r'class="ui-btn ui-btn-secondary[^"]*">save<', g("row_edit")) is not None)
+check("the ledger's rows are still .lgr, never .led", 'class="lgr ' in g("lg") and 'class="led' not in g("lg"))
+RETIRED_S5 |= {"ledger", "adding", "doing", "dropped", "done"}
+
+d = render(r"""
+import * as M from '../ui/src/apps/Memory.jsx'
+const noop = () => {}
+const facts = [
+  { name: 'm1', text: 'he takes his coffee black', mem_class: 'preference', speaker: 'user', ts: '2026-09-25T08:00:00',
+    mentions: 3, recalled: 2, salience: 4.2 },
+  { name: 'm2', text: 'I like the sound of rain on the window', mem_class: 'self-narrative', kind: 'thought', speaker: 'self',
+    core: 1, ts: '2026-09-24T22:00:00', salience: 6, status: 'inferred', derived_from: ['m1'] },
+  { name: 'm3', text: 'he was born in spring', mem_class: 'identity', speaker: 'user', ts: '2026-09-20T10:00:00' },
+  { name: 'g1', text: 'an old phrasing', mem_class: 'fact', speaker: 'user', lifecycle: 1, retired_because: 'reworded', ts: '2026-09-01' },
+  { name: 'g2', text: 'a conclusion on sand', mem_class: 'fact', speaker: 'self', lifecycle: 1, superseded_by: 'supports-retired', ts: '2026-08-30' },
+]
+const why = { ok: true, row: { support_days: 3 },
+              supports: [ { name: 'm1', text: 'he takes his coffee black', mem_class: 'preference' },
+                          { name: 'x', text: 'a retired support', kind: 'thought', lifecycle: 1, retired_because: 'folded' } ],
+              missing_supports: ['y'], dependents: [ { text: 'a conclusion resting here', mem_class: 'self-narrative' } ] }
+const V = M.MemoryView, R = M.MemRow, W = M.WhyView
+const mv = (p) => V ? html(h(V, { d: { facts }, q: '', setQ: noop, who: 'all', setWho: noop, adding: '', setAdding: noop,
+                                   onAdd: noop, refresh: noop, ...p })) : 'NO VIEW'
+const wv = (p) => W ? html(h(W, { d: why, err: '', onClose: noop, ...p })) : 'NO VIEW'
+const out = {
+  mem: mv({}), mem_hers: mv({ who: 'hers' }), mem_q: mv({ q: 'coffee' }), mem_none: mv({ q: 'zzz' }),
+  mem_typed: mv({ adding: 'she likes tides', who: 'hers' }),
+  row: R ? html(h(R, { r: facts[1], onDone: noop })) : 'NO ROW',
+  row_open: R ? html(h(R, { r: facts[0], onDone: noop, startOpen: true })) : 'NO ROW',
+  why: wv({}), why_wait: wv({ d: null }), why_err: wv({ d: null, err: 'TypeError: Failed to fetch' }),
+}
+""")
+check("the memory probe rendered", "_error" not in d, d.get("_error", ""))
+g = lambda k: grab(d, k)
+# MEMORY — live rows and retired ones, and showing both is the point
+check("whose rows is the kit's Tabs, named — live, his, hers, their counts verbatim",
+      'role="tablist" aria-label="whose rows"' in g("mem") and g("mem").count('role="tab"') == 3
+      and re.search(r'aria-selected="true"[^>]*>3 live<', g("mem")) is not None
+      and ">2 his<" in g("mem") and ">1 hers<" in g("mem"))
+check("choosing hers selects its tab and leaves only her rows",
+      re.search(r'aria-selected="true"[^>]*>1 hers<', g("mem_hers")) is not None
+      and "rain on the window" in g("mem_hers") and "coffee black" not in g("mem_hers"))
+check("core and retired are counts, not buttons that did nothing — chips, the core title verbatim",
+      re.search(r'<span class="ui-chip ui-tone-neutral" title="pinned identity — lead the self block, never folded">'
+                r'<span class="ui-chip-t">★1 core<', g("mem")) is not None
+      and re.search(r'ui-chip-t">2 retired<', g("mem")) is not None
+      and 'class="chips"' not in g("mem") and "r-off" not in g("mem"))
+check("filter and add are kit fields named by their own words; add is the window's one primary",
+      'aria-label="filter — text, class or kind"' in g("mem") and 'aria-label="add a fact about him"' in g("mem")
+      and 'aria-label="add a memory of hers"' in g("mem_hers")
+      and g("mem").count("ui-btn-primary") == 1
+      and re.search(r'disabled="" class="ui-btn ui-btn-primary[^"]*">add<', g("mem")) is not None
+      and re.search(r'<button type="button" class="ui-btn ui-btn-primary[^"]*">add<', g("mem_typed")) is not None)
+check("a filter narrows the list; nothing matching is the kit's empty state, verbatim",
+      "coffee black" in g("mem_q") and "born in spring" not in g("mem_q")
+      and "ui-state-empty" in g("mem_none") and "nothing matches." in g("mem_none"))
+check("newest first: this week's row leads the list",
+      0 <= g("mem").find("coffee black") < g("mem").find("born in spring"))
+check("her memories are drawn verbatim, live and retired",
+      all(t in g("mem") for t in ("he takes his coffee black", "I like the sound of rain on the window",
+                                   "he was born in spring", "an old phrasing", "a conclusion on sand")))
+check("a retired row stays, struck, and says why it died — verbatim",
+      "retired — kept, never deleted" in g("mem") and g("mem").count('class="mem-row gone"') == 2
+      and "reworded" in g("mem") and "its supports were retired" in g("mem"))
+check("a row's text opens it by a button that says whether it is open",
+      '<button type="button" class="mem-t" aria-expanded="false" title="click to re-file">'
+      'I like the sound of rain on the window</button>' in g("row"))
+check("class and status are app-owned marks in their colour, the kind a kit chip, the owner said",
+      'class="mem-cls mem-c-self-narrative"' in g("row") and 'class="mem-cls mem-c-st-inferred"' in g("row")
+      and re.search(r'ui-chip-t">thought<', g("row")) is not None and 'class="mem-who mem-w-self">hers<' in g("row"))
+_core = re.search(r'<button([^>]*aria-label="core"[^>]*)>([^<]*)</button>', g("row"))
+check("core is a pressed toggle with a steady name, its title verbatim",
+      _core is not None and 'aria-pressed="true"' in _core.group(1)
+      and 'title="core — pinned; click to unpin"' in _core.group(1) and _core.group(2) == "★")
+check("why and re-file are kit buttons that say whether their box is open",
+      re.search(r'<button type="button" aria-expanded="false" aria-label="why"[^>]*class="ui-btn ui-btn-ghost', g("row")) is not None
+      and re.search(r'<button type="button" aria-expanded="false" aria-label="re-file" class="ui-btn ui-btn-ghost[^"]*">re-file<', g("row")) is not None
+      and "mem-edit\"" not in g("row"))
+check("a why button only on a row that carries supports", 'aria-label="why"' not in g("row_open"))
+check("the re-file box: whose, class and kind are kit selects in their labels; the wording named; retire danger",
+      g("row_open").count("ui-field-select") == 3 and '<label class="mem-lbl">whose' in g("row_open")
+      and 'aria-label="correct the wording — Enter saves"' in g("row_open")
+      and 'value="he takes his coffee black"' in g("row_open")
+      and re.search(r'class="ui-btn ui-btn-danger[^"]*">retire<', g("row_open")) is not None)
+check("the vocabulary offered is still the server's subset",
+      all(('<option value="%s"' % c) in g("row_open") for c in ("fact", "self-narrative", "feeling", "private-secret")))
+check("why: what it was drawn from, in one sentence — the counts verbatim",
+      "drawn from 2 rows across 3 days — 1 since retired — 1 no longer findable" in g("why"))
+check("a retired support is struck as retired, and says why",
+      'class="mem-why-row gone"' in g("why") and " — retired: folded" in g("why"))
+check("what rests on this row is said before he retires it",
+      "rest on this row — retiring it" in g("why") and "may orphan" in g("why") and "a conclusion resting here" in g("why"))
+check("each support's kind is a kit chip; close is a named kit button",
+      re.search(r'ui-chip-t">preference<', g("why")) is not None
+      and re.search(r'<button type="button" aria-label="close" class="ui-btn ui-btn-ghost[^"]*">×<', g("why")) is not None)
+check("reading and failing are the kit's states, verbatim",
+      "ui-state-loading" in g("why_wait") and "reading the receipts…" in g("why_wait")
+      and "ui-state-error" in g("why_err") and "TypeError: Failed to fetch" in g("why_err"))
+check("no bare t/meta/who/cls/mem/danger/dep class is drawn",
+      "mem-row" in g("mem")
+      and not any(re.search(r'class="[^"]*(?<![\w-])(t|meta|who|cls|mem|danger|dep)(?![\w-])', g(k))
+                  for k in ("mem", "row", "row_open", "why")))
+# WHO STILL DRAWS .chips — no stage-5 window does; the global rule stays exactly while someone does
+_S5 = {"Body", "Board", "Ledger", "Memory"}
+_chips5 = sorted(f[:-4] for f in os.listdir(_apps_dir) if f.endswith(".jsx")
+                 and re.search(r"""className=(?:"|\{')[^>]*(?<![\w-])chips(?![\w-])""", _code("ui/src/apps/" + f)))
+check("no stage-5 window draws a .chips row", not (set(_chips5) & _S5), _chips5)
+check("the global .chips rule stays exactly while a window still draws one",
+      bool(_chips5) == (re.search(r"(?m)^\.chips\s*\{", _css5()) is not None), _chips5)
+print("   .chips is still drawn by: %s — the rule goes when the last of them migrates (stage 6)"
+      % (", ".join(_chips5) or "nobody"))
+RETIRED_S5 |= {"mem", "t", "meta", "cls", "who", "w-self", "w-user", "c-kind", "c-fact", "c-preference",
+               "c-relationship", "c-identity", "c-event", "c-self-narrative", "c-feeling", "c-private-secret",
+               "c-st-inferred", "c-st-disputed", "mem-edit", "mem-core", "danger", "why-head", "why-row", "dep"}
+
+# ── leg 12's retired scan — keep this block last, directly above finish(GATE) ──
+_drawn5 = set()
+for s in ALL_HTML:
+    for cls in re.findall(r'class="([^"]*)"', s):
+        _drawn5 |= set(cls.split()) & RETIRED_S5
+check("no stage-5 window draws a class it retired", bool(RETIRED_S5) and not _drawn5, sorted(_drawn5))
+_written5 = sorted(c for c in RETIRED_S5 if re.search(r"\." + re.escape(c) + r"(?![\w-])", _css5()))
+check("...and room.css styles none of them", not _written5, _written5)
 
 finish(GATE)

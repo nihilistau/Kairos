@@ -41,7 +41,9 @@ UI = os.path.join(ROOT, "ui", "src")
 # longer collide, which is also a name that no longer means anything specific.
 SHARED = frozenset({
     "pad", "muted", "on", "err", "chips", "k", "v", "note", "r-off",
-    "meta", "who", "sal", "cls", "gone",
+    "sal", "gone",
+    # `meta`, `who`, `cls` left 2026-09-26 (redesign stage 5): Board and Memory were their
+    # only users, and both draw prefixed names now (`bd-meta`, `mem-meta`, `mem-cls` …).
     # TONE. Presentational only — they say how a thing reads, never what it is, which
     # is what makes them safe to share where `t` or `now` are not. Added 2026-08-01
     # when this gate caught its own author: Stage used `warn`, Ledger already did, and
@@ -99,11 +101,17 @@ def family_of(c: str):
 # ambiguity, listed so it is visible rather than tolerated in silence.
 # `dragging` left 2026-09-26 (redesign stage 4): Files' drop outline is `fl-dragging` now,
 # so the shell's window drag is the only owner.
-GRANDFATHERED = frozenset({
-    "now",        # Journal "today" (Music's "now playing" is `mus-now` since stage 4)
-    "t",          # Board note text; Memory row text (Music's track title left in stage 4)
-})
-GRANDFATHERED_MAX = len(GRANDFATHERED)   # frozen. Lowering this is the only edit allowed.
+# `now` left 2026-09-26 (redesign stage 5): Body's newest reading is `tel-beat-now`, so
+# Journal's "today" is its only owner. (The entry's comment named Journal alone; Body's
+# `tel-beat now` was the second owner all along.)
+# `t` left 2026-09-26 (redesign stage 5): Board's note title is `bd-t`, so Memory was its
+# last user, and a name with one owner needs no excuse. The table is EMPTY; the ratchet
+# below (GRANDFATHERED_MAX = 0) keeps it that way.
+GRANDFATHERED: frozenset = frozenset()
+# A LITERAL, never len(GRANDFATHERED): until 2026-09-26 it was the table's own size, so
+# "it has not grown" compared the table with itself and could not fail — re-adding `now`
+# raised the ceiling with it. Lowering this is the only edit allowed.
+GRANDFATHERED_MAX = 0
 
 PASS = FAIL = 0
 
@@ -271,7 +279,19 @@ css = re.sub(r"/\*.*?\*/", "", io.open(os.path.join(UI, "room.css"), encoding="u
              flags=re.S)
 check("room.css still defines `.led` as the 8px dot",
       re.search(r"\.led\s*\{[^}]*width:\s*8px", css) is not None)
-check("the ledger's rows are NOT `.led`", ".lgr" in css and "lgr" == declared.get("ledger"))
+# What the name says, read off the row itself: the element that holds a row's
+# disclosure button (`lgr-head`) carries `lgr` and no bare `led`, the ledger draws no
+# `led` anywhere, and room.css styles `.lgr`. (Until 2026-09-26 this only checked
+# that `.lgr` existed in room.css — a row renamed back to `led` stayed green here.)
+ledger_src = io.open(os.path.join(UI, "apps", "Ledger.jsx"), encoding="utf-8").read()
+row = re.search(r"<div className=\{?['\"]([^'\"]*)['\"][^>]*>\s*"
+                r"<button[^>]*className=\"lgr-head\"", ledger_src)
+row_cls = row.group(1).split() if row else []
+check("the ledger's rows are NOT `.led`",
+      "lgr" in row_cls and "led" not in row_cls
+      and "led" not in owners.get("app:ledger", set())
+      and re.search(r"\.lgr\s*\{", css) is not None and "lgr" == declared.get("ledger"),
+      "row classes %s, ledger draws led: %s" % (row_cls, "led" in owners.get("app:ledger", set())))
 
 print("\nG-ROOM-CSS: %d pass, %d fail" % (PASS, FAIL))
 rdir = os.path.join(ROOT, "var", "sem", "receipts")

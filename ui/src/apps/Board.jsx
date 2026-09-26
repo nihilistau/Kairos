@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { usePoll, Body } from './panel.jsx'
 import { When } from '../room/When.jsx'
+import { Button, Chip, Input, Select, State, TextArea } from '../kit/parts.jsx'
 import * as api from '../api.js'
 
 /* BOARD — notes, reminders, watches. HIS SIDE OF IT, with hands.
@@ -35,6 +36,102 @@ import * as api from '../api.js'
  *
  * Prefix `bd-`, per the appRegistry CSS-ownership rule that G-ROOM-CSS enforces.
  */
+
+/* The window's body, split out so G-ROOM-KIT leg 12 can render it with a fixture. The
+ * four controls stay four and stay kit Buttons: edit ghost, done secondary (its label says
+ * what it will do, so no pressed state), retire danger, put it back secondary. "retired
+ * (N)" shows or hides a list under a steady name, so it is a pressed toggle. The add
+ * form's "put it up" is the window's one primary; an edit saves in secondary, because an
+ * edit can be open beside the add form. */
+export function BoardView({ d, busy, err, setErr, editing, setEditing, draft, setDraft,
+                            showRetired, setShowRetired, write, refresh }) {
+  const rows = d.notes || d.items || []
+  const retired = d.retired || []
+  const cats = d.categories || ['note', 'idea', 'reminder', 'task', 'important', 'watch']
+  return (
+    <>
+      <div className="bd-bar">
+        <Button size="sm" onClick={() =>
+          setDraft(draft ? null : { title: '', body: '', category: 'note', due: '' })}>
+          {draft ? 'cancel' : '+ add'}
+        </Button>
+        {retired.length ? (
+          <Button size="sm" variant="ghost" aria-pressed={showRetired}
+                  onClick={() => setShowRetired(v => !v)}>
+            {'retired (' + retired.length + ')'}
+          </Button>
+        ) : null}
+        <span className="bd-count"><Chip>{rows.length + ' on the board'}</Chip></span>
+      </div>
+      {err ? <div className="bd-err"><Chip tone="err" wrap>{err}</Chip></div> : null}
+
+      {draft ? (
+        <NoteForm value={draft} cats={cats} busy={!!busy} submit="put it up" primary
+                  onChange={setDraft}
+                  onSave={async () => {
+                    if (!draft.title.trim()) { setErr('a note needs a title'); return }
+                    const r = await write(api.noteAdd, draft)
+                    if (r && r.ok) setDraft(null)
+                  }} />
+      ) : null}
+
+      {!rows.length && !draft ? <State kind="empty">the board is empty</State> : null}
+
+      {rows.map((n, i) => editing === n.id ? (
+        <NoteForm key={n.id || i} value={n} cats={cats} busy={!!busy} submit="save"
+                  onChange={v => { rows[i] = v; setEditing(n.id) }}
+                  onSave={async (v) => {
+                    const r = await write(api.noteUpdate, { id: n.id, ...v })
+                    if (r && r.ok) setEditing('')
+                  }}
+                  onCancel={() => { setEditing(''); refresh() }} />
+      ) : (
+        <div key={n.id || i} className={'bd-note' + (n.done ? ' bd-done' : '')}>
+          <div className="bd-t">{n.title}</div>
+          <div className="bd-meta">
+            <Chip>{n.category}</Chip>
+            <span className="bd-who">{n.author || n.speaker || '—'}</span>
+            {/* WHEN, on every row, in the same words as everywhere else. */}
+            <When at={n.updated_at || n.ts} />
+            {n.due_at ? <span className="bd-due-at">due <When at={n.due_at} bare /></span> : null}
+          </div>
+          {n.body ? <div className="bd-b">{n.body}</div> : null}
+          <div className="bd-acts">
+            <Button size="sm" variant="ghost" disabled={!!busy}
+                    onClick={() => setEditing(n.id)}>edit</Button>
+            <Button size="sm" disabled={!!busy}
+                    onClick={() => write(api.noteUpdate, { id: n.id, done: !n.done })}>
+              {n.done ? 'not done' : 'done'}
+            </Button>
+            <Button size="sm" variant="danger" disabled={!!busy}
+                    onClick={() => write(api.noteRemove, { id: n.id })}>retire</Button>
+          </div>
+        </div>
+      ))}
+
+      {showRetired && retired.length ? (
+        <div className="bd-retired">
+          <div className="bd-head">retired — kept, not deleted</div>
+          {retired.map((n, i) => (
+            <div key={n.id || i} className="bd-note bd-gone">
+              <div className="bd-t">{n.title}</div>
+              <div className="bd-meta">
+                <Chip>{n.category}</Chip>
+                <span className="bd-who">{n.author || n.speaker || '—'}</span>
+                <When at={n.updated_at || n.ts} />
+              </div>
+              <div className="bd-acts">
+                <Button size="sm" disabled={!!busy}
+                        onClick={() => write(api.noteRestore, { id: n.id })}>put it back</Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </>
+  )
+}
+
 export default function Board() {
   /* STABLE IDENTITY OR AN UNBOUNDED LOOP (2026-08-29 audit): an inline arrow is a
    new fn every render; usePoll re-subscribes on [fn, ms], run() sets state, state
@@ -69,95 +166,11 @@ export default function Board() {
 
   return (
     <div className="pad">
-      <Body state={s}>{d => {
-        const rows = d.notes || d.items || []
-        const retired = d.retired || []
-        const cats = d.categories || ['note', 'idea', 'reminder', 'task', 'important', 'watch']
-        return (
-          <>
-            <div className="bd-bar">
-              <button className="bd-btn bd-add" onClick={() =>
-                setDraft(draft ? null : { title: '', body: '', category: 'note', due: '' })}>
-                {draft ? 'cancel' : '+ add'}
-              </button>
-              {retired.length ? (
-                <button className={'bd-btn' + (showRetired ? ' on' : '')}
-                        onClick={() => setShowRetired(v => !v)}>
-                  retired ({retired.length})
-                </button>
-              ) : null}
-              <span className="bd-count">{rows.length} on the board</span>
-            </div>
-            {err ? <div className="err">{err}</div> : null}
-
-            {draft ? (
-              <NoteForm value={draft} cats={cats} busy={!!busy} submit="put it up"
-                        onChange={setDraft}
-                        onSave={async () => {
-                          if (!draft.title.trim()) { setErr('a note needs a title'); return }
-                          const r = await write(api.noteAdd, draft)
-                          if (r && r.ok) setDraft(null)
-                        }} />
-            ) : null}
-
-            {!rows.length && !draft ? <div className="muted">the board is empty</div> : null}
-
-            {rows.map((n, i) => editing === n.id ? (
-              <NoteForm key={n.id || i} value={n} cats={cats} busy={!!busy} submit="save"
-                        onChange={v => { rows[i] = v; setEditing(n.id) }}
-                        onSave={async (v) => {
-                          const r = await write(api.noteUpdate, { id: n.id, ...v })
-                          if (r && r.ok) setEditing('')
-                        }}
-                        onCancel={() => { setEditing(''); s.refresh() }} />
-            ) : (
-              <div key={n.id || i} className={'note' + (n.done ? ' done' : '')}>
-                <div className="t">{n.title}</div>
-                <div className="meta">
-                  <span className="cat">{n.category}</span>
-                  <span className="who">{n.author || n.speaker || '—'}</span>
-                  {/* WHEN, on every row, in the same words as everywhere else. */}
-                  <When at={n.updated_at || n.ts} />
-                  {n.due_at ? <span className="due">due <When at={n.due_at} bare /></span> : null}
-                </div>
-                {n.body ? <div className="b">{n.body}</div> : null}
-                <div className="bd-acts">
-                  <button className="bd-btn" disabled={!!busy}
-                          onClick={() => setEditing(n.id)}>edit</button>
-                  <button className={'bd-btn' + (n.done ? ' on' : '')} disabled={!!busy}
-                          onClick={() => write(api.noteUpdate, { id: n.id, done: !n.done })}>
-                    {n.done ? 'not done' : 'done'}
-                  </button>
-                  <button className="bd-btn bd-danger" disabled={!!busy}
-                          onClick={() => write(api.noteRemove, { id: n.id })}>retire</button>
-                </div>
-              </div>
-            ))}
-
-            {showRetired && retired.length ? (
-              <div className="bd-retired">
-                <div className="bd-head">retired — kept, not deleted</div>
-                {retired.map((n, i) => (
-                  <div key={n.id || i} className="note gone">
-                    <div className="t">{n.title}</div>
-                    <div className="meta">
-                      <span className="cat">{n.category}</span>
-                      <span className="who">{n.author || n.speaker || '—'}</span>
-                      <When at={n.updated_at || n.ts} />
-                    </div>
-                    <div className="bd-acts">
-                      <button className="bd-btn" disabled={!!busy}
-                              onClick={() => write(api.noteRestore, { id: n.id })}>
-                        put it back
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </>
-        )
-      }}</Body>
+      <Body state={s}>{d => (
+        <BoardView d={d} busy={busy} err={err} setErr={setErr} editing={editing} setEditing={setEditing}
+                   draft={draft} setDraft={setDraft} showRetired={showRetired} setShowRetired={setShowRetired}
+                   write={write} refresh={() => s.refresh()} />
+      )}</Body>
     </div>
   )
 }
@@ -167,31 +180,33 @@ export default function Board() {
  * words — "friday", "in an hour" — and parsed server-side by duetime.parse_due, so the
  * panel and her `add_note(due=...)` tool read times identically. A second parser here
  * is exactly how a reminder ends up firing on a different Friday. */
-function NoteForm({ value, cats, busy, submit, onChange, onSave, onCancel }) {
+function NoteForm({ value, cats, busy, submit, primary, onChange, onSave, onCancel }) {
   const [v, setV] = useState({
     title: value.title || '', body: value.body || '',
     category: value.category || 'note', due: '',
   })
   const set = (k, x) => { const nv = { ...v, [k]: x }; setV(nv); onChange && onChange(nv) }
+  const duePh = value.due_at
+    ? 'due ' + String(value.due_at).slice(0, 16) + ' — type to change'
+    : 'when? "friday", "in an hour" (optional)'
   return (
     <div className="bd-form">
-      <input className="bd-in" placeholder="what to keep in view" value={v.title}
+      <Input aria-label="what to keep in view" placeholder="what to keep in view" value={v.title}
              onChange={e => set('title', e.target.value)} />
-      <textarea className="bd-in bd-area" placeholder="anything more (optional)" value={v.body}
+      <TextArea aria-label="anything more (optional)" placeholder="anything more (optional)" value={v.body}
                 onChange={e => set('body', e.target.value)} />
       <div className="bd-frow">
-        <select className="bd-in bd-sel" value={v.category}
+        <Select className="bd-sel" aria-label="category" value={v.category}
                 onChange={e => set('category', e.target.value)}>
           {cats.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <input className="bd-in bd-due" placeholder={value.due_at
-          ? 'due ' + String(value.due_at).slice(0, 16) + ' — type to change'
-          : 'when? "friday", "in an hour" (optional)'}
+        </Select>
+        <Input className="bd-due" aria-label={duePh} placeholder={duePh}
                value={v.due} onChange={e => set('due', e.target.value)} />
       </div>
       <div className="bd-acts">
-        <button className="bd-btn bd-save" disabled={busy} onClick={() => onSave(v)}>{submit}</button>
-        {onCancel ? <button className="bd-btn" disabled={busy} onClick={onCancel}>cancel</button> : null}
+        <Button size="sm" variant={primary ? 'primary' : 'secondary'} disabled={busy}
+                onClick={() => onSave(v)}>{submit}</Button>
+        {onCancel ? <Button size="sm" variant="ghost" disabled={busy} onClick={onCancel}>cancel</Button> : null}
       </div>
     </div>
   )
