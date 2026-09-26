@@ -7,9 +7,12 @@ the last one learned. Two things it kept having to relearn:
   * THE EXIT CODE IS THE VERDICT. 0 held, 1 failed, 2 skipped (the subject is absent here).
     A gate that prints FAIL and exits 0 was the 2026-08-19 audit's finding; a runner that
     greps stdout for "FAIL" repeats it from the other side.
-  * SOME GATES ARE NOT CONCURRENCY-SAFE. `g_backup` writes real archives and its
-    idle-hour dedupe check fails when two runs overlap. It is green alone and red at -j6,
-    and a red that depends on the runner is worse than no runner.
+  * SOME GATES WERE NOT CONCURRENCY-SAFE. `g_backup` backed up her REAL tree, and its
+    idle-hour dedupe check failed whenever anything wrote between two runs. Running it
+    serially hid the other writer (another gate) but never the one that mattered — her own
+    stack — so on 2026-09-26 it moved to a sandbox and left the serial list. The mechanism
+    stays for the next gate that needs it; a red that depends on the runner is worse than
+    no runner.
 
 `--audit` adds what `tools/gate_sandbox_audit.py` does: her real stores are snapshotted
 and diffed AROUND EACH GATE, so a gate that writes into her journal is named. Nine of them
@@ -34,8 +37,8 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Not concurrency-safe: real archives, an idle-hour dedupe, and a second copy racing it.
-SERIAL = {"g_backup.py"}
+# Gates that must not run beside the others. Empty since g_backup went hermetic (2026-09-26).
+SERIAL: set = set()
 
 WATCH = ["memory-okf-personality", "memory-okf", "memory-okf-conv", "memory-okf-self",
          "var/memory", "var/room", "var/tuning.json", "persona.md"]

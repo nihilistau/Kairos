@@ -40,7 +40,7 @@ UI = os.path.join(ROOT, "ui", "src")
 # Any app may use these. Keep the list SHORT: every addition is a name that can no
 # longer collide, which is also a name that no longer means anything specific.
 SHARED = frozenset({
-    "pad", "muted", "on", "err", "chips", "row", "k", "v", "note", "r-off",
+    "pad", "muted", "on", "err", "chips", "k", "v", "note", "r-off",
     "meta", "who", "sal", "cls", "gone",
     # TONE. Presentational only — they say how a thing reads, never what it is, which
     # is what makes them safe to share where `t` or `now` are not. Added 2026-08-01
@@ -62,8 +62,9 @@ SHARED = frozenset({
     # button is: the switch appears in the DOCK, in the TASKBAR and on the room element
     # itself, three owners and no app that could hold it. `an-on` is a modifier on
     # `.room` rather than a class of its own, which is the point — the mode has to be
-    # visible on every frame without a window being open.
-    "an-wrap", "an-btn", "an-receipt", "an-chip", "an-held", "an-on",
+    # visible on every frame without a window being open. (`an-chip`/`an-held` left
+    # 2026-09-26, redesign stage 2: the taskbar chip is a kit Chip now.)
+    "an-wrap", "an-btn", "an-receipt", "an-on",
     # HER CLOTHES CHANGING, from the tool as well as the mark (2026-08-24).
     # Chat furniture, beside act-look and act-notice, which are already here.
     "act-wear",
@@ -75,18 +76,18 @@ SHARED = frozenset({
 # voice panel, the search panel's engine section — one renderer, one stylesheet
 # section, so the two-stylesheets ambiguity this gate exists for cannot arise);
 # looks.jsx renders every `rsc-` ledger row for the search and research windows;
-# titleChips.jsx renders every `tc` window-bar chip. The family's HOME app (the
+# titleChips.jsx rendered every `tc` window-bar chip (retired below). The family's HOME app (the
 # registry row that declares the prefix) is recorded; the renderer module is the
 # only file allowed to define NEW names in the family, which §4b enforces.
+# tc- retired 2026-09-26 (redesign stage 2): the title chips draw kit Chips.
 SHARED_FAMILIES = {
     "st":  "shared:knobs",        # home app: settings
     "rsc": "shared:looks",        # home app: research
-    "tc":  "shared:titlechips",   # no home app — window chrome furniture
     # THE KIT (2026-09-24, the redesign): every shared visual part — chip, button,
     # field, tabs, row, state, orb, icon — rendered by ui/src/kit/ and nowhere else.
     "ui":  "shared:kit",          # no home app
 }
-SHARED_MODULES = {"panel", "knobs", "looks", "titlechips", "kit"}
+SHARED_MODULES = {"panel", "knobs", "looks", "kit"}
 
 
 def family_of(c: str):
@@ -201,9 +202,11 @@ print("\n4b. a shared family grows only in its one renderer module")
 # st- name minted inside some app would be a second stylesheet author, which is
 # the original .led ambiguity wearing a prefix. Apps may USE what the renderer
 # and the family's home app define; they may not coin names.
-# RATCHET, same terms as GRANDFATHERED: the shell's taskbar "looked up" chip
-# coined rsc-chip (2026-08-0x) before the family rule existed. Shrink only.
-FAMILY_GRANDFATHER = {("shell", "rsc-chip")}
+# RATCHET, same terms as GRANDFATHERED. It held ("shell", "rsc-chip") — the taskbar's
+# "looked up" chip, coined before the family rule — until 2026-09-26 (redesign stage 2),
+# when the chip became a kit Chip. Empty now; it may not grow back.
+FAMILY_GRANDFATHER: set = set()
+FAMILY_GRANDFATHER_MAX = 0
 grown = []
 for fam, mod in SHARED_FAMILIES.items():
     home = next((aid for aid, pref in declared.items() if pref == fam), None)
@@ -216,6 +219,9 @@ for fam, mod in SHARED_FAMILIES.items():
                     and (o, c) not in FAMILY_GRANDFATHER:
                 grown.append((o, c))
 check("no app coins a new name in a shared family", not grown, grown)
+check("the family grandfather has not grown back",
+      len(FAMILY_GRANDFATHER) <= FAMILY_GRANDFATHER_MAX,
+      "%d > %d" % (len(FAMILY_GRANDFATHER), FAMILY_GRANDFATHER_MAX))
 
 print("\n4c. a `ui-` rule is written in kit/kit.css and nowhere else")
 # §4b reads JSX, so it could not see a STYLESHEET: `.ui-sneaky { ... }` appended to

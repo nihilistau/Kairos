@@ -216,6 +216,7 @@ export default function Chat() {
       }
     } finally {
       setBusy(false); abort.current = null
+      if (onMood) onMood(null, false)   // she has finished: the ONLY place thinking ends
       // the tail — whatever closed the reply without a sentence end behind it
       if (spokenText) spoken.current = speech.flush(spokenText, spoken.current)
     }

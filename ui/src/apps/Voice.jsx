@@ -1,6 +1,7 @@
 import { KnobGroups } from './knobs.jsx'
 import { usePoll } from './panel.jsx'
 import * as api from '../api.js'
+import { Chip } from '../kit/parts.jsx'
 
 /* VOICE — a dedicated panel for her voice (2026-08-21, his ask: "add a dedicated
  * voice panel ... but still keep them in settings").
@@ -13,6 +14,7 @@ import * as api from '../api.js'
  * sentence she speaks, no bounce.
  *
  * Prefix `vc-`, per G-ROOM-CSS; the knob rows borrow the shared st- furniture.
+ * The status chips are the kit's since redesign stage 2.
  */
 export default function Voice() {
   const s = usePoll(api.speakStatus, 15000)
@@ -21,21 +23,17 @@ export default function Voice() {
   return (
     <div className="vc">
       <div className="vc-bar">
-        <span className={'vc-chip ' + (lv.enabled === false ? 'vc-off' : 'vc-on')}>
+        <Chip tone={lv.enabled === false ? 'err' : 'ok'} dot>
           {lv.enabled === false ? 'voice off' : 'voice on'}
-        </span>
-        {lv.method ? <span className="vc-chip" title="provider">{lv.method}</span> : null}
+        </Chip>
+        {lv.method ? <Chip title="provider">{lv.method}</Chip> : null}
         {lv.speaking_as ? (
-          <span className="vc-chip" title="who would speak the next sentence">
+          <Chip title="who would speak the next sentence">
             {String(lv.speaking_as).replace(/^xai:/, '')}
-          </span>
+          </Chip>
         ) : null}
-        {lv.method === 'local' && st.available === false ? (
-          <span className="vc-chip vc-off">local chain dark</span>
-        ) : null}
-        {typeof st.cached === 'number' ? (
-          <span className="vc-chip" title="synthesized sentences on disk">{st.cached} cached</span>
-        ) : null}
+        {lv.method === 'local' && st.available === false ? <Chip tone="err">local chain dark</Chip> : null}
+        {typeof st.cached === 'number' ? <Chip title="synthesized sentences on disk">{st.cached} cached</Chip> : null}
       </div>
       <KnobGroups only={['Voice']} extras={{ Voice: 'voice-test' }} />
       <div className="vc-foot muted">

@@ -129,6 +129,9 @@ body.resizing, body.resizing * { user-select: none !important; }
 .tb-win-on { background: rgba(160, 190, 220, .08); color: var(--text-1);
   box-shadow: inset 0 -2px 0 hsl(var(--mood-h) 70% 65%); }
 .tb-win-min { color: var(--text-3); }   /* was opacity .6: 3.61:1; --text-3 is >= 4.5:1 */
+/* the label inside a taskbar chip — "looking up", "in scene", "off the record" */
+.tb-chip-k { font: 600 9.5px/1 var(--font-ui); letter-spacing: .1em; text-transform: uppercase; }
+.tb-scene { display: inline-flex; align-items: center; gap: 4px; }
 .tb-mood { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 11px 0 8px;
   border-radius: var(--r-pill); font: 400 var(--fs-12)/1 var(--font-ui);
   color: hsl(var(--mood-h) 80% 78%); background: hsl(var(--mood-h) 60% 50% / .12);
@@ -199,12 +202,18 @@ body.resizing, body.resizing * { user-select: none !important; }
   background: linear-gradient(135deg, transparent 46%, hsl(var(--mood-h) 70% 65% / .5) 50%, transparent 54%); }
 
 /* ── NARROW: shed, never overlap (priority order, as before) ─────────────── */
-@media (max-width: 1100px) { .taskbar .presence .note, .tb-console { display: none; } }
-@media (max-width: 820px) { .taskbar .status .st-prof, .tb-win .tb-win-t { display: none; } }
+/* GLANCES GO FIRST, CONTROLS NEVER (stage-2 review, I1): a finished look persists, and
+   with its query it pushed off the record and Shut down off-screen at laptop widths. The
+   widths are MEASURED with her status buttons and a 42-character look showing. */
+@media (max-width: 1440px) { .tb-chip-q { display: none; } }
+@media (max-width: 1200px) { .taskbar .presence .note, .tb-console { display: none; } }
+@media (max-width: 1000px) { .tb-look:not(.tb-look-on) { display: none; } }
+@media (max-width: 820px) { .taskbar .status .tb-prof, .tb-win .tb-win-t,
+  .tb-brand-t, .taskbar .status > span:not(.led) { display: none; } }   /* the mark keeps its icon, the gateway its LED */
 @media (max-width: 620px) {
-  .dsk-lb, .tb-brand-t, .taskbar .status button, .tb-mood-t { display: none; }
-  /* phone width: the controls keep their icons, the gateway keeps its LED */
-  .tb-right .an-lb, .tb-right .sd-btn span, .taskbar .status > span:not(.led) { display: none; }
+  .dsk-lb, .taskbar .status button, .tb-mood-t { display: none; }
+  /* phone width: the controls keep their icons (the brand and the gateway's words went at 820) */
+  .tb-right .an-lb, .tb-right .sd-btn span { display: none; }
   .tb-right { gap: 8px; }
   .dsk-tile { width: 48px; height: 48px; }
 }

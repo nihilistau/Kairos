@@ -1,6 +1,6 @@
 """G-ROOM-TOKENS — the room's design system holds its own promises.
 
-THE SPEC: docs/superpowers/specs/2026-09-23-room-redesign-design.md. Five legs:
+THE SPEC: docs/superpowers/specs/2026-09-23-room-redesign-design.md. Six legs:
 
   1. CONTRAST. Every text role on every surface is >= 4.5:1 (WCAG AA for the 11-13px
      sizes these roles are used at). Computed from tokens.css, not eyeballed. Plus the
@@ -10,11 +10,14 @@ THE SPEC: docs/superpowers/specs/2026-09-23-room-redesign-design.md. Five legs:
      4.47:1 on --surface-3); the mood tone at every hue, 10 degrees apart.
   2. ICONS. Every `icon:` in appRegistry names a glyph in kit/icons.jsx; no emoji left.
   3. MOOD. resolveMood's precedence, driven under node; and only room/useMood.js reads
-     roomMood.get, because owning the live read is owning the rule (AGENTS.md §0).
+     roomMood.get, because owning the live read is owning the rule (AGENTS.md §0). Plus
+     (2026-09-26) roomMood's thinking lifecycle: a mood mid-turn keeps it, only
+     set(null, false) — Chat's stream `finally` — ends it.
   4. COLOUR RATCHET. Raw colour literals outside kit/tokens.css may only fall.
   5. RGBA TRIPLES. Every `rgba(var(--x), a)` names a variable that is a comma triple.
      Legs 4 and 5 have floors: counting nothing is a FAIL, not a pass.
      `--es-rgb` was `6 182 212` and made fifty declarations invalid for seven weeks.
+  6. VOICES. The machine's words are mono on the chip Chat actually draws (`.act`).
 
 Offline: reads sources, runs node if present (leg 3 skips cleanly without it).
 """
@@ -168,7 +171,7 @@ if not missing:
             tones["neutral" if m.group(1) == "chip" else m.group(1)[5:]] = \
                 (decl["color"], decl["background"])
     # A FLOOR: a regex that stops matching must not pass by measuring nothing.
-    need = {"neutral", "accent", "ok", "warn", "err", "an", "mood"}
+    need = {"neutral", "accent", "ok", "warn", "err", "an", "mood", "warm"}
     check("every tone was read from kit.css", need <= set(tones), sorted(need - set(tones)))
     unreadable, lowt, worst_t = [], [], (99, "")
     for name, (fg_x, bg_x) in sorted(tones.items()):
@@ -212,7 +215,8 @@ if not node:
     print("  --   node absent; the precedence legs are skipped")
 elif os.path.isfile(MT):
     probe = r"""
-import { resolveMood } from './ui/src/room/moodTheme.js'
+import { resolveMood } from '../../src/room/moodTheme.js'
+import * as RM from '../../src/room/roomMood.js'
 const P = (m) => ({ her: { mood: m } })
 const out = {
   live_beats_pulse: resolveMood({ mood: 'tender' }, P('peaceful')),
@@ -224,9 +228,18 @@ const out = {
   thinking: resolveMood({ mood: null, thinking: true }, P('quiet')),
   junk: resolveMood({ mood: 5 }, { her: 7 }),
 }
+// THE THINKING LIFECYCLE, as Chat drives it: start, a mood mid-turn (the gateway's
+// persona event arrives at the TOP of a turn), end. Omitted thinking used to mean false.
+const snap = () => ({ ...RM.get() })
+RM.set(null, true); out.lc_start = snap()
+RM.set('playful'); out.lc_mark = snap()
+RM.set(null, false); out.lc_end = snap()
 console.log(JSON.stringify(out))
 """
-    pp = os.path.join(ROOT, "_g_room_tokens_probe.mjs")
+    # under ui/node_modules/.cache, not the repo root (stage-2 review, M1): every tree
+    # walker prunes node_modules, so a concurrent scan never meets the probe mid-delete.
+    os.makedirs(os.path.join(ROOT, "ui", "node_modules", ".cache"), exist_ok=True)
+    pp = os.path.join(ROOT, "ui", "node_modules", ".cache", "_g_room_tokens_probe.mjs")
     data, err = {}, ""
     try:
         with io.open(pp, "w", encoding="utf-8") as f:
@@ -253,6 +266,16 @@ console.log(JSON.stringify(out))
               and g("unknown", "hue") == 210)
         check("thinking passes through", g("thinking", "thinking") is True)
         check("junk input never throws and lands on quiet", g("junk", "word") == "quiet")
+        # 2026-09-26 (stage-2 live check): 0 of 803 samples over a 200 s turn had
+        # mood-thinking, because set(mood) reset thinking and the persona event lands first.
+        check("a mood arriving mid-turn keeps her thinking",
+              g("lc_start", "thinking") is True and g("lc_mark", "thinking") is True
+              and g("lc_mark", "mood") == "playful", [data.get("lc_start"), data.get("lc_mark")])
+        check("set(null, false) ends thinking and leaves her mood standing",
+              g("lc_end", "thinking") is False and g("lc_end", "mood") == "playful", data.get("lc_end"))
+chat_src = blank_comments(read(os.path.join(UI, "Chat.jsx")))
+check("Chat ends thinking in the stream's finally, on every exit",
+      re.search(r"finally\s*\{[^}]*onMood\(\s*null\s*,\s*false\s*\)", chat_src) is not None)
 
 readers = []
 for p in sorted(glob.glob(os.path.join(UI, "**", "*.js*"), recursive=True)):
@@ -277,7 +300,7 @@ for p in sorted(glob.glob(os.path.join(UI, "**", "*.*"), recursive=True)):
         count += n
 # RATCHET. Set once from the first run (Task 2 step 2). Lowering it is the only edit
 # allowed; stage 6 of the redesign takes it to 0.
-RATCHET_BASELINE = 272   # raised once, 2026-09-26, for kit.css's tone backgrounds — the only raise; 308 -> 299 when the shell left room.css (stage 1); 299 -> 291 when the taskbar and chat moved onto role tokens (stage 1, 3/4); 291 -> 272 when kit.css and the shell's tints read --ok/--warn/--err/--an-rgb and the ink tokens (final review, 2026-09-26); stage 6 takes it to 0
+RATCHET_BASELINE = 230   # raised once, 2026-09-26, for kit.css's tone backgrounds — the only raise; 308 -> 299 when the shell left room.css (stage 1); 299 -> 291 when the taskbar and chat moved onto role tokens (stage 1, 3/4); 291 -> 272 when kit.css and the shell's tints read --ok/--warn/--err/--an-rgb and the ink tokens (final review, 2026-09-26); 272 -> 271 when panel.jsx's rows moved to the kit (stage 2); 271 -> 265 when the title chips became kit Chips (stage 2); 265 -> 254 when the taskbar's looking, scene and off-the-record chips became kit Chips (stage 2); 254 -> 238 when the knob rows, the Voice window's status and the shell's profile label became kit Chips/fields and their settings and voice blocks went token-only (stage 2); 238 -> 230 when the looking ledger's his/hers chips, box and status bars became kit parts and the rsc-/sr- blocks went token-only (stage 2); stage 6 takes it to 0
 print("   %d literals in %d files (baseline %d)" % (count, len(where), RATCHET_BASELINE))
 for f, n in sorted(where.items(), key=lambda kv: -kv[1])[:8]:
     print("       %4d  %s" % (n, f))
@@ -307,5 +330,15 @@ print("   %d rgba(var(--x), a) uses read" % seen)
 # A FLOOR: the stylesheets use this form dozens of times; reading none is a broken glob.
 check("the leg read rgba(var(--x), a) uses at all", seen > 0, seen)
 check("every rgba(var(--x), a) resolves to a comma triple", not bad, sorted(set(bad)))
+
+print("\n6. VOICES — the machine's words are mono on the chip that is actually drawn")
+# 2026-09-26 (stage-2 live check): stage 1 put --font-mono on `.ev`, which no JSX
+# draws; her tool line computed to Inter. Chat draws `act` chips — read that rule.
+room_css = blank_comments(read(os.path.join(UI, "room.css")))
+act = re.search(r"(?:^|\})\s*\.act\s*\{([^}]*)\}", room_css)
+check("the event chip rule (.act) exists", act is not None)
+check("the event chips are mono", act is not None and "var(--font-mono)" in act.group(1))
+chat_jsx = read(os.path.join(UI, "Chat.jsx"))
+check("Chat draws its events as act chips", "act act-tool" in chat_jsx)
 
 finish("G-ROOM-TOKENS")

@@ -1,6 +1,7 @@
 import { usePoll, Body } from './panel.jsx'
 import { LookRows, AskRow } from './looks.jsx'
 import { KnobGroups } from './knobs.jsx'
+import { Chip } from '../kit/parts.jsx'
 import * as api from '../api.js'
 
 /* SEARCH — the web_search half of the looking ledger, as its own window
@@ -27,13 +28,11 @@ export default function Search() {
         return (
           <>
             <div className="rsc-bar">
-              <span className="rsc-arm">engine · {d.search_backend || 'ddg'}</span>
+              <Chip tone="ok" dot>engine · {d.search_backend || 'ddg'}</Chip>
               {up.length ? (
-                <span className="sr-eng" title="engines with a key or no key needed">
-                  ready: {up.join(', ')}
-                </span>
+                <Chip title="engines with a key or no key needed">ready: {up.join(', ')}</Chip>
               ) : null}
-              {d.inflight ? <span className="rsc-now">she is looking up {d.inflight.query}…</span> : null}
+              {d.inflight ? <Chip tone="accent" busy>she is looking up {d.inflight.query}…</Chip> : null}
             </div>
             <AskRow placeholder="search the web yourself — lands in the shared ledger as yours"
                     busyLabel="searching…"

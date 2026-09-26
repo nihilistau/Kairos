@@ -154,7 +154,10 @@ n_files = 0
 for dp, dns, fns in os.walk(ROOT):
     # var/ and persona/ are the tree's LOCAL state (gitignored there; never exported) — the
     # running companion's token and registry live in them by design
-    dns[:] = [d for d in dns if d not in (".git", "node_modules", "__pycache__", "var", "persona")]
+    # _g_* are a concurrent gate's scratch (stage-2 review, M1): G-ROOM-KIT's temp dirs sat
+    # under the root and vanished mid-walk, and a FileNotFoundError here was a red race.
+    dns[:] = [d for d in dns if d not in (".git", "node_modules", "__pycache__", "var", "persona")
+              and not d.startswith("_g_")]
     for fn in fns:
         if not fn.endswith(TEXT) and fn != ".gitignore":
             continue
@@ -162,8 +165,8 @@ for dp, dns, fns in os.walk(ROOT):
         n_files += 1
         try:
             txt = open(p, encoding="utf-8").read()
-        except UnicodeDecodeError:
-            continue
+        except (UnicodeDecodeError, FileNotFoundError, NotADirectoryError):
+            continue                                  # binary, or gone since the listing
         rel = os.path.relpath(p, ROOT).replace("\\", "/")
         if rel == "harness_tests/g_kairos_scrub.py":
             continue                                  # this file names the tokens it forbids
@@ -220,7 +223,8 @@ check("the key-file rule classifies its own cases (%d)" % len(_KEYISH_CASES), no
 
 keyish = []
 for dp, dns, fns in os.walk(ROOT):
-    dns[:] = [d for d in dns if d not in (".git", "node_modules", "var", "persona")]
+    dns[:] = [d for d in dns if d not in (".git", "node_modules", "var", "persona")
+              and not d.startswith("_g_")]
     for fn in fns:
         if _keyish(fn):
             keyish.append(os.path.relpath(os.path.join(dp, fn), ROOT))
@@ -259,6 +263,7 @@ for _b2, _d2, _f2 in os.walk(ROOT):
     if any((os.sep + x) in _b2 or _b2.endswith(os.sep + x)
            for x in (".git", "var", "persona", "node_modules", "__pycache__")):
         continue
+    _d2[:] = [d for d in _d2 if not d.startswith("_g_")]   # a concurrent gate's scratch
     for _n2 in _f2:
         _e2 = os.path.splitext(_n2)[1].lower()
         if _e2 and _e2 not in TEXT and _e2 not in _BINARY:

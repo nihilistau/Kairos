@@ -137,4 +137,7 @@ jobs:
           node-version: "20"
       - run: pip install -e ".[http]"
       - run: cd ui && npm ci
+      # G-ROOM-KIT renders the kit under node and skips (exit 2) without ui/node_modules,
+      # so it lives here beside the bundle, not in the npm-less offline job.
+      - run: python harness_tests/g_room_kit.py
       - run: python harness_tests/g_room_bundle.py

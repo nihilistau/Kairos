@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import * as api from '../api.js'
 import { Icon } from '../kit/icons.jsx'
+import { Chip } from '../kit/parts.jsx'
 
 /* OFF THE RECORD — the switch, and the two places it has to be visible.
  *
@@ -68,12 +69,10 @@ export function AnonChip({ anon }) {
   if (!anon || !anon.on) return null
   const m = Math.round((anon.for_s || 0) / 60)
   return (
-    <span className="an-chip" title={anon.receipt || 'nothing held back yet'}>
-      <b>off the record</b>
-      <span className="an-held">
-        {m >= 1 ? m + 'm' : 'just now'}
-        {anon.held_total ? ' · ' + anon.held_total + ' held' : ''}
-      </span>
-    </span>
+    <Chip tone="an" title={anon.receipt || 'nothing held back yet'}>
+      <span className="tb-chip-k">off the record</span>{' '}
+      {m >= 1 ? m + 'm' : 'just now'}
+      {anon.held_total ? ' · ' + anon.held_total + ' held' : ''}
+    </Chip>
   )
 }

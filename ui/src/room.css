@@ -36,8 +36,6 @@ main { flex: 1; position: relative; overflow: hidden; }
 .turn.assistant .txt { color: var(--text-1); font: 400 var(--fs-15)/1.65 var(--font-voice); }
 .turn .thumb { max-height: 90px; border-radius: var(--r-sm); border: 1px solid var(--hair-strong);
   display: block; margin-bottom: 6px; }
-.ev { font: 400 11.5px/1.5 var(--font-mono); color: var(--text-2);
-  border-left: 2px solid hsl(var(--mood-h) 70% 55% / .5); padding-left: 9px; margin: 6px 0; }
 .attached { display: flex; gap: 9px; align-items: center; padding: 6px 2px;
   font-size: var(--fs-11); color: var(--text-2); }
 .attached img { height: 34px; border-radius: var(--r-sm); border: 1px solid var(--hair-strong); }
@@ -70,10 +68,6 @@ main { flex: 1; position: relative; overflow: hidden; }
 h3, h4 { margin: 12px 0 6px; color: var(--cyan); font-size: 12px;
   text-transform: lowercase; font-weight: 600; }
 h3:first-child, h4:first-child { margin-top: 0; }
-.row { display: flex; justify-content: space-between; padding: 2px 0;
-  border-bottom: 1px dotted #131c28; }
-.row .k { color: var(--muted); } .row .v.ok { color: var(--ok); }
-.row .v.off { color: var(--off); }
 
 .chips { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 9px; }
 .chips button { background: none; border: 1px solid var(--line); color: var(--muted);
@@ -114,10 +108,6 @@ h3:first-child, h4:first-child { margin-top: 0; }
   z-index: 0; pointer-events: none; }
 header { background: color-mix(in srgb, var(--panel) 78%, transparent);
   backdrop-filter: blur(14px); }
-
-@media (prefers-reduced-motion: reduce) {
-  .rsc-chip.on { animation: none }
-}
 
 /* ── PHASE 2 PANELS ────────────────────────────────────────────────────────── */
 .music .now { margin-bottom: 10px; }
@@ -422,8 +412,6 @@ main { display: block; }
   background: hsl(var(--mhue) 90% 70%); animation: markglow 1.4s ease-in-out infinite; }
 .avatar.art .avatar-think i:nth-child(2) { animation-delay: .22s; }
 .avatar.art .avatar-think i:nth-child(3) { animation-delay: .44s; }
-.status .st-prof { font-size: 10px; opacity: .5; padding: 1px 6px; border-radius: 9px;
-  background: #ffffff10; letter-spacing: .03em; }
 .status button { font-size: 10.5px; padding: 2px 8px; }
 .status .warn { color: #e8c877; font-size: 11px; }
 
@@ -525,56 +513,29 @@ main { display: block; }
 .wr-thumb { width: 34px; height: 44px; object-fit: cover; border-radius: 5px;
             background: #05070d; border: 1px solid rgba(var(--es-rgb), .18); }
 .wr-want { align-items: center; }
-/* THE SCENE CHIP — amber, because it is a state he should notice, not decoration. */
-.scn { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px;
-       border-radius: 999px; font-size: 10.5px; flex-shrink: 0;
-       color: var(--es-amber); background: rgba(245,158,11,.10);
-       border: 1px solid rgba(245,158,11,.34); }
-.scn b { font-size: 9px; letter-spacing: .12em; text-transform: uppercase; opacity: .85; }
-.scn-b { color: var(--es-dim); }
-.scn button { padding: 2px 8px; border-radius: 6px; font-size: 9.5px; cursor: pointer;
-              color: var(--es-amber); background: rgba(245,158,11,.12);
-              border: 1px solid rgba(245,158,11,.35); }
-.scn button:hover:not(:disabled) { background: rgba(245,158,11,.22); }
 
-/* THE LOOKING CHIP — cyan, because it is an act in the world, not a mood.
-   Lives on the taskbar next to presence. Inflight pulses; last look stays
-   clickable so the research window is one tap from the bar. */
-.rsc-chip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px;
-            border-radius: 999px; font-size: 10.5px; flex-shrink: 0; cursor: pointer;
-            color: var(--cyan); background: rgba(70,217,230,.08);
-            border: 1px solid rgba(70,217,230,.28); }
-.rsc-chip b { font-size: 9px; letter-spacing: .12em; text-transform: uppercase; opacity: .85; }
-.rsc-chip.on { background: rgba(70,217,230,.16); border-color: rgba(70,217,230,.50);
-               animation: rscpulse 1.6s ease-in-out infinite; }
+/* the chat's speak button (.tool-btn.spk.on) still pulses with this; the looking chip
+   that named it is a kit Chip now (redesign stage 2) */
 @keyframes rscpulse { 50% { box-shadow: 0 0 10px rgba(70,217,230,.28); } }
 
-/* RESEARCH WINDOW (rsc-) — titles expand to what actually came back. */
-.rsc-bar { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
-           margin-bottom: 10px; font-size: 11px; }
-.rsc-arm { color: var(--ok); }
-.rsc-off { color: var(--muted); }
-.rsc-now { color: var(--cyan); }
-.rsc-row { border: 1px solid hsl(var(--h, 190) 45% 50% / .22);
-           border-left: 3px solid hsl(var(--h, 190) 70% 58% / .75);
-           border-radius: 7px; background: hsl(var(--h, 190) 40% 50% / .05);
-           margin: 5px 0; overflow: hidden; }
-.rsc-row.on { box-shadow: inset 2px 0 0 var(--cyan); }
-.rsc-head { display: flex; align-items: center; gap: 8px; width: 100%;
-            padding: 7px 10px; cursor: pointer; background: none; border: none;
-            text-align: left; }
-.rsc-head:hover { background: hsl(var(--h, 190) 50% 55% / .09); }
-.rsc-k { font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
-         color: var(--cyan); opacity: .8; flex-shrink: 0; }
-.rsc-t { flex: 1; font-size: 12.5px; }
-.rsc-ok { color: var(--err); font-size: 10px; }
-.rsc-body { padding: 2px 10px 10px; border-top: 1px solid #ffffff0c; }
-.rsc-body pre { white-space: pre-wrap; font-size: 12px; line-height: 1.5;
-                opacity: .88; margin: 8px 0; }
-.rsc-q { color: var(--muted); font-size: 11px; margin-top: 6px; }
-.rsc-src { margin: 6px 0 0; padding-left: 18px; font-size: 11px; }
-.rsc-src a { color: var(--cyan); }
-.rsc-foot { margin-top: 12px; }
+/* RESEARCH WINDOW (rsc-) — titles expand to what actually came back. Its chips, the box
+   and the states are the kit's since redesign stage 2; this is the row. */
+.rsc-bar { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; margin-bottom: var(--sp-3); }
+.rsc-row { margin: 6px 0; overflow: hidden; border: 1px solid var(--hair-strong);
+  border-radius: var(--r-md); background: var(--surface-1); }
+.rsc-row.on { box-shadow: inset 2px 0 0 var(--accent); }
+.rsc-head { display: flex; align-items: center; gap: var(--sp-2); width: 100%; padding: 7px 10px;
+  background: none; border: none; text-align: left; color: var(--text-1); }
+.rsc-head:hover { background: rgba(var(--accent-rgb), .06); }
+.rsc-k { flex: none; font: 500 var(--fs-11)/1 var(--font-mono); letter-spacing: .06em;
+  text-transform: uppercase; color: var(--accent); }
+.rsc-t { flex: 1; min-width: 0; font-size: var(--fs-13); }
+.rsc-body { padding: 2px 10px 10px; border-top: 1px solid var(--hair); }
+.rsc-body pre { margin: 8px 0; white-space: pre-wrap; font: 400 var(--fs-12)/1.55 var(--font-mono); color: var(--text-2); }
+.rsc-q { margin-top: 6px; font-size: var(--fs-11); color: var(--text-3); }
+.rsc-src { margin: 6px 0 0; padding-left: 18px; font-size: var(--fs-11); }
+.rsc-src a { color: var(--accent); }
+.rsc-foot { margin-top: var(--sp-3); font-size: var(--fs-11); color: var(--text-3); }
 
 /* ── HER OWN TIME (2026-08-04) ──────────────────────────────────────────────────
    A solo turn is not a message to him. She was out doing something of her own while
@@ -612,9 +573,12 @@ main { display: block; }
 
 /* ── WHAT SHE DID, AS THINGS SHE DID ──────────────────────────────────────────
    These were a grey line of prose under her reply that read like debug output. An
-   act is a chip: she looked something up, she looked at the room, she changed. */
+   act is a chip: she looked something up, she looked at the room, she changed.
+   THE MACHINE'S WORDS ARE MONO (spec §1). Stage 1 put that on `.ev`, a class nothing
+   draws, and the live check measured her tool line in Inter (2026-09-26); the rule
+   lives on the chip that is actually drawn now, and `.ev` is gone. */
 .acts { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 6px; }
-.act { font-size: 10px; padding: 2px 9px; border-radius: 99px; cursor: help;
+.act { font-family: var(--font-mono); font-size: 10px; padding: 2px 9px; border-radius: 99px; cursor: help;
   display: inline-flex; gap: 6px; align-items: baseline; max-width: 100%;
   border: 1px solid transparent; }
 .act b { font-weight: 600; letter-spacing: .02em; }
@@ -770,68 +734,34 @@ main { display: block; }
 .wr-dismiss { padding: 2px 7px; opacity: .7; }
 .wr-dismiss:hover { opacity: 1; border-color: #c66; }
 
-/* ── settings (2026-08-21) ──────────────────────────────────────────────────── */
-.st { padding: 4px 8px; overflow-y: auto; height: 100%; font-size: 13px; }
-.st-empty { padding: 16px; opacity: .6; }
-.st-note { padding: 6px 10px; border: 1px solid #c66; border-radius: 8px; margin-bottom: 8px; }
-.st-sec { margin-bottom: 14px; }
-.st-head { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; opacity: .8;
-  margin: 10px 0 6px; display: flex; align-items: center; gap: 10px; }
-.st-test { padding: 2px 10px; border-radius: 8px; border: 1px solid var(--edge, #444);
-  background: transparent; color: inherit; cursor: pointer; font-size: 12px; }
-.st-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 6px 4px;
-  border-bottom: 1px solid rgba(128,128,128,.12); align-items: center; }
-.st-label { font-weight: 500; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.st-ctl select, .st-ctl input[type=number] { background: transparent; color: inherit;
-  border: 1px solid var(--edge, #444); border-radius: 6px; padding: 3px 8px; max-width: 130px; }
-.st-ctl input[type=checkbox] { transform: scale(1.3); }
-.st-help { grid-column: 1 / -1; font-size: 11.5px; opacity: .6; line-height: 1.35; }
-.st-chip { font-size: 9.5px; padding: 1px 6px; border-radius: 6px; border: 1px solid var(--edge, #444);
-  opacity: .75; text-transform: uppercase; letter-spacing: .06em; }
-.st-live { border-color: #4a4; } .st-prof { border-color: #a84; }
-.st-meas { border-color: #48a; } .st-ovr { border-color: #a4a; } .st-eng { border-color: #888; opacity: .55; }
+/* ── settings — the knob rows (st-, shared:knobs). Chips, fields, the test button and
+   the states are the kit's since redesign stage 2; this is only the row's layout. ── */
+.st { padding: var(--sp-2) var(--sp-3); overflow-y: auto; height: 100%; font-size: var(--fs-13); }
+.st-sec { margin-bottom: var(--sp-4); }
+.st-head { display: flex; align-items: center; gap: var(--sp-3); margin: var(--sp-3) 0 var(--sp-2);
+  font: 600 var(--fs-11)/1 var(--font-ui); letter-spacing: .12em; text-transform: uppercase; color: var(--text-2); }
+.st-row { display: grid; grid-template-columns: 1fr auto; gap: 2px var(--sp-3); align-items: center;
+  padding: var(--sp-2) var(--sp-1); border-bottom: 1px solid var(--hair); }
+.st-label { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-weight: 500; color: var(--text-1); }
+.st-field { max-width: 160px; height: 28px; }
+.st-help { grid-column: 1 / -1; font-size: var(--fs-11); line-height: 1.4; color: var(--text-3); }
 
 /* ── panel session (2026-08-21): apps launcher, voice + search windows, chips ── */
 
-/* title chips — the framework: a glance at state, in the window bar (tc-) */
-.tc { font-size: 9.5px; padding: 1px 7px; border-radius: 8px; margin-left: 8px;
-  border: 1px solid var(--edge, #444); opacity: .8; letter-spacing: .05em;
-  text-transform: lowercase; white-space: nowrap; }
-.tc-on { border-color: rgba(80,190,120,.6); color: var(--ok, #7c8); }
-.tc-off { border-color: rgba(180,120,80,.6); color: var(--muted, #987); }
-.tc-busy { border-color: rgba(70,217,230,.6); color: var(--cyan);
-  animation: rscpulse 1.6s ease-in-out infinite; }
-
-/* his/hers chips on ledger rows (shared rsc- furniture) */
-.rsc-by { font-size: 9px; padding: 1px 6px; border-radius: 6px; flex-shrink: 0;
-  text-transform: uppercase; letter-spacing: .08em; border: 1px solid var(--edge, #444); }
-.rsc-hers { border-color: rgba(201,154,170,.55); color: var(--accent, #c9a); }
-.rsc-him { border-color: rgba(120,150,200,.55); color: #9bd; }
-
 /* the manual box — his lane into the shared ledger */
-.rsc-askrow { display: flex; gap: 8px; margin: 4px 0 10px; align-items: center; }
-.rsc-ask { flex: 1; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--edge, #444);
-  background: transparent; color: inherit; font-size: 13px; }
-.rsc-go { padding: 5px 14px; border-radius: 8px; border: 1px solid var(--edge, #444);
-  background: transparent; color: inherit; cursor: pointer; font-size: 12px; }
-.rsc-go:hover:not(:disabled) { border-color: var(--cyan); }
-.rsc-go:disabled { opacity: .45; cursor: default; }
-.rsc-err { color: var(--err); font-size: 11px; }
+.rsc-askrow { display: flex; gap: var(--sp-2); align-items: center; margin: 4px 0 var(--sp-3); }
+.rsc-ask { flex: 1; }
+.rsc-err { color: var(--err); font-size: var(--fs-11); }
 
 /* search window (sr-) */
-.sr-eng { color: var(--muted); font-size: 11px; }
-.sr-knobs { margin-top: 12px; }
-.sr-knobs summary { cursor: pointer; font-size: 11px; text-transform: uppercase;
-  letter-spacing: .1em; opacity: .7; }
+.sr-knobs { margin-top: var(--sp-3); }
+.sr-knobs summary { font: 600 var(--fs-11)/1 var(--font-ui); letter-spacing: .1em;
+  text-transform: uppercase; color: var(--text-2); }
 
-/* voice window (vc-) */
-.vc { display: flex; flex-direction: column; height: 100%; overflow-y: auto; padding: 8px; }
-.vc-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
-.vc-chip { font-size: 10px; padding: 2px 8px; border-radius: 8px;
-  border: 1px solid var(--edge, #444); letter-spacing: .05em; }
-.vc-on { border-color: rgba(80,190,120,.6); color: var(--ok, #7c8); }
-.vc-off { border-color: rgba(200,100,90,.6); color: var(--err, #c66); }
-.vc-foot { margin-top: auto; padding-top: 10px; font-size: 11px; }
+/* voice window (vc-) — its chips are the kit's */
+.vc { display: flex; flex-direction: column; height: 100%; overflow-y: auto; padding: var(--sp-2); }
+.vc-bar { display: flex; gap: var(--sp-2); align-items: center; flex-wrap: wrap; margin-bottom: var(--sp-2); }
+.vc-foot { margin-top: auto; padding-top: var(--sp-3); font-size: var(--fs-11); color: var(--text-3); }
 
 /* apps launcher (ap-) — the dock's switchboard */
 .ap { overflow-y: auto; height: 100%; }
@@ -882,6 +812,10 @@ main { display: block; }
 /* presence — her modes (2026-08-22) */
 .prs-state { margin-bottom: 8px; }
 .prs-shelf-h { margin: 14px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; opacity: .8; }
+/* a shelf row owns its layout — it leaned on the retired `.row` until stage 2 (2/7) */
+.prs-book { display: flex; justify-content: space-between; padding: 2px 0;
+  border-bottom: 1px dotted var(--hair); }
+.prs-book .k { color: var(--muted); }
 .prs-book .v button { margin-left: 8px; }
 /* her state chip: always there, brighter on the turn she moved (2026-08-22) */
 .act-persona.moved { outline: 1px solid currentColor; opacity: 1; }
@@ -902,6 +836,7 @@ main { display: block; }
 .tool-btn.spk { opacity: .55; }
 .tool-btn.spk.on { opacity: 1; color: var(--cyan); animation: rscpulse 1.6s ease-in-out infinite; }
 .tool-btn.spk.off { opacity: .35; }
+@media (prefers-reduced-motion: reduce) { .tool-btn.spk.on { animation: none; } }
 
 /* ── the closet, managed (2026-08-21): inbox import, edit, hide, retire ───────── */
 .wr-closet { margin-top: 14px; border-top: 1px solid rgba(128,128,128,.15); padding-top: 10px; }
@@ -1023,17 +958,6 @@ main { display: block; }
 .an-receipt { margin: 4px 2px 0; padding: 5px 6px; border-radius: 5px; font-size: 9.5px;
   line-height: 1.35; color: var(--es-dim); background: #a78bfa0d;
   border: 1px solid #a78bfa2e; cursor: pointer; }
-
-/* THE CHIP — same furniture as the scene chip, deliberately: a mode that changes what
-   survives the evening belongs in the same row, and read the same way, as one that
-   changes who she is. */
-.an-chip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px;
-  border-radius: 999px; font-size: 10.5px; flex-shrink: 0;
-  color: var(--an); background: rgba(167,139,250,.10);
-  border: 1px solid rgba(167,139,250,.34); }
-.an-chip b { font-size: 9px; letter-spacing: .12em; text-transform: uppercase;
-  opacity: .85; }
-.an-held { color: var(--es-dim); }
 
 /* THE ROOM ITSELF. An inset rule rather than a banner: it is present in peripheral
    vision on every frame and costs no layout, so it cannot be scrolled past, covered by

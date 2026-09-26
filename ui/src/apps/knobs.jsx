@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import * as api from '../api.js'
 import { usePoll } from './panel.jsx'
+import { Chip, Button, Input, Select, State } from '../kit/parts.jsx'
 
 /* knobs.jsx — the tuning registry, rendered — SHARED (2026-08-21).
  *
@@ -12,28 +13,33 @@ import { usePoll } from './panel.jsx'
  *
  * Prefix `st-` throughout — the settings window owns the style, the others
  * borrow the furniture (G-ROOM-CSS lists st- as this file's shared prefix).
+ * Chips, fields, the test button and the states are the kit's since redesign
+ * stage 2; st- keeps the row layout.
  */
 
+// THE CONTROL IS NAMED BY ITS KNOB (stage-2 review, M4): the label sits in a sibling div,
+// not a <label>, so a screen reader met "checkbox, checked" with no name. aria-label says it.
 export function KnobControl({ k, busy, onSet }) {
   const dis = busy === k.key || k.scope === 'profile'
   if (k.type === 'bool') {
-    return <input type="checkbox" checked={!!k.value} disabled={dis}
+    return <input type="checkbox" checked={!!k.value} disabled={dis} aria-label={k.label}
                   onChange={e => onSet(k.key, e.target.checked)} />
   }
   if (k.type === 'enum') {
     return (
-      <select value={String(k.value)} disabled={dis}
+      <Select className="st-field" value={String(k.value)} disabled={dis} aria-label={k.label}
               onChange={e => onSet(k.key, e.target.value)}>
         {(k.choices || []).map(c => <option key={c} value={c}>{c}</option>)}
-      </select>
+      </Select>
     )
   }
   if (k.type === 'str') {
     // a free-text knob (the first: presence.cue, 2026-08-22) — committed on blur like the numbers
-    return <input type="text" defaultValue={k.value || ''} disabled={dis} maxLength={200}
+    return <Input className="st-field" type="text" defaultValue={k.value || ''} disabled={dis} maxLength={200}
+                  aria-label={k.label}
                   onBlur={e => { if (e.target.value !== (k.value || '')) onSet(k.key, e.target.value) }} />
   }
-  return <input type="number" defaultValue={k.value} disabled={dis}
+  return <Input className="st-field" type="number" defaultValue={k.value} disabled={dis} aria-label={k.label}
                 min={k.min ?? undefined} max={k.max ?? undefined}
                 step={k.step ?? undefined}
                 onBlur={e => {
@@ -48,12 +54,10 @@ export function KnobRow({ k, busy, onSet }) {
     <div className="st-row" title={k.danger || ''}>
       <div className="st-label">
         {k.label}
-        <span className={'st-chip ' + (k.scope === 'live' ? 'st-live' : 'st-prof')}>
-          {k.scope === 'live' ? 'live' : 'restart to change'}
-        </span>
-        {k.provenance === 'measured' ? <span className="st-chip st-meas" title={k.receipt}>measured</span> : null}
-        {k.overridden ? <span className="st-chip st-ovr">changed</span> : null}
-        {k.engine ? <span className="st-chip st-eng" title="only the sp-daemon backend honours this knob; under an OpenAI-compatible engine it is moot">{k.engine}-daemon only</span> : null}
+        <Chip tone={k.scope === 'live' ? 'ok' : 'warn'}>{k.scope === 'live' ? 'live' : 'restart to change'}</Chip>
+        {k.provenance === 'measured' ? <Chip tone="accent" title={k.receipt}>measured</Chip> : null}
+        {k.overridden ? <Chip tone="mood">changed</Chip> : null}
+        {k.engine ? <Chip title="only the sp-daemon backend honours this knob; under an OpenAI-compatible engine it is moot">{k.engine}-daemon only</Chip> : null}
       </div>
       <div className="st-ctl"><KnobControl k={k} busy={busy} onSet={onSet} /></div>
       <div className="st-help">{k.help}</div>
@@ -79,9 +83,7 @@ export function TestVoice({ busy, setBusy, setNote }) {
     } finally { setBusy('') }
   }
   return (
-    <button className="st-test" disabled={!!busy} onClick={go}>
-      ▶ test her voice
-    </button>
+    <Button size="sm" disabled={!!busy} onClick={go}>▶ test her voice</Button>
   )
 }
 
@@ -92,8 +94,8 @@ export function KnobGroups({ only, first = [], extras = {} }) {
   const [busy, setBusy] = useState('')
   const [note, setNote] = useState('')
   const d = t.data
-  if (t.error) return <div className="st-empty">settings unreachable — {t.error}</div>
-  if (!d || !d.ok) return <div className="st-empty">reading the knobs…</div>
+  if (t.error) return <State kind="error" title="Settings unreachable">{t.error}</State>
+  if (!d || !d.ok) return <State kind="loading" title="Reading the knobs…" />
 
   const knobs = (d.knobs || []).filter(k => !only || only.includes(k.group))
   const groups = []
@@ -119,7 +121,7 @@ export function KnobGroups({ only, first = [], extras = {} }) {
 
   return (
     <div className="st">
-      {note ? <div className="st-note">{note}</div> : null}
+      {note ? <State kind="error">{note}</State> : null}
       {groups.map(g => (
         <div key={g.name} className="st-sec">
           <div className="st-head">{g.name}

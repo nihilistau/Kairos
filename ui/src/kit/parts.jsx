@@ -4,19 +4,23 @@
 import { useRef } from 'react'
 import { Icon } from './icons.jsx'
 
-/* CHIP. tone: neutral | accent | ok | warn | err | mood | an */
-export function Chip({ tone = 'neutral', icon, dot, title, onClick, children }) {
+/* CHIP. tone: neutral | accent | ok | warn | err | mood | an | warm (his words).
+ * BUSY is a state, not a tone: something bounded is happening now (a search in flight, a
+ * picture being made). It pulses the dot, so it implies one. Something that lasts (a
+ * scene, a reading) wears a still `dot` instead: an endless pulse is motion he cannot
+ * pause (WCAG 2.2.2). */
+export function Chip({ tone = 'neutral', icon, dot, busy, title, onClick, children }) {
   const inner = (
     <>
-      {dot ? <span className="ui-chip-dot" /> : null}
+      {dot || busy ? <span className="ui-chip-dot" /> : null}
       {icon ? <Icon name={icon} size={12} /> : null}
       <span className="ui-chip-t">{children}</span>
     </>
   )
+  const cls = 'ui-chip ui-tone-' + tone + (busy ? ' ui-chip-busy' : '')
   return onClick
-    ? <button type="button" className={'ui-chip ui-chip-btn ui-tone-' + tone}
-              title={title} onClick={onClick}>{inner}</button>
-    : <span className={'ui-chip ui-tone-' + tone} title={title}>{inner}</span>
+    ? <button type="button" className={cls + ' ui-chip-btn'} title={title} onClick={onClick}>{inner}</button>
+    : <span className={cls} title={title}>{inner}</span>
 }
 
 /* BUTTON. variant: secondary (default) | primary | ghost | danger. At most ONE primary
@@ -86,11 +90,27 @@ export function Row({ lead, title, meta, trail, onClick }) {
     : <div className="ui-row">{body}{tail}</div>
 }
 
+/* KV — a key and its value, the status panels' commonest line ("sight · yes"). tone
+ * colours the VALUE: ok | off | warn | err. 'good' and 'bad' are accepted because Setup
+ * has passed them since it was written and no rule ever styled them; anything else is
+ * dropped, never echoed into a class name. */
+const KV_TONE = { ok: 'ok', good: 'ok', off: 'off', warn: 'warn', err: 'err', bad: 'err' }
+export function KV({ k, v, tone }) {
+  const t = KV_TONE[tone]
+  return (
+    <div className="ui-kv">
+      <span className="ui-kv-k">{k}</span>
+      <span className={'ui-kv-v' + (t ? ' ui-kv-' + t : '')}>{v}</span>
+    </div>
+  )
+}
+
 /* STATE — loading | empty | error, in one voice. An empty state is an invitation, an
  * error says what happened and what to do; neither apologises. */
 export function State({ kind = 'empty', title, children, action }) {
   return (
-    <div className={'ui-state ui-state-' + kind} role={kind === 'error' ? 'alert' : undefined}>
+    <div className={'ui-state ui-state-' + kind}
+         role={kind === 'error' ? 'alert' : kind === 'loading' ? 'status' : undefined}>
       {kind === 'loading' ? <span className="ui-spin" aria-hidden="true" /> : null}
       {title ? <div className="ui-state-t">{title}</div> : null}
       {children ? <div className="ui-state-b">{children}</div> : null}

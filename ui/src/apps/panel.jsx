@@ -4,6 +4,7 @@
  * empty, which is how "her memory is gone" and "the endpoint 404'd" become the
  * same picture. */
 import { useEffect, useRef, useState } from 'react'
+import { KV, State } from '../kit/parts.jsx'
 
 export function usePoll(fn, ms = 0) {
   const [state, set] = useState({ loading: true, data: null, error: null })
@@ -34,12 +35,13 @@ export function usePoll(fn, ms = 0) {
   return { ...state, refresh: () => runRef.current && runRef.current() }
 }
 
+/* The states are the KIT'S (redesign stage 2): one loading voice and one error voice for
+ * every panel, so a new panel cannot invent a third. The error keeps saying what failed,
+ * verbatim — "could not load" alone is the silence this file was written against. */
 export function Body({ state, children }) {
-  if (state.loading) return <div className="muted pad">…</div>
-  if (state.error) return <div className="err pad">could not load — {state.error}</div>
+  if (state.loading) return <State kind="loading" title="Loading…" />
+  if (state.error) return <State kind="error" title="Could not load">{state.error}</State>
   return children(state.data)
 }
 
-export const Row = ({ k, v, tone }) => (
-  <div className="row"><span className="k">{k}</span><span className={'v ' + (tone || '')}>{v}</span></div>
-)
+export const Row = ({ k, v, tone }) => <KV k={k} v={v} tone={tone} />

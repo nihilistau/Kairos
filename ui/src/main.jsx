@@ -12,10 +12,11 @@ import Portrait from './room/Portrait.jsx'
 import Down from './room/Down.jsx'
 import DeskIcons from './room/DeskIcons.jsx'
 import { Icon } from './kit/icons.jsx'
-import { Orb } from './kit/parts.jsx'
+import { Chip, Orb } from './kit/parts.jsx'
 import { useMood } from './room/useMood.js'
 import { applyMood } from './room/moodTheme.js'
 import Anon, { AnonChip } from './room/Anon.jsx'
+import { LookingChip, SceneChip } from './room/TaskChips.jsx'
 import { useState } from 'react'
 import './kit/fonts.js'
 import './kit/tokens.css'
@@ -224,7 +225,7 @@ function Status() {
       <span className={'led ' + (on ? (d.warm ? 'ok' : 'warm') : 'off')}
             role="img" title={'gateway: ' + said} aria-label={'gateway: ' + said} />
       <span>{said}</span>
-      {prof ? <span className="st-prof" title="the profile this stack was launched with">{prof}</span> : null}
+      {prof ? <span className="tb-prof"><Chip title="the profile this stack was launched with">{prof}</Chip></span> : null}
       {!busy && sys.data && sys.data.restartable ? (
         ask ? (
           <>
@@ -242,37 +243,6 @@ function Status() {
         )
       ) : null}
     </div>
-  )
-}
-
-function LookingChip({ pulse }) {
-  const r = (pulse && pulse.research) || {}
-  if (!r.inflight && !r.title && !r.query) return null
-  const a = byId('research')
-  return (
-    <button className={'rsc-chip' + (r.inflight ? ' on' : '')}
-            title={r.query || r.title || 'what she looked up'}
-            onClick={() => a && wm.open('research', a)}>
-      <b>{r.inflight ? (r.kind === 'research' ? 'researching' : 'looking up') : 'looked up'}</b>
-      <span>{(r.query || r.title || '').slice(0, 42)}</span>
-    </button>
-  )
-}
-
-function SceneChip() {
-  const rp = usePoll(api.roleplay, 8000)
-  const sc = rp.data && rp.data.scene
-  const [busy, setBusy] = useState(false)
-  if (!sc) return null
-  return (
-    <span className="scn" title={(sc.role || '') + ' — ' + (sc.setting || '')}>
-      <b>in scene</b> {sc.title || sc.id}
-      <span className="scn-b">{sc.level_name || 'rung ' + sc.level} · {sc.beats} beats</span>
-      <button disabled={busy}
-              onClick={async () => { setBusy(true)
-                try { await api.roleplayWrite({ op: 'exit' }); rp.refresh() } finally { setBusy(false) } }}
-              title="leave the scene — she comes back as herself">exit</button>
-    </span>
   )
 }
 
@@ -397,7 +367,8 @@ function Room() {
               Persisting the scene is right; resuming it silently is not. */}
           <AnonChip anon={anon} />
           <SceneChip />
-          <LookingChip pulse={pulse} />
+          <LookingChip pulse={pulse}
+                       onOpen={() => { const a = byId('research'); if (a) wm.open('research', a) }} />
           {/* HER MOOD, NAMED. The one place it is always written down (spec §3). */}
           <span className="tb-mood" title={m.known ? 'her mood' : 'her mood — a word with no colour on file'}
                 role="status" aria-label={'her mood: ' + m.word + (m.thinking ? ', thinking' : '')}>

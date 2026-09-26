@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { When } from '../room/When.jsx'
+import { Chip, Button, Input, State } from '../kit/parts.jsx'
 
 /* looks.jsx — SHARED row renderer for the search and research windows (2026-08-21).
  *
@@ -10,20 +11,20 @@ import { When } from '../room/When.jsx'
  * chip is what keeps that distinction visible instead of tribal knowledge.
  *
  * Prefix `rsc-` — the research window owns the style, search borrows it whole.
+ * His/hers chips, the box and the states are the kit's since redesign stage 2.
  */
 export function ByChip({ by }) {
   const him = by === 'him'
   return (
-    <span className={'rsc-by ' + (him ? 'rsc-him' : 'rsc-hers')}
-          title={him ? 'you looked this up' : 'she looked this up — hers'}>
+    <Chip tone={him ? 'warm' : 'mood'} title={him ? 'you looked this up' : 'she looked this up — hers'}>
       {him ? 'his' : 'hers'}
-    </span>
+    </Chip>
   )
 }
 
 export function LookRows({ rows, empty }) {
   const [open, setOpen] = useState(null)
-  if (!rows.length) return <div className="muted">{empty}</div>
+  if (!rows.length) return <State kind="empty">{empty}</State>
   return rows.map((r, i) => {
     const id = r.receipt || (r.ended + ':' + i)
     const expanded = open === id
@@ -34,7 +35,7 @@ export function LookRows({ rows, empty }) {
           <ByChip by={r.by} />
           <span className="rsc-t">{r.title || r.query || '(untitled)'}</span>
           {r.ended ? <When at={r.ended} /> : null}
-          <span className="rsc-ok">{r.ok === false ? 'failed' : ''}</span>
+          {r.ok === false ? <Chip tone="err">failed</Chip> : null}
         </button>
         {expanded ? (
           <div className="rsc-body">
@@ -75,14 +76,14 @@ export function AskRow({ placeholder, busyLabel, run, onDone }) {
   }
   return (
     <div className="rsc-askrow">
-      <input className="rsc-ask" value={q} placeholder={placeholder}
+      <Input className="rsc-ask" value={q} placeholder={placeholder} aria-label={placeholder}
              disabled={busy}
              onChange={e => setQ(e.target.value)}
              onKeyDown={e => e.key === 'Enter' && go()} />
-      <button className="rsc-go" disabled={busy || !q.trim()} onClick={go}>
+      <Button variant="primary" disabled={busy || !q.trim()} onClick={go}>
         {busy ? busyLabel : 'go'}
-      </button>
-      {err ? <span className="rsc-err">{err}</span> : null}
+      </Button>
+      {err ? <span className="rsc-err" role="alert">{err}</span> : null}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { usePoll, Body } from './panel.jsx'
 import { LookRows, AskRow } from './looks.jsx'
+import { Chip } from '../kit/parts.jsx'
 import * as api from '../api.js'
 
 /* RESEARCH — the paid-tier half of the looking ledger.
@@ -24,9 +25,9 @@ export default function Research() {
           <>
             <div className="rsc-bar">
               {d.armed
-                ? <span className="rsc-arm">research tier on · {d.backend || 'xai'}</span>
-                : <span className="rsc-arm rsc-off">her research tier off — your box below still works</span>}
-              {inf ? <span className="rsc-now">looking up {inf.query || inf.kind}…</span> : null}
+                ? <Chip tone="ok" dot>research tier on · {d.backend || 'xai'}</Chip>
+                : <Chip>her research tier off — your box below still works</Chip>}
+              {inf ? <Chip tone="accent" busy>looking up {inf.query || inf.kind}…</Chip> : null}
             </div>
             <AskRow placeholder="research something yourself — a real model call, billed, minutes not seconds"
                     busyLabel="researching…"
@@ -34,9 +35,7 @@ export default function Research() {
                     onDone={() => s.refresh()} />
             <LookRows rows={rows}
                       empty="nothing researched yet — a title appears here when the tier actually returns, not when she talks about it" />
-            <div className="rsc-foot muted">
-              hers are her homework — you can read them, you cannot edit them
-            </div>
+            <div className="rsc-foot">hers are her homework — you can read them, you cannot edit them</div>
           </>
         )
       }}</Body>

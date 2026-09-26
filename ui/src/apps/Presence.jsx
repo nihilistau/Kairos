@@ -44,7 +44,7 @@ export default function Presence() {
             <KnobGroups only={['Presence — her modes']} />
             <h4 className="prs-shelf-h">the shelf <span className="muted">(var/library/ — drop .txt / .md / .epub in)</span></h4>
             {!shelf.length ? <div className="muted">empty</div> : shelf.map(b => (
-              <div key={b.title} className="row prs-book">
+              <div key={b.title} className="prs-book">
                 <span className="k">{b.title}{b.in_hand ? ' · in her hands' : ''}</span>
                 <span className="v">
                   {b.done ? 'finished' : Math.round(100 * b.pos / Math.max(1, b.chars)) + '%'}

@@ -1,5 +1,6 @@
 import { usePoll } from './panel.jsx'
 import * as api from '../api.js'
+import { Chip } from '../kit/parts.jsx'
 
 /* titleChips — the status chip a window wears in its own title bar (2026-08-21,
  * his ask: "Include a chip/indicator like on the research panel for all panels
@@ -11,14 +12,20 @@ import * as api from '../api.js'
  * are GLANCES — one or two words about state/provider — never controls; the
  * panel body owns the controls.
  *
- * Style: the shared .tc chip classes in room.css (tc-on / tc-off / tc-busy).
+ * Style: the KIT'S Chip (redesign stage 2). Four states, one mapping: on → ok,
+ * off → neutral, busy → accent with a pulsing dot, live → accent with a STILL dot.
+ * BUSY IS FOR BOUNDED ACTIVITY (a look in flight, a picture being made): a scene, a
+ * reading or a wait for quiet can last hours, and a pulse that never stops is motion he
+ * cannot pause (WCAG 2.2.2; stage-2 review, M3). Those say `live`. The tc- classes are gone.
  */
-const Chip = ({ tone = '', title, children }) =>
-  children ? <span className={'tc ' + tone} title={title}>{children}</span> : null
+const TONE = { on: 'ok', off: 'neutral', busy: 'accent', live: 'accent' }
+export const Glance = ({ state = 'on', title, children }) =>
+  children ? <Chip tone={TONE[state] || 'neutral'} busy={state === 'busy'} dot={state === 'live'}
+                   title={title}>{children}</Chip> : null
 // While the FIRST poll is in flight a chip is absent, which reads as "no status" —
 // indistinguishable from a window whose feature is off (his report, 2026-08-22). A quiet
 // ellipsis says "asking"; null is reserved for "off / nothing to show".
-const Pending = () => <span className="tc tc-off" title="asking…">…</span>
+export const Pending = () => <Chip tone="neutral" title="asking…">…</Chip>
 
 export function VoiceChip() {
   const s = usePoll(api.speakStatus, 20000)
@@ -26,8 +33,8 @@ export function VoiceChip() {
   const lv = (s.data && s.data.live) || null
   if (!lv) return null
   return lv.enabled === false
-    ? <Chip tone="tc-off" title="voice.enabled is off">muted</Chip>
-    : <Chip tone="tc-on" title="provider · voice">{lv.method}{lv.method === 'xai' ? ' · ' + lv.xai_voice : (lv.local_gguf ? ' · ' + lv.local_gguf : '')}</Chip>
+    ? <Glance state="off" title="voice.enabled is off">muted</Glance>
+    : <Glance state="on" title="provider · voice">{lv.method}{lv.method === 'xai' ? ' · ' + lv.xai_voice : (lv.local_gguf ? ' · ' + lv.local_gguf : '')}</Glance>
 }
 
 export function SearchChip() {
@@ -35,7 +42,7 @@ export function SearchChip() {
   if (s.loading && !s.data) return <Pending />
   const d = s.data
   if (!d || !d.ok) return null
-  return <Chip tone="tc-on" title="the engine her next search uses">{d.search_backend}</Chip>
+  return <Glance state="on" title="the engine her next search uses">{d.search_backend}</Glance>
 }
 
 export function ResearchChip() {
@@ -43,10 +50,10 @@ export function ResearchChip() {
   if (s.loading && !s.data) return <Pending />
   const d = s.data
   if (!d || !d.ok) return null
-  if (d.inflight) return <Chip tone="tc-busy" title={d.inflight.query}>looking…</Chip>
+  if (d.inflight) return <Glance state="busy" title={d.inflight.query}>looking…</Glance>
   return d.armed
-    ? <Chip tone="tc-on" title="her research tier">{d.backend}</Chip>
-    : <Chip tone="tc-off" title="her tier is off; your manual box still works">tier off</Chip>
+    ? <Glance state="on" title="her research tier">{d.backend}</Glance>
+    : <Glance state="off" title="her tier is off; your manual box still works">tier off</Glance>
 }
 
 export function WardrobeChip() {
@@ -54,9 +61,9 @@ export function WardrobeChip() {
   if (s.loading && !s.data) return <Pending />
   const g = s.data && s.data.genstatus
   if (!g) return null
-  if (g.running) return <Chip tone="tc-busy" title={g.last || g.what}>making…</Chip>
+  if (g.running) return <Glance state="busy" title={g.last || g.what}>making…</Glance>
   const waiting = (s.data.wants || s.data.waiting || []).length
-  return waiting ? <Chip tone="tc-on" title="wants waiting to be made">{waiting} waiting</Chip> : null
+  return waiting ? <Glance state="on" title="wants waiting to be made">{waiting} waiting</Glance> : null
 }
 
 export function StageChip() {
@@ -64,9 +71,9 @@ export function StageChip() {
   if (s.loading && !s.data) return <Pending />
   const sc = s.data && s.data.scene
   if (!sc) return null
-  return <Chip tone="tc-busy" title={(sc.role || '') + ' — ' + (sc.setting || '')}>
+  return <Glance state="live" title={(sc.role || '') + ' — ' + (sc.setting || '')}>
     {sc.level_name || 'rung ' + sc.level}
-  </Chip>
+  </Glance>
 }
 
 export function MusicChip() {
@@ -74,7 +81,7 @@ export function MusicChip() {
   if (s.loading && !s.data) return <Pending />
   const st = s.data && s.data.state
   if (!st || !st.playing) return null
-  return <Chip tone="tc-on" title="playing now">{(st.title || st.track || 'playing').slice(0, 24)}</Chip>
+  return <Glance state="on" title="playing now">{(st.title || st.track || 'playing').slice(0, 24)}</Glance>
 }
 
 export function RoomChip() {
@@ -82,40 +89,40 @@ export function RoomChip() {
   if (s.loading && !s.data) return <Pending />
   const a = s.data && s.data.ambient
   if (!a) return null
-  if (!a.enabled) return <Chip tone="tc-off" title="the hourly look is off">eye off</Chip>
-  if (a.waiting) return <Chip tone="tc-busy" title={a.waiting.why}>waiting for quiet</Chip>
+  if (!a.enabled) return <Glance state="off" title="the hourly look is off">eye off</Glance>
+  if (a.waiting) return <Glance state="live" title={a.waiting.why}>waiting for quiet</Glance>
   const m = a.next_in_s != null ? Math.max(0, Math.round(a.next_in_s / 60)) : null
-  return <Chip tone="tc-on" title="the eye is on its schedule">
+  return <Glance state="on" title="the eye is on its schedule">
     {m != null ? 'next look ~' + m + 'm' : 'looking hourly'}
-  </Chip>
+  </Glance>
 }
 
 export function GamesChip() {
   const s = usePoll(api.games, 30000)
   if (s.loading && !s.data) return <Pending />
   const n = ((s.data && s.data.games) || []).filter(g => !g.over && !g.done).length
-  return n ? <Chip tone="tc-on" title="boards in play">{n} live</Chip> : null
+  return n ? <Glance state="on" title="boards in play">{n} live</Glance> : null
 }
 
 export function PresenceChip() {
   const s = usePoll(api.presence, 15000)
   if (s.loading && !s.data) return <Pending />
   const st = (s.data && s.data.state) || {}
-  if (!st.mode || st.mode === 'off') return <Chip tone="tc-off" title="presence.mode is off">off</Chip>
-  if (st.reading && !st.reading.done) return <Chip tone="tc-busy" title={st.mode + ' · reading'}>reading {String(st.reading.title).slice(0, 18)}</Chip>
+  if (!st.mode || st.mode === 'off') return <Glance state="off" title="presence.mode is off">off</Glance>
+  if (st.reading && !st.reading.done) return <Glance state="live" title={st.mode + ' · reading'}>reading {String(st.reading.title).slice(0, 18)}</Glance>
   const m = st.next_in_s != null ? Math.max(0, Math.round(st.next_in_s / 60)) : null
-  return <Chip tone="tc-on" title="her mode, and when her next turn may come">{st.mode}{m != null ? ' · next ~' + m + 'm' : ''}</Chip>
+  return <Glance state="on" title="her mode, and when her next turn may come">{st.mode}{m != null ? ' · next ~' + m + 'm' : ''}</Glance>
 }
 
 export function AuxChip() {
   const s = usePoll(api.aux, 20000)
   if (s.loading && !s.data) return <Pending />
   const d = s.data || {}
-  if (!d.armed) return <Chip tone="tc-off" title="SP_AUX is off in the profile">off</Chip>
-  if (!d.embed_up) return <Chip tone="tc-off" title="the embedding door is not answering">embed dark</Chip>
-  return <Chip tone={d.warming ? 'tc-busy' : 'tc-on'} title={'chat ' + (d.chat_up ? 'up' : 'dark') + ' · ' + (d.chat_model || '')}>
+  if (!d.armed) return <Glance state="off" title="SP_AUX is off in the profile">off</Glance>
+  if (!d.embed_up) return <Glance state="off" title="the embedding door is not answering">embed dark</Glance>
+  return <Glance state={d.warming ? 'busy' : 'on'} title={'chat ' + (d.chat_up ? 'up' : 'dark') + ' · ' + (d.chat_model || '')}>
     embed ✓ {d.chat_up ? 'chat ✓' : 'chat dark'} · {d.chunks}{d.warming ? ' · warming' : ''}
-  </Chip>
+  </Glance>
 }
 
 export function SensesChip() {
@@ -124,8 +131,8 @@ export function SensesChip() {
   const e = (s.data && s.data.eyes) || null
   if (!e) return null
   if (e.backend === 'aux_vl') {
-    if (!e.vl_model || e.door_up === false) return <Chip tone="tc-off" title="Sight — her eyes: aux_vl needs a model and the door up">eyes: dark</Chip>
-    return <Chip tone="tc-on" title="an LFM VL model on the aux door">eyes: aux VL · {String(e.vl_model).slice(0, 18)}</Chip>
+    if (!e.vl_model || e.door_up === false) return <Glance state="off" title="Sight — her eyes: aux_vl needs a model and the door up">eyes: dark</Glance>
+    return <Glance state="on" title="an LFM VL model on the aux door">eyes: aux VL · {String(e.vl_model).slice(0, 18)}</Glance>
   }
-  return <Chip tone="tc-on" title="Sight — her eyes">{e.backend === 'openai' ? 'eyes: seam' : 'eyes: engine'}</Chip>
+  return <Glance state="on" title="Sight — her eyes">{e.backend === 'openai' ? 'eyes: seam' : 'eyes: engine'}</Glance>
 }

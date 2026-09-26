@@ -139,14 +139,24 @@ check("the window expands a title to the returned text (looks.jsx, shared)",
       "LookRows" in rsc and "rsc-head" in lks and "r.summary" in lks)
 check("her rows are read-only — the only write is HIS manual box",
       "api.research" in rsc and "researchRun" in rsc and "Write" not in rsc)
-check("...and every row says whose it is", "ByChip" in lks and "rsc-by" in lks)
+# 2026-09-26 (redesign stage 2): the his/hers mark is a kit Chip (warm / mood), so the
+# rsc-by class this used to quote is gone; read the row's use of ByChip and its tones.
+# G-ROOM-KIT leg 6 renders it.
+check("...and every row says whose it is",
+      "<ByChip by={r.by}" in lks and "'warm'" in lks and "'mood'" in lks)
 chip = open(os.path.join(ROOT, "ui", "src", "main.jsx"), encoding="utf-8").read()
+# 2026-09-26 (redesign stage 2): LookingChip moved to room/TaskChips.jsx and became a
+# kit Chip, so main.jsx only IMPORTS it — the order check reads the JSX use, not the
+# first mention (which is the import line now, and would pass on its own).
 check("the taskbar has a LookingChip next to presence",
-      "LookingChip" in chip and "<Presence" in chip
-      and chip.index("LookingChip") < chip.index("<Presence"))
+      "<LookingChip" in chip and "<Presence" in chip
+      and chip.index("<LookingChip") < chip.index("<Presence"))
+tc = open(os.path.join(ROOT, "ui", "src", "room", "TaskChips.jsx"), encoding="utf-8").read()
+check("the looking chip is a kit Chip that opens research",
+      "export function LookingChip" in tc and "<Chip" in tc and "onOpen" in tc
+      and "onOpen=" in chip and "'research'" in chip)
 css = open(os.path.join(ROOT, "ui", "src", "room.css"), encoding="utf-8").read()
-check("rsc-chip and rsc-row are styled",
-      ".rsc-chip" in css and ".rsc-row" in css)
+check("rsc-row is styled", ".rsc-row" in css)
 api = open(os.path.join(ROOT, "ui", "src", "api.js"), encoding="utf-8").read()
 check("the client has one reader, /v1/research",
       "export const research" in api and "/v1/research" in api)

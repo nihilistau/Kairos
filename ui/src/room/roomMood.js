@@ -25,11 +25,18 @@ const listeners = new Set()
 export const subscribe = (fn) => { listeners.add(fn); return () => listeners.delete(fn) }
 export const get = () => state
 
-/* Same call shape Chat always used: `set(mood)` or `set(null, true)` for "she is
- * thinking". A null mood LEAVES the last one standing — she is still wearing what she
- * was wearing while she thinks, and blanking the room between turns reads as a flicker. */
+/* Same call shape Chat always used: `set(mood)`, `set(null, true)` when she starts
+ * generating, `set(null, false)` when she stops. A null mood LEAVES the last one
+ * standing — she is still wearing what she was wearing while she thinks, and blanking
+ * the room between turns reads as a flicker.
+ *
+ * AN OMITTED `thinking` KEEPS THE CURRENT ONE (2026-09-26, the stage-1/2 live check).
+ * It used to default to false, and the gateway's persona event arrives at the TOP of a
+ * turn carrying her mood — so `set(mood)` ended "thinking" before the prefill had, and
+ * the orb and busy cursor never showed during a 3-minute turn (0 of 803 samples).
+ * Only Chat's `finally` ends it now. */
 export function set(mood, thinking) {
-  const next = { mood: mood ?? state.mood, thinking: thinking ?? false }
+  const next = { mood: mood ?? state.mood, thinking: thinking ?? state.thinking }
   if (next.mood === state.mood && next.thinking === state.thinking) return
   state = next
   listeners.forEach(fn => fn())

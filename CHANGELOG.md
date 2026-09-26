@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.8.43 — the shared renderers draw through the kit (2026-09-26)
+
+Stage 2 of the room redesign: the four modules that draw most of the room's small parts
+(`apps/panel.jsx`, `apps/titleChips.jsx`, `apps/knobs.jsx`, `apps/looks.jsx`) now render
+kit parts, and the windows built on them changed with them.
+
+* **One loading and error state.** Every panel's `Body` draws the kit `State`: a loading
+  spinner with `role="status"`, and an error with `role="alert"` that quotes what failed.
+  Status rows are the kit `KV`; the `good`/`bad` tones Setup passes are now styled.
+* **One chip.** The window title chips and the taskbar's looked-up, in-scene and
+  off-the-record chips are kit `Chip`s (on = ok, off = neutral, busy = accent with a pulsing
+  dot; a new `live` state is accent with a still dot, for states that last — a scene, a
+  reading, a wait — so nothing pulses indefinitely). The `tc-` classes are removed, and the
+  CSS gate's last family exception with them.
+  The taskbar's profile label is a kit chip under the shell's own `tb-prof` class.
+* **The look ledgers:** the user's rows use a new `warm` tone, the assistant's the mood
+  tone. Settings uses kit fields, selects, chips and a button; native checkboxes take the
+  accent colour at 16px.
+* **Fixes:** the live mood store no longer clears its "thinking" flag when a mood arrives
+  mid-turn — only the end of the chat stream clears it; event chips in chat (`.act`) are
+  monospace, as the spec asked (the rule had been written for a class nothing rendered);
+  the speak button's pulse is off under reduced motion.
+* **Gates:** new G-ROOM-KIT bundles the real components with esbuild and renders them with
+  react-dom/server under node, asserting on the markup; its last leg fails if a retired class
+  is drawn or styled again. G-ROOM-TOKENS covers the thinking lifecycle and the monospace
+  event chips; its raw-colour baseline fell 272 to 230.
+* **Taskbar at every width:** it sheds status glances, never controls — the looked-up
+  query at 1440px and below (it stays in the tooltip), the presence note and the Console
+  link at 1200, a finished look at 1000 (one in progress always shows), and at 820 the
+  profile chip, window titles, wordmark and gateway label. The off-the-record switch,
+  Shut down and a scene's exit are never hidden; measured from 1600 down to 375px, the bar
+  fits with no overlap.
+* **Accessibility:** Settings controls and the search box have accessible names; a
+  clickable chip shows a focus ring.
+* **Gates:** G-ROOM-KIT runs in the `room` CI job; its scratch lives under
+  `ui/node_modules/.cache/`, and G-KAIROS-SCRUB skips `_g_*` scratch and files removed
+  mid-scan.
+
 ## 0.8.42 — the room's tint follows the mood; fixes from the review of the redesign's first stages (2026-09-26)
 
 * **The backdrop tint follows the mood.** `.room::after` read a variable only a descendant

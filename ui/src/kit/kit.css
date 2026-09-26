@@ -38,6 +38,8 @@ html.mood-thinking body { cursor: var(--cur-busy); }
   background: rgba(160, 190, 220, .06); color: var(--text-2); }
 .ui-chip-btn { cursor: var(--cur-hand); }
 .ui-chip-btn:hover { border-color: rgba(var(--accent-rgb), .45); color: var(--text-1); }
+/* a clickable chip shows focus like a button does (stage-2 review, M5) */
+.ui-chip-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px hsl(var(--mood-h) 70% 60% / .6); }
 .ui-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .ui-tone-accent { color: var(--accent); border-color: rgba(var(--accent-rgb), .32);
   background: rgba(var(--accent-rgb), .10); }
@@ -48,6 +50,22 @@ html.mood-thinking body { cursor: var(--cur-busy); }
 .ui-tone-an { color: var(--an); border-color: rgba(var(--an-rgb), .38); background: rgba(var(--an-rgb), .10); }
 .ui-tone-mood { color: hsl(var(--mood-h) 80% 76%); border-color: hsl(var(--mood-h) 70% 60% / .30);
   background: hsl(var(--mood-h) 60% 50% / .12); }
+.ui-tone-warm { color: var(--warm); border-color: rgba(var(--warm-rgb), .34); background: rgba(var(--warm-rgb), .08); }
+.ui-chip-busy .ui-chip-dot { animation: ui-pulse 1.6s ease-in-out infinite; }
+@keyframes ui-pulse { 50% { opacity: .35; transform: scale(.7); } }
+
+/* KV — key left, value right; the value takes the tone */
+.ui-kv { display: flex; justify-content: space-between; gap: var(--sp-3); padding: 4px 0;
+  border-bottom: 1px solid var(--hair); font: 400 var(--fs-12)/1.45 var(--font-ui); }
+.ui-kv-k { flex: none; color: var(--text-3); }
+.ui-kv-v { min-width: 0; text-align: right; overflow-wrap: anywhere; color: var(--text-1); }
+.ui-kv-ok { color: var(--ok); }
+.ui-kv-off { color: var(--text-3); }
+.ui-kv-warn { color: var(--warn); }
+.ui-kv-err { color: var(--err); }
+
+/* native checkboxes take the accent — the one control the kit does not redraw */
+input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
 
 /* BUTTON */
 .ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -127,7 +145,7 @@ html.mood-thinking body { cursor: var(--cur-busy); }
 html { transition: --mood-h 2.4s var(--ease-out); }
 
 @media (prefers-reduced-motion: reduce) {
-  .ui-orb, .ui-spin { animation: none; }
+  .ui-orb, .ui-spin, .ui-chip-busy .ui-chip-dot { animation: none; }
   html { transition: none; }
   .ui-ic-d, .ui-btn, .ui-field, .ui-tab { transition: none; }
 }
