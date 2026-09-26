@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import os
 import threading
+import time
 from typing import Any, Dict
 
 # ── WHERE THE REPO IS, RESOLVED ONCE (2026-09-01) ─────────────────────────────────────
@@ -65,6 +66,11 @@ UNPROMPTED_SAMPLING = {"temperature": 0.5, "repetition_penalty": 1.15, "auto_rec
 # name — see the module docstring. Written by the native chat handler, read by the room
 # pulse to answer "how long since he said anything".
 LAST_TURN_AT: float = 0.0
+
+# WHEN THIS GATEWAY PROCESS STARTED (redesign stage 3). Set once, at import — the module
+# loads once per process, so a bounce resets it, which is the truth the top bar tells
+# ("the gateway, since …"). The daemon exposes no start time; none is invented for it.
+STARTED_AT: float = time.time()
 
 # The canonical transcript per session — what the daemon actually saw, which is not what
 # the client echoes back. Cleared at the day boundary.

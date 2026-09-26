@@ -17,7 +17,12 @@ export const getWindows = () => windows
 
 export function open(appId, opts = {}) {
   const found = windows.find(w => w.appId === appId)
-  if (found) { found.minimized = false; found.z = ++z; emit(); return }
+  if (found) {
+    stopTimer(appId)
+    if (found.minimized) found.restoredAt = Date.now()
+    found.minimized = false; found.minimizing = false
+    found.z = ++z; emit(); return
+  }
   windows.push({
     appId, z: ++z, minimized: false,
     // CLEAR OF THE ICONS (2026-09-23). The stagger started at x:60, which was empty
@@ -30,9 +35,37 @@ export function open(appId, opts = {}) {
   })
   emit()
 }
-export const close = (id) => { windows = windows.filter(w => w.appId !== id); emit() }
-export const focus = (id) => { const w = windows.find(x => x.appId === id); if (w) { w.z = ++z; w.minimized = false; emit() } }
-export const minimize = (id) => { const w = windows.find(x => x.appId === id); if (w) { w.minimized = true; emit() } }
+export const close = (id) => { stopTimer(id); windows = windows.filter(w => w.appId !== id); emit() }
+export function focus(id) {
+  const w = windows.find(x => x.appId === id)
+  if (!w) return
+  stopTimer(id)
+  if (w.minimized) w.restoredAt = Date.now()
+  w.minimized = false; w.minimizing = false
+  w.z = ++z; emit()
+}
+
+/* MINIMISE ANIMATES (redesign stage 3, spec §8 — his call). The window stays on the page,
+ * marked `minimizing`, for MIN_MS while the shell flies it toward its taskbar button, then
+ * it is minimised. This module holds the flag and the timer, never geometry: where the
+ * button is, and what "flying" looks like, is the shell's business. A caller that wants
+ * no flight (reduced motion) passes delay 0. */
+export const MIN_MS = 200
+const timers = new Map()
+function stopTimer(id) { const t = timers.get(id); if (t) { clearTimeout(t); timers.delete(id) } }
+
+export function minimize(id, { delay = MIN_MS } = {}) {
+  const w = windows.find(x => x.appId === id)
+  if (!w || w.minimized || w.minimizing) return
+  if (!delay) { w.minimized = true; emit(); return }
+  w.minimizing = true
+  emit()
+  timers.set(id, setTimeout(() => {
+    timers.delete(id)
+    const cur = windows.find(x => x.appId === id)
+    if (cur && cur.minimizing) { cur.minimizing = false; cur.minimized = true; emit() }
+  }, delay))
+}
 
 /* MAXIMISE — a toggle that REMEMBERS (2026-09-23, his ask). The three lights in the
  * title bar were close, minimise, and a green ornament labelled "focused" that did
@@ -49,9 +82,12 @@ export const minimize = (id) => { const w = windows.find(x => x.appId === id); i
 export function maximize(id) {
   const w = windows.find(x => x.appId === id)
   if (!w) return
+  // a maximise mid-flight cancels the minimise, as open/focus/close do (final review, M1):
+  // without this the flight's timer fired afterwards and minimised the window just maximised
+  stopTimer(id)
   if (w.max) { Object.assign(w, w.pre || {}, { max: false, pre: null }) }
   else { w.pre = { x: w.x, y: w.y, w: w.w, h: w.h }; w.max = true }
-  w.minimized = false
+  w.minimized = false; w.minimizing = false
   w.z = ++z
   emit()
 }

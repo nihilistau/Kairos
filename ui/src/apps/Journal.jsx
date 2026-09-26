@@ -1,6 +1,7 @@
 import { usePoll, Body } from './panel.jsx'
 import * as api from '../api.js'
 import { When } from '../room/When.jsx'
+import { State } from '../kit/parts.jsx'
 
 /* JOURNAL — hers.
  *
@@ -28,56 +29,55 @@ function when(ts) {
   return d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
+/* The window's body, split out so G-ROOM-KIT leg 10 can render it with a fixture. */
+export function JournalView({ d }) {
+  if (!d.current && !d.history?.length) {
+    return <State kind="empty">
+      she has not written yet. one paragraph goes down at the day boundary,
+      once the room has been quiet for a while.
+    </State>
+  }
+  /* ── THE DUPLICATE THAT WAS ALWAYS THERE (2026-08-21, his report) ──────
+   * This rendered `current` as its own block AND the newest snapshot below
+   * it — the same paragraph twice, every day since the journal became
+   * readable. The server now sends `current_id`: the row that IS the
+   * current line wears the "most recent" label instead of being repeated.
+   * A standalone current block renders only when no snapshot matches
+   * (the composer wrote but the snapshot failed). */
+  const rows = d.history || []
+  const orphanCurrent = d.current && !d.current_id
+  return (
+    <>
+      {orphanCurrent ? (
+        <div className="entry now">
+          <div className="lab">most recent</div>
+          <p>{d.current}</p>
+        </div>
+      ) : null}
+      {rows.map(h => (
+        <div key={h.id} className={'entry' + (h.id === d.current_id ? ' now' : '')}>
+          {/* The day is the heading — the day SHE named, with the chip
+              saying when she actually sat down and wrote it. */}
+          <div className="lab">
+            {h.id === d.current_id ? <span className="jr-recent">most recent · </span> : null}
+            {stampDay(h.text) || when(h.at)} <When at={h.at} bare />
+            {h.drafts ? (
+              <span className="jr-drafts" title="she rewrote this day; the newest words stand">
+                {h.drafts} earlier draft{h.drafts > 1 ? 's' : ''}
+              </span>
+            ) : null}
+          </div>
+          <p>{h.text}</p>
+        </div>
+      ))}
+      <div className="foot muted">
+        hers — you can read it, you cannot edit it
+      </div>
+    </>
+  )
+}
+
 export default function Journal() {
   const s = usePoll(api.narrative, 60000)
-  return (
-    <div className="pad journal">
-      <Body state={s}>{d => {
-        if (!d.current && !d.history?.length) {
-          return <div className="muted">
-            she has not written yet. one paragraph goes down at the day boundary,
-            once the room has been quiet for a while.
-          </div>
-        }
-        /* ── THE DUPLICATE THAT WAS ALWAYS THERE (2026-08-21, his report) ──────
-         * This rendered `current` as its own block AND the newest snapshot below
-         * it — the same paragraph twice, every day since the journal became
-         * readable. The server now sends `current_id`: the row that IS the
-         * current line wears the "most recent" label instead of being repeated.
-         * A standalone current block renders only when no snapshot matches
-         * (the composer wrote but the snapshot failed). */
-        const rows = d.history || []
-        const orphanCurrent = d.current && !d.current_id
-        return (
-          <>
-            {orphanCurrent ? (
-              <div className="entry now">
-                <div className="lab">most recent</div>
-                <p>{d.current}</p>
-              </div>
-            ) : null}
-            {rows.map(h => (
-              <div key={h.id} className={'entry' + (h.id === d.current_id ? ' now' : '')}>
-                {/* The day is the heading — the day SHE named, with the chip
-                    saying when she actually sat down and wrote it. */}
-                <div className="lab">
-                  {h.id === d.current_id ? <span className="jr-recent">most recent · </span> : null}
-                  {stampDay(h.text) || when(h.at)} <When at={h.at} bare />
-                  {h.drafts ? (
-                    <span className="jr-drafts" title="she rewrote this day; the newest words stand">
-                      {h.drafts} earlier draft{h.drafts > 1 ? 's' : ''}
-                    </span>
-                  ) : null}
-                </div>
-                <p>{h.text}</p>
-              </div>
-            ))}
-            <div className="foot muted">
-              hers — you can read it, you cannot edit it
-            </div>
-          </>
-        )
-      }}</Body>
-    </div>
-  )
+  return <div className="pad journal"><Body state={s}>{d => <JournalView d={d} />}</Body></div>
 }

@@ -40,7 +40,10 @@ html.mood-thinking body { cursor: var(--cur-busy); }
 .ui-chip-btn:hover { border-color: rgba(var(--accent-rgb), .45); color: var(--text-1); }
 /* a clickable chip shows focus like a button does (stage-2 review, M5) */
 .ui-chip-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px hsl(var(--mood-h) 70% 60% / .6); }
-.ui-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.ui-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+/* a state line's chip may wrap (final review, M6): the sentence runs on, the pill rounds off */
+.ui-chip-wrap { white-space: normal; height: auto; min-height: 20px; padding: 3px 8px;
+  line-height: 1.35; border-radius: var(--r-md); }
 .ui-tone-accent { color: var(--accent); border-color: rgba(var(--accent-rgb), .32);
   background: rgba(var(--accent-rgb), .10); }
 .ui-tone-ok { color: var(--ok); border-color: rgba(var(--ok-rgb), .32); background: rgba(var(--ok-rgb), .08); }
@@ -98,14 +101,21 @@ input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px;
 .ui-field-select { padding-right: 26px; }
 
 /* TABS */
-.ui-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--hair); }
-.ui-tab { height: 32px; padding: 0 12px; background: none; border: none; color: var(--text-2);
+/* a strip wider than its box scrolls sideways — wheel, swipe, and the arrow keys (focus
+   scrolls the tab into view) — with no bar drawn; a tab never shrinks or wraps its label
+   (final review, Q3: this lived in Tools' own wrapper) */
+.ui-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--hair);
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.ui-tabs::-webkit-scrollbar { display: none; }
+.ui-tab { flex: none; white-space: nowrap;
+  height: 32px; padding: 0 12px; background: none; border: none; color: var(--text-2);
   font: 500 var(--fs-12)/1 var(--font-ui); box-shadow: inset 0 -2px 0 transparent;
   transition: color var(--dur-fast), box-shadow var(--dur-base); }
 .ui-tab:hover { color: var(--text-1); }
 .ui-tab-on { color: var(--text-1); box-shadow: inset 0 -2px 0 hsl(var(--mood-h) 70% 65%); }
+/* the ring is INSET: the strip is a scroll box now, and an outer ring would be clipped */
 .ui-tab:focus-visible { outline: none; border-radius: var(--r-sm);
-  box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px hsl(var(--mood-h) 70% 60% / .6); }
+  box-shadow: inset 0 0 0 2px hsl(var(--mood-h) 70% 60% / .7); }
 
 /* ROW */
 .ui-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px;

@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.8.44 — the room gets a top bar; minimise flies to its button; seven apps on the kit (2026-09-26)
+
+Stage 3 of the room redesign.
+
+* **A top bar** (`ui/src/room/TopBar.jsx`, 34px, `--top-h`) in three groups: the
+  assistant's mood pill (her word and a breathing orb, "· thinking" while she generates)
+  and voice word (with a presence note that fades after 14 s) on the left; her day in the centre ("you spoke …", whether her day has
+  closed, the ambient eye's next look), from one owner of those words,
+  `ui/src/room/facts.js`; the machine on the right (the launch profile, uptime, the stack
+  light, the next backup). The taskbar keeps the controls: the start mark, the windows,
+  the task chips, off the record, Shut down and the clock, which now shows the date.
+* **Shedding by width:** glances leave in a fixed order from 1536px down to 480px (the day
+  group at 1100, the backup, the voice word and the wordmark at 1024, uptime and the
+  profile at 820, the stack light's word at 620); the mood pill, the stack light, off the
+  record, Shut down and a scene's exit are never hidden. Measured from 1600 to 375px:
+  neither bar overflows. At 620px and below every window fills the desktop.
+* **Uptime:** `/v1/room/pulse` carries `stack: {started_at, up_s}` for the gateway
+  process (a gateway bounce resets it); the backend exposes no model-server start time, so
+  none is shown.
+* **Restart moved into the stack light:** clicking the light opens the gateway bounce and
+  the full restart, with the same labels; the full restart still asks first. Escape or an
+  outside click closes it. It is a disclosure (`aria-expanded`/`aria-controls` only when
+  it can open, the panel a named group): Escape and a finished action return focus to the
+  light, and the confirmation focuses "no".
+* **Minimise flies** to the window's taskbar button and restore flies back (200ms, from
+  the window's centre to the button's; restore has its own ease-out keyframe); off under
+  `prefers-reduced-motion`, which minimises at once with no transform. `windowManager.js`
+  gains `MIN_MS`, a `minimizing` state and `restoredAt`; maximising mid-flight cancels the
+  minimise, and a window in flight is not the focused one.
+* **The portrait and the desktop icons** clamp to the desktop's own box (below the top
+  bar, above the taskbar), so neither can be dragged out of reach.
+* **Seven windows on the kit:** Apps (its note says the list decides the desktop icons;
+  checkboxes are named), Librarians and Room (their states are toned kit Chips — the old
+  `good`/`warn` classes were never styled), Senses, Presence (mode buttons are kit Buttons
+  with `aria-pressed`), Journal, and Tools (filters are the kit's Tabs; a second click no
+  longer toggles back to "all"; tier and arming knob are chips). The kit's `Chip` gains
+  `wrap` for sentence-length state lines, and `Tabs` a `label` and a sideways-scrolling
+  strip.
+* New role tokens `--top-h`, `--bar-bg`, `--bar-shade`, `--hover-tint`; the raw-colour
+  baseline fell 230 to 222.
+* **Gates:** G-ROOM-KIT 155 checks (top bar, minimise, and the seven windows rendered with
+  fixtures); G-PANELS-SERVE covers the pulse's `stack`; G-SYSTEM-RESTART reads the stack
+  light with comments blanked.
+* **Fixed before release:** the top bar's presence note never faded while the pulse ran;
+  restore started slowly (the minimise keyframe reversed); at phone width windows opened at
+  their full width and ran off screen.
+
 ## 0.8.43 — the shared renderers draw through the kit (2026-09-26)
 
 Stage 2 of the room redesign: the four modules that draw most of the room's small parts

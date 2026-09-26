@@ -8,8 +8,11 @@ import { Icon } from './icons.jsx'
  * BUSY is a state, not a tone: something bounded is happening now (a search in flight, a
  * picture being made). It pulses the dot, so it implies one. Something that lasts (a
  * scene, a reading) wears a still `dot` instead: an endless pulse is motion he cannot
- * pause (WCAG 2.2.2). */
-export function Chip({ tone = 'neutral', icon, dot, busy, title, onClick, children }) {
+ * pause (WCAG 2.2.2).
+ * WRAP is for a window's state line, which is a sentence ("due — waiting for quiet
+ * (…)"): a chip is nowrap, and at phone width a sentence in one clipped mid-word (final
+ * review, M6). A wrapping chip lets the words run onto a second line, verbatim. */
+export function Chip({ tone = 'neutral', icon, dot, busy, wrap, title, onClick, children }) {
   const inner = (
     <>
       {dot || busy ? <span className="ui-chip-dot" /> : null}
@@ -17,7 +20,7 @@ export function Chip({ tone = 'neutral', icon, dot, busy, title, onClick, childr
       <span className="ui-chip-t">{children}</span>
     </>
   )
-  const cls = 'ui-chip ui-tone-' + tone + (busy ? ' ui-chip-busy' : '')
+  const cls = 'ui-chip ui-tone-' + tone + (busy ? ' ui-chip-busy' : '') + (wrap ? ' ui-chip-wrap' : '')
   return onClick
     ? <button type="button" className={cls + ' ui-chip-btn'} title={title} onClick={onClick}>{inner}</button>
     : <span className={cls} title={title}>{inner}</span>
@@ -43,8 +46,11 @@ export const Select = (p) => <select {...p} className={'ui-field ui-field-select
 /* TABS — role=tablist; Left/Right move, Home/End jump, and FOCUS MOVES WITH THE
  * SELECTION (roving tabindex): the old button went tabIndex=-1 while keeping focus, so a
  * second arrow press came from a button the tab order no longer had. The selected one
- * carries the mood underline. */
-export function Tabs({ tabs, value, onChange }) {
+ * carries the mood underline. `label` names the list (aria-label). The tab in the tab
+ * order is the CLAMPED index, so a value that is no longer among the tabs still leaves
+ * one reachable (final review, M7). The strip scrolls sideways when it outruns its box
+ * (kit.css) — every caller gets that, not only the one that hit it first (Q3). */
+export function Tabs({ tabs, value, onChange, label }) {
   const refs = useRef([])
   const i = Math.max(0, tabs.findIndex(t => t.id === value))
   const key = (e) => {
@@ -57,11 +63,11 @@ export function Tabs({ tabs, value, onChange }) {
     if (refs.current[j]) refs.current[j].focus()
   }
   return (
-    <div className="ui-tabs" role="tablist" onKeyDown={key}>
+    <div className="ui-tabs" role="tablist" aria-label={label} onKeyDown={key}>
       {tabs.map((t, k) => (
         <button key={t.id} type="button" role="tab" aria-selected={t.id === value}
                 ref={b => { refs.current[k] = b }}
-                tabIndex={t.id === value ? 0 : -1}
+                tabIndex={k === i ? 0 : -1}
                 className={'ui-tab' + (t.id === value ? ' ui-tab-on' : '')}
                 onClick={() => onChange(t.id)}>{t.label}</button>
       ))}

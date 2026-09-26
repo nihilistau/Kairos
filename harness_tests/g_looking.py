@@ -148,9 +148,11 @@ chip = open(os.path.join(ROOT, "ui", "src", "main.jsx"), encoding="utf-8").read(
 # 2026-09-26 (redesign stage 2): LookingChip moved to room/TaskChips.jsx and became a
 # kit Chip, so main.jsx only IMPORTS it — the order check reads the JSX use, not the
 # first mention (which is the import line now, and would pass on its own).
-check("the taskbar has a LookingChip next to presence",
-      "<LookingChip" in chip and "<Presence" in chip
-      and chip.index("<LookingChip") < chip.index("<Presence"))
+# 2026-09-26 (redesign stage 3): Presence went up to the top bar, so the chip's neighbour
+# in the taskbar is off the record — the chip still sits among the chips, before <Anon.
+check("the taskbar has a LookingChip among its chips, before off the record",
+      "<LookingChip" in chip and "<Anon " in chip
+      and chip.index("<LookingChip") < chip.index("<Anon "))
 tc = open(os.path.join(ROOT, "ui", "src", "room", "TaskChips.jsx"), encoding="utf-8").read()
 check("the looking chip is a kit Chip that opens research",
       "export function LookingChip" in tc and "<Chip" in tc and "onOpen" in tc

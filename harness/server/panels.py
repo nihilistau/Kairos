@@ -971,6 +971,9 @@ def _room_pulse() -> Dict[str, Any]:
                          "newest": b.get("newest")}
     except Exception as _swx:
         _swallowed(logger, "_room_pulse", _swx, lane="server")
+    # the room's uptime — the gateway's, since this process loaded (state.STARTED_AT)
+    out["stack"] = {"started_at": _state.STARTED_AT,
+                    "up_s": int(max(0, now - _state.STARTED_AT))}
     return out
 
 

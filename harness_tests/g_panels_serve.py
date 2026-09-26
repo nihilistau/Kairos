@@ -118,6 +118,22 @@ check("not one of them raises", not _raised, _raised[:6])
 check("...and not one of them answers ok:false for a reason of its own",
       not _said_false, _said_false[:6])
 
+# THE ROOM'S UPTIME (redesign stage 3, spec §8): the pulse carries when THIS gateway
+# process started. A bounce resets it — the top bar's tooltip says "the gateway, since".
+import time as _t  # noqa: E402
+_p1 = _panels._room_pulse()
+_st = _p1.get("stack") or {}
+check("the pulse names when the gateway started", isinstance(_st.get("started_at"), (int, float))
+      and 0 < _st["started_at"] <= _t.time(), _st)
+check("and how long ago that was, in whole seconds", isinstance(_st.get("up_s"), int)
+      and _st["up_s"] >= 0, _st)
+_t.sleep(1.1)
+_p2 = _panels._room_pulse()
+check("up_s grows while the process lives", (_p2.get("stack") or {}).get("up_s", -1) > _st.get("up_s", 10**9),
+      (_st, _p2.get("stack")))
+check("started_at does not move between beats",
+      (_p2.get("stack") or {}).get("started_at") == _st.get("started_at"))
+
 try:
     with urllib.request.urlopen(BASE + "/health", timeout=5) as r:
         _h = json.loads(r.read().decode("utf-8"))

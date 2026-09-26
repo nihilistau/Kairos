@@ -27,6 +27,17 @@ import * as api from '../api.js'
 const KEY = 'kairos.portrait.box'
 const MIN_W = 180, MIN_H = 200
 
+/* THE DESKTOP'S OWN BOX, not the window's. The Portrait lives in .desktop, which starts
+ * below the top bar and stops above the taskbar, so its coordinates are desktop-local.
+ * Clamping against innerHeight minus a bar height worked until a second bar arrived
+ * (stage 3): the "she must always be reachable" floor then put her fully under the
+ * taskbar (final review, I1). The fallback, before the element exists, is the window. */
+const STRIP = 60   // the grabbable height kept on screen when she is dragged low
+function area(el) {
+  const d = el && el.closest('.desktop')
+  return d ? { w: d.clientWidth, h: d.clientHeight } : { w: window.innerWidth || 1280, h: window.innerHeight || 800 }
+}
+
 function load() {
   try {
     const b = JSON.parse(localStorage.getItem(KEY) || 'null')
@@ -41,6 +52,7 @@ export default function Portrait({ mood, thinking }) {
   })
   const [wd, setWd] = useState(null)
   const drag = useRef(null)
+  const el = useRef(null)
 
   useEffect(() => {
     let alive = true
@@ -56,13 +68,15 @@ export default function Portrait({ mood, thinking }) {
    * render, and a stored box was saved against whatever screen he had last time — so
    * either can land her entirely off the canvas, where there is no way to drag her back.
    * Measured: default x=942 in a 420px-wide window. Clamped on mount and on every
-   * resize, keeping a grabbable strip on screen rather than snapping her to a corner. */
+   * resize, keeping a grabbable strip on screen rather than snapping her to a corner.
+   * The same floor holds while she is dragged, so she cannot be dropped out of reach. */
   useEffect(() => {
     const clamp = () => setBox(b => {
-      const maxX = Math.max(0, (window.innerWidth || 1280) - 90)
-      const maxY = Math.max(0, (window.innerHeight || 800) - 70)
-      const w = Math.min(b.w, Math.max(MIN_W, window.innerWidth - 20))
-      const h = Math.min(b.h, Math.max(MIN_H, window.innerHeight - 20))
+      const a = area(el.current)
+      const maxX = Math.max(0, a.w - 90)
+      const maxY = Math.max(0, a.h - STRIP)
+      const w = Math.min(b.w, Math.max(MIN_W, a.w - 20))
+      const h = Math.min(b.h, Math.max(MIN_H, a.h - 20))
       const x = Math.min(Math.max(0, b.x), maxX)
       const y = Math.min(Math.max(0, b.y), maxY)
       if (x === b.x && y === b.y && w === b.w && h === b.h) return b
@@ -81,12 +95,14 @@ export default function Portrait({ mood, thinking }) {
     // The grab point and the box AT THE MOMENT OF GRABBING. Reading `box` inside the
     // move handler instead would compound each frame's delta onto the previous one and
     // the panel would accelerate away from the cursor.
-    drag.current = { mx: e.clientX, my: e.clientY, ...box }
+    const a = area(el.current)
+    drag.current = { mx: e.clientX, my: e.clientY, ...box,
+                     maxX: Math.max(0, a.w - 90), maxY: Math.max(0, a.h - STRIP) }
     const onMove = (ev) => {
       const d = drag.current; if (!d) return
       save({ w: d.w, h: d.h,
-             x: Math.max(0, d.x + (ev.clientX - d.mx)),
-             y: Math.max(0, d.y + (ev.clientY - d.my)) })
+             x: Math.min(d.maxX, Math.max(0, d.x + (ev.clientX - d.mx))),
+             y: Math.min(d.maxY, Math.max(0, d.y + (ev.clientY - d.my))) })
     }
     const up = () => {
       drag.current = null
@@ -124,7 +140,7 @@ export default function Portrait({ mood, thinking }) {
      paints in, which is the only arrangement where the two cannot drift. */
   const wearing = wd && wd.wearing_now
   return (
-    <div className="por" style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
+    <div ref={el} className="por" style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
          onMouseDown={onDown}>
       <div className="por-frame">
         {clip ? (

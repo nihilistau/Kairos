@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import * as wm from '../windowManager.js'
 import * as deskIcons from '../deskIcons.js'
 import * as dockPrefs from '../dockPrefs.js'
@@ -30,10 +30,11 @@ const GAP_Y = 6
 
 /* An id that has never been dragged gets a slot in the default column, in registry
  * order, wrapping to a second column before it would run off the bottom. Computed from
- * the CURRENT viewport rather than stored, so a new app on a short screen still lands
- * somewhere visible instead of below the fold. */
-function defaultPos(index) {
-  const perCol = Math.max(1, Math.floor((window.innerHeight - TOP_Y - 120) / (ICON_H + GAP_Y)))
+ * the CURRENT desktop rather than stored, so a new app on a short screen still lands
+ * somewhere visible instead of below the fold. `h` is the desktop's own height (below
+ * the top bar, above the taskbar); the 40 is slack, not a bar. */
+function defaultPos(index, h) {
+  const perCol = Math.max(1, Math.floor((h - TOP_Y - 40) / (ICON_H + GAP_Y)))
   const col = Math.floor(index / perCol)
   const row = index % perCol
   return { x: COL_X + col * (ICON_W + 10), y: TOP_Y + row * (ICON_H + GAP_Y) }
@@ -50,16 +51,26 @@ export default function DeskIcons() {
   const [sel, setSel] = useState(null)
   const [dragId, setDragId] = useState(null)
   const drag = useRef(null)
+  const layer = useRef(null)
+  // THE DESKTOP'S BOX, measured (final review, I1). These clamps worked in window
+  // coordinates minus a taskbar height; the desktop now starts below the top bar too, so
+  // a low icon's label went under the taskbar. .dsk-layer fills .desktop exactly, so its
+  // client box IS the room an icon has. Before the first measure: the window.
+  const [area, setArea] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
 
   /* NOTHING MAY BE STRANDED. A window shrunk since he arranged these — or a laptop
    * after a desktop — can leave an icon beyond the right or bottom edge with no way to
    * reach it. Clamp on resize, keeping the whole icon on screen. The Portrait does the
    * same thing for the same reason; that one only had to save a person, this has to
    * save the way into every app. */
-  useEffect(() => {
+  useLayoutEffect(() => {
     const clamp = () => {
-      const maxX = Math.max(0, window.innerWidth - ICON_W - 8)
-      const maxY = Math.max(0, window.innerHeight - ICON_H - 46)   // taskbar
+      const el = layer.current
+      if (!el) return false
+      const W = el.clientWidth, H = el.clientHeight
+      setArea(a => (a.w === W && a.h === H ? a : { w: W, h: H }))
+      const maxX = Math.max(0, W - ICON_W - 8)
+      const maxY = Math.max(0, H - ICON_H - 8)
       let moved = false
       for (const [id, p] of Object.entries(deskIcons.positions())) {
         const x = Math.min(p.x, maxX), y = Math.min(p.y, maxY)
@@ -67,6 +78,10 @@ export default function DeskIcons() {
       }
       return moved
     }
+    // measured on mount (the default column needs the height); positions are only
+    // moved on a resize, as before — a load never rewrites his arrangement
+    const el = layer.current
+    if (el) setArea({ w: el.clientWidth, h: el.clientHeight })
     window.addEventListener('resize', clamp)
     return () => window.removeEventListener('resize', clamp)
   }, [])
@@ -74,7 +89,10 @@ export default function DeskIcons() {
   const onDown = (app, pos) => (e) => {
     if (e.button !== 0) return
     setSel(app.id)
-    const start = { mx: e.clientX, my: e.clientY, ...pos, moved: false }
+    const el = layer.current
+    const W = el ? el.clientWidth : area.w, H = el ? el.clientHeight : area.h
+    const start = { mx: e.clientX, my: e.clientY, ...pos, moved: false,
+                    maxX: Math.max(0, W - ICON_W - 8), maxY: Math.max(0, H - ICON_H - 8) }
     drag.current = start
     const move = (ev) => {
       const d = drag.current
@@ -85,8 +103,8 @@ export default function DeskIcons() {
       if (!d.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return
       if (!d.moved) { d.moved = true; setDragId(app.id) }
       deskIcons.place(app.id,
-        Math.max(0, Math.min(window.innerWidth - ICON_W - 8, d.x + dx)),
-        Math.max(0, Math.min(window.innerHeight - ICON_H - 46, d.y + dy)))
+        Math.max(0, Math.min(d.maxX, d.x + dx)),
+        Math.max(0, Math.min(d.maxY, d.y + dy)))
     }
     const up = () => {
       drag.current = null
@@ -101,9 +119,9 @@ export default function DeskIcons() {
   }
 
   return (
-    <div className="dsk-layer" onMouseDown={(e) => { if (e.target === e.currentTarget) setSel(null) }}>
+    <div className="dsk-layer" ref={layer} onMouseDown={(e) => { if (e.target === e.currentTarget) setSel(null) }}>
       {shown.map((app, i) => {
-        const pos = deskIcons.posOf(app.id) || defaultPos(i)
+        const pos = deskIcons.posOf(app.id) || defaultPos(i, area.h)
         return (
           <button key={app.id}
                   className={'dsk-icon'

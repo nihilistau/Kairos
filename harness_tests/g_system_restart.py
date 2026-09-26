@@ -35,6 +35,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -110,7 +111,13 @@ check("no command string is ever taken from the body",
       "body.get(\"cmd\"" not in APP and "body.get('cmd'" not in APP)
 
 print("\n6. the two costs are shown as different")
-UI = io.open(os.path.join(ROOT, "ui", "src", "main.jsx"), encoding="utf-8").read()
+# 2026-09-26 (redesign stage 3): the two restarts left main.jsx's Status for the top bar's
+# stack light, which owns them now — read the owner, not the file they used to live in.
+# Comments blanked: StackLight's header comment says "keeps the model warm" in prose, and
+# the check passed with the button's own title changed (mutant, 2026-09-26).
+UI = io.open(os.path.join(ROOT, "ui", "src", "room", "StackLight.jsx"), encoding="utf-8").read()
+UI = re.sub(r"/\*.*?\*/", "", UI, flags=re.S)
+UI = re.sub(r"(?m)^\s*//.*$", "", UI)
 check("the room offers both, separately", "restart_gateway" in UI and "'restart'" in UI)
 check("the expensive one asks first", "yes, restart" in UI)
 check("...and says what it costs", "2 min" in UI or "~2" in UI)

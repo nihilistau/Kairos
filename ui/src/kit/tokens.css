@@ -42,11 +42,16 @@
   --err: #e2685b;
   --err-rgb: 226, 104, 91;
   --on-err: #170403;              /* ink drawn ON a red fill (the stop button) */
+  --hover-tint: rgba(160, 190, 220, .05);  /* a row under the pointer (Apps' list) */
   /* the dark ink drawn on the green/amber/red window lights */
   --lt-ink-max: #0b3a20; --lt-ink-min: #4a3306; --lt-ink-close: #4a120d;
   /* an UNFOCUSED window's bar, and its three lights while they are grey. The grey was
      #3a4658, 1.81:1 on that bar; a control wants 3:1 (WCAG 1.4.11) — this is 3.34:1. */
   --bar-idle: #131b28;
+  /* the two BARS' ground — the taskbar below, the top bar above (stage 3): one
+     expression each, so the two cannot drift apart */
+  --bar-bg: rgba(12, 17, 25, .92);
+  --bar-shade: rgba(0, 0, 0, .45);
   --lt-idle: #606e84;
   --idle: #4a5568;
   --an: #a78bfa;                  /* off the record — its own colour, never the error red */
@@ -83,6 +88,7 @@
 
   /* layout */
   --tb-h: 46px;
+  --top-h: 34px;
 
   /* ── LEGACY ALIASES — delete in stage 6 ─────────────────────────────────── */
   --bg: var(--surface-0);

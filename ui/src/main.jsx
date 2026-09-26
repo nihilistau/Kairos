@@ -1,4 +1,4 @@
-import React, { useSyncExternalStore, useRef, useEffect } from 'react'
+import React, { useSyncExternalStore, useRef, useEffect, useLayoutEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import * as wm from './windowManager.js'
 import { APPS, byId, DOCK_HIDDEN_DEFAULT } from './appRegistry.jsx'
@@ -7,12 +7,11 @@ import { usePoll } from './apps/panel.jsx'
 import * as api from './api.js'
 import Renderer from './room/Renderer.jsx'
 import Clock from './room/Clock.jsx'
-import Presence from './room/Presence.jsx'
+import TopBar from './room/TopBar.jsx'
 import Portrait from './room/Portrait.jsx'
 import Down from './room/Down.jsx'
 import DeskIcons from './room/DeskIcons.jsx'
 import { Icon } from './kit/icons.jsx'
-import { Chip, Orb } from './kit/parts.jsx'
 import { useMood } from './room/useMood.js'
 import { applyMood } from './room/moodTheme.js'
 import Anon, { AnonChip } from './room/Anon.jsx'
@@ -61,6 +60,10 @@ class PanelBoundary extends React.Component {
   }
 }
 
+// REDUCED MOTION MINIMISES AT ONCE (stage 3): no flight, no delay. Read at the click,
+// not at load, so flipping the OS setting takes effect without a reload.
+const minDelay = () => (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : wm.MIN_MS)
+
 function Win({ w, focused }) {
   const app = byId(w.appId)
   const drag = useRef(null)
@@ -73,6 +76,36 @@ function Win({ w, focused }) {
   // DRAGGING IS STATE, not a read of the ref: the ref clears on mouseup without a render,
   // so the class (and the grabbing cursor) stayed on the bar until something else drew.
   const [dragging, setDragging] = useState(false)
+  // THE FLIGHT: the vector from this window's centre to its taskbar button's centre,
+  // measured when the flight starts, written as CSS variables the keyframes read.
+  const [restoring, setRestoring] = useState(false)
+  const aim = () => {
+    const box = el.current
+    const btn = document.querySelector('.tb-win[data-app="' + w.appId + '"]')
+    if (!box || !btn) return
+    const a = box.getBoundingClientRect(), b = btn.getBoundingClientRect()
+    box.style.setProperty('--min-dx', Math.round(b.left + b.width / 2 - (a.left + a.width / 2)) + 'px')
+    box.style.setProperty('--min-dy', Math.round(b.top + b.height / 2 - (a.top + a.height / 2)) + 'px')
+  }
+  useLayoutEffect(() => { if (w.minimizing) aim() }, [w.minimizing])
+  // RESTORE: aim FIRST, then the class, both before paint. Measured in the browser: with
+  // the flag set in a useEffect the window painted full-size for a frame before it flew,
+  // and aiming after the class read a rect already moved by the reversed animation's
+  // first frame (getBoundingClientRect includes transforms), so --min-dy came out 245
+  // where the minimise had measured 486. The class comes off at the animation's END, not
+  // on a MIN_MS timer: the animation starts a frame after the timer does, and the timer
+  // cut it off at ~3/4 scale, so the window snapped the last quarter. The timer stays, at
+  // twice the length, only so a flight that never ends cannot leave the class on.
+  // Restore plays its OWN keyframe, `win-restore` (final review, Q2) — the end handler
+  // below matched only 'win-min', so the class sat there until this timer. A cancelled
+  // animation (reduced motion switched on mid-flight, the window hidden) clears it too.
+  useLayoutEffect(() => {
+    if (!w.restoredAt || !minDelay()) return
+    aim()
+    setRestoring(true)
+    const t = setTimeout(() => setRestoring(false), wm.MIN_MS * 2)
+    return () => clearTimeout(t)
+  }, [w.restoredAt])
   // SPRING, not snap. A window that jumps to its position reads as a div; one that
   // settles reads as an object. The easing lives in CSS so dragging stays exact —
   // a transition on transform during a drag makes the window lag the cursor, which
@@ -145,9 +178,12 @@ function Win({ w, focused }) {
   return (
     <div ref={el}
          className={'win' + (focused ? ' win-focus' : '') + (fresh ? ' win-in' : '')
-                    + (dragging ? ' dragging' : '') + (w.max ? ' maxed' : '')}
+                    + (dragging ? ' dragging' : '') + (w.max ? ' maxed' : '')
+                    + (w.minimizing ? ' win-min-out' : '') + (restoring && !w.minimizing ? ' win-restore' : '')}
          style={w.max ? { zIndex: w.z } : { left: w.x, top: w.y, width: w.w, height: w.h, zIndex: w.z }}
-         onMouseDown={() => wm.focus(w.appId)}>
+         onMouseDown={() => wm.focus(w.appId)}
+         onAnimationEnd={(e) => { if (e.target === e.currentTarget && e.animationName === 'win-restore') setRestoring(false) }}
+         onAnimationCancel={(e) => { if (e.target === e.currentTarget) setRestoring(false) }}>
       {/* CONTROLS ON THE RIGHT (2026-08-21, his ask), title leading — the dots ARE
           the controls, not decoration next to them: red closes, amber minimises. A
           row of ornaments beside real buttons is the thing that makes a skin feel
@@ -168,7 +204,7 @@ function Win({ w, focused }) {
                   title={w.max ? 'Restore' : 'Maximise'} aria-label={w.max ? 'Restore' : 'Maximise'}>
             <svg width="7" height="7" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M1.5 1.5h5v5h-5z" /></svg>
           </button>
-          <button className="lt lt-amber" onClick={() => wm.minimize(w.appId)} title="Minimise" aria-label="Minimise">
+          <button className="lt lt-amber" onClick={() => wm.minimize(w.appId, { delay: minDelay() })} title="Minimise" aria-label="Minimise">
             <svg width="7" height="7" viewBox="0 0 8 8" stroke="currentColor" strokeWidth="1.4"><path d="M1.5 4h5" /></svg>
           </button>
           <button className="lt lt-red" onClick={() => wm.close(w.appId)} title="Close" aria-label="Close">
@@ -184,73 +220,13 @@ function Win({ w, focused }) {
   )
 }
 
-function Status() {
-  const h = usePoll(api.health, 10000)
-  const sys = usePoll(api.system, 60000)
-  const [busy, setBusy] = useState('')
-  const [ask, setAask] = useState(false)
-  const d = h.data || {}
-  const on = !h.error && d.ok
-
-  /* RESTART FROM HERE. Added the morning a twelve-hour-old daemon degenerated into token
-   * soup and the only cure was a terminal. The two are deliberately separate and labelled
-   * with what they cost: bouncing the gateway is seconds and keeps the warm prefix, while
-   * a full restart reloads the model and takes minutes. Offering one button for both
-   * would make the cheap fix feel as expensive as the dear one, and nobody would use it.
-   *
-   * The full restart asks first. It is the only control in this room that takes her away
-   * for two minutes. */
-  async function go(op) {
-    setBusy(op); setAask(false)
-    try { await api.systemWrite({ op }) } catch { /* the gateway dies mid-request; expected */ }
-    // Poll until it answers again rather than guessing at a duration.
-    const t0 = Date.now()
-    const wait = async () => {
-      if (Date.now() - t0 > 300000) { setBusy(''); return }
-      try {
-        const r = await fetch('/health')
-        if (r.ok) { setBusy(''); h.refresh(); return }
-      } catch { /* still down */ }
-      setTimeout(wait, 2000)
-    }
-    setTimeout(wait, 3000)
-  }
-
-  const prof = sys.data && sys.data.profile
-  const said = busy ? (busy === 'restart' ? 'restarting…' : 'bouncing…')
-    : h.error ? 'gateway unreachable' : d.warm ? 'warm' : d.ok ? 'warming…' : '…'
-  return (
-    <div className="status">
-      {/* the light is NAMED: at phone width the word beside it is hidden (shell.css) */}
-      <span className={'led ' + (on ? (d.warm ? 'ok' : 'warm') : 'off')}
-            role="img" title={'gateway: ' + said} aria-label={'gateway: ' + said} />
-      <span>{said}</span>
-      {prof ? <span className="tb-prof"><Chip title="the profile this stack was launched with">{prof}</Chip></span> : null}
-      {!busy && sys.data && sys.data.restartable ? (
-        ask ? (
-          <>
-            <span className="warn">reload the model? ~2 min</span>
-            <button className="r-off" onClick={() => go('restart')}>yes, restart</button>
-            <button onClick={() => setAask(false)}>no</button>
-          </>
-        ) : (
-          <>
-            <button onClick={() => go('restart_gateway')}
-                    title="bounce the gateway only — seconds, keeps the model warm">bounce</button>
-            <button onClick={() => setAask(true)}
-                    title="reload the model — minutes. The cure when she degenerates.">restart</button>
-          </>
-        )
-      ) : null}
-    </div>
-  )
-}
-
 function Room() {
   const windows = useSyncExternalStore(wm.subscribe, wm.getWindows)
   // FOCUS IS THE TOP WINDOW THAT IS SHOWING. The manager already orders by z; the room
-  // only has to say which one is on top so the chrome can say so too.
-  const focusedId = windows.filter(w => !w.minimized)
+  // only has to say which one is on top so the chrome can say so too. A window in its
+  // minimise flight is leaving, not on (final review, M2): its button drops aria-current
+  // at once, and a click on it mid-flight restores rather than minimising again.
+  const focusedId = windows.filter(w => !w.minimized && !w.minimizing)
     .reduce((top, w) => (!top || w.z > top.z ? w : top), null)?.appId
   const open = new Set(windows.filter(w => !w.minimized).map(w => w.appId))
   useSyncExternalStore(dockPrefs.subscribe, dockPrefs.getVersion)
@@ -289,6 +265,10 @@ function Room() {
    * window (2026-09-26: every window, not only minimised ones). Same components, same endpoints, same window manager; only the furniture
    * moved. Modelled on CosySim's executive_suite kit, which is where the operator wants
    * this to end up in 3D.
+   *
+   * 2026-09-26 (stage 3): the glances went UP. Her mood, her presence, her day and the
+   * gateway's light live in the TOP BAR (room/TopBar.jsx); the taskbar keeps what he
+   * acts on — windows, chips, off the record, Shut down — and the clock.
    */
   /* OFF THE RECORD (2026-08-23) rides the PULSE the shell already beats on, rather
      than a poll of its own: the switch has to be visible everywhere at once, and a
@@ -311,6 +291,7 @@ function Room() {
   return (
     <div className={"room" + (anon && anon.on ? " an-on" : "")}>
       <Renderer kind="2d" pulse={shown} />
+      <TopBar pulse={shown} mood={m} />
 
       {/* THE DOCK IS GONE (2026-09-23, his ask): "move the room icons from a side bar
           on the left so that they are actual free desktop like icons". The apps are
@@ -352,8 +333,8 @@ function Room() {
             return (
               <button key={w.appId}
                       className={'tb-win' + (on ? ' tb-win-on' : '') + (w.minimized ? ' tb-win-min' : '')}
-                      title={a.title} aria-current={on ? 'true' : undefined}
-                      onClick={() => (on ? wm.minimize(w.appId) : wm.open(w.appId, a))}>
+                      title={a.title} aria-current={on ? 'true' : undefined} data-app={w.appId}
+                      onClick={() => (on ? wm.minimize(w.appId, { delay: minDelay() }) : wm.open(w.appId, a))}>
                 <Icon name={a.icon} size={16} /><span className="tb-win-t">{a.title}</span>
               </button>
             )
@@ -369,13 +350,6 @@ function Room() {
           <SceneChip />
           <LookingChip pulse={pulse}
                        onOpen={() => { const a = byId('research'); if (a) wm.open('research', a) }} />
-          {/* HER MOOD, NAMED. The one place it is always written down (spec §3). */}
-          <span className="tb-mood" title={m.known ? 'her mood' : 'her mood — a word with no colour on file'}
-                role="status" aria-label={'her mood: ' + m.word + (m.thinking ? ', thinking' : '')}>
-            <Orb thinking={m.thinking} /><span className="tb-mood-t">{m.word}{m.thinking ? ' · thinking' : ''}</span>
-          </span>
-          <Presence pulse={shown} />
-          <Status />
           <Anon anon={anon} refresh={beat.refresh} />
 
           <div className="sd-wrap">

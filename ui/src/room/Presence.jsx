@@ -46,9 +46,19 @@ export default function Presence({ pulse }) {
     if (!fresh) return
     seen.current[fresh.id] = true
     setNote(fresh)
+  }, [pulse])
+
+  /* THE FADE IS KEYED TO THE NOTE, not to the pulse (final review, Q1). It lived in the
+   * effect above, whose cleanup ran on every beat — the pulse is a new object every 5 s
+   * and every render of the room — so the 14 s timer was cleared before it could fire
+   * and "she looked something up" sat in the top bar for 14 minutes. Now only a new note
+   * (or none) restarts it. */
+  const noteId = note ? note.id : null
+  useEffect(() => {
+    if (!noteId) return
     const t = setTimeout(() => setNote(null), 14000)
     return () => clearTimeout(t)
-  }, [pulse])
+  }, [noteId])
 
   const her = (pulse || {}).her || {}
   const warm = (pulse || {}).presence?.warm

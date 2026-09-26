@@ -68,11 +68,16 @@ export default function Anon({ anon, refresh }) {
 export function AnonChip({ anon }) {
   if (!anon || !anon.on) return null
   const m = Math.round((anon.for_s || 0) / 60)
+  // A GLANCE, so a narrow bar sheds it (shell.css, stage 3): the off-the-record button
+  // beside it wears the same state, and the rule around the room says it everywhere.
+  // Chip takes no className, hence the span.
   return (
-    <Chip tone="an" title={anon.receipt || 'nothing held back yet'}>
-      <span className="tb-chip-k">off the record</span>{' '}
-      {m >= 1 ? m + 'm' : 'just now'}
-      {anon.held_total ? ' · ' + anon.held_total + ' held' : ''}
-    </Chip>
+    <span className="tb-anon">
+      <Chip tone="an" title={anon.receipt || 'nothing held back yet'}>
+        <span className="tb-chip-k">off the record</span>{' '}
+        {m >= 1 ? m + 'm' : 'just now'}
+        {anon.held_total ? ' · ' + anon.held_total + ' held' : ''}
+      </Chip>
+    </span>
   )
 }
