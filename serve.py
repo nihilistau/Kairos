@@ -1507,12 +1507,60 @@ def _running_daemon_model() -> str:
         return ""
 
 
+GATEWAY_PORT_DEFAULT = 8800   # a bare stop (no profile) flushes this one
+FLUSH_TIMEOUT_S = 5.0          # how long a stop waits for the gateway to write its outbox
+
+
+def flush_gateway(port=None):
+    """Ask the gateway to write its undelivered outbox to disk. Returns the row count,
+    or None when it could not be asked. Best-effort, and logged either way.
+
+    WHY (2026-09-27, measured): the kill below is a hard kill (Stop-Process -Force /
+    pkill). It runs no atexit and no signal handler, so the gateway cannot save its
+    outbox on the way down. 13 queued own-time lines were lost to one --gateway-only
+    bounce. The gateway writes them (POST /v1/shutdown/flush -> shutdown.bounce_flush)
+    and the next boot restores them (scheduler.reload_undelivered).
+
+    NEVER BLOCKS THE STOP. No gateway, an older build without the route, a hung
+    gateway: all print a line and return None, and the kill goes ahead."""
+    import urllib.error as _ue
+    p = int(port or GATEWAY_PORT_DEFAULT)
+    url = "http://127.0.0.1:%d/v1/shutdown/flush" % p
+    try:
+        req = urllib.request.Request(url, data=b"", method="POST")
+        d = json.loads(urllib.request.urlopen(req, timeout=FLUSH_TIMEOUT_S).read().decode())
+    except _ue.HTTPError as exc:
+        print("[kairos serve] outbox flush on :%d refused (HTTP %s) — killing anyway"
+              % (p, exc.code))
+        return None
+    except _ue.URLError as exc:
+        if isinstance(getattr(exc, "reason", None), ConnectionRefusedError):
+            print("[kairos serve] outbox flush: no gateway on :%d" % p)
+        else:
+            print("[kairos serve] outbox flush on :%d failed (%s) — killing anyway"
+                  % (p, str(exc)[:80]))
+        return None
+    except Exception as exc:
+        print("[kairos serve] outbox flush on :%d failed (%s) — killing anyway"
+              % (p, str(exc)[:80]))
+        return None
+    n = int(d.get("flushed") or 0)
+    print("[kairos serve] outbox flushed on :%d — %d undelivered row(s) saved for the next boot"
+          % (p, n))
+    return n
+
+
 def stop_gateway_only(port=None) -> None:
     """Kill the gateway — BY PORT when one is given (2026-08-21): two stacks may now
     run side by side (hers on 8800, the engine-agnostic companion on 8810 while Kairos
     is developed), and a stop that killed every `harness.server.app` would take hers
     down to bounce the other. The port rides on the spawn argv for exactly this;
-    app.py reads no argv. A bare stop (no profile, no port) still kills them all."""
+    app.py reads no argv. A bare stop (no profile, no port) still kills them all.
+
+    FLUSH FIRST (2026-09-27). Every stop path lands here (--gateway-only, --stop, the
+    stop() in front of a full boot), so this is where the outbox is saved. A bare stop
+    flushes GATEWAY_PORT_DEFAULT only; another stack's queue dies with it."""
+    flush_gateway(port)
     m = "harness.server.app"
     if port:
         m = "harness.server.app.*--gateway-port %s\\b" % int(port)

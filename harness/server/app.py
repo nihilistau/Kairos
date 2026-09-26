@@ -2859,6 +2859,27 @@ def _run_stdlib(host: str, port: int) -> None:
                 self.send_response(code); _cors(self)
                 self.send_header("Content-Type", "application/json"); self.end_headers()
                 self.wfile.write(payload)
+            elif self.path == "/v1/shutdown/flush":
+                # serve.py calls this right before it hard-kills this process
+                # (--gateway-only, --stop, the stop() before a full boot). A kill runs no
+                # atexit, so the outbox is written here or not at all. SYNCHRONOUS, unlike
+                # /v1/shutdown: the caller must not kill before the rows are on disk, so
+                # the reply comes after the flush and carries the count.
+                from harness.control import shutdown as _sd
+                if not _sd.peer_may_flush(self.client_address[0]):
+                    code, res = 403, {"ok": False, "error": "loopback only"}
+                else:
+                    try:
+                        code, res = 200, {"ok": True, **_sd.bounce_flush()}
+                    except Exception as exc:
+                        code, res = 500, {"ok": False, "error": str(exc)[:200]}
+                logger.info("[gateway] shutdown/flush -> %s", res)
+                payload = json.dumps(res).encode()
+                self.send_response(code); _cors(self)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
             elif self.path == "/v1/shutdown":
                 # ── THE REPLY GOES FIRST, ALWAYS ─────────────────────────────────
                 # For mode=all the last rung is os._exit on THIS thread. If the ladder ran

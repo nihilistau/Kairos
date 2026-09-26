@@ -11,7 +11,9 @@ per-session turn state. It no longer loses DELIVERY (2026-08-20): flush() preser
 unshown messages and `scheduler.reload_undelivered()` hands them back at the next
 re-entry — gateway boot or resume() — while they are still warm (UNDELIVERED_SHELF_S;
 past that they stay in the file as record). Until then the flush was write-only — the
-loss it scoped away had merely been made tidy.
+loss it scoped away had merely been made tidy. And until 2026-09-27 only the ladder and
+the watchdog called flush: every serve.py stop path hard-killed the gateway with its
+outbox in memory. They now go through bounce_flush() first (POST /v1/shutdown/flush).
 
 WHY THE GATEWAY OWNS IT. Every one of those lives in gateway memory. The process holding
 the state has to be the one that flushes it, so the flush and the stop belong in one
@@ -168,6 +170,42 @@ def flush() -> int:
         return 0
     logger.info("[shutdown] flushed %d undelivered row(s)", len(rows))
     return len(rows)
+
+
+def bounce_flush() -> Dict[str, Any]:
+    """Quiesce, then flush. For a caller that is about to HARD-KILL this process.
+
+    WHY (2026-09-27, measured). serve.py stops a gateway with kill_by_cmdline:
+    `Stop-Process -Force` on Windows, `pkill` on POSIX. A hard kill runs no atexit and
+    no signal handler, so nothing inside the dying process can save its outbox. Only
+    the ladder above and the watchdog called flush(); the three serve.py stop paths
+    (--gateway-only, --stop, the stop() before every full boot) called nothing. 13
+    queued own-time lines were pending before a --gateway-only bounce and 0 after,
+    with no "redelivered" line at the next boot.
+
+    QUIESCE FIRST, as the ladder does: once the outbox is on disk, a line queued before
+    the kill would be lost, so the ticker and the armed timers stop before the flush.
+    No finish_or_abandon here: serve.py asks the gateway whether a turn is in flight
+    before it gets this far (guard_live_turn), and a kill must not wait.
+
+    If the kill that should follow never comes, this gateway stays quiesced (turns are
+    refused) until /v1/start calls resume(), which also reloads what was flushed.
+    """
+    quiesced = quiesce()
+    n = flush()
+    logger.info("[shutdown] bounce flush: %d row(s) written before the kill", n)
+    return {"quiesced": quiesced, "flushed": n}
+
+
+def peer_may_flush(addr: str) -> bool:
+    """Only a process on this machine may ask for bounce_flush. The gateway binds to
+    127.0.0.1 by default, but SP_GATEWAY_BIND can open it to the LAN, and a quiesce
+    from another machine would mute her until somebody pressed start."""
+    import ipaddress
+    try:
+        return ipaddress.ip_address((addr or "").split("%")[0]).is_loopback
+    except ValueError:
+        return False
 
 
 _IN_FLIGHT = 0

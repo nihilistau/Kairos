@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.49 — a gateway bounce keeps her undelivered lines (2026-09-27)
+
+* **Stopping or bouncing the gateway no longer loses what she has queued.** Every `serve.py`
+  stop path (`--gateway-only`, `--stop`, and the stop in front of a full boot) ends in a hard
+  kill, which runs no exit handler, so the gateway's in-memory outbox died with it. The stop
+  now asks the gateway to write its outbox first (`POST /v1/shutdown/flush`, loopback peers
+  only, 5 s timeout, best-effort and logged either way), then kills it. The next boot restores
+  the lines through the existing `reload_undelivered()` (warm rows only, 4 h), and the first
+  tab to poll receives them, silent if they are more than a minute late.
+* The new route calls `shutdown.bounce_flush()`, which quiesces before it flushes, so no new
+  line is queued between the flush and the kill.
+* A restored row whose `at` was an ISO string no longer raises out of `drain()`:
+  `reload_undelivered()` now puts `at` back as an epoch number.
+* **Gate:** G-BOUNCE-FLUSH (new, 39 checks, seven mutants red by name).
+
 ## 0.8.48 — her own time reaches the open tab, and keeps its chip after a refresh (2026-09-27)
 
 * **Her own-time lines appear without a refresh.** An unprompted turn is queued under the

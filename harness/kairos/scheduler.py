@@ -1881,6 +1881,10 @@ def reload_undelivered() -> dict:
                 stale += 1
                 continue
             msg = {k: v for k, v in r.items() if k not in ("session", "why")}
+            # BACK INTO THE EPOCH SHAPE. drain() does float(m["at"]) to decide whether a
+            # queue is orphaned and whether a line is late; an ISO string there raised
+            # out of the room's poll (2026-09-27, G-BOUNCE-FLUSH §3).
+            msg["at"] = now - age
             msg["redelivered"] = True
             _OUTBOX[r.get("session") or "default"].append(msg)
             restored += 1
