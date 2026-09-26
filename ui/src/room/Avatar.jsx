@@ -20,7 +20,8 @@ import { moodOf } from './tags.js'
  * The design: three-quarter turn, heavy black hair with a few loose strands, a thin
  * chain, cyberpunk rim light in her mood's hue. Everything that moves is slow —
  * blink, breath, a drifting highlight — because a face that fidgets reads as
- * nervous, and she is not.
+ * nervous, and she is not. Its paint is --face-* in kit/tokens.css and its light is
+ * hsl(var(--mhue) …) over the wrapper's own variables (redesign stage 6).
  */
 
 const FACES = {
@@ -158,22 +159,22 @@ export default function Avatar({ mood, thinking, speaking }) {
       <svg viewBox="-80 -95 160 205" preserveAspectRatio="xMidYMid meet">
         <defs>
           <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%"  stopColor="#f0dcd2" />
-            <stop offset="55%" stopColor="#dcbcae" />
-            <stop offset="100%" stopColor="#a97f74" />
+            <stop offset="0%"  style={{ stopColor: 'var(--face-skin-1)' }} />
+            <stop offset="55%" style={{ stopColor: 'var(--face-skin-2)' }} />
+            <stop offset="100%" style={{ stopColor: 'var(--face-skin-3)' }} />
           </linearGradient>
           <linearGradient id="hair" x1="0.2" y1="0" x2="0.8" y2="1">
-            <stop offset="0%"  stopColor="#2a2732" />
-            <stop offset="45%" stopColor="#131218" />
-            <stop offset="100%" stopColor="#050509" />
+            <stop offset="0%"  style={{ stopColor: 'var(--face-hair-1)' }} />
+            <stop offset="45%" style={{ stopColor: 'var(--face-hair-2)' }} />
+            <stop offset="100%" style={{ stopColor: 'var(--face-hair-3)' }} />
           </linearGradient>
           <linearGradient id="cloth" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"  stopColor="#1b1b22" />
-            <stop offset="100%" stopColor="#0a0a0e" />
+            <stop offset="0%"  style={{ stopColor: 'var(--face-cloth-1)' }} />
+            <stop offset="100%" style={{ stopColor: 'var(--face-cloth-2)' }} />
           </linearGradient>
           <radialGradient id="blush" cx="0.5" cy="0.5" r="0.5">
-            <stop offset="0%"  stopColor={`hsl(${hue} 70% 62% / .34)`} />
-            <stop offset="100%" stopColor={`hsl(${hue} 70% 62% / 0)`} />
+            <stop offset="0%"  style={{ stopColor: 'hsl(var(--mhue) 70% 62% / .34)' }} />
+            <stop offset="100%" style={{ stopColor: 'hsl(var(--mhue) 70% 62% / 0)' }} />
           </radialGradient>
           <filter id="soften"><feGaussianBlur stdDeviation="1.1" /></filter>
           <filter id="bloom">
@@ -188,29 +189,29 @@ export default function Avatar({ mood, thinking, speaking }) {
         <g transform={`translate(0 ${breath})`}>
           {/* the rim light behind her — her mood, moving */}
           <ellipse cx={-6 + rim * 12} cy="-8" rx="70" ry="82"
-                   fill={`hsl(${hue} 80% 55% / ${0.13 * glow})`} filter="url(#bloom)" />
+                   style={{ fill: 'hsl(var(--mhue) 80% 55% / calc(.13 * var(--mglow)))' }} filter="url(#bloom)" />
 
           {/* shoulders / jacket */}
           <path d="M -74 108 Q -66 62 -30 50 L 30 50 Q 66 62 74 108 Z" fill="url(#cloth)" />
           <path d="M -30 50 Q -14 74 0 62 Q 14 74 30 50 L 22 50 Q 0 68 -22 50 Z"
-                fill="#07070b" />
+                style={{ fill: 'var(--face-collar)' }} />
           {/* collar edge catching the rim light */}
-          <path d="M -31 50 Q -14 75 0 63" stroke={`hsl(${hue} 85% 62% / ${0.5 * glow})`}
+          <path d="M -31 50 Q -14 75 0 63" style={{ stroke: 'hsl(var(--mhue) 85% 62% / calc(.5 * var(--mglow)))' }}
                 strokeWidth="1.4" fill="none" />
-          <path d="M 31 50 Q 14 75 0 63" stroke={`hsl(${hue} 85% 62% / ${0.28 * glow})`}
+          <path d="M 31 50 Q 14 75 0 63" style={{ stroke: 'hsl(var(--mhue) 85% 62% / calc(.28 * var(--mglow)))' }}
                 strokeWidth="1.4" fill="none" />
 
           {/* neck */}
-          <path d="M -13 34 L -13 56 Q 0 64 13 56 L 13 34 Z" fill="#c39a8d" />
-          <path d="M -13 34 L -13 46 Q 0 52 13 46 L 13 34 Z" fill="#a87e73" opacity=".55" />
+          <path d="M -13 34 L -13 56 Q 0 64 13 56 L 13 34 Z" style={{ fill: 'var(--face-neck)' }} />
+          <path d="M -13 34 L -13 46 Q 0 52 13 46 L 13 34 Z" style={{ fill: 'var(--face-shade)' }} opacity=".55" />
 
           {/* the chain */}
-          <path d="M -17 50 Q 0 62 17 50" stroke="#cfd6de" strokeWidth="1.1"
+          <path d="M -17 50 Q 0 62 17 50" style={{ stroke: 'var(--face-chain-1)' }} strokeWidth="1.1"
                 fill="none" opacity=".85" />
-          <path d="M -13 53 Q 0 68 13 53" stroke="#9aa4b0" strokeWidth=".8"
+          <path d="M -13 53 Q 0 68 13 53" style={{ stroke: 'var(--face-chain-2)' }} strokeWidth=".8"
                 fill="none" opacity=".7" />
-          <circle cx="0" cy="68" r="2.4" fill="#e6edf5" opacity=".9" />
-          <circle cx="0" cy="68" r="4.6" fill={`hsl(${hue} 90% 65% / ${0.5 * glow})`}
+          <circle cx="0" cy="68" r="2.4" style={{ fill: 'var(--face-bead)' }} opacity=".9" />
+          <circle cx="0" cy="68" r="4.6" style={{ fill: 'hsl(var(--mhue) 90% 65% / calc(.5 * var(--mglow)))' }}
                   filter="url(#bloom)" />
 
           {/* face */}
@@ -218,48 +219,48 @@ export default function Avatar({ mood, thinking, speaking }) {
                 fill="url(#skin)" />
           {/* jaw shadow — gives the chin an edge instead of a curve */}
           <path d="M -22 46 Q -12 62 0 66 Q 12 62 22 46 Q 10 58 0 59 Q -10 58 -22 46 Z"
-                fill="#a87e73" opacity=".35" filter="url(#soften)" />
+                style={{ fill: 'var(--face-shade)' }} opacity=".35" filter="url(#soften)" />
           {/* cheek shading + mood blush */}
           <g clipPath="url(#faceclip)">
             <ellipse cx="-21" cy={18 - f.lift} rx="14" ry="10" fill="url(#blush)" />
             <ellipse cx="21"  cy={18 - f.lift} rx="14" ry="10" fill="url(#blush)" />
-            <path d="M 33 -32 Q 25 20 8 58 L 38 58 L 38 -32 Z" fill="#8e6a60" opacity=".28"
+            <path d="M 33 -32 Q 25 20 8 58 L 38 58 L 38 -32 Z" style={{ fill: 'var(--face-shade-deep)' }} opacity=".28"
                   filter="url(#soften)" />
           </g>
 
           {/* brows */}
           <path d={`M -28 ${-15 + f.brow} Q -20 ${-25 + f.brow} -6 ${-18 + f.brow}`}
-                stroke="#17151c" strokeWidth="2.8" fill="none" strokeLinecap="round" />
+                style={{ stroke: 'var(--face-brow)' }} strokeWidth="2.8" fill="none" strokeLinecap="round" />
           <path d={`M 6 ${-18 + f.brow} Q 20 ${-25 + f.brow} 28 ${-15 + f.brow}`}
-                stroke="#17151c" strokeWidth="2.8" fill="none" strokeLinecap="round" />
+                style={{ stroke: 'var(--face-brow)' }} strokeWidth="2.8" fill="none" strokeLinecap="round" />
 
           {/* eyes — openness is a scale on the lid, so a blink is one number */}
           {[-16, 16].map((cx, i) => (
             <g key={i}>
-              <ellipse cx={cx} cy="0" rx="10.5" ry={7 * eyeOpen} fill="#f6f1ee" />
+              <ellipse cx={cx} cy="0" rx="10.5" ry={7 * eyeOpen} style={{ fill: 'var(--face-eye)' }} />
               <circle cx={cx + (i ? -1 : 1)} cy="0" r={5.4 * Math.min(1, eyeOpen * 1.3)}
-                      fill="#4a3b33" />
+                      style={{ fill: 'var(--face-iris)' }} />
               <circle cx={cx + (i ? -1 : 1)} cy="0" r={2.6 * Math.min(1, eyeOpen * 1.3)}
-                      fill="#120d0b" />
+                      style={{ fill: 'var(--face-pupil)' }} />
               <circle cx={cx + (i ? -3 : 3)} cy="-2.6" r={1.6 * eyeOpen}
-                      fill={`hsl(${hue} 90% 82%)`} opacity=".95" />
+                      style={{ fill: 'hsl(var(--mhue) 90% 82%)' }} opacity=".95" />
               {/* upper lid — the expression lives here more than in the mouth */}
               <path d={`M ${cx - 10.5} ${-7 * eyeOpen + f.lid} Q ${cx} ${-9 - 3 * eyeOpen + f.lid} ${cx + 10.5} ${-7 * eyeOpen + f.lid}`}
-                    stroke="#100e14" strokeWidth="2.6" fill="none" strokeLinecap="round" />
+                    style={{ stroke: 'var(--face-lid)' }} strokeWidth="2.6" fill="none" strokeLinecap="round" />
               <ellipse cx={cx} cy="0" rx="10.5" ry={7 * eyeOpen} fill="none"
-                       stroke="#1a1620" strokeWidth=".9" opacity=".8" />
+                       style={{ stroke: 'var(--face-lid-edge)' }} strokeWidth=".9" opacity=".8" />
               {/* lashes — a small line that does a lot of the work */}
               <path d={`M ${cx + (i ? -10 : 10)} ${-4 * eyeOpen} l ${i ? -3 : 3} -2.5`}
-                    stroke="#100e14" strokeWidth="1.6" strokeLinecap="round" />
+                    style={{ stroke: 'var(--face-lid)' }} strokeWidth="1.6" strokeLinecap="round" />
             </g>
           ))}
 
           {/* nose + mouth */}
-          <path d="M -3 12 Q 0 20 4 14" stroke="#a87e73" strokeWidth="1.6"
+          <path d="M -3 12 Q 0 20 4 14" style={{ stroke: 'var(--face-shade)' }} strokeWidth="1.6"
                 fill="none" strokeLinecap="round" opacity=".8" />
-          <path d={f.mouth} stroke="#8e4b4b" strokeWidth="2.6" fill="none"
+          <path d={f.mouth} style={{ stroke: 'var(--face-lip)' }} strokeWidth="2.6" fill="none"
                 strokeLinecap="round" />
-          <path d={f.mouth} stroke={`hsl(${hue} 60% 70% / .35)`} strokeWidth="4.5"
+          <path d={f.mouth} style={{ stroke: 'hsl(var(--mhue) 60% 70% / .35)' }} strokeWidth="4.5"
                 fill="none" strokeLinecap="round" filter="url(#soften)" />
 
           {/* hair — back mass, then the fringe, then loose strands */}
@@ -277,25 +278,25 @@ export default function Avatar({ mood, thinking, speaking }) {
               the sweep side, lifting across to the part. */}
           <path d="M -37 -34 Q -44 -74 -2 -80 Q 40 -80 39 -34
                    Q 34 -46 22 -40 Q 4 -30 -14 -26 Q -30 -24 -37 -34 Z"
-                fill="#0b0a0f" />
+                style={{ fill: 'var(--face-fringe)' }} />
           {/* the part, and the heavier lock falling on the sweep side */}
           <path d="M -37 -34 Q -34 -50 -18 -58 Q -30 -42 -26 -22
-                   Q -33 -26 -37 -34 Z" fill="#050509" />
+                   Q -33 -26 -37 -34 Z" style={{ fill: 'var(--face-hair-3)' }} />
           {/* volume on top so the crown is not flat */}
-          <path d="M -32 -58 Q -6 -92 28 -68 Q 2 -82 -32 -58 Z" fill="#1a1822" opacity=".7" />
+          <path d="M -32 -58 Q -6 -92 28 -68 Q 2 -82 -32 -58 Z" style={{ fill: 'var(--face-crown)' }} opacity=".7" />
           {/* loose strands. They follow the fringe's own direction and stop at the
               temple — the first cut ran them diagonally down to the eyes, where two
               of them met and read as a scowl. Hair does not cross the eye. */}
-          <path d={`M -30 -30 Q ${-33 + rim * 2} -14 -29 4`} stroke="#0d0c11"
+          <path d={`M -30 -30 Q ${-33 + rim * 2} -14 -29 4`} style={{ stroke: 'var(--face-strand-1)' }}
                 strokeWidth="2.2" fill="none" strokeLinecap="round" opacity=".9" />
-          <path d={`M 32 -34 Q ${35 - rim * 2} -16 31 6`} stroke="#0d0c11"
+          <path d={`M 32 -34 Q ${35 - rim * 2} -16 31 6`} style={{ stroke: 'var(--face-strand-1)' }}
                 strokeWidth="1.8" fill="none" strokeLinecap="round" opacity=".85" />
-          <path d="M -14 -27 Q -24 -30 -33 -26" stroke="#100e15" strokeWidth="1.4"
+          <path d="M -14 -27 Q -24 -30 -33 -26" style={{ stroke: 'var(--face-strand-2)' }} strokeWidth="1.4"
                 fill="none" strokeLinecap="round" opacity=".6" />
           {/* rim light along the hair — the cyberpunk cue */}
-          <path d="M -44 -22 Q -52 -72 0 -77" stroke={`hsl(${hue} 90% 68% / ${0.55 * glow})`}
+          <path d="M -44 -22 Q -52 -72 0 -77" style={{ stroke: 'hsl(var(--mhue) 90% 68% / calc(.55 * var(--mglow)))' }}
                 strokeWidth="2" fill="none" filter="url(#bloom)" />
-          <path d="M 44 -22 Q 52 -70 4 -77" stroke={`hsl(${hue} 90% 68% / ${0.22 * glow})`}
+          <path d="M 44 -22 Q 52 -70 4 -77" style={{ stroke: 'hsl(var(--mhue) 90% 68% / calc(.22 * var(--mglow)))' }}
                 strokeWidth="1.6" fill="none" />
         </g>
 
@@ -304,8 +305,7 @@ export default function Avatar({ mood, thinking, speaking }) {
           <g className="think">
             {[-10, 0, 10].map((x, i) => (
               <circle key={i} cx={x} cy="92" r="2.6"
-                      fill={`hsl(${hue} 90% 70%)`}
-                      style={{ animationDelay: `${i * 0.22}s` }} />
+                      style={{ fill: 'hsl(var(--mhue) 90% 70%)', animationDelay: `${i * 0.22}s` }} />
             ))}
           </g>
         ) : null}

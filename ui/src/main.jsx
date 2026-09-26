@@ -14,6 +14,7 @@ import DeskIcons from './room/DeskIcons.jsx'
 import { Icon } from './kit/icons.jsx'
 import { useMood } from './room/useMood.js'
 import { applyMood } from './room/moodTheme.js'
+import { flightTarget } from './room/flight.js'
 import Anon, { AnonChip } from './room/Anon.jsx'
 import { LookingChip, SceneChip } from './room/TaskChips.jsx'
 import { useState } from 'react'
@@ -93,9 +94,10 @@ function Win({ w, focused }) {
     const box = el.current
     const btn = document.querySelector('.tb-win[data-app="' + w.appId + '"]')
     if (!box || !btn) return
-    const a = box.getBoundingClientRect(), b = btn.getBoundingClientRect()
-    box.style.setProperty('--min-dx', Math.round(b.left + b.width / 2 - (a.left + a.width / 2)) + 'px')
-    box.style.setProperty('--min-dy', Math.round(b.top + b.height / 2 - (a.top + a.height / 2)) + 'px')
+    const a = box.getBoundingClientRect()
+    const t = flightTarget(btn.getBoundingClientRect(), btn.closest('.tb-mid')?.getBoundingClientRect() || null)
+    box.style.setProperty('--min-dx', Math.round(t.x - (a.left + a.width / 2)) + 'px')
+    box.style.setProperty('--min-dy', Math.round(t.y - (a.top + a.height / 2)) + 'px')
   }
   useLayoutEffect(() => { if (w.minimizing) aim() }, [w.minimizing])
   // RESTORE: aim FIRST, then the class, both before paint. Measured in the browser: with

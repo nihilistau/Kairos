@@ -48,6 +48,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -127,13 +128,22 @@ check("Room.jsx no longer slices its own hh:mm", "slice(11, 16)" not in src(
     "ui", "src", "apps", "Room.jsx"))
 
 print("\n4. HER TURNS ARE CHIPS AND ACTS, NOT PROSE")
-check("her acts render as chips", 'className="acts"' in chat and "act-tool" in chat)
-check("...looking at the room is one of them", "act-look" in chat)
+# (2026-09-27, redesign stage 6's final wave: the acts and the unprompted tag are kit Chips,
+# so the kinds are told apart by the chip's TONE, and the tones live in kit.css. G-ROOM-KIT
+# leg 13 draws every one of them; this reads that the wiring is still there.)
+check("her acts render as chips", 'className="acts"' in chat
+      and re.search(r'ev\.tool \? \(\s*<Chip key=\{j\} tone="accent"', chat) is not None)
+check("...looking at the room is one of them",
+      re.search(r'ev\.looking \? \(\s*<Chip key=\{j\} tone="accent"', chat) is not None)
+_kt = re.search(r"export const KIND_TONE = \{([^}]*)\}", chat)
+_kinds = dict(re.findall(r"(\w+): '(\w+)'", _kt.group(1))) if _kt else {}
 check("...and the four unprompted kinds are told apart by colour",
-      "'kairos-tag k-'" in chat)
-css = src("ui", "src", "room.css")
-for k in ("k-solo", "k-muse", "k-remind", "k-expand"):
-    check("...%s has its own hue" % k, (".kairos-tag." + k) in css)
+      set(_kinds) == {"solo", "muse", "remind", "expand"} and len(set(_kinds.values())) == 4
+      and "<Chip tone={KIND_TONE[t.kind] || 'accent'}" in chat, _kinds)
+css = src("ui", "src", "kit", "kit.css")
+for k in ("solo", "muse", "remind", "expand"):
+    check("...the %s kind has its own tone" % k,
+          re.search(r"\.ui-tone-%s\s*\{[^}]*color:" % re.escape(_kinds.get(k, "?")), css) is not None)
 
 print("\n5. THE AGENCY FEED OWNS NOTHING")
 feed_src = src("harness", "control", "agency_feed.py")

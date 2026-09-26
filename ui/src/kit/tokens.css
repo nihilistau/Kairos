@@ -1,9 +1,10 @@
 /* tokens.css — THE ONLY PLACE A COLOUR IS WRITTEN DOWN (2026-09-24).
  *
- * Three layers, read top to bottom: palette → roles → scale. Components read roles.
- * Below them, the LEGACY ALIASES: every name room.css and the apps used before this file
- * existed, pointed at a role, so an app that has not been migrated keeps rendering.
- * Stage 6 of the redesign deletes the aliases; G-ROOM-TOKENS' ratchet counts toward it.
+ * Three layers, read top to bottom: palette → roles → scale. Components read roles. Below
+ * the roles, two fenced sections of object paint (the game table, the drawn portrait) that
+ * only their own window reads. The legacy aliases (--bg, --cyan, --es-* …) were deleted in
+ * redesign stage 6; G-ROOM-TOKENS leg 7 fails if one comes back, and leg 4 fails on any
+ * colour literal outside this file.
  *
  * `--mood-h` / `--mood-glow` are DEFAULTS. room/moodTheme.js writes the live values on
  * <html> — nothing else may (spec §3).
@@ -23,9 +24,14 @@
   --text-2: #9aabbd;
   --text-3: #7a8ca6;
 
-  /* hairlines — named `hair`, not `line`: `--line` is a legacy alias below until stage 6 */
+  /* hairlines — named `hair`, not `line`: `line` was a console-era alias (deleted in stage 6),
+     and one name with two values is this codebase's standing bug */
   --hair: rgba(160, 190, 220, .10);
   --hair-strong: rgba(160, 190, 220, .18);
+  --hair-rgb: 160, 190, 220;      /* COMMA triple — the hairline's hue at any other alpha (tints, hovers) */
+  --shade-rgb: 0, 0, 0;           /* what a shadow or a scrim is drawn in */
+  --surface-0-rgb: 7, 10, 15;
+  --surface-1-rgb: 12, 17, 25;
 
   /* roles */
   --accent: #46d9e6;
@@ -63,6 +69,29 @@
   --feeling: #e07a9a;
   --self-narrative: #8fd0b0;
   --read: #4ad98a; --write: #e8b64c; --world: #46d9e6; --machine: #e2685b;
+  /* Chat's event kinds that had no role (redesign stage 6), at today's values */
+  --solo: #c9a4e8; --solo-rgb: 201, 164, 232;      /* her own time, unprompted */
+  --recall: #9ecbff; --recall-rgb: 76, 155, 232;   /* what she remembered; the tint's base is the deeper blue, as it was */
+  --wear: #d8a7ea; --wear-rgb: 216, 167, 234;      /* she changed her clothes (the [WEAR:] hue, h 288) */
+  --err-soft: #f2a39a;            /* the shut-down button's word: red, softened for a resting control */
+  --tile-ink: #cfe0ee;            /* a desktop tile's glyph */
+  /* THE GAME TABLE (redesign stage 6) — object paint, not roles: the colours of a real board,
+     a card and a word grid. Only `.gm-` rules read these (G-ROOM-TOKENS leg 7). */
+  --board-light: #e9e2d4; --board-dark: #8f9c8c;
+  --piece-light: #fbfbf8; --piece-dark: #16161c; --piece-edge: #111111;
+  --card-face: #f4f1ea; --card-red: #b3242c; --card-back: #2a3350; --card-back-2: #1d2438;
+  --word-hit: #358d52;            /* was hsl(140 45% 38%) */
+  --word-near: #b8952e;           /* was hsl(45 60% 45%) */
+  /* THE DRAWN PORTRAIT (room/Avatar.jsx, redesign stage 6) — illustration paint, not roles.
+     Only Avatar.jsx reads these (G-ROOM-TOKENS leg 7), each through a style property. */
+  --face-skin-1: #f0dcd2; --face-skin-2: #dcbcae; --face-skin-3: #a97f74;
+  --face-hair-1: #2a2732; --face-hair-2: #131218; --face-hair-3: #050509;
+  --face-cloth-1: #1b1b22; --face-cloth-2: #0a0a0e; --face-collar: #07070b;
+  --face-neck: #c39a8d; --face-shade: #a87e73; --face-shade-deep: #8e6a60;
+  --face-chain-1: #cfd6de; --face-chain-2: #9aa4b0; --face-bead: #e6edf5;
+  --face-brow: #17151c; --face-eye: #f6f1ee; --face-iris: #4a3b33; --face-pupil: #120d0b;
+  --face-lid: #100e14; --face-lid-edge: #1a1620; --face-lip: #8e4b4b;
+  --face-fringe: #0b0a0f; --face-crown: #1a1822; --face-strand-1: #0d0c11; --face-strand-2: #100e15;
 
   /* her mood (defaults — moodTheme.js owns the live values) */
   --mood-h: 210;
@@ -94,29 +123,4 @@
   /* layout */
   --tb-h: 46px;
   --top-h: 34px;
-
-  /* ── LEGACY ALIASES — delete in stage 6 ─────────────────────────────────── */
-  --bg: var(--surface-0);
-  --panel: var(--surface-2);
-  --line: var(--hair);
-  --ink: var(--text-1);
-  --muted: var(--text-3);
-  --cyan: var(--accent);
-  --cyan-dim: var(--accent-dim);
-  --gold: var(--warm);
-  --off: var(--idle);
-  --es: var(--accent);
-  /* WAS `6 182 212`, space-separated, used as rgba(var(--es-rgb), a) fifty times — a
-     mixed syntax that is invalid at computed-value time. Every one of those rules has
-     been silently discarded since e1285c0 (2026-08-02): borders fell to currentColor,
-     backgrounds to transparent. A comma triple makes them all apply, as written. */
-  --es-rgb: var(--accent-rgb);
-  --es-glow: rgba(var(--accent-rgb), .45);
-  --es-amber: var(--warn);
-  --es-red: var(--err);
-  --es-green: var(--ok);
-  --es-ink: var(--text-1);
-  --es-dim: var(--text-3);
-  --es-900: var(--surface-0);
-  --es-800: var(--surface-2);
 }

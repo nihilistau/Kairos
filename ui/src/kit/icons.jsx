@@ -61,6 +61,12 @@ export const GLYPHS = {
   anonOn: ['M4 12a3 3 0 1 0 6 0v-1.5H4zM14 12a3 3 0 1 0 6 0v-1.5h-6zM10 11.5c1.3-.7 2.7-.7 4 0M2.5 10.5H4M20 10.5h1.5'],
   power: ['M12 3.5v8M7 6.5a7 7 0 1 0 10 0'],
   console: ['M4.5 5.5h15v13h-15zM8 10l2.5 2L8 14', 'M12.5 14.5H16'],
+  // Chat's composer (redesign stage 6, final wave): they replaced its paperclip and speaker emoji.
+  // A paperclip whose inner loop is the detail; a speaker whose waves are (or, off, a cross).
+  attach: ['M19 11.5l-7.2 7.2a4.6 4.6 0 0 1-6.5-6.5l7.8-7.8a3 3 0 0 1 4.3 4.3',
+           'M17.4 8.7l-7.6 7.6a1.4 1.4 0 0 1-2-2l6.9-6.9'],
+  speaker: ['M4.5 9.5h3l4.5-4v13l-4.5-4h-3z', 'M15 9.5a3.5 3.5 0 0 1 0 5M17.5 7a7 7 0 0 1 0 10'],
+  speakerOff: ['M4.5 9.5h3l4.5-4v13l-4.5-4h-3z', 'M15.5 9.5l5 5M20.5 9.5l-5 5'],
 }
 
 export function Icon({ name, size = 20, className = '' }) {

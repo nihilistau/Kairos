@@ -4,6 +4,10 @@ import { extractTags, moodOf, traitHue, forSpeech } from './room/tags.js'
 import { When } from './room/When.jsx'
 import * as speech from './room/speech.js'
 import * as roomMood from './room/roomMood.js'
+import { isProbe } from './room/probe.js'
+import { Chip, Button, TextArea } from './kit/parts.jsx'
+import { Icon } from './kit/icons.jsx'
+const PROBE = isProbe()   // ?probe=1: never drain her outbox, never speak (room/probe.js)
 
 /* CHAT — the centre of the room.
  *
@@ -33,7 +37,7 @@ function Marks({ marks }) {
           <span key={i} className={'mark ' + m.kind + (m.sign < 0 ? ' minus' : '')}
                 style={{ '--h': hue }}>
             {m.kind === 'mood' ? '◆' : m.kind === 'voice' ? '❧'
-             : m.kind === 'wear' ? '👗' : m.kind === 'show' ? '▶'
+             : m.kind === 'wear' ? <Icon name="wardrobe" size={12} /> : m.kind === 'show' ? '▶'
              : m.sign < 0 ? '−' : '+'}
             {m.value}
           </span>
@@ -41,6 +45,161 @@ function Marks({ marks }) {
       })}
     </div>
   )
+}
+
+/* HER UNPROMPTED KINDS WEAR KIT TONES (redesign stage 6, final wave). An evening of
+ * unprompted turns read as one machine repeating itself when they all wore the same chip;
+ * the kind is the whole point, so four of them wear their own tone. Every other kind
+ * (spoke up, picked the thread back up, the modes) wears the accent, as it did. The
+ * words are the chip's text and `why` its title, verbatim. */
+export const KIND_TONE = { solo: 'solo', muse: 'warm', remind: 'ok', expand: 'accent' }
+
+export function TurnTag({ t }) {
+  return (
+    <Chip tone={KIND_TONE[t.kind] || 'accent'} title={t.why || ''}>
+      {t.kind === 'continue' ? 'picked the thread back up'
+       : t.kind === 'expand'   ? 'one more thing'
+       : t.kind === 'remind' ? 'reminding you'
+       : t.kind === 'muse'   ? 'been thinking'
+       : t.kind === 'solo'   ? 'her own time'
+       : t.kind === 'mode'   ? (t.mode === 'lucid' ? 'dreaming'
+                                : t.mode === 'company' ? 'keeping you company'
+                                : 'narrating')
+       : 'spoke up'}
+    </Chip>
+  )
+}
+
+/* WHAT SHE DID, AS THINGS SHE DID. These were a grey line of prose that
+ * read like debug output; they are ACTS — she looked something up, she
+ * looked at the room, she changed her mood — and a chip says so where a
+ * sentence fragment does not. Same row as her marks, immediately below,
+ * because from his side "she checked the board" and "she got happier" are
+ * the same kind of event in the same moment. Kit Chips since redesign stage 6's
+ * final wave; the machine's words inside them are still mono (room.css `.acts b`). */
+export function Acts({ events }) {
+  return (
+    <div className="acts">
+      {events.map((ev, j) => ev.tool ? (
+        <Chip key={j} tone="accent" title={String(ev.tool.result || '')}>
+          <b>{ev.tool.name || 'tool'}</b>
+          <span className="act-out">{String(ev.tool.result || '').slice(0, 64)}</span>
+        </Chip>
+      ) : ev.image ? (
+        /* WHAT SHE SAW, WIDE (2026-08-21, his ask). 64 chars made a real
+           description look truncated — the cut he chased was actually the
+           vision ceiling (sight._look_tokens), but the chip owes honesty
+           too: a readable first line, and the WHOLE text one click away.
+           SHE always received the full string; this is only display. */
+        <details key={j} className="act-img">
+          <summary>
+            <Chip tone="accent" wrap>
+              <b>looked</b>
+              <span className="act-out act-full">
+                {String(ev.image.seen || ev.image.error || '').slice(0, 220)}
+              </span>
+            </Chip>
+          </summary>
+          <div className="act-img-full">{String(ev.image.seen || ev.image.error || '')}</div>
+        </details>
+      ) : ev.persona ? (
+        /* the gateway sends {"persona": state} — the flat mood/voice/traits dict
+           (app.py's persona events). There is no .field/.value; rendering those
+           produced a chip that said only "persona" (his report, 2026-08-22). */
+        /* her MOOD first and never cut mid-word (2026-08-22: "mood: prim"); the
+           rest of the state is in the title. The ring on the turn she moved is the
+           wrapper's: a kit Chip takes no class of its own. */
+        <span key={j} className={'act-mood' + (ev.persona.changed ? ' moved' : '')}>
+          <Chip tone="private"
+                title={Object.entries(ev.persona)
+                  .filter(([k, v]) => v && k !== 'changed')
+                  .map(([k, v]) => k + ': ' + (Array.isArray(v) ? v.join(' ') : v)).join(' · ')
+                  + (ev.persona.changed ? ' — she moved this turn' : ' — unchanged this turn')}>
+            <b>{ev.persona.changed ? '◆ mood' : 'mood'}</b>
+            <span className="act-out">
+              {[ev.persona.mood ? String(ev.persona.mood) : '',
+                ev.persona.voice ? 'voice: ' + String(ev.persona.voice) : '']
+                .filter(Boolean).join(' · ') || 'unchanged'}
+            </span>
+          </Chip>
+        </span>
+      ) : ev.looking ? (
+        <Chip key={j} tone="accent">
+          <b>{ev.looking.phase === 'start' ? 'looking up' : 'looked up'}</b>
+          <span className="act-out">{String(ev.looking.q || ev.looking.tool || '').slice(0, 64)}</span>
+        </Chip>
+      ) : ev.wear ? (
+        /* SHE CHANGED, WHICHEVER DOOR SHE TOOK (2026-08-24, he caught it).
+           A `[WEAR:]` mark draws a chip because this file parses the mark out
+           of her text. `wear()` the TOOL drew nothing — and that is the half
+           she actually uses. The wardrobe emits at its one writer now, so the
+           chip no longer depends on which way she did it. Same glyph and same
+           hue as the mark's chip, deliberately: it is the same event. */
+        <Chip key={j} tone="wear" icon="wardrobe"
+              title={'she is wearing ' + String(ev.wear.label || ev.wear.outfit || '')}>
+          <b>wearing</b>
+          <span className="act-out">{String(ev.wear.label || ev.wear.outfit || '')}</span>
+        </Chip>
+      ) : ev.recall ? (
+        /* WHAT SHE REMEMBERED INTO THIS TURN (2026-08-24, audit D8): the
+           gateway has emitted this event since ADR-008 and only the legacy
+           console drew it — in the room, recall was invisible. The facts
+           ride the title; the chip stays small. */
+        <Chip key={j} tone="recall"
+              title={(Array.isArray(ev.recall) ? ev.recall : []).join('\n')}>
+          <b>remembered</b>
+          <span className="act-out">
+            {(Array.isArray(ev.recall) ? ev.recall : []).length + ' thing' +
+             ((ev.recall || []).length === 1 ? '' : 's')}
+          </span>
+        </Chip>
+      ) : ev.notice ? (
+        /* SOMETHING THE MACHINE DID TO THIS TURN — today only the context trim
+           (harness/inference/context.py). A chip and not her words, for the same
+           reason the wordless-turn message is a notice: engine text in her mouth
+           is its own kind of leak. The whole sentence is in the title AND in the
+           body, because a thing he needs to know is not a thing to make him hover.
+           --warm and not the red: not an error, a loss he is entitled to know about.
+           It wraps: unlike every other chip its whole point is the sentence. */
+        <Chip key={j} tone="warm" wrap title={String(ev.notice)}>
+          <b>note</b>
+          <span className="act-out act-full">{String(ev.notice)}</span>
+        </Chip>
+      ) : null)}
+    </div>
+  )
+}
+
+/* THE COMPOSER'S PARTS (redesign stage 6, final wave): kit Buttons. Pure, so G-ROOM-KIT
+ * can draw each state; Chat owns what they do. */
+export function Attached({ img, onRemove }) {
+  return (
+    <div className="attached">
+      <img src={img} alt="" />
+      <span>she will look at this</span>
+      <Button variant="ghost" size="sm" onClick={onRemove}>remove</Button>
+    </div>
+  )
+}
+
+/* HER VOICE, VISIBLE: pressed while she is speaking, a click hushes the rest of
+   what is queued. The on/off switch itself is the voice.enabled knob (voice
+   panel / settings) — this never overrides it, it only stops the current run. */
+export function Speaker({ voice }) {
+  return (
+    <Button className="chat-tool" icon={voice.enabled ? 'speaker' : 'speakerOff'}
+            aria-label="her voice" aria-pressed={!!voice.playing}
+            onClick={() => speech.stop()}
+            title={!voice.enabled ? 'her voice is off (voice.enabled)'
+                   : voice.playing ? 'speaking — click to hush' : 'her voice is on'} />
+  )
+}
+
+/* send is the window's one primary; while she is generating it is stop, in danger */
+export function SendStop({ busy, onSend, onStop }) {
+  return busy
+    ? <Button variant="danger" className="chat-send" onClick={onStop}>stop</Button>
+    : <Button variant="primary" className="chat-send" onClick={onSend}>send</Button>
 }
 
 /* SHE REPORTS HER MOOD TO A STORE, NOT TO A PARENT (2026-09-23). This took an
@@ -237,6 +396,7 @@ export default function Chat() {
    * where she had spoken: she would say something and then not know she had said it.
    */
   useEffect(() => {
+    if (PROBE) return   // a probe tab takes nothing from her queue
     let alive = true
     const tick = async () => {
       if (!alive || busy || abort.current) return   // never interleave with a live stream
@@ -281,7 +441,7 @@ export default function Chat() {
   }
 
   return (
-    <div className="chat">
+    <div className="chat" data-probe={PROBE ? '1' : undefined}>
       <div className="log">
         {turns.map((t, i) => {
           // HER MARKS ARE NOT SPEECH. persona.md: "they vanish from what he sees".
@@ -307,112 +467,12 @@ export default function Chat() {
                 a timestamp on only her side reads as instrumentation of her rather than
                 a record of the evening. */}
             <div className="turn-head">
-              {t.unprompted ? (
-                <span className={'kairos-tag k-' + (t.kind || 'spoke')} title={t.why || ''}>
-                  {t.kind === 'continue' ? 'picked the thread back up'
-                   : t.kind === 'expand'   ? 'one more thing'
-                   : t.kind === 'remind' ? 'reminding you'
-                   : t.kind === 'muse'   ? 'been thinking'
-                   : t.kind === 'solo'   ? 'her own time'
-                   : t.kind === 'mode'   ? (t.mode === 'lucid' ? 'dreaming'
-                                            : t.mode === 'company' ? 'keeping you company'
-                                            : 'narrating')
-                   : 'spoke up'}
-                </span>
-              ) : null}
+              {t.unprompted ? <TurnTag t={t} /> : null}
               <When at={t.at} />
             </div>
             {t.img ? <img className="thumb" src={t.img} alt="" /> : null}
-            {/* WHAT SHE DID, AS THINGS SHE DID. These were a grey line of prose that
-                read like debug output; they are ACTS — she looked something up, she
-                looked at the room, she changed her mood — and a chip says so where a
-                sentence fragment does not. Same row as her marks, immediately below,
-                because from his side "she checked the board" and "she got happier" are
-                the same kind of event in the same moment. */}
-            {(t.events || []).length ? (
-              <div className="acts">
-                {(t.events || []).map((ev, j) => ev.tool ? (
-                  <span key={j} className="act act-tool"
-                        title={String(ev.tool.result || '')}>
-                    <b>{ev.tool.name || 'tool'}</b>
-                    <span className="act-out">{String(ev.tool.result || '').slice(0, 64)}</span>
-                  </span>
-                ) : ev.image ? (
-                  /* WHAT SHE SAW, WIDE (2026-08-21, his ask). 64 chars made a real
-                     description look truncated — the cut he chased was actually the
-                     vision ceiling (sight._look_tokens), but the chip owes honesty
-                     too: a readable first line, and the WHOLE text one click away.
-                     SHE always received the full string; this is only display. */
-                  <details key={j} className="act act-look act-img">
-                    <summary>
-                      <b>looked</b>
-                      <span className="act-out">
-                        {String(ev.image.seen || ev.image.error || '').slice(0, 220)}
-                      </span>
-                    </summary>
-                    <div className="act-img-full">{String(ev.image.seen || ev.image.error || '')}</div>
-                  </details>
-                ) : ev.persona ? (
-                  /* the gateway sends {"persona": state} — the flat mood/voice/traits dict
-                     (app.py's persona events). There is no .field/.value; rendering those
-                     produced a chip that said only "persona" (his report, 2026-08-22). */
-                  /* her MOOD first and never cut mid-word (2026-08-22: "mood: prim"); the
-                     rest of the state is in the title. */
-                  <span key={j} className={'act act-persona' + (ev.persona.changed ? ' moved' : '')}
-                        title={Object.entries(ev.persona)
-                          .filter(([k, v]) => v && k !== 'changed')
-                          .map(([k, v]) => k + ': ' + (Array.isArray(v) ? v.join(' ') : v)).join(' · ')
-                          + (ev.persona.changed ? ' — she moved this turn' : ' — unchanged this turn')}>
-                    <b>{ev.persona.changed ? '◆ mood' : 'mood'}</b>
-                    <span className="act-out">
-                      {[ev.persona.mood ? String(ev.persona.mood) : '',
-                        ev.persona.voice ? 'voice: ' + String(ev.persona.voice) : '']
-                        .filter(Boolean).join(' · ') || 'unchanged'}
-                    </span>
-                  </span>
-                ) : ev.looking ? (
-                  <span key={j} className="act act-look">
-                    <b>{ev.looking.phase === 'start' ? 'looking up' : 'looked up'}</b>
-                    <span className="act-out">{String(ev.looking.q || ev.looking.tool || '').slice(0, 64)}</span>
-                  </span>
-                ) : ev.wear ? (
-                  /* SHE CHANGED, WHICHEVER DOOR SHE TOOK (2026-08-24, he caught it).
-                     A `[WEAR:]` mark draws a chip because this file parses the mark out
-                     of her text. `wear()` the TOOL drew nothing — and that is the half
-                     she actually uses. The wardrobe emits at its one writer now, so the
-                     chip no longer depends on which way she did it. Same glyph and same
-                     hue as the mark's chip, deliberately: it is the same event. */
-                  <span key={j} className="act act-wear"
-                        title={'she is wearing ' + String(ev.wear.label || ev.wear.outfit || '')}>
-                    <b>👗 wearing</b>
-                    <span className="act-out">{String(ev.wear.label || ev.wear.outfit || '')}</span>
-                  </span>
-                ) : ev.recall ? (
-                  /* WHAT SHE REMEMBERED INTO THIS TURN (2026-08-24, audit D8): the
-                     gateway has emitted this event since ADR-008 and only the legacy
-                     console drew it — in the room, recall was invisible. The facts
-                     ride the title; the chip stays small. */
-                  <span key={j} className="act act-recall"
-                        title={(Array.isArray(ev.recall) ? ev.recall : []).join('\n')}>
-                    <b>remembered</b>
-                    <span className="act-out">
-                      {(Array.isArray(ev.recall) ? ev.recall : []).length + ' thing' +
-                       ((ev.recall || []).length === 1 ? '' : 's')}
-                    </span>
-                  </span>
-                ) : ev.notice ? (
-                  /* SOMETHING THE MACHINE DID TO THIS TURN — today only the context trim
-                     (harness/inference/context.py). A chip and not her words, for the same
-                     reason the wordless-turn message is a notice: engine text in her mouth
-                     is its own kind of leak. The whole sentence is in the title AND in the
-                     body, because a thing he needs to know is not a thing to make him hover. */
-                  <span key={j} className="act act-notice" title={String(ev.notice)}>
-                    <b>note</b>
-                    <span className="act-out">{String(ev.notice)}</span>
-                  </span>
-                ) : null)}
-              </div>
-            ) : null}
+            {/* WHAT SHE DID, AS THINGS SHE DID — <Acts>, above. */}
+            {(t.events || []).length ? <Acts events={t.events} /> : null}
             {parsed || t.savedMarks ? (
               <Marks marks={(parsed && parsed.marks && parsed.marks.length)
                             ? parsed.marks : (t.savedMarks || [])} />
@@ -432,26 +492,15 @@ export default function Chat() {
       </div>
 
       {img ? (
-        <div className="attached">
-          <img src={img} alt="" />
-          <span>she will look at this</span>
-          <button onClick={() => { setImg(null); if (fileRef.current) fileRef.current.value = '' }}>remove</button>
-        </div>
+        <Attached img={img} onRemove={() => { setImg(null); if (fileRef.current) fileRef.current.value = '' }} />
       ) : null}
 
       <div className="composer">
         <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={attach} />
-        <button className="tool-btn" onClick={() => fileRef.current && fileRef.current.click()} title="attach an image">📎</button>
-        {/* HER VOICE, VISIBLE: lit while she is speaking, a click hushes the rest of
-            what is queued. The on/off switch itself is the voice.enabled knob (voice
-            panel / settings) — this never overrides it, it only stops the current run. */}
-        <button className={'tool-btn spk' + (voice.playing ? ' on' : '') + (voice.enabled ? '' : ' off')}
-                onClick={() => speech.stop()}
-                title={!voice.enabled ? 'her voice is off (voice.enabled)'
-                       : voice.playing ? 'speaking — click to hush' : 'her voice is on'}>
-          {voice.enabled ? (voice.playing ? '🔊' : '🔈') : '🔇'}
-        </button>
-        <textarea value={text} placeholder="talk to her"
+        <Button className="chat-tool" icon="attach" aria-label="attach an image" title="attach an image"
+                onClick={() => fileRef.current && fileRef.current.click()} />
+        <Speaker voice={voice} />
+        <TextArea className="chat-text" value={text} placeholder="talk to her"
                   onChange={e => { setText(e.target.value); histIdx.current = -1 }}
                   onKeyDown={e => {
                     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
@@ -479,9 +528,7 @@ export default function Chat() {
                       }
                     }
                   }} />
-        {busy
-          ? <button className="send stop" onClick={() => abort.current && abort.current.abort()}>stop</button>
-          : <button className="send" onClick={send}>send</button>}
+        <SendStop busy={busy} onSend={send} onStop={() => abort.current && abort.current.abort()} />
       </div>
     </div>
   )

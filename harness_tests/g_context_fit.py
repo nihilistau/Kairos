@@ -27,6 +27,7 @@ FOUR CLAIMS, and the first is the one that matters:
 from __future__ import annotations
 
 import os
+import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -188,13 +189,15 @@ chat = open(os.path.join(ROOT, "ui", "src", "Chat.jsx"),
 # list beside it and the check went red on a line that still does exactly what it
 # claims. The claim is that a notice is routed to `events` and rendered as a chip -
 # assert that, not which siblings it happens to stand next to.
+# AMENDED 2026-09-27 (redesign stage 6's final wave): the chip is a kit Chip in the warm
+# tone now, not a bespoke `.act-notice` pill, so the claim is read off the Chip and its tone.
 check("the room keeps a notice as an ACT, not as her words",
       "ev.notice" in chat and "last.events = [...last.events, ev]" in chat
-      and "act-notice" in chat)
-css = open(os.path.join(ROOT, "ui", "src", "room.css"),
+      and '<Chip key={j} tone="warm" wrap title={String(ev.notice)}>' in chat)
+css = open(os.path.join(ROOT, "ui", "src", "kit", "kit.css"),
            encoding="utf-8", errors="replace").read()
 check("...and the chip has a style, so it is not an invisible div",
-      ".act-notice" in css)
+      re.search(r"\.ui-tone-warm\s*\{[^}]*color:\s*var\(--warm\)", css) is not None)
 
 print("\n7. THE FOREIGN BACKEND ANSWERS HONESTLY RATHER THAN NOT AT ALL")
 from harness.inference.backends.openai import OpenAIClient  # noqa: E402

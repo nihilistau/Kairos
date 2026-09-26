@@ -1,5 +1,67 @@
 # Changelog
 
+## 0.8.47 — the room redesign finished: Games, Wardrobe and Chat on the kit, the aliases deleted, zero colour literals (2026-09-27)
+
+Stage 6 of the room redesign, and the last. No server code changed.
+
+* **The room now:** one token file (`ui/src/kit/tokens.css`) and no colour literal anywhere
+  else in `ui/src` except the backdrop canvas's five, pinned; one type scale and three
+  self-hosted faces; one drawn icon family and one cursor set; one mood source
+  (`room/moodTheme.js`, read through `useMood`); one set of kit parts that all 27 windows draw
+  through.
+* **Chat on the kit:** send is the window's one primary Button and stop its danger Button;
+  attach and the voice toggle are named icon Buttons with drawn glyphs (`attach`, `speaker`,
+  `speakerOff`, new in the kit's icon family) instead of emoji, the voice toggle carrying
+  `aria-pressed` while speech plays (its pulse animation is gone); the composer is a kit
+  TextArea with Enter-to-send and input history unchanged. The event chips (tool, look, state,
+  looking-up, wear, recall, notice) and the unprompted-turn tag are kit Chips, one tone per
+  kind; four tones were added to kit.css for them (`private`, `recall`, `wear`, `solo`), each
+  measured >= 4.5:1 on its own tint. What Chat sends, polls and speaks is unchanged.
+* **Games on the kit:** the games are Tabs; the chess board's 64 squares are buttons named by
+  square and piece, so a keyboard can play, and its rows are equal (the squares were not
+  square). "in check", a draw offer and a hand's winner are chips; a refused move is an err
+  chip. Wordle tiles carry their mark in words as well as colour, and the near tile's letter is
+  readable. The poker table's street is in the accent; "raise to" is named. Only the selected square
+  carries `aria-pressed`.
+* **Wardrobe on the kit:** its mood chip reads the room's mood (`useMood`) instead of the
+  persona file's raw string; who chose the current look is a chip; a refused read is the kit's
+  error state; every action is a kit button with one primary; the ask box, dismiss, edit,
+  retire and every closet field are named. Hidden and retired closet rows dim by text role, not
+  opacity. The undefined `--edge` and `--mono` variables are gone.
+* **Everywhere:** time chips use `--text-2`/`--text-3` (they were `--idle`, below AA); one
+  spelling of a relative age (`room/facts.js`), so 45–59 s reads "just now"; the minimise
+  flight lands inside the taskbar strip when the button is scrolled out of view
+  (`room/flight.js`); the top bar's landmark is named "top bar"; the kit's cursors win on the
+  shut-down options, the off-the-record receipt and two disclosures; Stage's ladder and Story's
+  retired lines dim by role; Body's history shows one state at a time (a failed or refused read
+  is an error alone, a new window no longer shows the previous window's series); at phone width
+  the desktop icons sit above the portrait, and the portrait's default box fits the desktop
+  (at 375px it overflowed by 85px).
+* **Fonts:** 18 woff2 files (483,800 B) → 7 (304,336 B): latin for all three faces, plus the
+  Inter latin-ext/greek/cyrillic and Source Serif latin-ext subsets the stored text actually
+  uses. Characters outside the kept subsets fall to the system font.
+* **Probe mode:** a room tab opened at `/room/?probe=1` never polls the outbox (a destructive
+  read), never speaks, and its Music window neither plays nor posts a position, so a UI check
+  cannot take queued unprompted turns from the operator's own tab. `.chat` carries
+  `data-probe="1"`. Other tabs behave as before.
+* **Tokens and gates:** the 19 legacy aliases are deleted; new object-paint tokens for the game
+  table and the drawn portrait (read only where they paint), and roles `--hair-rgb`,
+  `--shade-rgb`, `--surface-0-rgb`, `--surface-1-rgb`, `--solo`, `--recall`, `--wear`,
+  `--err-soft`, `--tile-ink`. The portrait was measured pixel-identical across 76 variants.
+  G-ROOM-KIT gains leg 13 (Games, Wardrobe, the closet, the portrait, probe mode, Chat's parts,
+  the portrait's default box, a 62-class retired scan): 417 checks. G-ROOM-TOKENS asserts zero
+  colour literals (one pinned exemption) and adds legs for aliases and undefined variables,
+  cursors, opacity-dimmed text (a ratchet at 12, each dim pinned by name), fonts, every glyph a
+  window names, and no emoji in Chat: 68 checks. `chips`, `r-off`, `good`, `bad` and `warn` left G-ROOM-CSS's
+  shared list, and the global `.chips`/`.r-off` rules are gone.
+* **Known, not done:** the backdrop renderer keeps its own mood table (9 of the 19 moods in
+  `tags.js`; two hues differ); 12 opacity dims remain; the outbox is still a destructive GET
+  shared by every non-probe tab; the kit's Tabs name no tab panel; a failed poll replaces a
+  panel's last good data with the error; the closet draws nothing when the catalog refuses;
+  the Board's edit form writes into the polled array; at 375px the desktop icons' default
+  layout overflows the desktop by one column; G-ROOM-BUNDLE compares against a fresh build, so
+  export and CI checkouts must have LF line endings (a `core.autocrlf=true` checkout goes red).
+
 ## 0.8.46 — four dense windows on the kit: Body, Board, Ledger, Memory (2026-09-26)
 
 Stage 5 of the room redesign. No server code changed.

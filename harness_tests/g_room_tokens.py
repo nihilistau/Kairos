@@ -1,6 +1,6 @@
 """G-ROOM-TOKENS — the room's design system holds its own promises.
 
-THE SPEC: docs/superpowers/specs/2026-09-23-room-redesign-design.md. Six legs:
+THE SPEC: docs/superpowers/specs/2026-09-23-room-redesign-design.md. Ten legs:
 
   1. CONTRAST. Every text role on every surface is >= 4.5:1 (WCAG AA for the 11-13px
      sizes these roles are used at). Computed from tokens.css, not eyeballed. Plus the
@@ -15,11 +15,19 @@ THE SPEC: docs/superpowers/specs/2026-09-23-room-redesign-design.md. Six legs:
      roomMood.get, because owning the live read is owning the rule (AGENTS.md §0). Plus
      (2026-09-26) roomMood's thinking lifecycle: a mood mid-turn keeps it, only
      set(null, false) — Chat's stream `finally` — ends it.
-  4. COLOUR RATCHET. Raw colour literals outside kit/tokens.css may only fall.
+  4. COLOUR RATCHET — ZERO. No raw colour literal outside kit/tokens.css (spec §6), counting
+     template colours; one pinned exemption (Backdrop2D, spec §0), which is also the leg's
+     positive control.
   5. RGBA TRIPLES. Every `rgba(var(--x), a)` names a variable that is a comma triple.
      Legs 4 and 5 have floors: counting nothing is a FAIL, not a pass.
      `--es-rgb` was `6 182 212` and made fifty declarations invalid for seven weeks.
   6. VOICES. The machine's words are mono on the chip Chat actually draws (`.act`).
+  7. ALIASES. The legacy names are gone from ui/src, and every var(--x) names something
+     that exists.
+  8. CURSORS. Every cursor rule outside the kit names a kit cursor (or help).
+  9. OPACITY. Text dimmed by opacity instead of a text role may only fall.
+ 10. FONTS. Latin, plus only the subsets her own words use (KEEP names the character that
+     needs each): seven faces, seven files, where the package's wght.css shipped eighteen.
 
 Offline: reads sources, runs node if present (leg 3 skips cleanly without it).
 """
@@ -87,7 +95,9 @@ SURFACES = ["--surface-0", "--surface-1", "--surface-2", "--surface-3"]
 TEXTS = ["--text-1", "--text-2", "--text-3", "--accent", "--warm",
          # Memory's class marks set text in these three (redesign stage 5); --private also
          # colours her own time's "changed" kind (stage 4)
-         "--private", "--feeling", "--self-narrative"]
+         "--private", "--feeling", "--self-narrative",
+         # Chat's event kinds, the shell's soft red and the desktop tile's glyph (stage 6)
+         "--solo", "--recall", "--wear", "--err-soft", "--tile-ink"]
 missing = [n for n in SURFACES + TEXTS if not re.fullmatch(r"#[0-9a-fA-F]{6}", T.get(n, ""))]
 check("every surface and text role is a plain 6-digit hex", not missing, missing)
 if not missing:
@@ -164,6 +174,15 @@ if not missing:
         r = ratio(rgb_token("--lt-idle"), rgb_token("--bar-idle"))
         check("an unfocused window's grey lights >= 3:1 on its bar (WCAG 1.4.11)", r >= 3.0,
               "%.2f:1" % r)
+        # THE GAME TABLE (stage 6): a card's ink on its face, and a Wordle tile's letter on
+        # its mark. The tiles are 19px weight 700 — large text, so 3:1 is their floor.
+        table = [("--piece-dark", "--card-face", 4.5), ("--card-red", "--card-face", 4.5),
+                 ("--text-1", "--word-hit", 3.0), ("--piece-dark", "--word-near", 4.5)]
+        unread_t = [p for p in table if rgb_token(p[0]) is None or rgb_token(p[1]) is None]
+        check("the game table's pairs are hex tokens", not unread_t, unread_t)
+        lowg = [(a, b, round(ratio(rgb_token(a), rgb_token(b)), 2)) for a, b, floor in table
+                if not unread_t and ratio(rgb_token(a), rgb_token(b)) < floor]
+        check("the game table reads: card ink >= 4.5:1 on its face, tile letters on their marks", not lowg, lowg)
 
     print("   tones — each .ui-tone-* text on its own tint, composited over every surface")
     KIT_CSS = os.path.join(UI, "kit", "kit.css")
@@ -176,7 +195,8 @@ if not missing:
             tones["neutral" if m.group(1) == "chip" else m.group(1)[5:]] = \
                 (decl["color"], decl["background"])
     # A FLOOR: a regex that stops matching must not pass by measuring nothing.
-    need = {"neutral", "accent", "ok", "warn", "err", "an", "mood", "warm"}
+    # Chat's four (stage 6, final wave): her state, recall, wear and her own time.
+    need = {"neutral", "accent", "ok", "warn", "err", "an", "mood", "warm", "private", "recall", "wear", "solo"}
     check("every tone was read from kit.css", need <= set(tones), sorted(need - set(tones)))
     unreadable, lowt, worst_t = [], [], (99, "")
     for name, (fg_x, bg_x) in sorted(tones.items()):
@@ -232,6 +252,26 @@ nonascii = [n for n in names if any(ord(ch) > 127 for ch in n)]
 check("no emoji left in any icon field", not nonascii, nonascii[:6])
 unknown = sorted(n for n in names if n not in glyphs and not any(ord(ch) > 127 for ch in n))
 check("every registry icon names a glyph that exists", not unknown, unknown)
+# EVERY GLYPH A WINDOW NAMES EXISTS (stage 6, final wave): <Icon> draws a dashed square for
+# a name it does not know, which is a bug nobody sees until it is on screen. Every quoted
+# name in an `icon=` / `<Icon name=` / `icon={a ? 'x' : 'y'}` under ui/src, comments blanked.
+_named = set()
+for p in glob.glob(os.path.join(UI, "**", "*.jsx"), recursive=True):
+    # a `/*` closing a string (Chat's accept="image/*") is not a comment: left alone, the
+    # blanker read it as one and ate the file down to the next `*/`, composer and all
+    src = blank_comments(read(p).replace('/*"', '"'))
+    for m in re.finditer(r"""(?:<Icon\s+name|\bicon)=(?:"([\w]+)"|\{([^{}]*)\})""", src):
+        _named |= {m.group(1)} if m.group(1) else set(re.findall(r"'(\w+)'", m.group(2)))
+check("the leg read the glyphs windows name (Chat's attach, speaker, speakerOff among them)",
+      {"attach", "speaker", "speakerOff", "wardrobe"} <= _named, sorted(_named)[:12])
+_unglyphed = sorted(n for n in _named if n not in glyphs)
+check("every glyph a window names is drawn in icons.jsx", not _unglyphed, _unglyphed)
+# NO EMOJI IN CHAT: its buttons were a paperclip and three speakers, and a worn outfit a dress.
+# The typographic marks it keeps (the diamond, the fleuron, the triangle, the minus) sit below
+# U+1F000 and carry no emoji presentation.
+_emoji = sorted({"U+%04X" % ord(ch) for ch in read(os.path.join(UI, "Chat.jsx"))
+                 if ord(ch) >= 0x1F000 or ord(ch) == 0xFE0F})
+check("no emoji left in Chat.jsx", not _emoji, _emoji)
 titles = re.findall(r"title:\s*'([^']*)'", REG)
 lower = [t for t in titles if t[:1].islower()]
 check("window titles are sentence case", not lower, lower[:6])
@@ -315,33 +355,47 @@ for p in sorted(glob.glob(os.path.join(UI, "**", "*.js*"), recursive=True)):
         readers.append(rel)
 check("only room/useMood.js reads roomMood.get", not readers, readers)
 
-print("\n4. COLOUR RATCHET — raw colour literals outside kit/tokens.css may only fall")
-COLOUR = re.compile(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(\s*\d|\bhsla?\(\s*\d")
-count, where = 0, {}
+print("\n4. COLOUR RATCHET — zero raw colour literals outside kit/tokens.css (spec §6, stage 6)")
+# WHAT COUNTS: a hex; rgb()/rgba()/hsl()/hsla() whose first argument is a number; and (stage 6)
+# one whose first argument is a TEMPLATE — `hsl(${hue} 80% 55%)` is a literal colour computed
+# in JS, which the ratchet did not see until the portrait's eleven were found.
+# WHAT DOES NOT: `hsl(var(--mood-h) …)` / `hsl(var(--mhue) …)` / `hsl(var(--h) …)` — a colour
+# whose hue is a mood or kind variable is the form spec §2 prescribes, and leg 1 measures the
+# kit's at every hue. The hue TABLES in JS (tags.js MOODS/TRAIT_HUE, RUNG_HUE, KIND_HUE) are
+# numbers, not colours. The cursor SVGs are images: url() cannot reach a custom property.
+COLOUR = re.compile(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(\s*(?:\d|\$\{)|\bhsla?\(\s*(?:\d|\$\{)")
+# THE ONE EXEMPTION, PINNED. Spec §0 keeps the backdrop renderer out of the redesign, and
+# Backdrop2D paints a <canvas>, whose fillStyle cannot resolve var() without a per-frame
+# getComputedStyle. So it is counted and pinned: a new literal there fails, and so does one
+# fewer (whoever lifts §0 deletes this entry). The pin is also the leg's positive control —
+# a regex or glob that stopped seeing the tree cannot match it.
+EXEMPT = {"room/Backdrop2D.jsx": 5}
+_probe = ["#fff", "rgba(0,0,0,.5)", "hsl(${h} 50% 50%)", "rgb( 1, 2, 3)",
+          "rgba(var(--accent-rgb), .2)", "hsl(var(--mood-h) 70% 60%)", "url(#soften)", "var(--x)"]
+_hits = [bool(COLOUR.search(s)) for s in _probe]
+check("the regex counts literals and templates, and no token expression",
+      _hits == [True, True, True, True, False, False, False, False], list(zip(_probe, _hits)))
+count, where, exempt = 0, {}, {}
 for p in sorted(glob.glob(os.path.join(UI, "**", "*.*"), recursive=True)):
-    if not p.endswith((".css", ".jsx", ".js")):
+    if not p.endswith((".css", ".jsx", ".js")) or os.path.abspath(p) == os.path.abspath(TOKENS):
         continue
-    if os.path.abspath(p) == os.path.abspath(TOKENS):
-        continue
+    rel = os.path.relpath(p, UI).replace(os.sep, "/")
     n = len(COLOUR.findall(blank_comments(read(p))))
-    if n:
-        where[os.path.relpath(p, UI).replace(os.sep, "/")] = n
+    if rel in EXEMPT:
+        exempt[rel] = n
+    elif n:
+        where[rel] = n
         count += n
-# RATCHET. Set once from the first run (Task 2 step 2). Lowering it is the only edit
-# allowed; stage 6 of the redesign takes it to 0.
-RATCHET_BASELINE = 147   # raised once, 2026-09-26, for kit.css's tone backgrounds — the only raise; 308 -> 299 when the shell left room.css (stage 1); 299 -> 291 when the taskbar and chat moved onto role tokens (stage 1, 3/4); 291 -> 272 when kit.css and the shell's tints read --ok/--warn/--err/--an-rgb and the ink tokens (final review, 2026-09-26); 272 -> 271 when panel.jsx's rows moved to the kit (stage 2); 271 -> 265 when the title chips became kit Chips (stage 2); 265 -> 254 when the taskbar's looking, scene and off-the-record chips became kit Chips (stage 2); 254 -> 238 when the knob rows, the Voice window's status and the shell's profile label became kit Chips/fields and their settings and voice blocks went token-only (stage 2); 238 -> 230 when the looking ledger's his/hers chips, box and status bars became kit parts and the rsc-/sr- blocks went token-only (stage 2); 230 -> 227 when Status left with its `.status .warn` literal and the taskbar's ground became --bar-bg/--bar-shade, shared with the top bar (stage 3); 227 -> 225 when the Apps list went token-only (--hover-tint, --hair; stage 3, 5/8); 225 -> 223 when Room's and Journal's rules went token-only (--hair, --text-1; stage 3, 6/8); 223 -> 222 when the Tools rows went token-only and its tier/arms became kit Chips (stage 3, 7/8); 222 -> 212 when Files' and House's blocks went token-only (stage 4, 1/6); 212 -> 206 when Decisions' and Her own time's blocks went token-only (stage 4, 2/6); 206 -> 194 when Music's and Stage's blocks went token-only and Stage's stop took the kit's danger colour (stage 4, 3/6); 194 -> 192 when Setup's marks became kit Chips and its block went token-only (stage 4, 4/6); 192 -> 186 when Story's lanes became kit Tabs and its block went token-only (stage 4, 5/6); 186 -> 172 when Body's block went token-only and its states became kit Chips (stage 5, 1/5); 172 -> 168 when Board's block went token-only and its controls became kit Buttons (stage 5, 2/5); 168 -> 157 when the ledger's health became kit Chips and its block went token-only (stage 5, 3/5); 157 -> 147 when Memory's marks moved to role tokens (--feeling, --self-narrative) and its blocks went token-only (stage 5, 4/5); stage 6 takes it to 0
-print("   %d literals in %d files (baseline %d)" % (count, len(where), RATCHET_BASELINE))
+# History, for the record: 290 → raised once to 308 (kit.css's tones) → 186 at stage 4 →
+# 147 at stage 5 → 109 (Games, stage 6 1/9) → 88 (Wardrobe, 2/9) → 81 (the closet, 3/9) →
+# 34 (Chat's and the shell's furniture, 4/9) → 0 (the portrait, 5/9; the regex began counting
+# template colours in the same commit, which is what made Backdrop2D's pin 5 and not 2).
+print("   %d literals outside tokens.css (exempt: %s)" % (count, exempt))
 for f, n in sorted(where.items(), key=lambda kv: -kv[1])[:8]:
     print("       %4d  %s" % (n, f))
-# A FLOOR: zero literals over the whole tree is a glob that found nothing, not stage 6.
-# Stage 6 replaces this with its own check when it takes the count to zero.
-check("the ratchet counted literals at all (the glob found the tree)", count > 0 and len(where) > 0,
-      "%d literals in %d files" % (count, len(where)))
-check("raw colour literals have not grown past the baseline", count <= RATCHET_BASELINE,
-      "%d > %d" % (count, RATCHET_BASELINE))
-if count < RATCHET_BASELINE:
-    print("   note: %d under baseline — lower RATCHET_BASELINE to %d" % (
-        RATCHET_BASELINE - count, count))
+check("the exemption is exactly its pin — the regex and the glob see the tree (positive control)",
+      exempt == EXEMPT, "%s != %s" % (exempt, EXEMPT))
+check("no raw colour literal outside tokens.css and the one pinned exemption", count == 0, where)
 
 print("\n5. RGBA TRIPLES — rgba(var(--x), a) needs --x to be a comma triple")
 bad, seen = [], 0
@@ -362,12 +416,200 @@ check("every rgba(var(--x), a) resolves to a comma triple", not bad, sorted(set(
 
 print("\n6. VOICES — the machine's words are mono on the chip that is actually drawn")
 # 2026-09-26 (stage-2 live check): stage 1 put --font-mono on `.ev`, which no JSX
-# draws; her tool line computed to Inter. Chat draws `act` chips — read that rule.
+# draws; her tool line computed to Inter. Since stage 6's final wave each act is a kit Chip
+# (whose own font is the UI face), and the words INSIDE it are Chat's: the label a <b>, the
+# value `.act-out`. Read the rule that sets their face, and that Chat draws exactly those.
 room_css = blank_comments(read(os.path.join(UI, "room.css")))
-act = re.search(r"(?:^|\})\s*\.act\s*\{([^}]*)\}", room_css)
-check("the event chip rule (.act) exists", act is not None)
-check("the event chips are mono", act is not None and "var(--font-mono)" in act.group(1))
-chat_jsx = read(os.path.join(UI, "Chat.jsx"))
-check("Chat draws its events as act chips", "act act-tool" in chat_jsx)
+act = re.search(r"(?:^|\})\s*\.acts b\s*,\s*\.act-out\s*\{([^}]*)\}", room_css)
+check("the event chips' word rule (.acts b, .act-out) exists", act is not None)
+check("the event chips' words are mono", act is not None and "var(--font-mono)" in act.group(1))
+chat_jsx = blank_comments(read(os.path.join(UI, "Chat.jsx")))
+check("Chat draws its events as kit chips holding those words",
+      re.search(r'<Chip key=\{j\} tone="accent" title=\{String\(ev\.tool\.result[^>]*>\s*<b>\{ev\.tool\.name', chat_jsx) is not None
+      and chat_jsx.count('<span className="act-out') == 7)
+
+print("\n7. ALIASES — the legacy names are gone, and every var() names something that exists")
+# Spec §1: the console-era names and the --es-* set were aliases onto the roles from day one,
+# "stage 6 deletes them". Deleted 2026-09-27. A name coming back — defined OR used — fails,
+# anywhere under ui/src, comments blanked (the src-trap). The legacy console pages
+# (console/index.html, ops.html) keep their own :root and are not under ui/src.
+ALIASES = ["--bg", "--panel", "--line", "--ink", "--muted", "--cyan", "--cyan-dim", "--gold", "--off",
+           "--es", "--es-rgb", "--es-glow", "--es-amber", "--es-red", "--es-green", "--es-ink",
+           "--es-dim", "--es-900", "--es-800"]
+_alias = re.compile(r"(?<![\w-])(" + "|".join(re.escape(a) for a in sorted(ALIASES, key=len, reverse=True)) + r")(?![\w-])")
+SRCS = {os.path.relpath(p, UI).replace(os.sep, "/"): blank_comments(read(p))
+        for p in sorted(glob.glob(os.path.join(UI, "**", "*.*"), recursive=True)) if p.endswith((".css", ".jsx", ".js"))}
+roles_used = sum(len(re.findall(r"var\(--(?:accent|text-[123]|hair|surface-[0-3])\b", s)) for s in SRCS.values())
+check("the leg reads the tree (positive control: the roles are used, >= 200 times)", roles_used >= 200, roles_used)
+alias_hits = sorted({(f, m.group(1)) for f, s in SRCS.items() for m in _alias.finditer(s)})
+check("no legacy alias is defined or used anywhere under ui/src", not alias_hits, alias_hits[:8])
+# EVERY var(--x) NAMES SOMETHING. Found while planning stage 6: Wardrobe's var(--edge, #444)
+# and var(--mono, …) named properties nothing had ever defined, so the fallback always ran.
+defined = set(T) | {m for f, s in SRCS.items() if f.endswith(".css") for m in re.findall(r"(--[\w-]+)\s*:", s)}
+runtime = {m for s in SRCS.values() for m in re.findall(r"""['"](--[\w-]+)['"]""", s)}   # style={{'--h': …}}, setProperty
+uses = [(f, m.group(1)) for f, s in SRCS.items() for m in re.finditer(r"var\(\s*(--[\w-]+)", s)]
+check("the leg read var() uses (floor)", len(uses) >= 300, len(uses))
+undefined = sorted({u for u in uses if u[1] not in defined | runtime})
+check("every var(--x) names a property some stylesheet defines or the room sets at runtime", not undefined, undefined[:8])
+# PAINT IS NOT A ROLE: the game table's and the portrait's colours are read only where they paint.
+table = sorted({f for f, s in SRCS.items() for _ in re.finditer(r"var\(--(?:board|piece|card|word)-", s)})
+check("the game table's paint is read only by room.css", table == ["room.css"], table)
+_rc = SRCS.get("room.css", "")
+_table_sel = [sel.strip() for sel, body in re.findall(r"([^{}]+)\{([^}]*)\}", _rc)
+              if re.search(r"var\(--(?:board|piece|card|word)-", body)
+              for sel in sel.split(",") if not sel.strip().startswith(".gm-")]
+check("...and only by .gm- rules", not _table_sel, _table_sel)
+face = sorted({f for f, s in SRCS.items() if "var(--face-" in s})
+check("the portrait's paint is read only by room/Avatar.jsx", face == ["room/Avatar.jsx"], face)
+face_defined = {n for n in T if n.startswith("--face-")}
+face_used = set(re.findall(r"var\((--face-[\w-]+)\)", SRCS.get("room/Avatar.jsx", "")))
+check("every --face- token is used, and every one used exists", face_defined == face_used and face_defined,
+      {"unused": sorted(face_defined - face_used), "undefined": sorted(face_used - face_defined)})
+
+print("\n8. CURSORS — a per-class cursor names a kit cursor, never the system keyword it replaces")
+# 2026-09-24 (stage 0): the kit's cursors "reach only surfaces with no more specific cursor:
+# rule of their own"; room.css had 69 such rules. The kit's family (arrow, hand, text, no,
+# busy, the grips) is what every rule outside it must name. `help` stays: the kit has none.
+OK_CURSOR = re.compile(r"var\(--cur-[\w-]+\)|help|inherit|none|auto")
+bad_c, n_c = [], 0
+for rel in ("room.css", "room/shell.css"):
+    for m in re.finditer(r"cursor\s*:\s*([^;}]+)", blank_comments(read(os.path.join(UI, rel)))):
+        n_c += 1
+        if not OK_CURSOR.fullmatch(m.group(1).strip()):
+            bad_c.append((rel, m.group(1).strip()))
+check("the leg read cursor rules (floor: the shell's grips alone are 10)", n_c >= 10, n_c)
+check("no per-class cursor falls back to a system keyword the kit replaces", not bad_c, bad_c)
+
+print("\n9. OPACITY — dimming by opacity instead of a text role may only fall")
+# Opacity under a text colour defeats leg 1: --text-3 at .55 is not --text-3. Counted in
+# room.css and shell.css, outside @keyframes and outside :disabled (WCAG 1.4.3 exempts an
+# inactive control). Not all of what is left is text, and some is his call (the follow-up
+# list in the stage-6 CHANGELOG); the ratchet keeps the list honest and short.
+OPACITY_BASELINE = 12  # measured 2026-09-27 (stage 6; 16 once `opacity: 0` counted: the lights' svg; 12 after the final wave put Chat on the kit); lowering it is the only edit allowed
+# THE DIMS THEMSELVES, pinned (final wave, M4): a count alone let one dim be swapped for another
+# at the same total. Every dim found must be one of these; one that leaves must leave here too
+# (the list and the baseline are the same number, checked below).
+PINNED_DIMS = {
+    ("room.css", ".mark.minus", ".55"), ("room.css", ".turn.solo", ".82"),
+    ("room.css", ".thinking summary", ".55"), ("room.css", ".thinking summary:hover", ".85"),
+    ("room.css", ".thinking-body", ".7"), ("room.css", ".sd-down-mark", ".8"),
+    ("room.css", ".jr-drafts", ".55"), ("room.css", ".dec-done", ".55"),
+    ("room/shell.css", ".dsk-drag", ".75"), ("room/shell.css", ".win > .bar .lt svg", "0"),
+    ("room/shell.css", ".win > .g-se::after", ".5"), ("room/shell.css", ".win:hover > .g-se::after", ".9"),
+}
+# HIS DESIGN CALLS — dims a review measured and left to him, by name. They are printed on
+# their own line and pinned here, never folded into the baseline, so the number above
+# cannot quietly carry a decision nobody made. An entry leaves when he decides (and the
+# stale check below fails if the rule changes without this list changing with it).
+HIS_CALLS = {
+    ("room.css", ".lgr-s-dropped", ".42"),   # stage 5: a dropped ledger row reads 3.5:1 / 1.9:1, its restore button dimmed with it
+}
+# Any value below 1: `0`, `0.x` and `.x`. The first cut matched only `0?\.\d+`, so a bare
+# `opacity: 0` (hidden outright, the deepest dim there is) was invisible to it (fix round 1).
+# `1`, `1.0` and `var(...)` never match. Non-text dims (a drag ghost, an image, the lights'
+# hover glyph) are counted like the rest: the leg does not judge text-ness, the list does.
+OPACITY_DIM = re.compile(r"(?<![\w-])opacity\s*:\s*(0(?:\.\d+)?|\.\d+)(?![\w.])")
+
+
+def opacity_dims(rel, src):
+    """(dims, rules) in one stylesheet: every opacity < 1 outside @keyframes and :disabled."""
+    s = blank_comments(src)
+    s = re.sub(r"@keyframes[^{]*\{(?:[^{}]*\{[^}]*\})*[^}]*\}", "", s)
+    out, n = [], 0
+    for sel, body in re.findall(r"([^{}]+)\{([^{}]*)\}", s):
+        n += 1
+        for m in OPACITY_DIM.finditer(body):
+            if ":disabled" not in sel:
+                out.append((rel, " ".join(sel.split())[-60:], m.group(1)))
+    return out, n
+
+
+# POSITIVE CONTROL, in the same collection: a text rule hidden by `opacity: 0` is a dim.
+_pc, _ = opacity_dims("control", """
+.pc-zero { color: var(--text-2); opacity: 0; }   .pc-lead { opacity: 0.5; }  .pc-bare { opacity: .5 }
+.pc-one { opacity: 1; }  .pc-onept { opacity: 1.0; }  .pc-var { opacity: var(--o); }
+.pc-off:disabled { opacity: 0; }  @keyframes pc-in { from { opacity: 0; } to { opacity: 1; } }
+""")
+check("control: opacity 0, 0.5 and .5 are counted; 1, 1.0, var(), :disabled and @keyframes are not",
+      [(x[1], x[2]) for x in _pc] == [(".pc-zero", "0"), (".pc-lead", "0.5"), (".pc-bare", ".5")], _pc)
+dims, rules_read = [], 0
+for rel in ("room.css", "room/shell.css"):
+    _d, _n = opacity_dims(rel, read(os.path.join(UI, rel)))
+    dims += _d
+    rules_read += _n
+his = [x for x in dims if x in HIS_CALLS]
+dims = [x for x in dims if x not in HIS_CALLS]
+print("   %d opacity dims in %d rules (baseline %d)" % (len(dims), rules_read, OPACITY_BASELINE))
+for x in dims:
+    print("       %s  %s  %s" % x)
+print("   his design calls, still dimmed by opacity (named, not in the baseline):")
+for x in his:
+    print("       %s  %s  %s" % x)
+check("the leg read the stylesheets (floor)", rules_read >= 300, rules_read)
+check("opacity dims have not grown past the baseline", len(dims) <= OPACITY_BASELINE,
+      "%d > %d" % (len(dims), OPACITY_BASELINE))
+check("the pinned list is the baseline (one number, written twice, must agree)",
+      len(PINNED_DIMS) == OPACITY_BASELINE, "%d pinned, baseline %d" % (len(PINNED_DIMS), OPACITY_BASELINE))
+_unpinned = sorted(x for x in dims if x not in PINNED_DIMS)
+check("every opacity dim is one of the pinned ones (a swap at the same count fails)", not _unpinned, _unpinned)
+_gone = sorted(x for x in PINNED_DIMS if x not in dims)
+check("no pinned dim is stale: one that left was taken off the list", not _gone, _gone)
+check("his design calls are named and still true — .lgr-s-dropped { opacity: .42 } among them",
+      sorted(his) == sorted(HIS_CALLS), {"listed": sorted(HIS_CALLS), "found": sorted(his)})
+_named = [x for x in dims if re.search(r"\.stg-rung|\.stg-n\b|\.stg-dwell|\.stg-hook|\.sty-row\.gone", x[1])]
+check("Stage's ladder and Story's retired lines dim by role, not opacity (stage-4/5 ledger)", not _named, _named)
+
+print("\n10. FONTS — latin, plus the subsets her own words use; nothing the room never renders")
+# Spec §1 says latin only. Measured at the cut (2026-09-27) over what the room renders: the
+# Memory and Research windows (Inter) show her own words, which carry latin-ext (ș ć đ, in
+# place names and surnames) and Greek (Φ), and one Ledger row quotes a Cyrillic і; so Inter keeps those four
+# subsets and the rest go. Her voice (Source Serif, Chat) keeps latin-ext as well (controller
+# ruling, fix round 1): she speaks from those memories. The mono carries no character
+# outside latin in anything the room shows today. A subset joins KEEP only with the
+# character that needs it named beside it.
+KEEP = {
+    ("inter", "latin"), ("jetbrains-mono", "latin"), ("source-serif-4", "latin"),
+    ("inter", "latin-ext"),   # Memory: ș ć đ (her registry); Research/Search: ă ć ș ō đ (her looks)
+    ("inter", "greek"),       # Memory: Φ (her registry); Research: β ψ (her looks)
+    ("inter", "cyrillic"),    # Ledger: the quoted homoglyph і in one row's body
+    ("source-serif-4", "latin-ext"),   # her voice in Chat: an accented name from her memories (ș ć đ) stays in her face
+}
+FJS, FCSS = os.path.join(UI, "kit", "fonts.js"), os.path.join(UI, "kit", "fonts.css")
+fjs = blank_comments(read(FJS))
+fcss = blank_comments(read(FCSS)) if os.path.isfile(FCSS) else ""
+faces = re.findall(r"@font-face\s*\{([^}]*)\}", fcss)
+urls = [u.strip("'\" ") for u in re.findall(r"url\(([^)]+)\)", fcss)]
+got = set()
+for u in urls:
+    m = re.search(r"@fontsource-variable/([\w-]+)/files/\1-([\w-]+)-wght-normal\.woff2$", u)
+    got.add((m.group(1), m.group(2)) if m else ("?", u))
+check("fonts.js imports the kit's fonts.css and no package stylesheet",
+      "./fonts.css" in fjs and "@fontsource" not in fjs, fjs.strip()[:120])
+check("one face per kept subset, each the package's own -wght-normal file",
+      len(faces) == len(urls) == len(KEEP) and got == KEEP,
+      {"extra": sorted(got - KEEP), "missing": sorted(KEEP - got)})
+check("each latin face carries the latin unicode-range",
+      fcss.count("unicode-range: U+0000-00FF") == 3)
+_pkg_ranges, _mismatch = 0, []
+for fam, sub in sorted(KEEP):
+    pcss = os.path.join(ROOT, "ui", "node_modules", "@fontsource-variable", fam, "wght.css")
+    if not os.path.isfile(pcss):
+        continue
+    pm = re.search(r"/\* %s-%s-wght-normal \*/\s*@font-face\s*\{[^}]*?(unicode-range:[^;]+;)"
+                   % (re.escape(fam), re.escape(sub)), read(pcss))
+    mine = [f for f in faces if "/files/%s-%s-wght-normal." % (fam, sub) in f]
+    _pkg_ranges += 1
+    if not pm or not mine or pm.group(1) not in mine[0]:
+        _mismatch.append((fam, sub))
+if _pkg_ranges:
+    check("each face's unicode-range is the package's own, verbatim", not _mismatch, _mismatch)
+else:
+    print("   (no ui/node_modules: the verbatim unicode-range check has nothing to compare)")
+check("the three families are the ones tokens.css names",
+      all(("font-family: '%s'" % f) in fcss for f in ("Inter Variable", "JetBrains Mono Variable", "Source Serif 4 Variable")))
+woffs = sorted(os.path.basename(p) for p in glob.glob(os.path.join(ROOT, "console", "room", "assets", "*.woff2")))
+_wset = {(fam, sub) for fam, sub in KEEP for w in woffs if w.startswith("%s-%s-wght-normal-" % (fam, sub))}
+check("the committed bundle ships exactly the kept files (%d woff2)" % len(KEEP),
+      len(woffs) == len(KEEP) and _wset == KEEP, woffs)
 
 finish("G-ROOM-TOKENS")

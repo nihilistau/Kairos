@@ -21,6 +21,8 @@
  * off the gateway answers 503 and nothing plays. The room additionally asks
  * /v1/speak/status before it queues, so an off switch costs zero requests.
  */
+import { isProbe } from './probe.js'
+
 const MAX_CHARS = 240          // mirrors SP_TTS_MAX_CHARS; the server refuses above it
 const ENDS = /([.!?…]+)(\s+|$)/
 
@@ -113,6 +115,7 @@ async function pump() {
 
 /* Queue text to be spoken, in order behind whatever is queued. */
 export function say(text) {
+  if (isProbe()) return   // a probe tab never speaks (probe.js)
   const parts = sentences(text)
   if (!parts.length) return
   queue.push(...parts.map(t => ({ text: t })))

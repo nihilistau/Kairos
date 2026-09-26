@@ -9,18 +9,8 @@ body { margin: 0; background: var(--surface-0); color: var(--text-1);
 code, kbd, samp, pre { font-family: var(--font-mono); }
 button, textarea, input { font: inherit; color: inherit; }
 
-header { display: flex; align-items: center; gap: 14px; padding: 8px 14px;
-  border-bottom: 1px solid var(--line); background: var(--panel); }
-.brand { color: var(--cyan); font-weight: 700; letter-spacing: .5px; }
-.sub { color: var(--muted); }
-header nav { display: flex; gap: 6px; margin-left: 12px; flex-wrap: wrap; }
-header nav button, header nav a { background: transparent; border: 1px solid var(--line);
-  color: var(--muted); padding: 3px 9px; border-radius: 5px; cursor: pointer;
-  text-decoration: none; display: flex; gap: 6px; align-items: center; }
-header nav button:hover, header nav a:hover { border-color: var(--cyan-dim); color: var(--ink); }
-header nav button.on { border-color: var(--cyan); color: var(--cyan); }
-.led { width: 8px; height: 8px; border-radius: 50%; background: var(--off); }
-.led.ok { background: var(--ok); } .led.warm { background: var(--gold); }
+.led { width: 8px; height: 8px; border-radius: 50%; background: var(--idle); }
+.led.ok { background: var(--ok); } .led.warm { background: var(--warm); }
 .led.off { background: var(--err); }
 
 main { flex: 1; position: relative; overflow: hidden; }
@@ -38,40 +28,23 @@ main { flex: 1; position: relative; overflow: hidden; }
 .attached { display: flex; gap: 9px; align-items: center; padding: 6px 2px;
   font-size: var(--fs-11); color: var(--text-2); }
 .attached img { height: 34px; border-radius: var(--r-sm); border: 1px solid var(--hair-strong); }
-.attached button { background: none; border: 1px solid var(--hair-strong); border-radius: var(--r-sm);
-  padding: 2px 7px; color: var(--text-2); }
 .composer { display: flex; gap: 8px; align-items: flex-end;
   border-top: 1px solid var(--hair); padding-top: var(--sp-3); }
-.composer textarea { flex: 1; min-height: 40px; max-height: 160px; resize: vertical;
-  background: var(--surface-1); border: 1px solid var(--hair-strong); border-radius: var(--r-md);
-  padding: 9px 11px; font: 400 var(--fs-13)/1.5 var(--font-ui); color: var(--text-1);
-  transition: border-color var(--dur-fast), box-shadow var(--dur-fast); }
-.composer textarea::placeholder { color: var(--text-3); }
-.composer textarea:focus { outline: none; border-color: hsl(var(--mood-h) 60% 60% / .55);
-  box-shadow: 0 0 0 3px hsl(var(--mood-h) 70% 55% / .14); }
-.tool-btn { height: 40px; min-width: 40px; background: none; border: 1px solid var(--hair-strong);
-  border-radius: var(--r-md); color: var(--text-2); }
-.tool-btn:hover { color: var(--text-1); border-color: rgba(var(--accent-rgb), .35); }
-/* the ink on the cyan and red buttons is a token (--on-accent / --on-err), not a literal */
-.send { height: 40px; background: var(--accent); border: none; color: var(--on-accent);
-  font: 600 var(--fs-13)/1 var(--font-ui); border-radius: var(--r-md); padding: 0 18px; }
-.send:hover { background: var(--accent-hover); }
-.send.stop { background: var(--err); color: var(--on-err); }
-@media (prefers-reduced-motion: reduce) { .composer textarea { transition: none; } }
+/* THE COMPOSER IS KIT PARTS (redesign stage 6, final wave): a TextArea, icon Buttons, send the
+   one primary and stop danger. Chat's own classes only SIZE them, at the 40px the box stands. */
+.composer .chat-text { flex: 1; min-height: 40px; max-height: 160px; padding: 9px 11px;
+  border-radius: var(--r-md); line-height: 1.5; }
+.composer .chat-tool { width: 40px; height: 40px; border-radius: var(--r-md); }
+.composer .chat-send { height: 40px; padding: 0 18px; border-radius: var(--r-md); font-size: var(--fs-13); }
 
 /* panels */
 .pad { padding: 11px 13px; }
-.muted { color: var(--muted); } .err { color: var(--err); }
-.why { color: var(--muted); font-size: 11px; border-left: 2px solid var(--line);
+.muted { color: var(--text-3); } .err { color: var(--err); }
+.why { color: var(--text-3); font-size: 11px; border-left: 2px solid var(--hair);
   padding-left: 8px; margin: 6px 0; }
-h3, h4 { margin: 12px 0 6px; color: var(--cyan); font-size: 12px;
+h3, h4 { margin: 12px 0 6px; color: var(--accent); font-size: 12px;
   text-transform: lowercase; font-weight: 600; }
 h3:first-child, h4:first-child { margin-top: 0; }
-
-.chips { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 9px; }
-.chips button { background: none; border: 1px solid var(--line); color: var(--muted);
-  border-radius: 11px; padding: 2px 9px; cursor: pointer; font-size: 11px; }
-.chips button.on { border-color: var(--cyan); color: var(--cyan); }
 
 /* Tools. The tab strip's sideways scroll is the kit's (.ui-tabs, final review Q3). A row
    wraps its chips under a long name instead of pushing past the window. */
@@ -89,7 +62,6 @@ h3:first-child, h4:first-child { margin-top: 0; }
 .r-world { color: var(--world); } .dot.r-world { background: var(--world); }
 .r-machine { color: var(--machine); } .dot.r-machine { background: var(--machine); }
 .r-private { color: var(--private); } .dot.r-private { background: var(--private); }
-.r-off { color: var(--off); }
 
 .obs { display: flex; gap: 10px; padding: var(--sp-1) 0; border-bottom: 1px dotted var(--hair); }
 .obs .when { color: var(--accent); min-width: 40px; }
@@ -101,8 +73,6 @@ h3:first-child, h4:first-child { margin-top: 0; }
  * noticing the background at all. */
 .backdrop { position: fixed; inset: 0; width: 100%; height: 100%;
   z-index: 0; pointer-events: none; }
-header { background: color-mix(in srgb, var(--panel) 78%, transparent);
-  backdrop-filter: blur(14px); }
 
 /* ── PHASE 2 PANELS ────────────────────────────────────────────────────────── */
 /* music (mus-) — one player, two people */
@@ -154,18 +124,18 @@ header { background: color-mix(in srgb, var(--panel) 78%, transparent);
 
 /* SCROLLBARS. The default is a grey slab from another decade sitting inside a
  * room that is trying to feel like somewhere. */
-* { scrollbar-width: thin; scrollbar-color: var(--cyan-dim) transparent; }
+* { scrollbar-width: thin; scrollbar-color: var(--accent-dim) transparent; }
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg,
-    color-mix(in srgb, var(--cyan) 34%, transparent),
-    color-mix(in srgb, var(--cyan) 14%, transparent));
+    color-mix(in srgb, var(--accent) 34%, transparent),
+    color-mix(in srgb, var(--accent) 14%, transparent));
   border-radius: 99px; border: 2px solid transparent; background-clip: padding-box; }
 ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg,
-    color-mix(in srgb, var(--cyan) 58%, transparent),
-    color-mix(in srgb, var(--cyan) 28%, transparent));
+    color-mix(in srgb, var(--accent) 58%, transparent),
+    color-mix(in srgb, var(--accent) 28%, transparent));
   background-clip: padding-box; }
 ::-webkit-scrollbar-corner { background: transparent; }
 
@@ -189,7 +159,7 @@ header { background: color-mix(in srgb, var(--panel) 78%, transparent);
 main { display: block; }
 .stage { position: absolute; left: 22px; bottom: 26px; width: 210px;
   z-index: 2; pointer-events: none; user-select: none; }
-.avatar { width: 100%; filter: drop-shadow(0 14px 40px #000a); }
+.avatar { width: 100%; filter: drop-shadow(0 14px 40px rgba(var(--shade-rgb), .67)); }  /* black at alpha 0xaa = .667 */
 .avatar svg { width: 100%; height: auto; display: block; overflow: visible; }
 .avatar .think circle { animation: thinkdot 1.25s ease-in-out infinite; }
 @keyframes thinkdot { 0%,100% { opacity: .2; r: 2 } 50% { opacity: 1; r: 3.1 } }
@@ -296,20 +266,21 @@ main { display: block; }
 
 .stg-ladder { margin: 10px 0; }
 .stg-rung { display: flex; align-items: baseline; gap: 9px; padding: 4px 9px;
-  border-left: 3px solid hsl(var(--h) 65% 55% / .5); font-size: var(--fs-12); opacity: .55; }
-.stg-rung.here { opacity: 1; background: hsl(var(--h) 60% 55% / .13);
+  border-left: 3px solid hsl(var(--h) 65% 55% / .5); font-size: var(--fs-12); color: var(--text-2); }
+.stg-rung.here { color: var(--text-1); background: hsl(var(--h) 60% 55% / .13);
   border-left-width: 5px; border-radius: 0 5px 5px 0; }
-.stg-rung.over { opacity: .3; }
-.stg-rung.over .stg-name { text-decoration: line-through; }
-.stg-n { width: 14px; text-align: right; opacity: .6; font-variant-numeric: tabular-nums; }
-.stg-name { min-width: 96px; color: hsl(var(--h) 75% 72%); }
-.stg-dwell { font-size: var(--fs-11); opacity: .75; }
+.stg-rung.over { color: var(--text-3); }
+.stg-rung.over .stg-name { color: var(--text-3); text-decoration: line-through; }
+.stg-n { width: 14px; text-align: right; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.stg-name { min-width: 96px; color: var(--text-2); }
+.stg-rung.here .stg-name { color: hsl(var(--h) 75% 72%); }  /* the rung she is on keeps its hue */
+.stg-dwell { font-size: var(--fs-11); color: var(--text-3); }
 
 .stg-hooks h4 { margin: 12px 0 5px; font-size: 12px; text-transform: uppercase;
-  letter-spacing: .04em; opacity: .8; }
+  letter-spacing: .04em; color: var(--text-2); }
 .stg-hook { font-size: 11.5px; padding: 4px 9px; margin: 3px 0;
   background: var(--hover-tint); border-left: 2px solid var(--hair-strong); border-radius: var(--r-sm); }
-.stg-hook.spent { opacity: .4; text-decoration: line-through; }
+.stg-hook.spent { color: var(--text-3); text-decoration: line-through; }
 
 .stg-deck { display: grid; gap: 7px; }
 .stg-card { border: 1px solid var(--hair); border-radius: var(--r-md); padding: 8px 10px;
@@ -323,67 +294,73 @@ main { display: block; }
    The board is a plain 8-column grid. It knows nothing about chess: legal
    targets are highlighted from the list the SERVER sent, so the page can never
    disagree with the engine about what is playable. */
-.gm-head { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 12px; }
-.gm-head .muted { margin-left: auto; }
-.gm-err { margin: 6px 0; font-size: 11.5px; }
-.gm-board { display: grid; grid-template-columns: repeat(8, 1fr); aspect-ratio: 1;
-  border: 2px solid #ffffff22; border-radius: 5px; overflow: hidden; user-select: none; }
-.gm-sq { display: flex; align-items: center; justify-content: center; cursor: pointer;
-  position: relative; }
-.gm-sq.l { background: #e9e2d4; } .gm-sq.d { background: #8f9c8c; }
-.gm-sq.last { box-shadow: inset 0 0 0 3px hsl(45 65% 55% / .85); }
-.gm-sq.from { box-shadow: inset 0 0 0 3px hsl(190 80% 55%); }
-.gm-sq.to::after { content: ''; position: absolute; width: 26%; height: 26%;
-  border-radius: 50%; background: hsl(190 80% 50% / .55); }
+.gm-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.gm-tabs { flex: 1 1 200px; min-width: 0; }
+.gm-new { display: flex; flex-wrap: wrap; gap: 6px; }
+.gm-err { margin: 6px 0; }
+.gm-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-2) 0;
+  font-size: var(--fs-12); color: var(--text-1); }
+.gm-n { font-size: var(--fs-11); color: var(--text-3); }
+.gm-head .gm-n { margin-left: auto; }
+.gm-board { display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); aspect-ratio: 1;
+  border: 2px solid var(--hair-strong); border-radius: var(--r-sm); overflow: hidden; user-select: none; }
+.gm-sq { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0;
+  padding: 0; border: 0; border-radius: 0; font: inherit; }
+.gm-sq-l { background: var(--board-light); } .gm-sq-d { background: var(--board-dark); }
+.gm-sq-last { box-shadow: inset 0 0 0 3px rgba(var(--warm-rgb), .85); }
+.gm-sq-from { box-shadow: inset 0 0 0 3px var(--accent); }
+.gm-sq:focus-visible { outline: none; box-shadow: inset 0 0 0 3px hsl(var(--mood-h) 70% 60% / .9); }
+.gm-sq-to::after { content: ''; position: absolute; width: 26%; height: 26%;
+  border-radius: 50%; background: rgba(var(--accent-rgb), .55); }
 .gm-p { font-size: clamp(16px, 4.4vw, 34px); line-height: 1; }
-.gm-p.gm-lt { color: #fbfbf8; text-shadow: 0 0 1px #111, 1px 1px 0 #111, -1px -1px 0 #111,
-  1px -1px 0 #111, -1px 1px 0 #111; }
-.gm-p.gm-dk { color: #16161c; }
-.gm-moves { margin-top: 8px; font-size: 11px; opacity: .6; word-break: break-all; }
+.gm-p-lt { color: var(--piece-light); text-shadow: 0 0 1px var(--piece-edge), 1px 1px 0 var(--piece-edge),
+  -1px -1px 0 var(--piece-edge), 1px -1px 0 var(--piece-edge), -1px 1px 0 var(--piece-edge); }
+.gm-p-dk { color: var(--piece-dark); }
+.gm-moves { margin-top: var(--sp-2); font: 400 var(--fs-11)/1.5 var(--font-mono); color: var(--text-3); word-break: break-all; }
 
 .gm-wgrid { display: grid; gap: 5px; margin: 10px 0; justify-content: center; }
 .gm-wrow { display: flex; gap: 5px; }
-.gm-w { width: 42px; height: 42px; display: flex; align-items: center;
-  justify-content: center; font-size: 19px; text-transform: uppercase; font-weight: 600;
-  border-radius: 5px; background: #ffffff10; border: 1px solid #ffffff18; }
-.gm-w.g { background: hsl(140 45% 38%); border-color: transparent; }
-.gm-w.y { background: hsl(45 60% 45%); border-color: transparent; }
-.gm-ctl { display: flex; gap: 8px; align-items: center; justify-content: center; }
-.gm-in { width: 140px; padding: 6px 9px; font: inherit; letter-spacing: .18em;
-  text-transform: uppercase; text-align: center; color: inherit;
-  background: #00000038; border: 1px solid #ffffff20; border-radius: 5px; }
-.gm-agree { margin-top: 9px; justify-content: flex-start; flex-wrap: wrap; }
-.gm-agree .warn { color: #e8c877; font-size: 11.5px; }
+/* 700, not 600: 19px bold is large text, so the hit tile's --text-1 needs 3:1 (it is 3.43) */
+.gm-w { width: 42px; height: 42px; display: flex; align-items: center; justify-content: center;
+  font-size: 19px; text-transform: uppercase; font-weight: 700; color: var(--text-1);
+  border-radius: var(--r-sm); background: var(--hover-tint); border: 1px solid var(--hair-strong); }
+.gm-w-hit { background: var(--word-hit); border-color: transparent; }
+/* the near tile's letter is the table's dark ink: --text-1 on the yellow was 2.37:1 */
+.gm-w-near { background: var(--word-near); border-color: transparent; color: var(--piece-dark); }
+.gm-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+.gm-ctl { display: flex; gap: var(--sp-2); align-items: center; justify-content: center; flex-wrap: wrap; }
+.gm-in { width: 140px; letter-spacing: .18em; text-transform: uppercase; text-align: center; }
+.gm-agree { margin-top: 9px; justify-content: flex-start; }
 
 /* ── POKER TABLE (pk-) ───────────────────────────────────────────────────────
    Her cards render as backs because the SERVER did not send them, not because
    this file chose to hide them. */
-.pk-head { display: flex; gap: 10px; align-items: baseline; font-size: 11.5px;
-  opacity: .8; margin-bottom: 8px; }
-.pk-street { text-transform: uppercase; letter-spacing: .08em; color: hsl(160 60% 65%); }
-.pk-seat { display: flex; align-items: center; gap: 9px; padding: 8px 10px;
-  border-radius: 8px; background: #ffffff07; border: 1px solid #ffffff12; margin: 5px 0; }
-.pk-seat.mine { border-color: hsl(190 60% 50% / .35); }
-.pk-name { min-width: 78px; font-size: 12px; }
-.pk-stack { margin-left: auto; font-variant-numeric: tabular-nums; opacity: .85; }
-.pk-bet { padding: 1px 7px; border-radius: 10px; font-size: 11px;
-  background: hsl(45 65% 50% / .22); color: #e8c877; }
-.pk-pot { text-align: center; margin: 10px 0 6px; font-size: 12px; opacity: .8; }
-.pk-pot b { font-size: 15px; color: #e8c877; }
-.pk-board { display: flex; gap: 6px; justify-content: center; margin-bottom: 6px; }
-.pk-hole { display: flex; gap: 4px; }
-.pk-card { display: inline-flex; align-items: center; justify-content: center;
-  min-width: 34px; height: 46px; border-radius: 5px; background: #f4f1ea; color: #16161c;
-  font-weight: 700; font-size: 15px; gap: 1px; }
-.pk-card i { font-style: normal; font-size: 13px; }
-.pk-card.red { color: #b3242c; }
-.pk-card.back { background: repeating-linear-gradient(45deg, #2a3350, #2a3350 4px, #1d2438 4px, #1d2438 8px);
-  border: 1px solid #ffffff1a; }
-.pk-ctl { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
-.pk-ctl .good { color: #7fdca4; font-size: 12px; }
-.pk-in { width: 74px; padding: 5px 7px; font: inherit; font-size: 12px; color: inherit;
-  background: #00000038; border: 1px solid #ffffff20; border-radius: 5px; }
-.pk-log { font-size: 11px; opacity: .55; line-height: 1.55; margin-top: 8px; }
+.gm-pk-head { display: flex; gap: 10px; align-items: baseline; margin-bottom: var(--sp-2);
+  font-size: var(--fs-11); color: var(--text-2); }
+.gm-pk-street { text-transform: uppercase; letter-spacing: .08em; color: var(--accent); }
+.gm-pk-seat { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; padding: var(--sp-2) 10px; margin: 5px 0;
+  border-radius: var(--r-md); background: var(--hover-tint); border: 1px solid var(--hair); }
+.gm-pk-mine { border-color: rgba(var(--accent-rgb), .35); }
+.gm-pk-name { min-width: 78px; font-size: var(--fs-12); color: var(--text-1); }
+.gm-pk-stack { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--text-1); }
+.gm-pk-bet { padding: 1px 7px; border-radius: var(--r-pill); font-size: var(--fs-11);
+  background: rgba(var(--warm-rgb), .22); color: var(--warm); }
+.gm-pk-pot { text-align: center; margin: 10px 0 6px; font-size: var(--fs-12); color: var(--text-2); }
+.gm-pk-pot b { font-size: var(--fs-15); color: var(--warm); }
+.gm-pk-board { display: flex; gap: 6px; justify-content: center; margin-bottom: 6px; }
+.gm-pk-hole { display: flex; gap: 4px; }
+.gm-pk-card { display: inline-flex; align-items: center; justify-content: center; gap: 1px;
+  min-width: 34px; height: 46px; border-radius: var(--r-sm); background: var(--card-face); color: var(--piece-dark);
+  font-weight: 700; font-size: var(--fs-15); }
+.gm-pk-card i { font-style: normal; font-size: var(--fs-13); }
+.gm-pk-red { color: var(--card-red); }
+.gm-pk-back { background: repeating-linear-gradient(45deg, var(--card-back), var(--card-back) 4px,
+  var(--card-back-2) 4px, var(--card-back-2) 8px); border: 1px solid var(--hair-strong); }
+.gm-pk-ctl { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+.gm-pk-in { width: 84px; }
+.gm-pk-need { color: var(--text-3); }
+.gm-pk-log { margin-top: var(--sp-2); font-size: var(--fs-11); line-height: 1.55; color: var(--text-3); }
 
 /* ── AVATAR: THE GENERATED SET ───────────────────────────────────────────────
    The drawn SVG keeps its own rules below; this is only the art path. */
@@ -415,104 +392,54 @@ main { display: block; }
 /* She spoke without being asked, and it must not look identical to an answer —
    an unprompted message with no account of itself is indistinguishable from a bug. */
 .turn.unprompted {
-  border-left: 2px solid rgba(var(--es-rgb), .55);
+  border-left: 2px solid rgba(var(--accent-rgb), .55);
   padding-left: 11px;
-  background: linear-gradient(90deg, rgba(var(--es-rgb), .06), transparent 60%);
-}
-.kairos-tag {
-  display: inline-block; margin-bottom: 4px; padding: 2px 8px; border-radius: 999px;
-  font-size: 9.5px; letter-spacing: .10em; text-transform: uppercase;
-  color: var(--es); background: rgba(var(--es-rgb), .10);
-  border: 1px solid rgba(var(--es-rgb), .26); cursor: help;
+  background: linear-gradient(90deg, rgba(var(--accent-rgb), .06), transparent 60%);
 }
 
 /* ══ THE WARDROBE PANEL ══════════════════════════════════════════════════════ */
-.wr { display: flex; flex-direction: column; gap: 10px; padding: 12px; overflow-y: auto; }
-.wr-empty { padding: 16px; color: var(--es-dim); font-size: 12px; }
-.wr-now { display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
-          padding: 9px 11px; border-radius: 10px;
-          background: rgba(var(--es-rgb), .07);
-          border: 1px solid rgba(var(--es-rgb), .18); font-size: 12.5px; }
-.wr-by { color: var(--es-dim); font-size: 11px; }
-.wr-held { color: var(--es-amber); font-size: 10.5px; border: 1px solid rgba(245,158,11,.35);
-           border-radius: 999px; padding: 1px 8px; cursor: help; }
-.wr-sec { font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
-          color: var(--es-dim); margin-top: 2px; }
+.wr { display: flex; flex-direction: column; gap: 10px; padding: var(--sp-3); overflow-y: auto; }
+.wr-her { display: flex; flex-wrap: wrap; gap: 5px; }
+/* PREFIXED names only: `mood` and `voice` are the SHELL's, on Presence — G-ROOM-CSS caught the collision once. Her state is kit Chips since stage 6. */
+.wr-err { margin: 2px 0; }
+.wr-now { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; padding: var(--sp-2) 11px;
+  border-radius: var(--r-md); background: rgba(var(--accent-rgb), .07); border: 1px solid rgba(var(--accent-rgb), .18);
+  font-size: var(--fs-13); }
+.wr-now-t { color: var(--text-1); }
+.wr-sec { font-size: var(--fs-11); letter-spacing: .14em; text-transform: uppercase; color: var(--text-3); margin-top: 2px; }
 .wr-count { text-transform: none; letter-spacing: 0; }
-.wr-tiers { display: flex; flex-direction: column; gap: 6px; }
-.wr-tier { display: flex; align-items: center; gap: 10px; text-align: left;
-           padding: 9px 11px; border-radius: 9px; cursor: pointer; font-size: 12px;
-           background: rgba(255,255,255,.02);
-           border: 1px solid rgba(var(--es-rgb), .12); color: var(--es-ink); }
-.wr-tier:hover:not(:disabled) { background: rgba(var(--es-rgb), .09);
-                                border-color: rgba(var(--es-rgb), .28); }
-.wr-tier.on { border-color: rgba(var(--es-rgb), .45); background: rgba(var(--es-rgb), .12); }
-.wr-tier.locked { opacity: .42; cursor: not-allowed; }
-.wr-t { font-size: 10px; color: var(--es); letter-spacing: .1em; width: 22px; }
-.wr-wear { flex: 1; }
-.wr-hers { font-size: 9.5px; color: var(--es); border: 1px solid rgba(var(--es-rgb), .3);
-           border-radius: 999px; padding: 1px 7px; }
-.wr-lock { font-size: 9.5px; color: var(--es-dim); }
 .wr-clips { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
-.wr-clip { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 10px;
-           background: rgba(255,255,255,.02); border: 1px solid rgba(var(--es-rgb), .12); }
-.wr-clip.playing { border-color: rgba(var(--es-rgb), .45); background: rgba(var(--es-rgb), .09); }
-.wr-clip video { width: 100%; aspect-ratio: 3/2; object-fit: cover; border-radius: 7px;
-                 background: #05070d; }
-.wr-meta { display: flex; flex-direction: column; gap: 2px; font-size: 11px; }
-.wr-meta span { color: var(--es-dim); font-size: 10px; }
-.wr-tags { opacity: .75; }
-.wr-play { padding: 5px 9px; border-radius: 7px; font-size: 10.5px; cursor: pointer;
-           background: rgba(var(--es-rgb), .10); color: var(--es);
-           border: 1px solid rgba(var(--es-rgb), .26); }
-.wr-play:hover:not(:disabled) { background: rgba(var(--es-rgb), .18); }
-.wr-note { font-size: 10.5px; color: var(--es-dim); line-height: 1.6;
-           border-top: 1px solid rgba(var(--es-rgb), .12); padding-top: 9px; }
-.wr-note code { color: var(--es); }
+.wr-clip { position: relative; display: flex; flex-direction: column; gap: 6px; padding: var(--sp-2);
+  border-radius: var(--r-md); background: var(--hover-tint); border: 1px solid rgba(var(--accent-rgb), .12); }
+.wr-clip-on { border-color: rgba(var(--accent-rgb), .45); background: rgba(var(--accent-rgb), .09); }
+.wr-clip video { width: 100%; aspect-ratio: 3/2; object-fit: cover; border-radius: var(--r-sm); background: var(--surface-0); }
+.wr-clip img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: var(--r-sm); background: var(--surface-0); }
+.wr-meta { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-11); color: var(--text-1); }
+.wr-meta span { color: var(--text-3); }
+.wr-tags { color: var(--text-3); }
+.wr-play { align-self: flex-start; }
+.wr-note { font-size: var(--fs-11); line-height: 1.6; color: var(--text-3); border-top: 1px solid var(--hair); padding-top: 9px; }
+.wr-note code { color: var(--accent); }
 .por-look { width: 100%; height: 100%; object-fit: cover; display: block; }
-.wr-clip img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 7px;
-               background: #05070d; }
-.wr-wants { display: flex; flex-direction: column; gap: 5px; padding: 9px 11px;
-            border-radius: 9px; font-size: 11px;
-            background: rgba(245,158,11,.06); border: 1px solid rgba(245,158,11,.22); }
-.wr-wants b { color: var(--es-amber); font-size: 10px; letter-spacing: .12em;
-              text-transform: uppercase; }
-.wr-want { color: var(--es-ink); display: flex; gap: 8px; }
-.wr-wants code { color: var(--es-dim); font-size: 10px; margin-top: 3px; }
-.wr-new { display: flex; flex-direction: column; gap: 8px; padding: 10px 11px;
-          border-radius: 10px; background: rgba(var(--es-rgb), .09);
-          border: 1px solid rgba(var(--es-rgb), .30); }
-.wr-new > b { color: var(--es); font-size: 10px; letter-spacing: .14em;
-              text-transform: uppercase; }
+.wr-new { display: flex; flex-direction: column; gap: var(--sp-2); padding: 10px 11px; border-radius: var(--r-md);
+  background: rgba(var(--accent-rgb), .09); border: 1px solid rgba(var(--accent-rgb), .30); }
+.wr-new > b { color: var(--accent); font-size: var(--fs-11); letter-spacing: .14em; text-transform: uppercase; }
 .wr-newrow { display: flex; gap: 10px; align-items: center; }
 .wr-newrow img, .wr-newrow video { width: 76px; aspect-ratio: 3/4; object-fit: cover;
-                                   border-radius: 7px; background: #05070d; }
-.wr-her { display: flex; flex-wrap: wrap; gap: 5px; }
-.wr-chip { font-size: 10px; padding: 2px 8px; border-radius: 999px;
-           border: 1px solid rgba(var(--es-rgb), .22); color: var(--es-dim); }
-/* PREFIXED: `mood` and `voice` are the SHELL's, on Presence. G-ROOM-CSS caught
-   the collision — the third time this session that gate has earned itself. */
-.wr-chip.wr-mood { color: var(--es); border-color: rgba(var(--es-rgb), .40); }
-.wr-chip.wr-voice { color: #c084fc; border-color: rgba(192,132,252,.35); }
-.wr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-           gap: 7px; }
+  border-radius: var(--r-sm); background: var(--surface-0); }
+.wr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 7px; }
 .wr-face { display: flex; flex-direction: column; gap: 3px; align-items: center; }
-.wr-face img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 6px;
-               background: #05070d; border: 1px solid rgba(var(--es-rgb), .14); }
-.wr-face span { font-size: 9px; color: var(--es-dim); }
-.wr-face video { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 6px;
-                 background: #05070d; border: 1px solid rgba(var(--es-rgb), .14); }
-.wr-half { margin-left: auto; font-size: 9.5px; color: var(--es-amber); opacity: .85; }
-
-.wr-face.on img, .wr-face.on video { border-color: rgba(var(--es-rgb), .55);
-  box-shadow: 0 0 14px rgba(var(--es-rgb), .22); }
-.wr-thumb { width: 34px; height: 44px; object-fit: cover; border-radius: 5px;
-            background: #05070d; border: 1px solid rgba(var(--es-rgb), .18); }
-.wr-want { align-items: center; }
-
-/* the chat's speak button (.tool-btn.spk.on) still pulses with this; the looking chip
-   that named it is a kit Chip now (redesign stage 2) */
-@keyframes rscpulse { 50% { box-shadow: 0 0 10px rgba(70,217,230,.28); } }
+.wr-face img, .wr-face video { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: var(--r-sm);
+  background: var(--surface-0); border: 1px solid rgba(var(--accent-rgb), .14); }
+.wr-face span { font-size: var(--fs-11); color: var(--text-3); }
+.wr-face-on img, .wr-face-on video { border-color: rgba(var(--accent-rgb), .55); box-shadow: 0 0 14px rgba(var(--accent-rgb), .22); }
+.wr-wants { display: flex; flex-direction: column; gap: 5px; padding: 9px 11px; border-radius: var(--r-md);
+  font-size: var(--fs-12); background: rgba(var(--warn-rgb), .06); border: 1px solid rgba(var(--warn-rgb), .22); }
+.wr-want { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); color: var(--text-1); }
+.wr-want-t { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
+.wr-thumb { width: 34px; height: 34px; object-fit: cover; border-radius: 3px;
+  background: var(--surface-0); border: 1px solid rgba(var(--accent-rgb), .18); }
+.wr-half { margin-left: auto; font-size: var(--fs-11); color: var(--warn); }
 
 /* RESEARCH WINDOW (rsc-) — titles expand to what actually came back. Its chips, the box
    and the states are the kit's since redesign stage 2; this is the row. */
@@ -540,8 +467,7 @@ main { display: block; }
    distinction is the whole point of the feature: an evening where every unprompted
    thing looked identical is what made four of them feel like one machine repeating
    itself. */
-.turn.solo { opacity: .82; border-left: 2px solid #ffffff1f; padding-left: 10px; }
-.turn.solo .kairos-tag { font-style: italic; opacity: .7; }
+.turn.solo { opacity: .82; border-left: 2px solid var(--hair-strong); padding-left: 10px; }
 
 /* ── WHEN: the one time chip, on every line either of them produces ────────────
    His ask, 2026-08-05: "a date and time chip to all actions/dialog, both mine and
@@ -549,23 +475,20 @@ main { display: block; }
    would turn the log into a table of timestamps with some conversation in it. The
    relative half is dimmer than the clock time because "18:31" is what he
    cross-references against a log and "4m ago" is what he reads. */
-.when { font-size: 9.5px; letter-spacing: .04em; color: var(--off);
+.when { font-size: 9.5px; letter-spacing: .04em; color: var(--text-2);
   display: inline-flex; gap: 6px; align-items: baseline; cursor: help;
   font-variant-numeric: tabular-nums; }
-.when-ago { opacity: .62; }
+/* dimmer by ROLE, not opacity (redesign stage 6): the chip was --idle, about 2.4:1, and
+   this half dimmer still; now --text-2 and --text-3, both >= 4.5:1 */
+.when-ago { color: var(--text-3); }
 
 /* THE HEADER ROW OF A TURN — why she spoke, and when. Right-aligned time so a
    column of them lines up regardless of how long the reason is. */
 .turn-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
 .turn-head .when { margin-left: auto; }
 .turn.user .turn-head { justify-content: flex-end; }
-.kairos-tag { margin-bottom: 0; }
-/* FOUR KINDS, FOUR COLOURS. An evening of unprompted turns read as one machine
-   repeating itself when they all wore the same chip; the kind is the whole point. */
-.kairos-tag.k-solo     { color: #c9a4e8; background: #c9a4e814; border-color: #c9a4e83d; }
-.kairos-tag.k-muse     { color: var(--gold); background: #e8b64c14; border-color: #e8b64c3d; }
-.kairos-tag.k-remind   { color: var(--ok);   background: #4ad98a14; border-color: #4ad98a3d; }
-.kairos-tag.k-expand   { color: var(--cyan); background: #46d9e614; border-color: #46d9e63d; }
+/* FOUR KINDS, FOUR COLOURS: the tag is a kit Chip, its tone Chat.jsx's KIND_TONE (solo, warm,
+   ok, accent; the rest accent). The solo tone is the tint these rules drew by hand. */
 
 /* ── WHAT SHE DID, AS THINGS SHE DID ──────────────────────────────────────────
    These were a grey line of prose under her reply that read like debug output. An
@@ -574,29 +497,23 @@ main { display: block; }
    draws, and the live check measured her tool line in Inter (2026-09-26); the rule
    lives on the chip that is actually drawn now, and `.ev` is gone. */
 .acts { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 6px; }
-.act { font-family: var(--font-mono); font-size: 10px; padding: 2px 9px; border-radius: 99px; cursor: help;
-  display: inline-flex; gap: 6px; align-items: baseline; max-width: 100%;
-  border: 1px solid transparent; }
-.act b { font-weight: 600; letter-spacing: .02em; }
-.act-out { color: var(--muted); overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap; }
-.act-tool    { color: var(--cyan); background: #46d9e60f; border-color: #46d9e630; }
-.act-look    { color: var(--world); background: #46d9e60f; border-color: #46d9e630; }
-.act-persona { color: var(--private); background: #c96ce00f; border-color: #c96ce030; }
-/* A NOTE ABOUT THE MACHINE, not about her (the context trim). --gold and not --machine
-   (the red): this is not an error, it is a loss he is entitled to know about. It wraps,
-   because unlike every other chip its whole point is the sentence, not the label. */
-.act-notice  { color: var(--gold); background: #e8b64c0f; border-color: #e8b64c30; }
-.act-notice .act-out { white-space: normal; }
-/* what she remembered into the turn (audit D8, 2026-08-24) */
-.act-recall  { color: #9ecbff; background: #4c9be80f; border-color: #4c9be830; }
+/* Each act is a kit Chip since redesign stage 6's final wave (its kind is the chip's tone:
+   tool and look accent, her state private, a note warm, recall, wear). The words inside are
+   Chat's: the label and the value are mono, and the value is cut with an ellipsis so one
+   long result cannot push the row past the log at phone width. */
+.acts b, .act-out { font-family: var(--font-mono); }
+.acts b { font-weight: 600; letter-spacing: .02em; margin-right: 6px; }
+.act-out { display: inline-block; max-width: min(52ch, 60vw); overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; vertical-align: bottom; line-height: 1.35; color: var(--text-2); }
+/* a note and what she saw are the sentence, not the label: they wrap (the chip's `wrap`) */
+.act-full { display: inline; max-width: none; white-space: normal; }
 /* her thinking, folded (audit R2, 2026-08-24) — quiet by design: it is hers, he
    opens it when he wants her workings. */
 .thinking { margin: 2px 0 4px; font-size: 12px; }
-.thinking summary { cursor: pointer; opacity: .55; user-select: none; }
+.thinking summary { cursor: var(--cur-hand); opacity: .55; user-select: none; }
 .thinking summary:hover { opacity: .85; }
 .thinking-body { white-space: pre-wrap; opacity: .7; font-style: italic;
-                 border-left: 2px solid #ffffff22; padding: 4px 0 4px 10px;
+                 border-left: 2px solid var(--hair-strong); padding: 4px 0 4px 10px;
                  margin-top: 4px; }
 
 /* ── THE BOARD, WITH HANDS ─────────────────────────────────────────────────────
@@ -663,63 +580,50 @@ main { display: block; }
    A want is not one state. `delayed` is the one that needs to be visible — it used to
    be invisible, because the panel filtered on state=="asked" and a delayed row is not
    that. Colour says which without reading. */
-.wr-want.wr-delayed .wr-half { color: var(--gold); }
-.wr-want.wr-refused { opacity: .5; }
-.wr-want.wr-refused .wr-half { color: var(--off); text-decoration: line-through; }
-.wr-want.wr-making .wr-half { color: var(--cyan); }
-.wr-want .wr-thumb { width: 34px; height: 34px; object-fit: cover; border-radius: 3px; }
+.wr-want.wr-delayed .wr-half { color: var(--warm); }
+/* not going to be made: the words recede by role, not by opacity (AA) */
+.wr-want.wr-refused .wr-want-t { color: var(--text-3); }
+.wr-want.wr-refused .wr-half { color: var(--text-3); text-decoration: line-through; }
+.wr-want.wr-making .wr-half { color: var(--accent); }
 /* ── A SUGGESTION IS AN OFFER, NOT AN ORDER (2026-08-27) ──────────────────────────
    She reached for a verb the control surface does not have; the prose was kept and
    nothing is queued until he accepts. It reads as an offer — dimmer than live work,
    with a left edge so it is separable at a glance from the rows actually being made. */
-.wr-want.wr-suggested { opacity: .82; border-left: 2px solid var(--gold, #c9a); padding-left: 6px; }
-.wr-want.wr-suggested .wr-half { color: var(--gold, #c9a); }
+.wr-want.wr-suggested { border-left: 2px solid var(--warm); padding-left: 6px; }
+.wr-want.wr-suggested .wr-want-t { color: var(--text-2); }
+.wr-want.wr-suggested .wr-half { color: var(--warm); }
 /* HER EXACT WORDS, not a paraphrase of them: the offer is judged on what she wrote. */
-.wr-want.wr-suggested .wr-mark { font-family: var(--mono, ui-monospace, monospace);
-  font-size: .92em; opacity: .85; word-break: break-all; }
-.wr-gen.wr-accept { border-color: var(--gold, #c9a); }
-
-
+.wr-want.wr-suggested .wr-mark { font-family: var(--font-mono); font-size: .92em; color: var(--text-1); word-break: break-all; }
+.wr-gen.wr-accept { border-color: var(--warm); }
 /* NEW UNTIL SHE WEARS IT. Not "new until someone looked at a list" — his rule, and the
    difference is the whole point: a thing is new until it has been used. */
-.wr-clip.wr-fresh { outline: 1px solid rgba(var(--es-rgb), .5); }
-.wr-new-tag { position: absolute; top: 5px; left: 5px; z-index: 2;
-  font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase;
-  padding: 1px 6px; border-radius: 99px; color: var(--es);
-  background: #06080ccc; border: 1px solid rgba(var(--es-rgb), .5); }
-.wr-clip { position: relative; }
+.wr-fresh { outline: 1px solid rgba(var(--accent-rgb), .5); }
+.wr-new-tag { position: absolute; top: 5px; left: 5px; z-index: 2; }
 
 /* ── STOPPING HER ─────────────────────────────────────────────────────────────
    Red and set apart, at the right of the taskbar: the one control here that ends
    things. The confirm replaces the button in place, so the mode IS the second
    deliberate act and there is no modal to dismiss. The button and its row are
    drawn in room/shell.css (.tb-right .sd-*); the options and the down state here. */
-.sd-opt { background: transparent; border: 1px solid var(--line); color: var(--ink);
-  font-size: 10px; padding: 4px 6px; border-radius: 5px; cursor: pointer; }
-.sd-opt:hover:not(:disabled) { border-color: var(--cyan-dim); }
-.sd-opt:disabled { opacity: .5; cursor: default; }
-.sd-kill { color: var(--err); border-color: #e2685b4d; }
-.sd-cancel { color: var(--off); }
+.sd-opt { background: transparent; border: 1px solid var(--hair); color: var(--text-1);
+  font-size: 10px; padding: 4px 6px; border-radius: 5px; cursor: var(--cur-hand); }
+.sd-opt:hover:not(:disabled) { border-color: var(--accent-dim); }
+.sd-opt:disabled { opacity: .5; }
+.sd-kill { color: var(--err); border-color: rgba(var(--err-rgb), .3); }  /* was a hex alpha 0x4d = .302 */
+/* a text role, not --idle (about 2.4:1): "cancel" is a word he has to read (stage 6) */
+.sd-cancel { color: var(--text-3); }
 .sd-down { position: absolute; inset: 0; z-index: 40; display: flex;
   flex-direction: column; align-items: center; justify-content: center; gap: 10px;
-  background: #06080cf2; text-align: center; padding: 24px; }
+  background: rgba(var(--surface-0-rgb), .95); text-align: center; padding: 24px; }  /* 0xf2 = .949 */
 .sd-down-mark { font-size: 34px; color: var(--err); opacity: .8; }
-.sd-down-t { color: var(--ink); letter-spacing: .04em; }
-.sd-down-b { color: var(--muted); font-size: 12px; max-width: 46ch; line-height: 1.6; }
-.sd-down code { color: var(--cyan); }
+.sd-down-t { color: var(--text-1); letter-spacing: .04em; }
+.sd-down-b { color: var(--text-3); font-size: 12px; max-width: 46ch; line-height: 1.6; }
+.sd-down code { color: var(--accent); }
 
 /* ── generate-now + his wants (2026-08-21) ─────────────────────────────────── */
-.wr-gen { margin-left: 8px; padding: 2px 10px; border-radius: 8px; border: 1px solid var(--edge, #444);
-  background: transparent; color: inherit; cursor: pointer; font-size: 12px; }
-.wr-gen:hover:not(:disabled) { border-color: var(--accent, #c9a); }
-.wr-gen:disabled { opacity: .45; cursor: default; }
-.wr-gen-all { display: block; margin-top: 8px; }
-.wr-askrow { display: flex; gap: 8px; margin: 6px 0 10px; }
-.wr-ask { flex: 1; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--edge, #444);
-  background: transparent; color: inherit; font-size: 13px; }
-
-.wr-dismiss { padding: 2px 7px; opacity: .7; }
-.wr-dismiss:hover { opacity: 1; border-color: #c66; }
+.wr-gen-all { align-self: flex-start; margin-top: var(--sp-2); }
+.wr-askrow { display: flex; gap: var(--sp-2); margin: 6px 0 10px; }
+.wr-ask { flex: 1; min-width: 0; width: auto; }
 
 /* ── settings — the knob rows (st-, shared:knobs). Chips, fields, the test button and
    the states are the kit's since redesign stage 2; this is only the row's layout. ── */
@@ -768,7 +672,7 @@ main { display: block; }
 .sty-hint { margin: 0 0 var(--sp-2); font-size: var(--fs-11); color: var(--text-3); }
 .sty-tabs { margin-bottom: var(--sp-2); }
 .sty-row { border-bottom: 1px solid var(--hair); }
-.sty-row.gone { opacity: .45; }
+.sty-row.gone, .sty-row.gone .sty-text, .sty-row.gone .sty-core { color: var(--text-3); }
 .sty-line { display: flex; gap: var(--sp-2); align-items: baseline; width: 100%; padding: 5px 2px;
   line-height: 1.35; text-align: left; font: inherit; color: inherit; background: none; border: none;
   border-radius: var(--r-sm); }
@@ -803,8 +707,10 @@ button.sty-line:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--m
   border-bottom: 1px dotted var(--hair); }
 .prs-book .k { color: var(--text-3); }
 .prs-act { margin-left: var(--sp-2); }
-/* her state chip: always there, brighter on the turn she moved (2026-08-22) */
-.act-persona.moved { outline: 1px solid currentColor; opacity: 1; }
+/* her state chip: always there, ringed on the turn she moved (2026-08-22). The ring is the
+   wrapper's (a kit Chip takes no class), in her state's tone. */
+.act-mood { display: inline-flex; max-width: 100%; border-radius: var(--r-pill); }
+.act-mood.moved { outline: 1px solid rgba(var(--private-rgb), .75); }
 /* the live mode is the kit Button's secondary variant + aria-pressed — no outline of its own */
 .prs-now { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 10px; }
 .prs-now .prs-stop { margin-left: auto; }
@@ -812,44 +718,42 @@ button.sty-line:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--m
 .lib-state { margin-bottom: var(--sp-2); }
 .lib-row { margin: var(--sp-1) 0; color: var(--text-2); }
 .act-img { display: block; max-width: 100%; }
-.act-img summary { cursor: pointer; display: flex; gap: 6px; align-items: baseline; list-style: none; }
+.act-img summary { cursor: var(--cur-hand); display: flex; gap: 6px; align-items: baseline; list-style: none; }
 .act-img summary::-webkit-details-marker { display: none; }
-.act-img .act-out { white-space: normal; }
-.act-img-full { white-space: pre-wrap; font-size: 12px; line-height: 1.5; opacity: .85; padding: 6px 2px 2px; }
+/* the whole of what she saw, dimmed by role (it was opacity .85) */
+.act-img-full { white-space: pre-wrap; font-size: 12px; line-height: 1.5; color: var(--text-2); padding: 6px 2px 2px; }
 
-/* her voice in the composer (2026-08-21) */
-.tool-btn.spk { opacity: .55; }
-.tool-btn.spk.on { opacity: 1; color: var(--cyan); animation: rscpulse 1.6s ease-in-out infinite; }
-.tool-btn.spk.off { opacity: .35; }
-@media (prefers-reduced-motion: reduce) { .tool-btn.spk.on { animation: none; } }
+/* her voice in the composer (2026-08-21): a kit Button with aria-pressed while she speaks
+   (the kit's pressed style); the pulse it wore is gone, and so is the opacity it idled at. */
 
 /* ── the closet, managed (2026-08-21): inbox import, edit, hide, retire ───────── */
-.wr-closet { margin-top: 14px; border-top: 1px solid rgba(128,128,128,.15); padding-top: 10px; }
-.wr-inbox { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 6px 0 12px; }
+.wr-closet { margin-top: 14px; border-top: 1px solid var(--hair); padding-top: 10px; }
+.wr-in-help { margin-bottom: 6px; }
+.wr-inbox { display: grid; grid-template-columns: 1fr; gap: var(--sp-2); margin: 6px 0 12px; }
 .wr-inrow { display: grid; grid-template-columns: 1.2fr .8fr 1.4fr auto; gap: 6px; align-items: center;
-  padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(128,128,128,.18); font-size: 12px; }
-.wr-inrow input, .wr-inrow select, .wr-edit input, .wr-edit select, .wr-edit textarea {
-  background: transparent; color: inherit; border: 1px solid var(--edge, #444); border-radius: 6px;
-  padding: 3px 6px; font-size: 12px; width: 100%; }
-.wr-inrow .wr-fname { font-family: monospace; font-size: 11px; opacity: .8; word-break: break-all; }
-.wr-inrow label { font-size: 10.5px; opacity: .75; white-space: nowrap; }
+  padding: 6px var(--sp-2); border-radius: var(--r-md); border: 1px solid var(--hair-strong); font-size: var(--fs-12); }
+.wr-fname { font: 400 var(--fs-11)/1.4 var(--font-mono); color: var(--text-2); word-break: break-all; }
+.wr-in-desc { grid-column: 1 / 3; }
+.wr-in-loop { grid-column: 3 / 5; display: flex; align-items: center; gap: 6px; font-size: var(--fs-11); color: var(--text-2); }
+/* layout fix (stage 6, 3/9): at 375 the four columns squeezed the kind select to 58px */
+@media (max-width: 620px) { .wr-inrow { grid-template-columns: 1fr 1fr; } .wr-in-desc, .wr-in-loop { grid-column: 1 / -1; } }
 .wr-rows { display: flex; flex-direction: column; gap: 4px; }
-.wr-row { display: grid; grid-template-columns: 16px 64px 1fr auto; gap: 8px; align-items: center;
-  padding: 5px 6px; border-radius: 8px; border: 1px solid rgba(128,128,128,.12); font-size: 12px; }
-.wr-row.wr-on { border-color: rgba(70,217,230,.45); }
-.wr-row.wr-dim { opacity: .55; }
-.wr-row .wr-thumb2 { width: 64px; height: 42px; object-fit: cover; border-radius: 5px; background: #0003; }
-.wr-row .wr-cat { font-size: 9.5px; text-transform: uppercase; letter-spacing: .08em; opacity: .7;
-  border: 1px solid var(--edge, #444); border-radius: 6px; padding: 1px 5px; }
-.wr-row .wr-ttl { font-weight: 500; }
-.wr-row .wr-desc { font-size: 11px; opacity: .6; }
-.wr-row .wr-acts { display: flex; gap: 4px; }
-.wr-row .wr-acts button { padding: 2px 7px; font-size: 11px; }
-.wr-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px 8px 8px 30px; }
-.wr-edit textarea { grid-column: 1 / -1; min-height: 44px; resize: vertical; }
-.wr-edit .wr-editacts { grid-column: 1 / -1; display: flex; gap: 6px; }
-.wr-fold summary { cursor: pointer; font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
-  opacity: .65; margin: 8px 0 4px; }
+.wr-row { display: grid; grid-template-columns: 16px 64px minmax(0, 1fr) auto; gap: var(--sp-2); align-items: center;
+  padding: 5px 6px; border-radius: var(--r-md); border: 1px solid var(--hair); font-size: var(--fs-12); }
+.wr-row-on { border-color: rgba(var(--accent-rgb), .45); }
+/* hidden or retired: the words recede by role, not by opacity (it was .55, under AA) */
+.wr-row-dim .wr-ttl, .wr-row-dim .wr-desc { color: var(--text-3); }
+.wr-src { color: var(--text-3); }
+.wr-thumb2 { width: 64px; height: 42px; object-fit: cover; border-radius: var(--r-sm); background: var(--surface-0); }
+.wr-row-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.wr-ttl { font-weight: 500; color: var(--text-1); overflow-wrap: anywhere; }
+.wr-desc { font-size: var(--fs-11); color: var(--text-2); }
+.wr-acts { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.wr-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px var(--sp-2) var(--sp-2) 30px; }
+.wr-e-desc, .wr-editacts { grid-column: 1 / -1; }
+.wr-editacts { display: flex; gap: 6px; }
+.wr-fold summary { margin: var(--sp-2) 0 4px; font-size: var(--fs-11); letter-spacing: .12em;
+  text-transform: uppercase; color: var(--text-2); }
 
 /* ── setup (2026-08-23): what is configured and what is not ───────────────────
  * Deliberately quiet furniture. This window is read at most twice — once on the
@@ -925,24 +829,22 @@ button.sty-line:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--m
    dead LED, the kill option); anonymous mode is neither. It is a deliberate state he
    chose and it is working correctly while it is on, so it gets its own colour rather
    than borrowing the one that means something went wrong. */
-.an-btn:disabled { opacity: .5; cursor: default; }
+.an-btn:disabled { opacity: .5; }
 .an-btn.on .an-lb { color: var(--an); }
 .an-receipt { margin: 4px 2px 0; padding: 5px 6px; border-radius: 5px; font-size: 9.5px;
-  line-height: 1.35; color: var(--es-dim); background: #a78bfa0d;
-  border: 1px solid #a78bfa2e; cursor: pointer; }
+  line-height: 1.35; color: var(--text-3); background: rgba(var(--an-rgb), .05);
+  border: 1px solid rgba(var(--an-rgb), .18); cursor: var(--cur-hand); }  /* 0x0d = .051, 0x2e = .180 */
 
 /* THE ROOM ITSELF. An inset rule rather than a banner: it is present in peripheral
    vision on every frame and costs no layout, so it cannot be scrolled past, covered by
    a window, or mistaken for one more chip in a row of chips. */
 .room.an-on::after { content: ""; position: fixed; inset: 0; pointer-events: none;
-  z-index: 60; border: 1px solid rgba(167,139,250,.42);
-  box-shadow: inset 0 0 44px rgba(167,139,250,.10); }
+  z-index: 60; border: 1px solid rgba(var(--an-rgb), .42);
+  box-shadow: inset 0 0 44px rgba(var(--an-rgb), .10); }
 
-/* SHE CHANGED HER CLOTHES (2026-08-24). The same hue the [WEAR:] mark's chip uses in
-   Chat.jsx (h 288), because a tool-driven change and a mark-driven change are the same
-   event and must not read as two different things. */
-.act-wear { color: #d8a7ea; background: rgba(216,167,234,.10);
-  border-color: rgba(216,167,234,.34); }
+/* SHE CHANGED HER CLOTHES (2026-08-24): the kit's `wear` tone since redesign stage 6's final
+   wave — the same hue the [WEAR:] mark's chip uses in Chat.jsx (h 288), because a tool-driven
+   change and a mark-driven change are the same event. */
 
 /* ── body: his heart and his movement (2026-08-26) ─────────────────────────────────── */
 /* The tail is the feature, so the tail gets the ink: each reading is its own pill and the
@@ -1019,11 +921,11 @@ button.sty-line:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--m
 .rv-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .rv-think {
   position: absolute; left: 10px; bottom: 8px; font-size: 10px; letter-spacing: .08em;
-  color: var(--es); text-shadow: 0 1px 4px rgba(0,0,0,.9);
+  color: var(--accent); text-shadow: 0 1px 4px rgba(var(--shade-rgb), .9);
 }
 .rv-read {
   display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 3px 8px;
-  padding: 8px 10px; border-top: 1px solid var(--line); font-size: 11px;
+  padding: 8px 10px; border-top: 1px solid var(--hair); font-size: 11px;
 }
-.rv-k { color: var(--muted); letter-spacing: .06em; }
-.rv-v { color: var(--es-ink); }
+.rv-k { color: var(--text-3); letter-spacing: .06em; }
+.rv-v { color: var(--text-1); }

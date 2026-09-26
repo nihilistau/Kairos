@@ -162,18 +162,21 @@ export function BodyView({ d, hours, setHours, hist, err }) {
           </span>
         ) : null}
       </div>
-      {err ? <State kind="error">{err}</State> : null}
-      {hist && hist.ok ? (
-        hist.kinds.length === 0
-          ? <State kind="empty">nothing recorded in this window.</State>
-          : hist.kinds.map(k => (
-              <div key={k} className="tel-series">
-                <div className="tel-series-k">{KIND_LABEL[k] || k}</div>
-                <Spark points={hist.series[k]} />
-                <div className="tel-series-n">{hist.series[k].length + ' min'}</div>
-              </div>
-            ))
-      ) : <State kind="loading">reading history…</State>}
+      {/* ONE history state at a time (redesign stage 6): a failed fetch is the error alone,
+          a refused read says the server's words, and loading means only "not answered yet". */}
+      {err ? <State kind="error">{err}</State>
+        : hist && hist.ok === false ? <State kind="error">{hist.error || 'history unavailable'}</State>
+        : hist && hist.ok ? (
+          hist.kinds.length === 0
+            ? <State kind="empty">nothing recorded in this window.</State>
+            : hist.kinds.map(k => (
+                <div key={k} className="tel-series">
+                  <div className="tel-series-k">{KIND_LABEL[k] || k}</div>
+                  <Spark points={hist.series[k]} />
+                  <div className="tel-series-n">{hist.series[k].length + ' min'}</div>
+                </div>
+              ))
+        ) : <State kind="loading">reading history…</State>}
     </>
   )
 }
@@ -190,6 +193,7 @@ export default function Body() {
   const [err, setErr] = useState('')
 
   useEffect(() => {
+    setErr(''); setHist(null)
     let live = true
     api.telemetryHistory(hours)
       .then(h => { if (live) setHist(h) })

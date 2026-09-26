@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { usePoll, Body } from './panel.jsx'
+import { Button, Chip, Input, State, Tabs } from '../kit/parts.jsx'
 import * as api from '../api.js'
 
 /* GAMES — a board you both touch.
@@ -19,9 +20,13 @@ import * as api from '../api.js'
  */
 
 const GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' }
+// Each square's accessible name — chrome words, so a keyboard can play. Not hers.
+const PIECE = { k: 'king', q: 'queen', r: 'rook', b: 'bishop', n: 'knight', p: 'pawn' }
+// A wordle mark, for the eye and in words: colour alone is not a mark (WCAG 1.4.1).
+const WMARK = { g: ['hit', 'in place'], y: ['near', 'elsewhere'], '.': ['miss', 'not in the word'] }
 
-function Board({ st, onMove }) {
-  const [from, setFrom] = useState(null)
+export function Board({ st, onMove, startFrom = null }) {
+  const [from, setFrom] = useState(startFrom)
   const rows = st.fen.split(' ')[0].split('/')
   const grid = []
   for (const row of rows) {
@@ -47,51 +52,55 @@ function Board({ st, onMove }) {
   }
 
   return (
-    <div className="gm-board">
+    <div className="gm-board" role="group" aria-label="the board">
       {grid.map((c, i) => {
         const sq = name(i)
         const dark = (Math.floor(i / 8) + i % 8) % 2 === 1
-        const cls = ['gm-sq', dark ? 'd' : 'l',
-                     from === sq ? 'from' : '',
-                     targets.includes(sq) ? 'to' : '',
-                     (last.slice(0, 2) === sq || last.slice(2, 4) === sq) ? 'last' : ''].join(' ')
+        const to = targets.includes(sq)
+        const cls = ['gm-sq', dark ? 'gm-sq-d' : 'gm-sq-l',
+                     from === sq ? 'gm-sq-from' : '',
+                     to ? 'gm-sq-to' : '',
+                     (last.slice(0, 2) === sq || last.slice(2, 4) === sq) ? 'gm-sq-last' : ''].filter(Boolean).join(' ')
+        const who = c !== '.' ? (c === c.toUpperCase() ? ' white ' : ' black ') + PIECE[c.toLowerCase()] : ''
         return (
-          <div key={i} className={cls} onClick={() => click(i)} title={sq}>
+          <button key={i} type="button" className={cls} title={sq}
+                  aria-label={sq + who + (to ? ', a legal move' : '')} aria-pressed={from === sq ? true : undefined}
+                  onClick={() => click(i)}>
             {c !== '.' ? (
-              <span className={'gm-p ' + (c === c.toUpperCase() ? 'gm-lt' : 'gm-dk')}>
+              <span className={'gm-p ' + (c === c.toUpperCase() ? 'gm-p-lt' : 'gm-p-dk')} aria-hidden="true">
                 {GLYPH[c.toLowerCase()]}
               </span>
             ) : null}
-          </div>
+          </button>
         )
       })}
     </div>
   )
 }
 
-function Wordle({ st, onMove }) {
-  const [g, setG] = useState('')
+export function Wordle({ st, onMove, startGuess = '' }) {
+  const [g, setG] = useState(startGuess)
   return (
     <>
       <div className="gm-wgrid">
         {st.history.map((w, r) => (
           <div key={r} className="gm-wrow">
-            {w.split('').map((ch, i) => (
-              <span key={i} className={'gm-w ' + st.marks[r][i]}>{ch}</span>
-            ))}
+            {w.split('').map((ch, i) => {
+              const m = WMARK[st.marks[r][i]] || WMARK['.']
+              return <span key={i} className={'gm-w gm-w-' + m[0]} title={m[1]}>{ch}<span className="gm-sr">{', ' + m[1]}</span></span>
+            })}
           </div>
         ))}
       </div>
       {!st.over ? (
         <div className="gm-ctl">
-          <input className="gm-in" value={g} maxLength={5} placeholder="five letters"
+          <Input className="gm-in" value={g} maxLength={5} placeholder="five letters" aria-label="five letters"
                  onChange={e => setG(e.target.value.replace(/[^a-z]/gi, '').toLowerCase())}
                  onKeyDown={e => { if (e.key === 'Enter' && g.length === 5) { onMove(g); setG('') } }} />
-          <button className="on" disabled={g.length !== 5}
-                  onClick={() => { onMove(g); setG('') }}>guess</button>
-          <span className="muted">{st.tries_left} left</span>
+          <Button variant="primary" disabled={g.length !== 5} onClick={() => { onMove(g); setG('') }}>guess</Button>
+          <span className="gm-n">{st.tries_left + ' left'}</span>
         </div>
-      ) : <p className="muted">{st.result} — {st.reason}</p>}
+      ) : <p className="gm-n">{st.result + ' — ' + st.reason}</p>}
     </>
   )
 }
@@ -104,16 +113,16 @@ function Wordle({ st, onMove }) {
 const SUIT = { s: '♠', h: '♥', d: '♦', c: '♣' }
 
 function Card({ c }) {
-  if (!c) return <span className="pk-card back" />
+  if (!c) return <span className="gm-pk-card gm-pk-back" />
   const red = c[1] === 'h' || c[1] === 'd'
   return (
-    <span className={'pk-card' + (red ? ' red' : '')}>
+    <span className={'gm-pk-card' + (red ? ' gm-pk-red' : '')}>
       {c[0] === 'T' ? '10' : c[0]}<i>{SUIT[c[1]]}</i>
     </span>
   )
 }
 
-function Poker({ st, onAct, onDeal }) {
+export function Poker({ st, onAct, onDeal }) {
   const [amt, setAmt] = useState(0)
   const me = st.seats[st.seat]
   const them = st.seats[1 - st.seat]
@@ -126,68 +135,145 @@ function Poker({ st, onAct, onDeal }) {
 
   return (
     <>
-      <div className="pk-head">
-        <span>hand {st.hand_no}</span><span className="pk-street">{st.street}</span>
-        <span className="muted">{st.sb}/{st.bb}</span>
+      <div className="gm-pk-head">
+        <span>{'hand ' + st.hand_no}</span><span className="gm-pk-street">{st.street}</span>
+        <span className="gm-n">{st.sb + '/' + st.bb}</span>
       </div>
 
-      <div className="pk-seat them">
-        <span className="pk-name">{them.name}{st.button === 1 - st.seat ? ' ◉' : ''}</span>
-        <span className="pk-hole">
+      <div className="gm-pk-seat">
+        <span className="gm-pk-name">{them.name + (st.button === 1 - st.seat ? ' ◉' : '')}</span>
+        <span className="gm-pk-hole">
           <Card c={them.hole && them.hole[0]} /><Card c={them.hole && them.hole[1]} />
         </span>
-        <span className="pk-stack">{them.stack}</span>
-        {them.street_bet ? <span className="pk-bet">{them.street_bet}</span> : null}
-        {them.folded ? <span className="muted">folded</span> : null}
+        <span className="gm-pk-stack">{them.stack}</span>
+        {them.street_bet ? <span className="gm-pk-bet">{them.street_bet}</span> : null}
+        {them.folded ? <Chip>folded</Chip> : null}
       </div>
 
-      <div className="pk-pot">pot <b>{st.pot}</b></div>
-      <div className="pk-board">
+      <div className="gm-pk-pot">pot <b>{st.pot}</b></div>
+      <div className="gm-pk-board">
         {[0, 1, 2, 3, 4].map(i => <Card key={i} c={st.board[i]} />)}
       </div>
 
-      <div className="pk-seat mine">
-        <span className="pk-name">{me.name}{st.button === st.seat ? ' ◉' : ''}</span>
-        <span className="pk-hole">
+      <div className="gm-pk-seat gm-pk-mine">
+        <span className="gm-pk-name">{me.name + (st.button === st.seat ? ' ◉' : '')}</span>
+        <span className="gm-pk-hole">
           <Card c={me.hole && me.hole[0]} /><Card c={me.hole && me.hole[1]} />
         </span>
-        <span className="pk-stack">{me.stack}</span>
-        {me.street_bet ? <span className="pk-bet">{me.street_bet}</span> : null}
+        <span className="gm-pk-stack">{me.stack}</span>
+        {me.street_bet ? <span className="gm-pk-bet">{me.street_bet}</span> : null}
       </div>
 
       {st.over ? (
-        <div className="pk-ctl">
+        <div className="gm-pk-ctl">
           {st.winners.map((w, i) => (
-            <span key={i} className="good">
-              {st.seats[w.seat].name} wins {w.amount}{w.hand ? ' with ' + w.hand : ''}
-            </span>
+            <Chip key={i} tone="ok" wrap>
+              {st.seats[w.seat].name + ' wins ' + w.amount + (w.hand ? ' with ' + w.hand : '')}
+            </Chip>
           ))}
-          <button className="on" onClick={onDeal}>deal next</button>
+          <Button variant="primary" onClick={onDeal}>deal next</Button>
         </div>
       ) : yours ? (
-        <div className="pk-ctl">
-          {o.actions.includes('fold') ? <button onClick={() => onAct('fold')}>fold</button> : null}
-          {o.actions.includes('check') ? <button onClick={() => onAct('check')}>check</button> : null}
+        <div className="gm-pk-ctl">
+          {o.actions.includes('fold') ? <Button size="sm" onClick={() => onAct('fold')}>fold</Button> : null}
+          {o.actions.includes('check') ? <Button size="sm" onClick={() => onAct('check')}>check</Button> : null}
           {o.actions.includes('call')
-            ? <button onClick={() => onAct('call')}>call {call} <i className="muted">({need}%)</i></button>
+            ? <Button size="sm" onClick={() => onAct('call')}>{'call ' + call}<span className="gm-pk-need">{' (' + need + '%)'}</span></Button>
             : null}
           {(o.actions.includes('raise') || o.actions.includes('bet')) ? (
             <>
-              <input className="pk-in" type="number" value={amt || o.min_raise_to || 0}
+              <Input className="gm-pk-in" type="number" aria-label="raise to" value={amt || o.min_raise_to || 0}
                      min={o.min_raise_to} max={o.max_raise_to}
                      onChange={e => setAmt(Number(e.target.value))} />
-              <button className="on"
+              <Button size="sm"
                       onClick={() => onAct(o.actions.includes('bet') ? 'bet' : 'raise',
                                            amt || o.min_raise_to)}>
-                {o.actions.includes('bet') ? 'bet' : 'raise'} to
-              </button>
+                {(o.actions.includes('bet') ? 'bet' : 'raise') + ' to'}
+              </Button>
             </>
           ) : null}
-          {o.actions.includes('allin') ? <button className="r-off" onClick={() => onAct('allin')}>all in</button> : null}
+          {o.actions.includes('allin') ? <Button variant="danger" size="sm" onClick={() => onAct('allin')}>all in</Button> : null}
         </div>
-      ) : <div className="pk-ctl muted">waiting for {them.name}…</div>}
+      ) : <div className="gm-pk-ctl gm-n">{'waiting for ' + them.name + '…'}</div>}
 
-      <div className="pk-log">{(st.log || []).slice(-6).map((l, i) => <div key={i}>{l}</div>)}</div>
+      <div className="gm-pk-log">{(st.log || []).slice(-6).map((l, i) => <div key={i}>{l}</div>)}</div>
+    </>
+  )
+}
+
+/* The window's body, split out so G-ROOM-KIT leg 13 can render it with fixtures. The poll
+ * and act() stay in the default export. Your games are the kit's Tabs — they were a
+ * single-select row of bare buttons inside a `.chips` row; the actions beside them are
+ * kit Buttons, and remove (which drops a game) is danger. */
+export function GamesView({ d, pick, setPick, err, setErr, act, startFrom, startGuess }) {
+  if (d.ok === false) return <State kind="error">{'games unavailable — ' + d.error}</State>
+  const ids = Object.keys(d.states || {})
+  const cur = (pick && d.states[pick]) || d.states[ids[0]] || null
+  return (
+    <>
+      <div className="gm-bar">
+        {ids.length ? (
+          <div className="gm-tabs">
+            <Tabs value={cur ? cur.id : ''} label="your games" onChange={id => { setPick(id); setErr('') }}
+                  tabs={ids.map(id => ({ id, label: id }))} />
+          </div>
+        ) : null}
+        <div className="gm-new">
+          {(d.kinds || []).map(k => (
+            <Button key={k} size="sm" onClick={() => act({ op: 'new', kind: k, name: k })}>{'+ ' + k}</Button>
+          ))}
+          {cur ? (
+            <Button variant="danger" size="sm" onClick={() => { act({ op: 'drop', name: cur.id }); setPick(null) }}>remove</Button>
+          ) : null}
+        </div>
+      </div>
+
+      {err ? <div className="gm-err"><Chip tone="err" wrap>{err}</Chip></div> : null}
+      {!cur ? <State kind="empty">No game yet — start one above, or ask her to.</State> : null}
+
+      {cur && cur.kind === 'chess' ? (
+        <>
+          <div className="gm-head">
+            {cur.over
+              ? <b>{cur.result + ' — ' + cur.reason}</b>
+              : <><b>{cur.side}</b>{' to move'}{cur.in_check ? <Chip tone="err">in check</Chip> : null}</>}
+            <span className="gm-n">{cur.history.length + ' moves'}</span>
+          </div>
+          <Board st={cur} startFrom={startFrom} onMove={m => act({ op: 'move', name: cur.id, move: m })} />
+          <div className="gm-moves">{cur.history.join(' ')}</div>
+          {/* RESIGN, DRAW, TAKEBACK. Found by playing rather than by reading:
+              the rules were complete and "gg" still had nowhere to live, so a
+              resigned game sat in the listing forever with no result. */}
+          <div className="gm-ctl gm-agree">
+            {cur.draw_offer ? (
+              <>
+                <Chip tone="warn" wrap>{cur.draw_offer + ' offers a draw'}</Chip>
+                <Button variant="primary" size="sm" onClick={() => act({ op: 'draw', name: cur.id, accept: true })}>accept</Button>
+                <Button size="sm" onClick={() => act({ op: 'draw', name: cur.id, accept: false })}>decline</Button>
+              </>
+            ) : !cur.over ? (
+              <Button size="sm" onClick={() => act({ op: 'offer_draw', name: cur.id })}>offer draw</Button>
+            ) : null}
+            {!cur.over ? (
+              <Button variant="danger" size="sm" onClick={() => act({ op: 'resign', name: cur.id })}>resign</Button>
+            ) : null}
+            {cur.history.length ? (
+              <Button variant="ghost" size="sm" onClick={() => act({ op: 'rewind', name: cur.id, plies: 1 })}
+                      title="takes back one half-move; un-ends a finished game">take back</Button>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+
+      {cur && cur.kind === 'holdem' ? (
+        <Poker st={cur}
+               onAct={(a, n) => act({ op: 'move', name: cur.id, move: n ? a + ' ' + n : a })}
+               onDeal={() => act({ op: 'deal', name: cur.id })} />
+      ) : null}
+
+      {cur && cur.kind === 'wordle' ? (
+        <Wordle st={cur} startGuess={startGuess} onMove={w => act({ op: 'move', name: cur.id, move: w })} />
+      ) : null}
     </>
   )
 }
@@ -207,74 +293,7 @@ export default function Games() {
 
   return (
     <div className="pad gm">
-      <Body state={s}>{d => {
-        if (d.ok === false) return <div className="err">games unavailable — {d.error}</div>
-        const ids = Object.keys(d.states || {})
-        const cur = (pick && d.states[pick]) || d.states[ids[0]] || null
-        return (
-          <>
-            <div className="chips">
-              {ids.map(id => (
-                <button key={id} className={cur && cur.id === id ? 'on' : ''}
-                        onClick={() => { setPick(id); setErr('') }}>{id}</button>
-              ))}
-              {(d.kinds || []).map(k => (
-                <button key={k} onClick={() => act({ op: 'new', kind: k, name: k })}>+ {k}</button>
-              ))}
-              {cur ? <button className="r-off" onClick={() => { act({ op: 'drop', name: cur.id }); setPick(null) }}>
-                remove</button> : null}
-            </div>
-
-            {err ? <div className="err gm-err">{err}</div> : null}
-            {!cur ? <p className="muted">No game yet — start one above, or ask her to.</p> : null}
-
-            {cur && cur.kind === 'chess' ? (
-              <>
-                <div className="gm-head">
-                  {cur.over
-                    ? <b>{cur.result} — {cur.reason}</b>
-                    : <><b>{cur.side}</b> to move{cur.in_check ? <span className="bad"> — in check</span> : null}</>}
-                  <span className="muted">{cur.history.length} moves</span>
-                </div>
-                <Board st={cur} onMove={m => act({ op: 'move', name: cur.id, move: m })} />
-                <div className="gm-moves">{cur.history.join(' ')}</div>
-                {/* RESIGN, DRAW, TAKEBACK. Found by playing rather than by reading:
-                    the rules were complete and "gg" still had nowhere to live, so a
-                    resigned game sat in the listing forever with no result. */}
-                <div className="gm-ctl gm-agree">
-                  {cur.draw_offer ? (
-                    <>
-                      <span className="warn">{cur.draw_offer} offers a draw</span>
-                      <button className="on" onClick={() => act({ op: 'draw', name: cur.id, accept: true })}>accept</button>
-                      <button onClick={() => act({ op: 'draw', name: cur.id, accept: false })}>decline</button>
-                    </>
-                  ) : !cur.over ? (
-                    <button onClick={() => act({ op: 'offer_draw', name: cur.id })}>offer draw</button>
-                  ) : null}
-                  {!cur.over ? (
-                    <button className="r-off" onClick={() => act({ op: 'resign', name: cur.id })}>resign</button>
-                  ) : null}
-                  {cur.history.length ? (
-                    <button onClick={() => act({ op: 'rewind', name: cur.id, plies: 1 })}
-                            title="takes back one half-move; un-ends a finished game">take back</button>
-                  ) : null}
-                </div>
-              </>
-            ) : null}
-
-            {cur && cur.kind === 'holdem' ? (
-              <Poker st={cur}
-                     onAct={(a, n) => act({ op: 'move', name: cur.id,
-                                            move: n ? a + ' ' + n : a })}
-                     onDeal={() => act({ op: 'deal', name: cur.id })} />
-            ) : null}
-
-            {cur && cur.kind === 'wordle' ? (
-              <Wordle st={cur} onMove={w => act({ op: 'move', name: cur.id, move: w })} />
-            ) : null}
-          </>
-        )
-      }}</Body>
+      <Body state={s}>{d => <GamesView d={d} pick={pick} setPick={setPick} err={err} setErr={setErr} act={act} />}</Body>
     </div>
   )
 }

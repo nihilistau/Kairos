@@ -38,6 +38,17 @@ function area(el) {
   return d ? { w: d.clientWidth, h: d.clientHeight } : { w: window.innerWidth || 1280, h: window.innerHeight || 800 }
 }
 
+/* THE DEFAULT BOX FITS THE DESKTOP (redesign stage 6, final wave). It was
+ * x = max(120, width - 400) at 340 wide, so at a 375px phone it ran from 120 to 460: the
+ * desktop clips it, but its scrollWidth grew by 85px and a focus scrolled the whole desktop
+ * sideways with no way back. Now the top right as before where there is room, pulled left
+ * until its right edge is the desktop's, and never wider than the desktop. A box he has
+ * placed himself is his; only the default is fitted. */
+export function defaultBox(a) {
+  const w = Math.min(340, a.w)
+  return { x: Math.max(0, Math.min(Math.max(120, a.w - 400), a.w - w)), y: 24, w, h: 440 }
+}
+
 function load() {
   try {
     const b = JSON.parse(localStorage.getItem(KEY) || 'null')
@@ -47,9 +58,9 @@ function load() {
 }
 
 export default function Portrait({ mood, thinking }) {
-  const [box, setBox] = useState(() => load() || {
-    x: Math.max(120, (window.innerWidth || 1280) - 400), y: 24, w: 340, h: 440,
-  })
+  // `fresh` marks the default until it has been fitted to the desktop's own box on mount
+  // (before the element exists, area() can only measure the window)
+  const [box, setBox] = useState(() => load() || { ...defaultBox(area(null)), fresh: true })
   const [wd, setWd] = useState(null)
   const drag = useRef(null)
   const el = useRef(null)
@@ -71,8 +82,10 @@ export default function Portrait({ mood, thinking }) {
    * resize, keeping a grabbable strip on screen rather than snapping her to a corner.
    * The same floor holds while she is dragged, so she cannot be dropped out of reach. */
   useEffect(() => {
-    const clamp = () => setBox(b => {
+    const clamp = () => setBox(b0 => {
       const a = area(el.current)
+      // the default is fitted to the desktop first (and, unchanged below, not saved: it is not his arrangement)
+      const b = b0.fresh ? defaultBox(a) : b0
       const maxX = Math.max(0, a.w - 90)
       const maxY = Math.max(0, a.h - STRIP)
       const w = Math.min(b.w, Math.max(MIN_W, a.w - 20))

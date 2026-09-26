@@ -4,7 +4,8 @@
 import { useRef } from 'react'
 import { Icon } from './icons.jsx'
 
-/* CHIP. tone: neutral | accent | ok | warn | err | mood | an | warm (his words).
+/* CHIP. tone: neutral | accent | ok | warn | err | mood | an | warm (his words) | private (her
+ * state) | recall (what she remembered) | wear (what she put on) | solo (her own time).
  * BUSY is a state, not a tone: something bounded is happening now (a search in flight, a
  * picture being made). It pulses the dot, so it implies one. Something that lasts (a
  * scene, a reading) wears a still `dot` instead: an endless pulse is motion he cannot

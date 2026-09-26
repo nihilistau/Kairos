@@ -2,6 +2,7 @@ import { usePoll, Body } from './panel.jsx'
 import * as api from '../api.js'
 import { KnobGroups } from './knobs.jsx'
 import { Chip, Button } from '../kit/parts.jsx'
+import { ago } from '../room/facts.js'
 
 /* THE LIBRARIANS — the aux (LFM2.5) CPU helpers (2026-08-22, sub-project D).
  *
@@ -16,7 +17,7 @@ export function LibrariansView({ d, onRebuild }) {
     : <Chip tone={d.embed_up && d.chat_up ? 'ok' : 'warn'} dot wrap>
         armed · embed {d.embed_up ? '✓' : 'dark'} · chat {d.chat_up ? '✓' : 'dark'}
         {' · '}{d.chunks} chunks in {d.files} files
-        {d.last_refresh_s_ago != null ? ' · refreshed ' + Math.round(d.last_refresh_s_ago / 60) + 'm ago' : ''}
+        {d.last_refresh_s_ago != null ? ' · refreshed ' + ago(d.last_refresh_s_ago) : ''}
         {d.warming ? ' · warming…' : ''}
       </Chip>
   return (

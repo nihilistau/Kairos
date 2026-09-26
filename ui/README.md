@@ -42,7 +42,7 @@ and loses its grips. Chat is a window like the rest and opens itself when nothin
 | `src/room/useMood.js`, `moodTheme.js`, `roomMood.js` | her mood decided in ONE place: her live `[MOOD:]` mark beats the polled one, and `moodTheme.js` writes the hue onto `<html>` so every surface reads the same one |
 | `src/room/Renderer.jsx`, `Backdrop2D.jsx`, `describe.js`, `RoomView.jsx` | the backdrop, and The view window framing the same `describeRoom` output. `describe.js` has no imports, so G-ROOM-SHELL tests the contract without a build |
 | `src/Chat.jsx` | the conversation — and it is a CLIENT: it renders a stream, it decides nothing. The day read-back on mount (`GET /v1/day`, into an empty log only), and the line that hurt: **restored turns are DISPLAY, never re-sent as prompt** — sending them back cost an 11-minute cold turn. The off-the-record filter (turns made under the switch stay visible and stop being SENT once it is off — she must not carry the private hour in-context). Her thinking channel, rendered. Notice chips for engine errors and context trims — **never appended to her content**, because engine text in her mouth is its own leak. Up-arrow input history (2026-08-25) |
-| `src/kit/` | the design system (redesign stage 0, 2026-09-24): `tokens.css` (the only place a colour is written — palette, roles, scale, and the legacy aliases stage 6 deletes), `kit.css` + `parts.jsx` (Chip, Button, Tabs, rows, states, Orb — every class `ui-`), `icons.jsx` (one hand-drawn glyph family; no emoji), `fonts.js` (Inter, JetBrains Mono, Source Serif 4, bundled) |
+| `src/kit/` | the design system (redesign stage 0, 2026-09-24): `tokens.css` (the only place a colour is written — palette, roles, scale; the legacy aliases were deleted in stage 6), `kit.css` + `parts.jsx` (Chip, Button, Tabs, rows, states, Orb — every class `ui-`), `icons.jsx` (one hand-drawn glyph family; no emoji), `fonts.js` + `fonts.css` (Inter, JetBrains Mono, Source Serif 4, self-hosted: seven woff2 subsets — latin for all three, plus the latin-ext/greek/cyrillic her words need, each named in G-ROOM-TOKENS leg 10) |
 | `src/room/shell.css`, `src/room.css` | the shell's furniture (`dsk-`, `tb-`, `top-`, `por-`, `win`, `bar`, `lt`) and the windows' own styles, each under its prefix |
 | `src/apps/Presence.jsx` | her modes (2026-08-22) — narration / company / lucid dream: the picker, the knobs, the shelf (`var/library/`, hand a book to her / put it down) and the honest state; `PresenceChip` in the title bar |
 | `src/apps/Senses.jsx` | her senses — the capability row, the hourly look, and (2026-08-22) **which eyes**: engine / aux VL model / the seam, with the `Sight — her eyes` knobs; `SensesChip` in the title bar |
@@ -65,7 +65,9 @@ and loses its grips. Chat is a window like the rest and opens itself when nothin
   Two owners of one name is how the ledger's rows once rendered as 8px dots.
 - **The design system keeps its promises (G-ROOM-TOKENS):** every text role meets contrast on
   every surface, every registry icon names a glyph, only `room/useMood.js` reads the live mood,
-  and raw colour literals outside `kit/tokens.css` may only fall (a ratchet).
+  there are NO raw colour literals outside `kit/tokens.css` (zero since stage 6; the one
+  exemption is the backdrop canvas's five, pinned), no legacy alias and no `var()` naming
+  nothing, and opacity-dimmed text may only fall (a ratchet).
 - **The kit renders (G-ROOM-KIT):** the real source is bundled and rendered under node — the
   kit parts, the top bar, the stack light, the minimise flight and the apps moved onto the kit.
 - **The committed bundle is the source (G-ROOM-BUNDLE):** a source edit without a rebuild fails.

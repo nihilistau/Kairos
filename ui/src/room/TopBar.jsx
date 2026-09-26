@@ -19,7 +19,7 @@ export function TopBarView({ pulse, mood, health, healthError, system, refresh }
   const up = p.stack && p.stack.up_s != null ? upFor(p.stack.up_s) : null
   const bk = p.backup && p.backup.next_in_s != null ? until(p.backup.next_in_s) : null
   return (
-    <div className="topbar" role="region" aria-label="the room">
+    <div className="topbar" role="region" aria-label="top bar">
       <div className="top-her">
         <span className="top-mood" role="status"
               title={m.known ? 'her mood' : 'her mood — a word with no colour on file'}

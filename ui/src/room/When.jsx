@@ -30,6 +30,8 @@
  * `bare` drops the relative half — for places that already say "due" or "at" in front of
  * it and would otherwise read "due in 3 days ago".
  */
+import { ago } from './facts.js'
+
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -66,11 +68,10 @@ export function relative(d, now) {
     if (a < 86400) return `in ${Math.round(a / 3600)}h`
     return `in ${Math.round(a / 86400)}d`
   }
-  if (s < 45) return 'just now'
-  if (s < 3600) return `${Math.round(s / 60)}m ago`
-  if (s < 86400) return `${Math.round(s / 3600)}h ago`
-  if (s < 7 * 86400) return `${Math.round(s / 86400)}d ago`
-  return ''
+  // THE PAST IS facts.ago's (redesign stage 6) — one spelling of "46m ago" in the room.
+  // Past a week the chip's date says it, so the relative half is blank, as before.
+  if (s >= 7 * 86400) return ''
+  return ago(s)
 }
 
 /* The words, without the element — for anywhere that needs the text alone. */

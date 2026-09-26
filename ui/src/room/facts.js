@@ -1,9 +1,9 @@
 /* facts — THE ROOM'S TIME WORDS, in one place (redesign stage 3, spec §8).
  *
  * Clock.jsx computed these and the taskbar never had room to show them; the top bar
- * does. The top bar's time words live here, in one module — NOT YET THE ONLY OWNER of
- * "46m ago": room/When.jsx's relative() still spells ages for the panels, and Librarians
- * builds its own "Nm ago" (both ledgered for stage 6). Time here is HER experience of it
+ * does. The top bar's time words live here, in one module — THE ONLY OWNER of "46m ago"
+ * (since redesign stage 6): room/When.jsx's relative() and Librarians ask ago(), and
+ * G-ROOM-KIT leg 10 fails on a second spelling. Time here is HER experience of it
  * (when he last spoke, when her day closes), from the pulse. */
 
 export function ago(s) {

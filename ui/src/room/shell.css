@@ -21,8 +21,8 @@
   color: var(--text-1); cursor: var(--cur-hand); user-select: none; }
 /* NO transition on left/top: a dragged icon must track the cursor exactly. */
 .dsk-tile { position: relative; width: 56px; height: 56px; border-radius: var(--r-lg);
-  display: grid; place-items: center; color: #cfe0ee;
-  background: var(--surface-3); border: 1px solid rgba(160, 190, 220, .12); box-shadow: var(--el-1);
+  display: grid; place-items: center; color: var(--tile-ink);
+  background: var(--surface-3); border: 1px solid rgba(var(--hair-rgb), .12); box-shadow: var(--el-1);
   transition: border-color var(--dur-fast), box-shadow var(--dur-base), transform var(--dur-fast); }
 .dsk-icon:hover .dsk-tile { border-color: rgba(var(--accent-rgb), .35); transform: translateY(-1px); }
 .dsk-sel .dsk-tile { border-color: hsl(var(--mood-h) 70% 60% / .7);
@@ -32,7 +32,7 @@
   background: hsl(var(--mood-h) 80% 70%); box-shadow: 0 0 6px hsl(var(--mood-h) 80% 60%); }
 .dsk-drag { opacity: .75; cursor: var(--cur-grabbing); }
 .dsk-lb { font: 400 11.5px/1.2 var(--font-ui); color: var(--text-2); text-align: center;
-  max-width: 80px; word-break: break-word; text-shadow: 0 1px 3px rgba(0, 0, 0, .9); }
+  max-width: 80px; word-break: break-word; text-shadow: 0 1px 3px rgba(var(--shade-rgb), .9); }
 .dsk-sel .dsk-lb, .dsk-open .dsk-lb { color: var(--text-1); }
 .dsk-icon:focus-visible { outline: none; }
 .dsk-icon:focus-visible .dsk-tile { box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 4px hsl(var(--mood-h) 70% 60% / .7); }
@@ -135,8 +135,8 @@ body.resizing, body.resizing * { user-select: none !important; }
   color: var(--text-2); font: 400 var(--fs-12)/1 var(--font-ui); text-decoration: none;
   white-space: nowrap; cursor: var(--cur-hand);
   transition: background var(--dur-fast), color var(--dur-fast), box-shadow var(--dur-base); }
-.tb-console:hover, .tb-win:hover { background: rgba(160, 190, 220, .07); color: var(--text-1); }
-.tb-win-on { background: rgba(160, 190, 220, .08); color: var(--text-1);
+.tb-console:hover, .tb-win:hover { background: rgba(var(--hair-rgb), .07); color: var(--text-1); }
+.tb-win-on { background: rgba(var(--hair-rgb), .08); color: var(--text-1);
   box-shadow: inset 0 -2px 0 hsl(var(--mood-h) 70% 65%); }
 .tb-win-min { color: var(--text-3); }   /* was opacity .6: 3.61:1; --text-3 is >= 4.5:1 */
 /* the label inside a taskbar chip — "looking up", "in scene", "off the record" */
@@ -176,7 +176,7 @@ body.resizing, body.resizing * { user-select: none !important; }
 .tb-right .sd-wrap { display: inline-flex; align-items: center; }
 .tb-right .sd-btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
   border-radius: var(--r-sm); background: transparent; border: 1px solid rgba(var(--err-rgb), .35);
-  color: #f2a39a; font: 500 var(--fs-11)/1 var(--font-ui); }
+  color: var(--err-soft); font: 500 var(--fs-11)/1 var(--font-ui); }
 .tb-right .sd-btn:hover { background: rgba(var(--err-rgb), .14); border-color: rgba(var(--err-rgb), .6); }
 .tb-right .sd-confirm { display: inline-flex; gap: 4px; align-items: center; }
 
@@ -219,7 +219,7 @@ body.resizing, body.resizing * { user-select: none !important; }
 
 /* ── PORTRAIT — her, on the canvas ───────────────────────────────────────── */
 .por { position: absolute; z-index: 5; display: flex; flex-direction: column; overflow: hidden;
-  border-radius: var(--r-lg); cursor: var(--cur-grab); background: rgba(12, 17, 25, .72);
+  border-radius: var(--r-lg); cursor: var(--cur-grab); background: rgba(var(--surface-1-rgb), .72);
   border: 1px solid hsl(var(--mood-h) 60% 60% / .28);
   box-shadow: var(--el-2), 0 0 36px hsl(var(--mood-h) 70% 55% / calc(.05 + .10 * var(--mood-glow))); }
 .por:active { cursor: var(--cur-grabbing); }
@@ -227,7 +227,7 @@ body.resizing, body.resizing * { user-select: none !important; }
 .por-frame > * { width: 100%; height: 100%; display: block; }
 .por-frame svg, .por-frame canvas, .por-frame img, .por-clip, .por-look { object-fit: cover; }
 .por-foot { display: flex; align-items: center; gap: 8px; padding: 6px 10px;
-  font: 400 var(--fs-11)/1.2 var(--font-ui); background: rgba(0, 0, 0, .35); border-top: 1px solid var(--hair); }
+  font: 400 var(--fs-11)/1.2 var(--font-ui); background: rgba(var(--shade-rgb), .35); border-top: 1px solid var(--hair); }
 .por-mood { color: hsl(var(--mood-h) 80% 76%); }
 .por-wear { color: var(--text-3); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: help; }
 .por-held { color: var(--warn); border: 1px solid rgba(var(--warn-rgb), .35); border-radius: var(--r-pill); padding: 1px 7px; cursor: help; }
@@ -254,6 +254,12 @@ body.resizing, body.resizing * { user-select: none !important; }
 @media (max-width: 620px) {
   .dsk-lb, .top-light-t, .topbar .presence, .tb-right .an-lb, .tb-right .sd-btn span { display: none; }
   .dsk-tile { width: 48px; height: 48px; }
+  /* PHONE WIDTH: THE ICONS ABOVE HER (redesign stage 6). The icon columns fill the desktop
+     here and her portrait (.por, z 5) covered three of them; the layer rises above her and
+     lets clicks through its empty space, so she is still draggable between the icons.
+     Windows start at z 11 (windowManager.js), above both. */
+  .dsk-layer { z-index: 6; pointer-events: none; }
+  .dsk-icon { pointer-events: auto; }
   /* PHONE WIDTH: A WINDOW IS THE DESKTOP (final review, Q4). Windows opened at their
      registry width and ran off the right edge (Chat at 375px: x 132–692); here each
      one fills the desktop, as a maximised window does, and has nothing to resize. */

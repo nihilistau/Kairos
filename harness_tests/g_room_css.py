@@ -10,7 +10,7 @@ same shape as the bridged `take_screenshot` overwriting the native one, and the 
 shape as AGENTS.md §0.
 
 THE RULE. A class an app uses must be one of:
-  * SHARED — the committed list below. Furniture: `pad`, `muted`, `on`, `chips`, `err`.
+  * SHARED — the committed list below. Furniture: `pad`, `muted`, `on`, `err`.
     These are deliberately common and deliberately few.
   * ITS OWN PREFIX — the `css:` field each app declares in `ui/src/appRegistry.jsx`,
     either bare (`lgr`) or hyphenated (`lgr-title`).
@@ -40,16 +40,13 @@ UI = os.path.join(ROOT, "ui", "src")
 # Any app may use these. Keep the list SHORT: every addition is a name that can no
 # longer collide, which is also a name that no longer means anything specific.
 SHARED = frozenset({
-    "pad", "muted", "on", "err", "chips", "k", "v", "note", "r-off",
+    "pad", "muted", "on", "err", "k", "v", "note",
     "sal", "gone",
     # `meta`, `who`, `cls` left 2026-09-26 (redesign stage 5): Board and Memory were their
     # only users, and both draw prefixed names now (`bd-meta`, `mem-meta`, `mem-cls` …).
-    # TONE. Presentational only — they say how a thing reads, never what it is, which
-    # is what makes them safe to share where `t` or `now` are not. Added 2026-08-01
-    # when this gate caught its own author: Stage used `warn`, Ledger already did, and
-    # the collision check fired on the day after it landed. Blessing the whole family
-    # rather than the one name, so `bad` does not repeat the same failure next month.
-    "good", "bad", "warn",
+    # TONE (`good`, `bad`, `warn`) left 2026-09-26 (redesign stage 6): Games, their last user,
+    # draws kit Chips (ok / err / warn). `chips` and `r-off` left with them — no window
+    # draws a `.chips` row or an `r-off` button, and room.css styles neither.
     # TIME. `<When>` (ui/src/room/When.jsx) is the ONE renderer of a timestamp, and it is
     # meant to appear on every line either of them produces — the board, the chat, her
     # agency window. Shared furniture in the literal sense: one component, one pair of
@@ -67,9 +64,8 @@ SHARED = frozenset({
     # visible on every frame without a window being open. (`an-chip`/`an-held` left
     # 2026-09-26, redesign stage 2: the taskbar chip is a kit Chip now.)
     "an-wrap", "an-btn", "an-receipt", "an-on",
-    # HER CLOTHES CHANGING, from the tool as well as the mark (2026-08-24).
-    # Chat furniture, beside act-look and act-notice, which are already here.
-    "act-wear",
+    # (`act-wear` left 2026-09-27, redesign stage 6's final wave: Chat's acts are kit Chips,
+    # the wear one in the kit's `wear` tone, and no window draws the name.)
 })
 
 # ── SHARED FAMILIES (2026-08-21, the panel-framework session) ────────────────────

@@ -407,7 +407,8 @@ check("a persona event REPLACES the turn's chip rather than appending a second o
       "const rest = last.events.filter(e => !e.persona)" in chat, "two chips per turn was the bug")
 check("...and the chip is rendered whether or not she moved",
       "ev.persona.changed ? ' moved' : ''" in chat and "'unchanged'" in chat)
-check("...with her mood never cut mid-word", ".slice(0, 40)" not in chat.split("act-persona")[1][:600])
+# (the anchor was "act-persona" until 2026-09-27: the chip is a kit Chip in an `act-mood` wrapper)
+check("...with her mood never cut mid-word", ".slice(0, 40)" not in chat.split("act-mood")[1][:900])
 
 
 # ── NO INDENT WHERE THE MARK WAS (2026-08-27, the operator's report) ────────────────────────────

@@ -92,7 +92,7 @@ entry of `CHANGELOG.md`).
    `ui/src/kit/icons.jsx`, `w`, `h`, `Component`, `css`, `blurb`; `dock: false` if it should
    start without a desktop icon; optional `TitleChip`).
 4. Styles in `ui/src/room.css` under the window's own `css` prefix (G-ROOM-CSS), colours from
-   `ui/src/kit/tokens.css` only (G-ROOM-TOKENS ratchets raw colour literals down).
+   `ui/src/kit/tokens.css` only (G-ROOM-TOKENS fails on any raw colour literal elsewhere).
 5. `npm run build` in `ui/` — the bundle is committed, and **G-ROOM-BUNDLE fails if the
    committed bundle does not match a rebuild of the committed source**.
 

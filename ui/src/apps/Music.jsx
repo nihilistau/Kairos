@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { usePoll, Body } from './panel.jsx'
 import * as api from '../api.js'
 import { Button, Chip, Input, Row, State } from '../kit/parts.jsx'
+import { isProbe } from '../room/probe.js'
+const PROBE = isProbe()   // ?probe=1: a looking tab plays nothing and reports nothing (room/probe.js)
 
 /* MUSIC — one player, two people.
  *
@@ -26,6 +28,7 @@ export default function Music() {
   const lib = s.data?.library || []
 
   useEffect(() => {
+    if (PROBE) return   // a probe tab starts no audio
     if (!audio.current) {
       audio.current = new Audio()
       audio.current.preload = 'metadata'
@@ -55,6 +58,7 @@ export default function Music() {
 
   // let the server know where the decoder actually got to, occasionally
   useEffect(() => {
+    if (PROBE) return   // ...and posts no position
     const t = setInterval(() => {
       const a = audio.current
       if (a && !a.paused && a.currentTime > 0) {
