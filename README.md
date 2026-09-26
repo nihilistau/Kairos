@@ -1,14 +1,21 @@
 # Kairos — a local AI companion framework that owns its memory
 
-Kairos is the engine-agnostic companion framework distilled from
-a private working repository: a Python harness
-that owns **durable, auditable memory**, unprompted speech, personality, presence, a wardrobe
-and a voice — and a React room you talk to her in — running against **any OpenAI-compatible
-chat endpoint** (LM Studio, llama.cpp's `llama-server`, vLLM, a cloud) on one consumer GPU.
+Kairos is the engine-agnostic companion framework distilled from a private working
+repository: a Python harness that owns **durable, auditable memory**, unprompted speech,
+personality, presence, a wardrobe and a voice — and a React room you talk to her in — running
+against **any OpenAI-compatible chat endpoint** (LM Studio, llama.cpp's `llama-server`, vLLM, a
+cloud) on one consumer GPU. She remembers the person she talks to, speaks when she has a
+reason to, spends time on her own while you are away, and has a face, a wardrobe and a voice.
 
 **The one rule over everything: nothing she knows is ever deleted.** Facts are tombstoned,
 never dropped; every row says who said it, what it came from, and when; an inference may never
 retire an observation; every verdict is a ruling of a committed finite table, not prose.
+
+![The room: a column of desktop app icons, the Chat window with a reply, the portrait on the right, and the top bar with the mood pill, the day's facts, the profile chip, uptime, the stack light and the next backup](docs/screenshots/room-chat.webp)
+
+*The screenshots on this page are the room of the reference install, the long-running
+companion Kairos was extracted from. A fresh clone draws the same room with an empty memory
+and the default face.*
 
 ```
  the room (browser)  --->  gateway :8810 (Python, harness/server/)  --->  any /v1/chat/completions server
@@ -16,13 +23,67 @@ retire an observation; every verdict is a ruling of a committed finite table, no
         |                         '-->  optional: the xAI API (voice, images/motion, live search) . CPU sidecars
 ```
 
+## What is in the room
+
+The room is a desktop in the browser: loose app icons you arrange, windows you move, resize,
+maximise, minimise and restore, a taskbar along the bottom (a button per window, off the
+record, Shut down, the clock) and a top bar that says how she is (her mood and voice), how her
+day is going (when you last spoke, whether her day has closed) and how the machine is (the
+profile, uptime, the stack light with its bounce / restart actions, the next backup). Every
+window is listed with the route it reads and whose it is in
+[`docs/PANELS.md`](docs/PANELS.md); the room itself is [`ui/README.md`](ui/README.md).
+
+**She has her own time.** When the room goes quiet, the idle clock (`harness/kairos/`) gives
+her reasons to act: continue a thread, check in, remind, think on her own, and the presence
+modes that keep you company while you sleep. Every impulse is metered, judged, and dropped by
+default. What she did while you were away is in the *Her own time* window — journal lines,
+notes, what she wore, what she asked for — and it is read-only by construction: there is no
+write route behind it.
+
+![The Her own time window open over Chat, listing her own-time notes and a look she asked for, with the taskbar below showing window buttons, the looked-up chip, the Anonymous switch and Shut down](docs/screenshots/room-her-own-time.webp)
+
+**She remembers, and can say why.** One append-only fact registry with two lanes — what she
+knows about you and what she knows about herself. A changed fact is tombstoned forward with
+its provenance, never dropped, so the Memory window shows the retired rows beside the live
+ones, and a row she *concluded* carries a **why** button: what it was drawn from, and whether
+each support is still live. Every night she writes her journal and a short paragraph on who
+she has been becoming; weekly, a chapter. Neither consolidator may read a distillate, so what
+she concludes cannot quietly rest on what she concluded before. The rules:
+[`docs/MEMORY-AND-RECALL.md`](docs/MEMORY-AND-RECALL.md).
+
+**She has a face and clothes.** A catalog of looks, gestures and moments — stills and motion
+loops, generated through the xAI API when a key is present — chosen by her or by you, with a
+chip saying which. Her marks (`[MOOD:]`, `[VOICE:]`, `[TRAIT:]`, `[WEAR:]`, `[SHOW:]`) move
+real state mid-sentence: the mood pill, her voice, the portrait.
+
+![The Memory window with its live / his / hers / core / retired counts, a filter, an add box and a re-file control on each row, beside the Wardrobe window with mood chips, what she has on and the looks that just arrived](docs/screenshots/room-memory-wardrobe.webp)
+
+**She looks things up, and does homework.** Web search answers in the turn (DuckDuckGo by
+default, free; xAI live search, Brave, Tavily or SearxNG if you choose); the optional research
+tier is a real, slower model call whose receipts land in the Research window — hers you can
+read and cannot edit, and there is a box to set her one yourself. Every knob is in the
+Settings window, each saying whether it is live or needs a restart, and whether you have
+overridden it from the room; everything that ships off has its arming condition written down
+in [`docs/OFF-BY-DEFAULT.md`](docs/OFF-BY-DEFAULT.md).
+
+![The Research window with research rows marked hers and a box to run one, beside the Settings window showing Voice, Web search, Research and Wardrobe knobs with live, restart to change and changed chips](docs/screenshots/room-research-settings.webp)
+
+**And the rest:**
+
+| | |
+|---|---|
+| **a voice** | xAI Ara with expressive tags when a key is present, a local chain otherwise; the room speaks her replies (`harness/voice/`). |
+| **eyes** | an hourly ambient look behind a quiet guard (off until you arm it), and sight through whatever the served model can receive (`harness/senses/`). |
+| **hands** | an MCP server for her tools and a bridge for yours ([`docs/MCP.md`](docs/MCP.md)); Home Assistant, on request, limited to an allowlist you write ([`docs/HOME-ASSISTANT.md`](docs/HOME-ASSISTANT.md)). |
+| **off the record** | one switch in the taskbar: she stays entirely herself and nothing about the evening is written down, held by a gate that diffs the whole sandbox ([`docs/ANON-MODE.md`](docs/ANON-MODE.md)). |
+| **a design system** | the room is drawn from one kit (`ui/src/kit/`) — tokens, parts, one icon family — rendered and checked under node by G-ROOM-KIT and G-ROOM-TOKENS. |
+
 ## Quick start
 
-> **Windows-only today, honestly:** `serve.py`'s process control uses Windows-native
-> calls (`taskkill`, `CREATE_NO_WINDOW`) and fails on Linux/macOS. The harness itself
-> is portable Python; the launcher is not, yet. On POSIX you can run the gateway
-> directly (`python -m harness.server.app` with the profile's env set) — a portable
-> launcher is on the list.
+> **Windows is the tested platform.** `serve.py` has had one platform seam since 0.8.14 — it
+> spawns and stops its processes on Linux and macOS too, held by `G-BACKEND-SEAM`, and CI runs
+> the offline suite on Linux — but the launcher has not been exercised end to end on real
+> Linux hardware; [`docs/BACKENDS.md`](docs/BACKENDS.md) says so plainly.
 
 ```bash
 pip install -e ".[http]"                      # zero hard deps on the core path; httpx for the client
@@ -34,11 +95,13 @@ python serve.py companion                     # boots the gateway; the engine is
 
 Open http://127.0.0.1:8810/room/ and talk to her. `profiles/companion.toml` is the one door:
 `[engine] base_url / model / dialect / api_key_file` point at your server; everything else is a
-knob in the settings window (live) or the profile (restart).
+knob in the Settings window (live) or the profile (restart). **The profile is positional and
+not optional** — a mistyped name fails loudly instead of quietly serving the wrong config.
+Stop her from Shut down in the taskbar, or `python serve.py --stop`.
 
 **If anything above is not obvious, open [`docs/SETUP.md`](docs/SETUP.md)** — the endpoint, every
 key file and where it goes, the model cards, what each setting actually affects, and a symptom
-table. The room has a live version of it: the **setup** window reports which step you are on
+table. The room has a live version of it: the **Setup** window reports which step you are on
 rather than which steps exist.
 
 ### Keys, in one paragraph
@@ -53,7 +116,7 @@ the room and every gate run offline against any endpoint.
 
 ### Which models
 
-`config/models.json` is the committed list with cards, and the setup panel reads that same file
+`config/models.json` is the committed list with cards, and the Setup window reads that same file
 so the two cannot drift. In short: **[`google/gemma-4-26B-A4B-it-qat-q4_0-gguf`](https://hf.co/google/gemma-4-26B-A4B-it-qat-q4_0-gguf)**
 for her — a 26B mixture-of-experts with ~4B active, which is the whole reason a companion can
 think in real time on one consumer card, and what every decode knob in the profile was tuned
@@ -166,7 +229,7 @@ you build yourself; nothing is running until you do.
                      |                                |
                body.read() / present()         GET /v1/telemetry/{now,history}
                      |                                |
-              her prefix + reasons                body panel  ♥
+              her prefix + reasons               the Body window
 ```
 
 **Build the agent** (no gradle needed — it stays on the platform SDK on purpose, so
@@ -207,9 +270,10 @@ and what the hardware will and will not give you: [`docs/TELEMETRY.md`](docs/TEL
 
 > **Reaching the gateway.** It binds `127.0.0.1` and **loopback is its security model** — the
 > origin check defends against a browser, not against a script. A watch is not on that
-> machine, so either tunnel (`adb reverse tcp:8800 tcp:8800`) or widen `[serve].bind` and
-> scope it with a firewall rule. That second one is a real decision about who can reach her;
-> `python tools/lan_bind.py --status` tells you whether your scoping is actually in place.
+> machine, so either tunnel (`adb reverse tcp:8810 tcp:8810` for the companion profile's port)
+> or widen `[serve].bind` and scope it with a firewall rule. That second one is a real decision
+> about who can reach her; `python tools/lan_bind.py --status` tells you whether your scoping
+> is actually in place.
 
 ## Where this sits, and what it is not
 
@@ -224,7 +288,7 @@ feature count — so this compares **stances**, and says what each stance costs.
 | **who said it** | roles in a transcript | usually flattened at ingest | a first-class column, and an **inference may never retire an observation** — enforced by a committed verdict table, not a convention |
 | **speaking first** | never; you send, it replies | on a schedule or a trigger you write | a **named-reason idle loop** — continue, check-in, remind, solo, muse, presence modes — SILENT by default, every bound checked before the model is consulted |
 | **identity** | a system prompt you edit | a prompt plus tools | persona, traits curated **from evidence**, wardrobe and mood marks she emits and that actually move state |
-| **what proves it** | manual testing | unit tests | ~180 offline gates, each a named claim with a receipt, most with a mutant proving the check is load-bearing |
+| **what proves it** | manual testing | unit tests | ~160 offline gates, each a named claim with a receipt, most with a mutant proving the check is load-bearing |
 
 **What it is not.** Not a model server — bring your own endpoint. Not a RAG framework for
 your documents; the memory here is about a *person*, and pointing it at a corpus is not what
@@ -242,7 +306,7 @@ is slow to change — that is the trade, and it is deliberate.
 Everything here runs engine-agnostically: memory with tombstones and verdicts, the recall seam,
 unprompted speech (remind / solo / muse / check-in), personality marks, the wardrobe and catalog,
 the voice (xAI Ara with expressive tags, or a local chain), the ambient eye's quiet guard, the
-room and all its panels, the gate culture (`harness_tests/`).
+room and all its windows, the gate culture (`harness_tests/`).
 
 The optional **sp-daemon** backend adds what a generic endpoint cannot give: the raw
 stop-vs-continue margin that drives her *continue* and *expand* impulses, byte-exact
@@ -270,14 +334,14 @@ git clone --recurse-submodules https://github.com/nihilistau/kairos-engine engin
 | the documents and which is authoritative | [`docs/README.md`](docs/README.md) |
 | what proves it still works | [`gates/GATE-INDEX.md`](gates/GATE-INDEX.md) |
 | what is deliberately off, and what would turn it on | [`docs/OFF-BY-DEFAULT.md`](docs/OFF-BY-DEFAULT.md) |
-| the room | [`ui/README.md`](ui/README.md) |
+| the room: windows, the kit, how to rebuild it | [`ui/README.md`](ui/README.md) |
+| every window, what it reads, and whose it is | [`docs/PANELS.md`](docs/PANELS.md) |
+| the six ways a fact reaches her, and which one yours belongs in | [`docs/LANES.md`](docs/LANES.md) |
+| what changed, by version | [`CHANGELOG.md`](CHANGELOG.md) |
 | the optional Rust + CUDA engine, and what it adds | [`kairos-engine`](https://github.com/nihilistau/kairos-engine) |
 
-- [`docs/LANES.md`](docs/LANES.md) — **the six ways a fact reaches her**, and which one
-  yours belongs in. Two of the six have already been measured wrong; the receipts are in
-  there. Read it before adding anything to her context.
-- [`docs/PANELS.md`](docs/PANELS.md) — every window in the room, what it reads, and whose
-  it is.
+Read [`docs/LANES.md`](docs/LANES.md) before adding anything to her context: two of the six
+lanes have already been measured wrong, and the receipts are in there.
 
 ## Before you say you are done
 
@@ -285,8 +349,9 @@ git clone --recurse-submodules https://github.com/nihilistau/kairos-engine engin
 python harness_tests/g_claim.py && python harness_tests/g_durability.py && python harness_tests/g_memory_lifecycle.py && python harness_tests/g_backend_seam.py && python harness_tests/g_docs_true.py
 ```
 
-Those five are OFFLINE. The LIVE gates read `SP_GATEWAY_URL` / `SP_BOOT_GATEWAY` (default
-`http://127.0.0.1:8800`; the companion profile serves `:8810`, so set it) — `g_kairos_boot.py` is
-the acceptance run, and `gates/KAIROS-BOOT-<date>.md` holds the receipts.
+Those five are OFFLINE; the whole offline suite is `python tools/sweep.py` (no GPU). The LIVE
+gates read `SP_GATEWAY_URL` / `SP_BOOT_GATEWAY` (default `http://127.0.0.1:8800`; the companion
+profile serves `:8810`, so set it) — `g_kairos_boot.py` is the acceptance run, and
+`gates/KAIROS-BOOT-<date>.md` holds the receipts.
 
 Kairos is exported from the source repo (see `KAIROS-SOURCE.txt`, `CONTRIBUTING.md`). MIT.

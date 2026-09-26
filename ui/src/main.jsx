@@ -60,6 +60,16 @@ class PanelBoundary extends React.Component {
   }
 }
 
+// A TITLE CHIP HAS ITS OWN BOUNDARY (stage-4 final review, M1): chips mount in the bar,
+// outside the body's PanelBoundary, so one throwing chip blanked the whole room. Chip-sized:
+// on error it draws nothing, and the bar keeps its title and its lights.
+class ChipBoundary extends React.Component {
+  constructor(p) { super(p); this.state = { err: null } }
+  static getDerivedStateFromError(err) { return { err } }
+  componentDidCatch(err) { console.error('[chip]', this.props.title, err) }
+  render() { return this.state.err ? null : this.props.children }
+}
+
 // REDUCED MOTION MINIMISES AT ONCE (stage 3): no flight, no delay. Read at the click,
 // not at load, so flipping the OS setting takes effect without a reload.
 const minDelay = () => (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : wm.MIN_MS)
@@ -195,7 +205,7 @@ function Win({ w, focused }) {
         <span className="ti">{app.title}</span>
         {/* THE TITLE CHIP (2026-08-21): a glance at state/provider, registry-declared
             (titleChips.jsx), mounted only while the window is open. Never a control. */}
-        {app.TitleChip ? <app.TitleChip /> : null}
+        {app.TitleChip ? <ChipBoundary title={app.title}><app.TitleChip /></ChipBoundary> : null}
         <span className="lights">
           {/* THREE LIGHTS, THREE CONTROLS (2026-09-23). The green one was an ornament
               labelled "focused" and did nothing; it is maximise now, which is what the
@@ -259,7 +269,7 @@ function Room() {
    * wrapping row — which is why the app list wrapped onto two lines and the desktop
    * started halfway down the screen.
    *
-   * Now: a LEFT DOCK of apps (icon over label, an active rail on the open ones), the
+   * Then (until 2026-09-23): a LEFT DOCK of apps (icon over label, an active rail on the open ones), the
    * desktop between, and a TASKBAR along the bottom holding the things you glance at
    * rather than press — clock, her presence, gateway health, and a button per open
    * window (2026-09-26: every window, not only minimised ones). Same components, same endpoints, same window manager; only the furniture

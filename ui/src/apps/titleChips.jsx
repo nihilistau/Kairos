@@ -76,12 +76,26 @@ export function StageChip() {
   </Glance>
 }
 
+/* The music chip's words. The server sends `track` as an OBJECT ({path, title, artist,
+ * album} — harness/skills/music.py, and Music.jsx reads track.title), never a string. The
+ * old `(st.title || st.track || 'playing').slice(0, 24)` called .slice on that object
+ * while music played; the title bar sits outside the window's error boundary, so the
+ * whole room went black (stage 4, 3/6). A string field is picked first, then cut. */
+export const musicLabel = (st) => {
+  const t = st.track
+  const name = (t && typeof t === 'object' && typeof t.title === 'string' && t.title)
+    || (typeof t === 'string' && t)
+    || (typeof st.title === 'string' && st.title)
+    || 'playing'
+  return String(name).slice(0, 24)
+}
+
 export function MusicChip() {
   const s = usePoll(api.music, 20000)
   if (s.loading && !s.data) return <Pending />
   const st = s.data && s.data.state
   if (!st || !st.playing) return null
-  return <Glance state="on" title="playing now">{(st.title || st.track || 'playing').slice(0, 24)}</Glance>
+  return <Glance state="on" title="playing now">{musicLabel(st)}</Glance>
 }
 
 export function RoomChip() {

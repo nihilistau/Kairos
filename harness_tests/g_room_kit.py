@@ -19,6 +19,10 @@ Legs, each shown red against a mutant before it was trusted (GATE-INDEX lists th
      the desktop-local clamps, the stack light as a disclosure, the presence note's fade,
      restore's own keyframe, the kit's scrolling Tabs, wrapping state chips, and phone-
      width windows that fill the desktop.
+  11. (stage 4) APPS — Files, House, Decisions, Her own time, Music, Stage, Setup, Story:
+     each window's pure view rendered with fixtures; kit parts, words verbatim; closes
+     with a scan that no stage-4 render draws, and room.css no longer styles, a class the
+     stage retired.
 
 Offline. Needs node and ui/node_modules (esbuild, react, react-dom); exit 2 without them.
 """
@@ -186,6 +190,42 @@ check("a selected id that vanished still leaves one tab in the tab order (M7)",
       g("tabs_gone").count('tabindex="0"') == 1, g("tabs_gone"))
 _kit_css = re.sub(r"/\*.*?\*/", "", io.open(os.path.join(ROOT, "ui/src/kit/kit.css"), encoding="utf-8").read(), flags=re.S)
 _tabs_rule = re.search(r"\.ui-tabs\s*\{([^}]*)\}", _kit_css)
+# SELECTION FOLLOWS THE SAME CLAMP (stage-4 review): a strip whose value vanished (a kind
+# whose count fell to 0 on a later poll) kept its tab order but showed NO selected tab.
+_gone_sel = re.findall(r'<button[^>]*aria-selected="true"[^>]*>([^<]*)<', g("tabs_gone"))
+check("a selected id that vanished still leaves exactly one tab selected — the first",
+      _gone_sel == ["A"] and g("tabs_gone").count("ui-tab-on") == 1, _gone_sel)
+_pressed = re.search(r'\.ui-btn\[aria-pressed="true"\]\s*\{([^}]*)\}', _kit_css)
+check("a pressed kit button looks pressed — kit.css styles .ui-btn[aria-pressed=\"true\"]",
+      _pressed is not None and "box-shadow" in _pressed.group(1), _pressed and _pressed.group(1))
+# THE RING SURVIVES PRESSING (stage-4 final review, I1): the pressed rule ties
+# .ui-btn:focus-visible on specificity and comes later, so its box-shadow replaced the focus
+# ring — a keyboard-focused pressed toggle (Decisions, Presence) showed only its underline.
+
+
+def _shadows(rule_body):
+    m = re.search(r"box-shadow\s*:\s*([^;}]+)", rule_body or "")
+    parts, depth, cur = [], 0, ""
+    for ch in (m.group(1) if m else ""):
+        depth += (ch == "(") - (ch == ")")
+        if ch == "," and depth == 0:
+            parts.append(cur)
+            cur = ""
+        else:
+            cur += ch
+    parts.append(cur)
+    return [re.sub(r"\s+", " ", p).strip() for p in parts if p.strip()]
+
+
+_ring = re.search(r"\.ui-btn:focus-visible\s*\{([^}]*)\}", _kit_css)
+_pfocus = re.search(r'\.ui-btn\[aria-pressed="true"\]:focus-visible\s*\{([^}]*)\}', _kit_css)
+_want = (_shadows(_ring.group(1)) if _ring else []) + (_shadows(_pressed.group(1)) if _pressed else [])
+check("a focused pressed button wears the focus ring AND its underline (I1, WCAG 2.4.7)",
+      _pfocus is not None and len(_want) >= 3 and all(w in _shadows(_pfocus.group(1)) for w in _want),
+      [_want, _pfocus and _shadows(_pfocus.group(1))])
+_ghover = re.search(r'\.ui-btn-ghost\[aria-pressed="true"\]:hover:not\(:disabled\)\s*\{([^}]*)\}', _kit_css)
+check("a pressed ghost keeps its border under the pointer (the ghost hover blanks it)",
+      _ghover is not None and "var(--hair-strong)" in _ghover.group(1), _ghover and _ghover.group(1))
 check("the kit's tab strip scrolls sideways when it outruns its box (Q3)",
       _tabs_rule is not None and re.search(r"overflow-x:\s*auto", _tabs_rule.group(1)) is not None,
       _tabs_rule and _tabs_rule.group(1))
@@ -231,6 +271,14 @@ const out = {
 const names = Object.keys(T).filter(n => /Chip$/.test(n))
 out.n_chips = String(names.length)
 for (const n of names) out['first_' + n] = html(h(T[n]))
+// The music chip's label, over the state the server really sends: track is an OBJECT.
+const ml = (st) => { try { return T.musicLabel ? String(T.musicLabel(st)) : 'NO HELPER' } catch (e) { return 'THREW: ' + e.message } }
+out.ml_server = ml({ playing: true, track: { path: 'b.mp3', title: 'Rain', artist: 'Ola' } })
+out.ml_string = ml({ playing: true, track: 'Tides' })
+out.ml_title = ml({ playing: true, title: 'Shore', track: null })
+out.ml_none = ml({ playing: true })
+out.ml_long = ml({ playing: true, track: { title: 'a'.repeat(40) } })
+out.ml_untitled = ml({ playing: true, track: { path: 'c.mp3' } })
 """)
 check("the title-chip probe rendered", "_error" not in d, d.get("_error", ""))
 g = lambda k: grab(d, k)
@@ -248,6 +296,16 @@ firsts = {k: v for k, v in d.items() if k.startswith("first_")}
 check("every chip's first paint is the kit's Pending",
       firsts and all("ui-chip" in v and 'class="tc' not in v for v in firsts.values()),
       sorted(k for k, v in firsts.items() if "ui-chip" not in v))
+# THE MUSIC CHIP READ THE TRACK AS A STRING (stage 4, 3/6). The server sends track as an
+# object ({path, title, artist, album}), so `.slice` on it threw while music played, and the
+# title bar sits outside the window's error boundary: the whole room went black.
+check("the music chip names the track the server sends (an object), not a throw",
+      d.get("ml_server") == "Rain", d.get("ml_server"))
+check("...a string track is itself, a top-level title is used, neither says 'playing'",
+      d.get("ml_string") == "Tides" and d.get("ml_title") == "Shore" and d.get("ml_none") == "playing"
+      and d.get("ml_untitled") == "playing",
+      [d.get(k) for k in ("ml_string", "ml_title", "ml_none", "ml_untitled")])
+check("...still cut to 24", d.get("ml_long") == "a" * 24, d.get("ml_long"))
 
 
 
@@ -267,6 +325,8 @@ check("a scene, a reading and a wait for quiet say live, not busy",
       [_line(">reading "), _line(">waiting for quiet<")])
 check("bounded work still pulses: looking… and making… say busy",
       'state="busy"' in _line(">looking…<") and 'state="busy"' in _line(">making…<"))
+check("the music chip speaks through musicLabel, not its own copy of the expression",
+      "musicLabel(st)" in _fn(TCS, "MusicChip") and ".slice" not in _fn(TCS, "MusicChip"))
 
 print("\n4. TASKBAR CHIPS — looked up, off the record: kit Chips, rsc-chip retired; the bar sheds them")
 d = render(r"""
@@ -611,6 +671,15 @@ check("every minimise call site passes the reduced-motion delay",
       _mins and len(_mins) == _mins_all and all("delay: minDelay()" in x for x in _mins), _mins)
 check("taskbar buttons carry data-app, so a window can find its button",
       re.search(r"className=\{'tb-win'[^>]*data-app=\{w\.appId\}", _main, re.S) is not None)
+# A TITLE CHIP IS INSIDE A BOUNDARY (stage-4 final review, M1): chips mount in the bar,
+# outside the body's PanelBoundary, so any throwing chip blanked the whole room.
+_tc_all = _main.count("<app.TitleChip")
+_tc_held = re.findall(r"<(ChipBoundary|PanelBoundary)\b[^>]*>\s*<app\.TitleChip\s*/>\s*</\1>", _main)
+_cb = re.search(r"class ChipBoundary extends React\.Component\s*\{(.*?)\n\}", _main, re.S)
+check("every title chip renders inside an error boundary (M1)",
+      _tc_all >= 1 and len(_tc_held) == _tc_all
+      and (_tc_held[0] == "PanelBoundary" or (_cb is not None and "getDerivedStateFromError" in _cb.group(1))),
+      [_tc_all, _tc_held])
 _rm = re.search(r"@media \(prefers-reduced-motion: reduce\)\s*\{(.*?)\n\}", _shell, re.S)
 _foc = re.search(r"const focusedId = windows\.filter\(([^)]*)\)", _main)
 check("a window in its minimise flight is not the focused one (M2)",
@@ -721,5 +790,351 @@ check("at phone width a window fills the desktop (Q4)",
                              for p in (r"left:\s*0", r"top:\s*0", r"width:\s*100%", r"height:\s*100%")),
       _win620 and _win620.group(1))
 check("...and has no resize grips there (Q4)", ".win > .grip" in _shed_at and 620 in _shed_at[".win > .grip"])
+
+print("\n11. APPS — the eight stage-4 windows draw kit parts (views rendered with fixtures)")
+# Each block below adds the classes its window retired to RETIRED_S4; the scan at the end
+# of the leg (kept LAST) proves no render draws them and room.css styles none of them.
+RETIRED_S4: set = set()
+
+d = render(r"""
+import * as F from '../ui/src/apps/Files.jsx'
+import * as H from '../ui/src/apps/House.jsx'
+const noop = () => {}
+const tree = { root: '/srv/shared', files: [ { path: 'notes.md', bytes: 2048 }, { path: 'photo.png', bytes: 3000000 } ] }
+const FV = F.FilesView
+const fv = (p) => FV ? html(h(FV, { d: tree, open: null, text: '', setText: noop, note: null, dragging: false,
+                                    onRead: noop, onSave: noop, onClose: noop, ...p })) : 'NO VIEW'
+const HV = H.HouseView
+const hv = (d) => HV ? html(h(HV, { d })) : 'NO VIEW'
+const ents = [ { entity_id: 'sensor.phone_sleep_confidence', kind: 'sleep', value: 0.82 },
+               { entity_id: 'sensor.phone_activity', kind: 'activity', value: null, why: 'unavailable' } ]
+const out = {
+  fl: fv({}),
+  fl_open: fv({ open: { path: 'notes.md' }, text: 'hello', note: { t: 'saved — she can read it now', tone: 'ok' } }),
+  fl_refused: fv({ note: { t: 'photo.png: text files only for now', tone: 'err' } }),
+  fl_empty: fv({ d: { root: '/srv/shared', files: [] } }),
+  fl_drag: fv({ dragging: true }),
+  ha_up: hv({ configured: true, alive: true, url: 'http://ha.local:8123', total_entities: 392, entities: ents, watching: [] }),
+  ha_down: hv({ configured: true, alive: false, why: 'connection refused' }),
+  ha_off: hv({ configured: false }),
+  ha_quiet: hv({ configured: true, alive: true, total_entities: 392, entities: [] }),
+}
+""")
+check("the files/house probe rendered", "_error" not in d, d.get("_error", ""))
+g = lambda k: grab(d, k)
+# FILES — the tree they share
+check("a text file is a kit row he can press; a picture is not (the write route takes a string)",
+      g("fl").count("ui-row-main") == 1 and g("fl").count('class="ui-row"') == 1, g("fl")[:400])
+check("sizes read as sizes, in the machine's type", ">2.0K<" in g("fl") and ">2.9M<" in g("fl"))
+check("the tree's root is shown", ">/srv/shared<" in g("fl"))
+check("an empty tree is the kit's empty state, the sentence verbatim",
+      "ui-state-empty" in g("fl_empty") and "empty — drag a text file in to share it with her" in g("fl_empty"))
+check("the open file: save is the window's one primary, close a ghost",
+      g("fl_open").count("ui-btn-primary") == 1
+      and re.search(r'ui-btn-primary[^"]*"[^>]*>save<', g("fl_open")) is not None
+      and re.search(r'ui-btn-ghost[^"]*"[^>]*>close<', g("fl_open")) is not None)
+check("the editor is a kit field, named by the file it holds",
+      "ui-field-area" in g("fl_open") and 'aria-label="the text of notes.md"' in g("fl_open"))
+check("the open file's row is marked", 'class="fl-file on"' in g("fl_open"))
+check("a save says so in ok, a refusal in err — the words verbatim",
+      "ui-tone-ok" in g("fl_open") and "saved — she can read it now" in g("fl_open")
+      and "ui-tone-err" in g("fl_refused") and "photo.png: text files only for now" in g("fl_refused"))
+check("dropping says so, only while dragging", "drop to share" in g("fl_drag") and "drop to share" not in g("fl"))
+# HOUSE — a beachhead: three states and a link, and no buttons
+check("connected is an ok chip with a dot", "ui-tone-ok" in g("ha_up") and ">connected<" in g("ha_up")
+      and "ui-chip-dot" in g("ha_up"))
+check("three states, three tones — unreachable is err, not configured is quiet",
+      "ui-tone-err" in g("ha_down") and ">unreachable<" in g("ha_down")
+      and "ui-tone-neutral" in g("ha_off") and ">not configured<" in g("ha_off")
+      and "ui-tone-err" not in g("ha_off"))
+check("the reason it is down is said, verbatim", "connection refused" in g("ha_down"))
+check("what crosses: each entity and its value; a missing value says why",
+      "sensor.phone_sleep_confidence" in g("ha_up") and ">0.82<" in g("ha_up") and ">unavailable<" in g("ha_up"))
+check("nothing crossing yet is the kit's empty state, the sentence verbatim",
+      "ui-state-empty" in g("ha_quiet")
+      and "Nothing here reaches her yet. The bridge takes a sleep confidence and an activity from the "
+          "companion app — enable those sensors on the phone and they appear." in g("ha_quiet"))
+check("the house still offers no button — nothing in it can call a service",
+      all("<button" not in g(k) for k in ("ha_up", "ha_down", "ha_off", "ha_quiet")))
+check("the link out is a link, its words verbatim",
+      'href="http://ha.local:8123"' in g("ha_up") and "open Home Assistant ↗" in g("ha_up"))
+check("the foot points at the Body window, not a heart glyph the room no longer draws",
+      "Her body readings are in the Body window." in g("ha_up") and "♥" not in g("ha_up"))
+RETIRED_S4 |= {"files", "fp", "fs", "viewer", "vh", "dropzone",
+               "ha-dot", "ha-up", "ha-down", "ha-off", "ha-state", "ha-empty", "ha-dim"}
+
+d = render(r"""
+import * as D from '../ui/src/apps/Decisions.jsx'
+import * as A from '../ui/src/apps/Agency.jsx'
+const noop = () => {}
+const dec = { open: [ { id: 'a', kind: 'route', area: 'voice', title: 'arm the voice knob?', body: 'asked twice', options: ['arm', 'leave off'] },
+                      { id: 'b', kind: 'once', title: 'relabel row 12', options: ['yes'] } ],
+              decided: [ { id: 'z', kind: 'note', choice: 'arm', title: 'the old one', decided_at: '2026-09-20T10:00:00' } ] }
+const DV = D.DecisionsView
+const dv = (p) => DV ? html(h(DV, { d: dec, showPast: false, setShowPast: noop, onDone: noop, ...p })) : 'NO VIEW'
+const day = { ok: true, days: 7, total: 3, counts: { own_time: 2, journal: 1 },
+              rows: [ { kind: 'own_time', id: '1', at: 1790380000, text: 'read about tides' },
+                      { kind: 'journal', id: '2', at: 1790300000, text: 'As of Friday: quiet.' },
+                      { kind: 'own_time', id: '3', at: 1790290000, text: 'wrote a list', state: 'delayed' } ],
+              sources_failed: { wore: 'missing' } }
+const AV = A.AgencyView
+const av = (p) => AV ? html(h(AV, { d: day, only: '', setOnly: noop, ...p })) : 'NO VIEW'
+const out = {
+  dec: dv({}), dec_past: dv({ showPast: true }), dec_none: dv({ d: { open: [], decided: [] } }),
+  ag: av({}), ag_journal: av({ only: 'journal' }), ag_vanished: av({ only: 'wore' }),
+  ag_kindless: av({ only: 'journal', d: { ...day, rows: day.rows.filter(r => r.kind !== 'journal') } }),
+  ag_none: av({ d: { ok: true, days: 7, total: 0, counts: {}, rows: [] } }),
+  ag_bad: av({ d: { ok: false } }),
+}
+""")
+check("the decisions/agency probe rendered", "_error" not in d, d.get("_error", ""))
+g = lambda k: grab(d, k)
+# DECISIONS — what only he can settle
+check("a decision's kind is a kit chip in its own tone — route accent, once warm",
+      re.search(r'ui-tone-accent"[^>]*title="applied immediately by code when you choose"', g("dec")) is not None
+      and re.search(r'ui-tone-warm"[^>]*title="one-off', g("dec")) is not None)
+_bs = re.findall(r"<button[^>]*>", g("dec"))
+check("every answer is a kit button, and none is primary — no answer is the default",
+      len(_bs) == 4 and all("ui-btn" in b for b in _bs) and "ui-btn-primary" not in g("dec")
+      and ">leave off<" in g("dec"), _bs)
+check("the why box is a kit field, named by its own words",
+      g("dec").count('aria-label="why (optional, kept with the answer)"') == 2 and "ui-field" in g("dec"))
+check("the head row is not a .chips row: a count chip, and a toggle that says whether it is pressed",
+      'class="chips"' not in g("dec")
+      and re.search(r'ui-tone-accent"><span class="ui-chip-t">2 waiting on you<', g("dec")) is not None
+      and re.search(r'aria-pressed="false"[^>]*>1 decided<', g("dec")) is not None)
+check("the decided list opens with its heading, each verdict a chip",
+      re.search(r'aria-pressed="true"[^>]*>1 decided<', g("dec_past")) is not None
+      and "decided — kept, never removed" in g("dec_past")
+      and re.search(r'ui-chip-t">arm<', g("dec_past")) is not None)
+check("nothing waiting is the kit's empty state, the sentence verbatim",
+      "ui-state-empty" in g("dec_none")
+      and "Nothing is waiting. Anything I cannot settle myself lands here rather than in a reply "
+          "that scrolls away." in g("dec_none"))
+# HER OWN TIME — a record of what she did
+check("her kinds are the kit's Tabs, named — all, plus one per kind she has rows in",
+      'role="tablist" aria-label="filter by kind"' in g("ag") and g("ag").count('role="tab"') == 3)
+check("'all' (the sum of her kinds) is selected by default",
+      re.search(r'aria-selected="true"[^>]*>all 3<', g("ag")) is not None)
+check("filtering to the journal selects its tab and leaves only its row",
+      re.search(r'aria-selected="true"[^>]*><span class="ag-dot ag-k-journal"', g("ag_journal")) is not None
+      and "As of Friday: quiet." in g("ag_journal") and "read about tides" not in g("ag_journal"))
+check("no emoji or text glyph stands for a kind — a dot in the kind's colour",
+      not any(c in g("ag") for c in ("◈", "📔", "👗", "✧", "📋")) and "ag-ic" not in g("ag")
+      and g("ag").count('class="ag-dot ag-k-own_time"') == 3)
+check("KINDS carries no icon field — the glyphs are gone at the source", "icon:" not in _code("ui/src/apps/Agency.jsx"))
+check("a source that failed is said out loud, as an err chip",
+      "ui-tone-err" in g("ag") and "could not read: wore" in g("ag"))
+check("a row's state is a chip", re.search(r'ui-chip-t">delayed<', g("ag")) is not None)
+check("no time to herself is the kit's empty state, her sentence verbatim",
+      "ui-state-empty" in g("ag_none") and "she has not had any time to herself in the last 7 days" in g("ag_none"))
+check("a kind with nothing in it says so, verbatim", "nothing of that kind in the last 7 days" in g("ag_kindless"))
+# A CHOSEN KIND THAT VANISHED (stage-4 final review, M2): 'wore' has no count, so no tab;
+# the strip selected "all" (Tabs' clamp) while the rows still filtered to 'wore' — nothing.
+check("a chosen kind whose tab has gone shows all her rows under 'all' (M2)",
+      re.search(r'aria-selected="true"[^>]*>all 3<', g("ag_vanished")) is not None
+      and all(t in g("ag_vanished") for t in ("read about tides", "As of Friday: quiet.", "wrote a list"))
+      and "nothing of that kind" not in g("ag_vanished"))
+check("an unreadable day is the kit's error state, verbatim",
+      "ui-state-error" in g("ag_bad") and "could not read her day" in g("ag_bad"))
+RETIRED_S4 |= {"dec-kind", "dec-k-once", "dec-k-route", "dec-k-note", "dec-choice",
+               "ag-bar", "ag-fil", "ag-ic", "ag-n", "ag-state"}
+
+d = render(r"""
+import * as M from '../ui/src/apps/Music.jsx'
+import * as S from '../ui/src/apps/Stage.jsx'
+const noop = () => {}
+const lib = [ { path: 'a.mp3', title: 'Tides', artist: 'Nils', album: 'Shore' },
+              { path: 'b.mp3', title: 'Rain', artist: 'Ola', album: 'Grey' } ]
+const playing = { dir_exists: true, dir: '/srv/music', playing: true, track: lib[0], changed_by: 'her', queue: [ { title: 'Rain' } ] }
+const MV = M.MusicView
+const mv = (p) => MV ? html(h(MV, { d: { state: playing, library: lib }, err: null, q: '', setQ: noop, onSend: noop, ...p })) : 'NO VIEW'
+const ladder = ['warm', 'near', 'close', 'heated', 'hot'].map((name, level) => ({ level, name, dwell: 2, direction: 'd' + level }))
+const scene = { title: 'Lighthouse', theme: 'storm', role: 'the keeper', setting: 'a tower', level: 1, beats: 5,
+                beats_at_level: 1, hooks: ['the lamp fails', 'a knock'], hooks_fired: [0], opened: false }
+const SV = S.StageView
+const sv = (d) => SV ? html(h(SV, { d, act: noop })) : 'NO VIEW'
+const out = {
+  mus: mv({}),
+  mus_paused: mv({ d: { state: { ...playing, playing: false }, library: lib } }),
+  mus_rain: mv({ q: 'rain' }),
+  mus_err: mv({ err: 'could not play that file' }),
+  mus_nodir: mv({ d: { state: { dir_exists: false, dir: '/srv/none' }, library: [] } }),
+  mus_empty: mv({ d: { state: { dir_exists: true, dir: '/srv/music' }, library: [] } }),
+  stg_live: sv({ enabled: true, max_heat: 3, dwell_scale: 1.5, ladder, scene, stop_words: 'say stop, any time' }),
+  stg_idle: sv({ enabled: true, max_heat: 3, ladder, pending: true, stop_words: '',
+                 deck: [ { id: 'lh', title: 'Lighthouse', theme: 'storm', premise: 'a night watch', authored: true } ] }),
+  stg_off: sv({ enabled: false, ladder: [], deck: [] }),
+  stg_bad: sv({ ok: false, error: 'roleplay module missing' }),
+}
+""")
+check("the music/stage probe rendered", "_error" not in d, d.get("_error", ""))
+g = lambda k: grab(d, k)
+_tracks = lambda k: g(k).split('class="mus-tracks"')[-1]
+# MUSIC — one player, two people
+check("play/pause is the window's one primary, and says what it will do",
+      g("mus").count("ui-btn-primary") == 1
+      and re.search(r'ui-btn-primary[^"]*"[^>]*>pause<', g("mus")) is not None
+      and re.search(r'ui-btn-primary[^"]*"[^>]*>play<', g("mus_paused")) is not None)
+check("next is a kit button", re.search(r'class="ui-btn ui-btn-secondary[^"]*"[^>]*>next<', g("mus")) is not None)
+check("no emoji-presentation glyph on the controls",
+      not any(c in g("mus") + g("mus_paused") for c in ("⏸", "▶", "⏭")))
+check("the find box is a kit field, named", "ui-field" in g("mus") and 'aria-label="find a track"' in g("mus"))
+check("every track is a kit row he can press", g("mus").count("ui-row-main") == 2)
+check("the track on now carries one chip that says so", g("mus").count('ui-chip-t">now<') == 1)
+# THE TRACK BUTTON'S NAME (stage-4 final review, M3): its text, tags stripped, is what a
+# screen reader hears — it was "TidesNils", and which track plays was outside the button.
+_tnames = [re.sub(r"<!-- -->|<[^>]+>", "", b) for b in
+           re.findall(r'<button type="button" class="ui-row-main"[^>]*>(.*?)</button>', _tracks("mus"))]
+check("each track button is named title · artist, and the one playing says so (M3)",
+      _tnames == ["Tides · Nils, now playing", "Rain · Ola"], _tnames)
+check("finding filters the rows", ">Rain<" in _tracks("mus_rain") and ">Tides<" not in _tracks("mus_rain"))
+check("who put it on is said, verbatim", "put on by her" in g("mus"))
+check("a player error is an err chip, verbatim", "ui-tone-err" in g("mus_err") and "could not play that file" in g("mus_err"))
+check("no library is the kit's empty state, its words verbatim",
+      "ui-state-empty" in g("mus_nodir") and "no music library — nothing at" in g("mus_nodir") and ">/srv/none<" in g("mus_nodir"))
+check("an empty library is the kit's empty state, its words verbatim",
+      "ui-state-empty" in g("mus_empty") and "is empty. drop some audio in and" in g("mus_empty"))
+# STAGE — the director, made visible; stop is always one click
+check("the status row is not a .chips row: armed, ceiling and pacing are chips",
+      'class="chips"' not in g("stg_live")
+      and re.search(r'ui-tone-ok"><span class="ui-chip-dot"></span><span class="ui-chip-t">armed<', g("stg_live")) is not None
+      and 'ui-chip-t">ceiling heated<' in g("stg_live") and 'ui-chip-t">pacing ×1.5<' in g("stg_live"))
+check("stop is a danger kit button, drawn only while a scene is live, its words verbatim",
+      re.search(r'ui-btn-danger[^"]*"[^>]*>■ stop the scene<', g("stg_live")) is not None
+      and "stop the scene" not in g("stg_idle"))
+check("every button in the window is a kit button — begin and stop included",
+      all("ui-btn" in b for k in ("stg_live", "stg_idle") for b in re.findall(r"<button[^>]*>", g(k)))
+      and ">begin<" in g("stg_idle"))
+check("an opening not yet delivered is a warn chip",
+      re.search(r'ui-tone-warn"><span class="ui-chip-t">opening not yet delivered<', g("stg_live")) is not None)
+check("the ladder is still shown: the wall struck, the rung's dwell said",
+      "above the ceiling" in g("stg_live") and "beats before the next rung can open" in g("stg_live"))
+check("an authored card wears an ok chip",
+      re.search(r'ui-tone-ok"[^>]*><span class="ui-chip-t">authored<', g("stg_idle")) is not None)
+check("switched off is a quiet chip, and the off paragraph stays verbatim",
+      re.search(r'ui-tone-neutral"><span class="ui-chip-t">switched off<', g("stg_off")) is not None
+      and "Roleplay is off. Turn on" in g("stg_off"))
+check("she has offered, verbatim", "She has offered — pick one in the chat." in g("stg_idle"))
+check("an unavailable stage is the kit's error state, verbatim",
+      "ui-state-error" in g("stg_bad") and "stage unavailable — roleplay module missing" in g("stg_bad"))
+RETIRED_S4 |= {"music", "controls", "tracks", "track", "tt", "ta", "stg-auth"}
+
+d = render(r"""
+import * as U from '../ui/src/apps/Setup.jsx'
+const setup = {
+  engine: { kind: 'openai', base_url: 'http://127.0.0.1:1234/v1', model: 'm', dialect: 'generic', probe: '200 OK', reachable: true,
+            key: { configured: true, present: false, path: 'config/engine-token' } },
+  xai: { key: { configured: false, present: false, path: 'config/xai-token' }, voice: { armed: false, method: 'off' },
+         images: { armed: false }, search: { backend: 'ddg', armed: false }, research: { armed: false } },
+  persona: { present: true, dir: 'persona', fragments: 12 },
+  avatar: { have_face: false, bundled: true, set: 'kairos-1', seeded: false, faces_with_art: 0, faces_total: 7 },
+  sidecars: { enabled: false },
+  memory: { present: true, registry: 'var/memory/registry.jsonl', rows: 812 },
+  models: { engine: { note: 'what the decode knobs were tuned on',
+                      recommended: [ { id: 'org/model-GGUF', card: 'https://example.org/model', format: 'gguf', knob: '[engine].model', note: 'the default' } ] } },
+}
+const out = { su: U.SetupView ? html(h(U.SetupView, { d: setup })) : 'NO VIEW' }
+""")
+check("the setup probe rendered", "_error" not in d, d.get("_error", ""))
+g = lambda k: grab(d, k)
+check("a ready section is an ok chip", re.search(r'ui-tone-ok"><span class="ui-chip-t">ready<', g("su")) is not None)
+check("needs attention is a warn chip (her face: bundled, not yet laid down)",
+      re.search(r'ui-tone-warn"><span class="ui-chip-t">needs attention<', g("su")) is not None)
+check("not set is a quiet chip — absent is not an error",
+      re.search(r'ui-tone-neutral"><span class="ui-chip-t">not set<', g("su")) is not None)
+check("a key file made but empty is its own state, in warn",
+      re.search(r'ui-tone-warn"><span class="ui-chip-t">empty file<', g("su")) is not None)
+check("a key file never made is quiet", re.search(r'ui-tone-neutral"><span class="ui-chip-t">not created<', g("su")) is not None)
+check("no su-mark and no bare good/bad/warn class is drawn — those tones only ever lived in .su-mark.*",
+      "su-mark" not in g("su") and not re.search(r'class="[^"]*(?<![\w-])(good|bad|warn)(?![\w-])', g("su")))
+check("its rows stay KV, and 'good'/'bad' still colour them",
+      'class="ui-kv"' in g("su") and "ui-kv-ok" in g("su") and "ui-kv-err" in g("su"))
+check("a model's format and its knob are chips; the knob warm, as Tools' arming knob is",
+      re.search(r'ui-tone-neutral"><span class="ui-chip-t">gguf<', g("su")) is not None
+      and re.search(r'ui-tone-warm"><span class="ui-chip-t">\[engine\]\.model<', g("su")) is not None)
+check("the lead is verbatim", "Everything below is read from the running stack." in g("su"))
+check("Setup still has no write authority — no button anywhere", "<button" not in g("su"))
+RETIRED_S4 |= {"su-mark", "su-fmt", "su-knob"}
+
+d = render(r"""
+import * as Y from '../ui/src/apps/Story.jsx'
+const noop = () => {}
+const facts = [
+  { name: 'r1', text: 'she likes tides', kind: 'fact', core: 1, salience: 0.9, ts: '2026-09-20T08:00:00' },
+  { name: 'c1', text: 'Chapter one: the first quiet week', kind: 'chapter', ts: '2026-09-21' },
+  { name: 'f1', text: 'an old thought', kind: 'thought', lifecycle: 'retired', retired_because: 'folded into the chapter c1', superseded_by: 'c1' },
+  { name: 't1', text: 'a thought about rain', kind: 'thought', ts: '2026-09-22' },
+  { name: 'd1', text: 'a dream of a lighthouse', kind: 'dream', ts: '2026-09-23' },
+]
+const st = { block: [ { section: 'fact', name: 'r1', label: 'she likes tides' }, { section: 'narrative', name: 'nope', label: 'an unattributed line' } ],
+             backup: { ok: true, count: 12, newest: '2026-09-26 10:00', bytes: 52428800 } }
+const V = Y.StoryView
+const sv = (p) => V ? html(h(V, { d: st, facts, lane: '', setLane: noop, refresh: noop, ...p })) : 'NO VIEW'
+const R = Y.StoryRow
+const out = {
+  sty: sv({}), sty_thought: sv({ lane: 'thought' }), sty_gone: sv({ lane: 'feeling' }),
+  sty_nochap: sv({ facts: facts.filter(r => r.kind !== 'chapter') }),
+  sty_nobk: sv({ d: { block: [], backup: { enabled: false } } }),
+  row_open: R ? html(h(R, { r: facts[0], onDone: noop, startOpen: true })) : 'NO ROW',
+}
+""")
+check("the story probe rendered", "_error" not in d, d.get("_error", ""))
+g = lambda k: grab(d, k)
+_LANE_NOTE = ("her becoming — the nightly paragraph — reads in the journal panel; these are the "
+              "registry lanes behind it.")
+check("her lanes are the kit's Tabs, named — one per lane with live rows; no .chips row",
+      'role="tablist" aria-label="filter by lane"' in g("sty") and g("sty").count('role="tab"') == 3
+      and 'class="chips"' not in g("sty"))
+check("choosing a lane selects its tab and shows its rows",
+      re.search(r'aria-selected="true"[^>]*>thought 1<', g("sty_thought")) is not None
+      and "a thought about rain" in g("sty_thought") and "a thought about rain" not in g("sty"))
+# Tabs always hold one selected tab (the clamped index): with no lane chosen, or a chosen
+# lane whose rows are gone, the FIRST lane is selected — and its rows are the ones shown,
+# so a selected tab never sits over an empty section.
+check("no lane chosen (or a lane that emptied) selects the first lane and shows its rows",
+      all(re.search(r'aria-selected="true"[^>]*>chapter 1<', g(k)) is not None
+          and g(k).count("Chapter one: the first quiet week") == 2 for k in ("sty", "sty_gone")))
+check("the lanes' note stands, verbatim, whether or not a lane is chosen",
+      all(_LANE_NOTE in g(k) for k in ("sty", "sty_thought")))
+check("a row's kind is a kit chip; the old cls chip is gone",
+      re.search(r'ui-chip-t">fact<', g("sty")) is not None and "sty-k" not in g("sty") and 'class="cls' not in g("sty"))
+check("a row opens by a button that says whether it is open",
+      '<button type="button" class="sty-line" aria-expanded="false"' in g("sty"))
+check("the core mark stays", "★" in g("sty"))
+check("an open row: pin and retire are kit buttons, retire in danger, the words verbatim",
+      'aria-expanded="true"' in g("row_open")
+      and re.search(r'ui-btn-secondary[^"]*"[^>]*>unpin core<', g("row_open")) is not None
+      and re.search(r'ui-btn-danger[^"]*"[^>]*>retire<', g("row_open")) is not None)
+check("the wording box is a kit field, named by its own words",
+      "ui-field" in g("row_open")
+      and 'aria-label="correct the wording — keeps the row, notes the edit"' in g("row_open"))
+check("no chapter yet is the kit's empty state, the sentence verbatim",
+      "ui-state-empty" in g("sty_nochap")
+      and "none yet — the first is written after about a week, at the 04:00 boundary of a quiet night." in g("sty_nochap"))
+check("the backup receipt is a chip: ok when backed up, warn when not — the words verbatim",
+      re.search(r'ui-tone-ok[^"]*"><span class="ui-chip-t">backed up hourly — 12 archives, newest 2026-09-26 10:00, 50 MB kept<', g("sty")) is not None
+      and re.search(r'ui-tone-warn[^"]*"><span class="ui-chip-t">backups are OFF<', g("sty_nobk")) is not None)
+check("an unattributed prefix line still shows, and the fold still archives under its chapter",
+      "an unattributed line" in g("sty") and "an old thought" in g("sty"))
+# WHO STILL DRAWS .chips — no stage-4 window does; the global rule stays for the rest
+_S4 = {"Files", "House", "Decisions", "Agency", "Music", "Stage", "Setup", "Story"}
+_apps_dir = os.path.join(ROOT, "ui", "src", "apps")
+_chips_users = sorted(f[:-4] for f in os.listdir(_apps_dir) if f.endswith(".jsx")
+                      and re.search(r"""className=(?:"|\{')[^>]*(?<![\w-])chips(?![\w-])""", _code("ui/src/apps/" + f)))
+check("no stage-4 window draws a .chips row", not (set(_chips_users) & _S4), _chips_users)
+print("   .chips is still drawn by: %s — its rule stays until the last of them migrates (stages 5-6)"
+      % (", ".join(_chips_users) or "nobody"))
+RETIRED_S4 |= {"sty-lane", "sty-k"}
+
+# ── leg 11's retired scan — keep this block last, directly above finish(GATE) ──
+_drawn4 = set()
+for s in ALL_HTML:
+    for cls in re.findall(r'class="([^"]*)"', s):
+        _drawn4 |= set(cls.split()) & RETIRED_S4
+check("no stage-4 window draws a class it retired", bool(RETIRED_S4) and not _drawn4, sorted(_drawn4))
+_room_now = re.sub(r"/\*.*?\*/", "", io.open(os.path.join(ROOT, "ui/src/room.css"), encoding="utf-8").read(), flags=re.S)
+_written4 = sorted(c for c in RETIRED_S4 if re.search(r"\." + re.escape(c) + r"(?![\w-])", _room_now))
+check("...and room.css styles none of them", not _written4, _written4)
 
 finish(GATE)

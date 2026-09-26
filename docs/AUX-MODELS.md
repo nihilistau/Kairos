@@ -98,7 +98,7 @@ search itself is a matmul over a few thousand rows — microseconds.
 One section, the same knob framework as everything else (`harness/tuning/registry.py`): boot
 defaults in the profile's `[aux]` block through serve.py's one door; live knobs read through the
 override-only bridge (`registry.tune_or_env`) so an untouched panel still obeys the profile. The
-window is **librarians** (📚) in the room; its chip says `embed ✓ chat ✓ · N` / `embed dark` / `off`.
+window is **Librarians** in the room; its chip says `embed ✓ chat ✓ · N` / `embed dark` / `off`.
 
 | Knob | Scope | Meaning |
 |---|---|---|

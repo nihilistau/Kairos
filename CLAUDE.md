@@ -5,8 +5,8 @@ the rules. This file is a POINTER, not a copy — two copies of one truth is the
 codebase keeps getting hit by (AGENTS.md §0).**
 
 - Start the stack: `python serve.py companion` — **the profile is positional and not optional**.
-  (The retired reference model profiles were deleted 2026-08-26; `profiles/` holds hers and the external-engine
-  one, so a mistyped profile now fails loudly instead of serving the wrong model quietly.)
+  (The retired reference model profiles were deleted 2026-08-26; `profiles/` holds hers, the external-engine
+  one and the export's placeholder `sp`, so a mistyped profile now fails loudly instead of serving the wrong model quietly.)
 - Memory and recall, before touching `harness/skills/`: `docs/MEMORY-AND-RECALL.md`.
 - What proves it still works: `gates/GATE-INDEX.md`. The whole offline suite in one command:
   `python tools/sweep.py` (~3 min, no GPU). **A green suite is not an audit** — the 2026-08-25

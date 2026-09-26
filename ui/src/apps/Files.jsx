@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { usePoll, Body } from './panel.jsx'
 import * as api from '../api.js'
+import { Button, Chip, Row, State, TextArea } from '../kit/parts.jsx'
 
 /* FILES — the tree they share.
  *
@@ -23,6 +24,40 @@ function size(n) {
   return `${(n / 1048576).toFixed(1)}M`
 }
 
+/* The window's body, split out so G-ROOM-KIT leg 11 can render it with a fixture.
+ * A text file is a kit Row he can press — a keyboard reaches it now; the old row was a
+ * clickable div. Anything else is a plain row: the write route takes a string, so there
+ * is nothing to open. `note` is {t, tone}: a save or an add reads ok, a refusal reads
+ * err (they were all the same cyan). Save is the window's one primary. */
+export function FilesView({ d, open, text, setText, note, dragging, onRead, onSave, onClose }) {
+  return (
+    <>
+      <div className="fl-root">{d.root}</div>
+      {!d.files.length
+        ? <State kind="empty">empty — drag a text file in to share it with her</State>
+        : d.files.map(f => (
+            <div key={f.path} className={'fl-file' + (open && open.path === f.path ? ' on' : '')}>
+              <Row title={<span className="fl-path">{f.path}</span>} meta={size(f.bytes)}
+                   onClick={TEXTY.test(f.path) ? () => onRead(f) : undefined} />
+            </div>
+          ))}
+      {open ? (
+        <div className="fl-viewer">
+          <div className="fl-vh">
+            <span className="fl-open">{open.path}</span>
+            <Button size="sm" variant="primary" onClick={onSave}>save</Button>
+            <Button size="sm" variant="ghost" onClick={onClose}>close</Button>
+          </div>
+          <TextArea className="fl-text" aria-label={'the text of ' + open.path}
+                    value={text} onChange={e => setText(e.target.value)} spellCheck="false" />
+        </div>
+      ) : null}
+      {note ? <div className="fl-note"><Chip tone={note.tone} wrap>{note.t}</Chip></div> : null}
+      {dragging ? <div className="fl-drop">drop to share</div> : null}
+    </>
+  )
+}
+
 export default function Files() {
   const s = usePoll(api.files, 15000)
   const [open, setOpen] = useState(null)
@@ -40,9 +75,9 @@ export default function Files() {
   }
 
   async function save() {
-    setNote('saving…')
+    setNote({ t: 'saving…', tone: 'neutral' })
     const r = await api.filesWrite({ path: open.path, text })
-    setNote(r.ok ? 'saved — she can read it now' : r.error)
+    setNote(r.ok ? { t: 'saved — she can read it now', tone: 'ok' } : { t: r.error, tone: 'err' })
     s.refresh?.()
   }
 
@@ -52,44 +87,22 @@ export default function Files() {
       // Text only, deliberately: the write route takes a string. Binary sharing
       // wants a different endpoint and a size policy, and pretending otherwise
       // would silently corrupt whatever he dropped.
-      if (!TEXTY.test(f.name)) { setNote(`${f.name}: text files only for now`); continue }
+      if (!TEXTY.test(f.name)) { setNote({ t: `${f.name}: text files only for now`, tone: 'err' }); continue }
       const body = await f.text()
       const r = await api.filesWrite({ path: f.name, text: body })
-      setNote(r.ok ? `added ${f.name}` : r.error)
+      setNote(r.ok ? { t: `added ${f.name}`, tone: 'ok' } : { t: r.error, tone: 'err' })
     }
     s.refresh?.()
   }
 
   return (
-    <div className={'pad files' + (dragging ? ' dragging' : '')}
+    <div className={'pad fl' + (dragging ? ' fl-dragging' : '')}
          onDragOver={e => { e.preventDefault(); setDragging(true) }}
          onDragLeave={() => setDragging(false)}
          onDrop={drop}>
       <Body state={s}>{d => (
-        <>
-          <div className="root muted">{d.root}</div>
-          {!d.files.length
-            ? <div className="muted">empty — drag a text file in to share it with her</div>
-            : d.files.map(f => (
-                <div key={f.path} className={'file' + (open?.path === f.path ? ' on' : '')}
-                     onClick={() => TEXTY.test(f.path) ? read(f) : null}>
-                  <span className="fp">{f.path}</span>
-                  <span className="fs">{size(f.bytes)}</span>
-                </div>
-              ))}
-          {open ? (
-            <div className="viewer">
-              <div className="vh">
-                <b>{open.path}</b>
-                <button onClick={save}>save</button>
-                <button onClick={() => { setOpen(null); setNote(null) }}>close</button>
-              </div>
-              <textarea value={text} onChange={e => setText(e.target.value)} spellCheck="false" />
-            </div>
-          ) : null}
-          {note ? <div className="note">{note}</div> : null}
-          {dragging ? <div className="dropzone">drop to share</div> : null}
-        </>
+        <FilesView d={d} open={open} text={text} setText={setText} note={note} dragging={dragging}
+                   onRead={read} onSave={save} onClose={() => { setOpen(null); setNote(null) }} />
       )}</Body>
     </div>
   )

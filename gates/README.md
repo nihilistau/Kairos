@@ -8,8 +8,8 @@ needs the stack, and its run command. This directory also keeps the write-ups an
 ## Modes
 - **OFFLINE** — no GPU, no daemon; run freely (`SP_DAEMON_URL` points at a discard port).
 - **LIVE** — the stack up: `python serve.py companion` (positional, not optional).
-- **LIVE-SP** — needs the sp-daemon specifically (byte-exact, KV, the kairos margin); arrives with
-  the engine-agnostic backend.
+- **LIVE-SP** — needs the sp-daemon specifically (byte-exact, KV, the kairos margin), not just any
+  OpenAI-compatible endpoint (`docs/BACKENDS.md`); the Kairos export drops these rows (`exclude_live_sp`).
 - **BROKEN** — red and said so, with the reason in the row.
 
 ## The exit convention

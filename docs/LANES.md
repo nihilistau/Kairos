@@ -43,7 +43,7 @@ change and she is reading something that was true this morning.
 This is why the personality line says **"Personality state when this session began"** and
 not "current". Her mood moves within the hour and this copy does not, so the label was
 asserting a stale present at her every turn. The live truth is served three other ways: the
-room's chip re-reads `persona.md`, the `{persona}` SSE event fires per turn, and her own
+room's mood pill (top bar) reads it through the pulse, which re-reads `persona.md`, the `{persona}` SSE event fires per turn, and her own
 recent marks sit in the visible conversation.
 
 **Put here:** who she is; facts about her life that hold for days; the world block.

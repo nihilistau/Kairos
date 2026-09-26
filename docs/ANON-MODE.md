@@ -2,7 +2,7 @@
 type: reference
 title: "ANON-MODE — the evening the room does not keep"
 date: 2026-08-23
-status: LIVE — the switch is in the dock; `harness/control/anon.py` is the truth, G-ANON is the proof
+status: LIVE — the switch is in the taskbar (since the dock was removed, 2026-09-23); `harness/control/anon.py` is the truth, G-ANON is the proof
 ---
 
 # Off the record
@@ -17,13 +17,18 @@ reaches disk, and that is the claim `harness_tests/g_anon.py` exists to keep hon
 
 ## How to use it
 
-The dock, at the foot, above `shut down`: **👤 anonymous**. One click on, one click off, no
-confirm. Turning it on is the direction that fails safe, and it is the one control here
-that should be reachable in a hurry.
+The taskbar, at the right, just before **Shut down**: **Anonymous** (`ui/src/room/Anon.jsx`,
+mounted in `main.jsx`'s `.tb-right`). One click on, one click off, no confirm. Turning it on
+is the direction that fails safe, and it is the one control here that should be reachable in
+a hurry — which is why it is a taskbar control and never a desktop icon: an icon can be
+dragged behind a window. It is never shed at any width; below 620px it keeps its icon and
+loses its word.
 
-While it is on the room says so three times — the button reads **🕶 off the record**, a
-violet chip appears in the taskbar with the elapsed time and the running tally, and a
-violet rule is drawn around the whole room. That is deliberate over-signalling: the failure
+While it is on the room says so three times — the button reads **Off the record** in the
+violet `--an` colour, a violet chip appears at the head of the taskbar's right-hand group
+with the elapsed time and the running tally ("off the record 12m · 6 held"; a bar narrower
+than 940px sheds this chip, since the button wears the same state), and a violet rule is
+drawn around the whole room. That is deliberate over-signalling: the failure
 mode of a private mode is forgetting which way it is set, and it is a failure in **both**
 directions. Forgetting it is ON costs an evening of her memory. Forgetting it is OFF costs
 the privacy you asked for.
@@ -153,7 +158,7 @@ than quieting it. **Only the door that creates is held.**
 
 `persona.state` writes into a shadow dict in `persona_file` instead of onto disk, and
 `parse_persona` overlays it. A plain refusal would freeze her dials at whatever they read
-when the switch went on, and the room's persona chip would show her marks visibly failing
+when the switch went on, and the mood pill in the room's top bar would show her marks visibly failing
 to move. She feels the evening; the file does not learn it.
 
 The shadow is dropped on **both** edges — entering, so a previous private evening cannot

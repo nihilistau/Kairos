@@ -14,7 +14,7 @@ something (a key, a download, a GPU). Nothing below §3 is needed for a complete
 the memory system, the personality, unprompted speech, the room and every gate run
 offline against any endpoint.
 
-**The room has a live version of this page.** Open the ⚙︎-adjacent **setup** window and it
+**The room has a live version of this page.** Open the **Setup** window (its icon is on the desktop) and it
 tells you which step you are actually on — whether your endpoint answered, which keys it
 can see, whether her face is seeded. It reads `/v1/setup`, writes nothing, and never
 returns the contents of a key file.
@@ -84,8 +84,8 @@ python serve.py companion
 is no safe default — a stack that boots on the wrong profile looks completely healthy and
 sends another model's decode knobs to yours. Open <http://127.0.0.1:8810/room/>.
 
-Stop her from the room (the ⏻ in the dock: *her only* / *everything* / *kill*) or
-`python serve.py --stop`.
+Stop her from the room (**Shut down** at the right of the taskbar: *her only* /
+*everything* / *kill*) or `python serve.py --stop`.
 
 ---
 
@@ -137,7 +137,10 @@ It is gitignored, which means **git is not your safety net for it**: `serve.py` 
 `persona.md` to `var/persona-backups/` on every launch, and the hourly backup
 (`[backup]`) carries the rest.
 
-The room's **persona** panel edits the fragments live. `harness/personality/` is the
+The room has no persona window: the fragments are plain files, so edit them in any editor
+(the gateway also takes one fragment at a time on `POST /v1/persona/layers`). Either way it
+changes a FILE, not her — her prefix is snapshot-cached, so an edit applies from the next
+session, or after the day-boundary refresh. `harness/personality/` is the
 machinery — marks, the curator, the layers. If you touch it, read
 [`MEMORY-AND-RECALL.md`](MEMORY-AND-RECALL.md) first: the personality writes facts, and
 facts are the thing this project refuses to lose.

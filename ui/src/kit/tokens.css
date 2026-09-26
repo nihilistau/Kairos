@@ -57,6 +57,7 @@
   --an: #a78bfa;                  /* off the record — its own colour, never the error red */
   --an-rgb: 167, 139, 250;
   --private: #c96ce0;
+  --private-rgb: 201, 108, 224;  /* COMMA triple, for rgba(var(--private-rgb), a) */
   --read: #4ad98a; --write: #e8b64c; --world: #46d9e6; --machine: #e2685b;
 
   /* her mood (defaults — moodTheme.js owns the live values) */

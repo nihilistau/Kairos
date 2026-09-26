@@ -1,5 +1,6 @@
 import { usePoll, Body } from './panel.jsx'
 import * as api from '../api.js'
+import { Chip, State } from '../kit/parts.jsx'
 
 /* THE HOUSE — a beachhead, and honest about being one.
  *
@@ -27,17 +28,12 @@ import * as api from '../api.js'
  *
  * Prefix `ha-`, per the appRegistry CSS-ownership rule G-ROOM-CSS enforces.
  */
-export default function House () {
-  /* THE PANEL THAT COULD NEVER OPEN (2026-08-29 audit). This first shipped as
-   * usePoll with the route STRING where it wants a function, read
-   * its fields off the poll wrapper instead of .data, and used Body without the
-   * {state, children:fn} contract. Three independent crashes, and with no
-   * ErrorBoundary in the room at the time, clicking 🏠 blanked the whole room.
-   * Now it is shaped like every other panel; api.house is the one spelling. */
-  const s = usePoll(api.house, 15000)
+const TONE = { off: 'neutral', up: 'ok', down: 'err' }
 
-  return (
-    <Body state={s}>{d => {
+/* The window's body, split out so G-ROOM-KIT leg 11 can render it with a fixture. The
+ * three states are a kit Chip with a dot: ok, err, and quiet for "not configured" —
+ * still three, never two. It still has no button, which is the point of the panel. */
+export function HouseView({ d }) {
   const configured = !!d.configured
   const alive = !!d.alive
   const ents = d.entities || []
@@ -52,8 +48,7 @@ export default function House () {
   return (
     <div className="pad house">
       <div className="ha-head">
-        <span className={'ha-dot ha-' + state} />
-        <span className="ha-state">{label}</span>
+        <Chip tone={TONE[state]} dot>{label}</Chip>
         {url ? <a className="ha-link" href={url} target="_blank" rel="noreferrer">
           open Home Assistant ↗
         </a> : null}
@@ -83,10 +78,7 @@ export default function House () {
           ))}
         </ul>
       ) : alive ? (
-        <div className="ha-empty">
-          Nothing here reaches her yet. The bridge takes a sleep confidence and an activity
-          from the companion app — enable those sensors on the phone and they appear.
-        </div>
+        <State kind="empty">{'Nothing here reaches her yet. The bridge takes a sleep confidence and an activity from the companion app — enable those sensors on the phone and they appear.'}</State>
       ) : null}
 
       {/* SILENCE IS AN ANSWER HERE TOO. The house watch list ships empty and she is told
@@ -94,10 +86,19 @@ export default function House () {
       <div className="ha-foot">
         She is told nothing about the house itself
         {d.watching && d.watching.length ? ` except ${d.watching.length} watched entities` : ''}
-        . Her body readings are in the ♥ panel.
+        . Her body readings are in the Body window.
       </div>
     </div>
   )
-    }}</Body>
-  )
+}
+
+export default function House () {
+  /* THE PANEL THAT COULD NEVER OPEN (2026-08-29 audit). This first shipped as
+   * usePoll with the route STRING where it wants a function, read
+   * its fields off the poll wrapper instead of .data, and used Body without the
+   * {state, children:fn} contract. Three independent crashes, and with no
+   * ErrorBoundary in the room at the time, clicking 🏠 blanked the whole room.
+   * Now it is shaped like every other panel; api.house is the one spelling. */
+  const s = usePoll(api.house, 15000)
+  return <Body state={s}>{d => <HouseView d={d} />}</Body>
 }

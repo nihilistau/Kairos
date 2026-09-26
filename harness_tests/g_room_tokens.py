@@ -7,7 +7,9 @@ THE SPEC: docs/superpowers/specs/2026-09-23-room-redesign-design.md. Six legs:
      pairs (2026-09-26, final review): ink on its fill (--on-accent, --on-err), the status
      colours on every surface, the idle window lights >= 3:1 on their bar, and every
      .ui-tone-* chip's text on its OWN tint composited over each surface (the err chip was
-     4.47:1 on --surface-3); the mood tone at every hue, 10 degrees apart.
+     4.47:1 on --surface-3); the mood tone at every hue, 10 degrees apart. And (stage-4
+     final review) --text-3 on every accent-tinted selected row (`.X.on` in room.css) over
+     the window body, --surface-2: Music's and Files' rows were 4.25:1 at a .10 tint.
   2. ICONS. Every `icon:` in appRegistry names a glyph in kit/icons.jsx; no emoji left.
   3. MOOD. resolveMood's precedence, driven under node; and only room/useMood.js reads
      roomMood.get, because owning the live read is owning the rule (AGENTS.md §0). Plus
@@ -191,6 +193,30 @@ if not missing:
         print("   worst tone: %s = %.2f:1" % (worst_t[1], worst_t[0]))
     check("every tone's text >= 4.5:1 on its own tint over every surface", not lowt, lowt[:6])
 
+    # SELECTED ROWS (stage-4 final review, I3): a selected row is tinted with the accent, and
+    # its meta is --text-3 (.ui-row-meta, .mus-ta). At .10 over the window body (--surface-2)
+    # that measured 4.25:1. Every `.X.on` rule in room.css tinted with --accent-rgb is read
+    # and --text-3 measured on it over --surface-2, where a window's rows sit.
+    print("   selected rows — --text-3 on each accent-tinted .on row, over the window body")
+    ROOM_CSS = os.path.join(UI, "room.css")
+    rcss = blank_comments(read(ROOM_CSS)) if os.path.isfile(ROOM_CSS) else ""
+    sel = {}
+    for m in re.finditer(r"\.([\w-]+)\.on\s*\{([^}]*)\}", rcss):
+        b = re.search(r"background\s*:\s*(rgba\(\s*var\(--accent-rgb\)\s*,\s*[\d.]+\s*\))", m.group(2))
+        if b:
+            sel[m.group(1)] = b.group(1)
+    need_rows = {"mus-track", "fl-file"}
+    check("the selected-row tints were read from room.css (Music's track, Files' file)",
+          need_rows <= set(sel), sorted(need_rows - set(sel)))
+    lowr, t3 = [], rgb_token("--text-3")
+    for row, expr in sorted(sel.items()):
+        pt = paint(expr, 210)
+        c = ratio(t3, over(pt[0], pt[1], rgb_token("--surface-2"))) if pt and t3 else 0.0
+        print("   %s.on (%s): --text-3 = %.2f:1" % (row, expr, c))
+        if c < 4.5:
+            lowr.append((row, expr, round(c, 2)))
+    check("--text-3 >= 4.5:1 on every accent-tinted selected row over --surface-2", not lowr, lowr)
+
 print("\n2. ICONS — every registry icon is a drawn glyph; no emoji left")
 REG = blank_comments(read(os.path.join(UI, "appRegistry.jsx")))
 ICONS_SRC = read(os.path.join(UI, "kit", "icons.jsx")) if os.path.isfile(
@@ -300,7 +326,7 @@ for p in sorted(glob.glob(os.path.join(UI, "**", "*.*"), recursive=True)):
         count += n
 # RATCHET. Set once from the first run (Task 2 step 2). Lowering it is the only edit
 # allowed; stage 6 of the redesign takes it to 0.
-RATCHET_BASELINE = 222   # raised once, 2026-09-26, for kit.css's tone backgrounds — the only raise; 308 -> 299 when the shell left room.css (stage 1); 299 -> 291 when the taskbar and chat moved onto role tokens (stage 1, 3/4); 291 -> 272 when kit.css and the shell's tints read --ok/--warn/--err/--an-rgb and the ink tokens (final review, 2026-09-26); 272 -> 271 when panel.jsx's rows moved to the kit (stage 2); 271 -> 265 when the title chips became kit Chips (stage 2); 265 -> 254 when the taskbar's looking, scene and off-the-record chips became kit Chips (stage 2); 254 -> 238 when the knob rows, the Voice window's status and the shell's profile label became kit Chips/fields and their settings and voice blocks went token-only (stage 2); 238 -> 230 when the looking ledger's his/hers chips, box and status bars became kit parts and the rsc-/sr- blocks went token-only (stage 2); 230 -> 227 when Status left with its `.status .warn` literal and the taskbar's ground became --bar-bg/--bar-shade, shared with the top bar (stage 3); 227 -> 225 when the Apps list went token-only (--hover-tint, --hair; stage 3, 5/8); 225 -> 223 when Room's and Journal's rules went token-only (--hair, --text-1; stage 3, 6/8); 223 -> 222 when the Tools rows went token-only and its tier/arms became kit Chips (stage 3, 7/8); stage 6 takes it to 0
+RATCHET_BASELINE = 186   # raised once, 2026-09-26, for kit.css's tone backgrounds — the only raise; 308 -> 299 when the shell left room.css (stage 1); 299 -> 291 when the taskbar and chat moved onto role tokens (stage 1, 3/4); 291 -> 272 when kit.css and the shell's tints read --ok/--warn/--err/--an-rgb and the ink tokens (final review, 2026-09-26); 272 -> 271 when panel.jsx's rows moved to the kit (stage 2); 271 -> 265 when the title chips became kit Chips (stage 2); 265 -> 254 when the taskbar's looking, scene and off-the-record chips became kit Chips (stage 2); 254 -> 238 when the knob rows, the Voice window's status and the shell's profile label became kit Chips/fields and their settings and voice blocks went token-only (stage 2); 238 -> 230 when the looking ledger's his/hers chips, box and status bars became kit parts and the rsc-/sr- blocks went token-only (stage 2); 230 -> 227 when Status left with its `.status .warn` literal and the taskbar's ground became --bar-bg/--bar-shade, shared with the top bar (stage 3); 227 -> 225 when the Apps list went token-only (--hover-tint, --hair; stage 3, 5/8); 225 -> 223 when Room's and Journal's rules went token-only (--hair, --text-1; stage 3, 6/8); 223 -> 222 when the Tools rows went token-only and its tier/arms became kit Chips (stage 3, 7/8); 222 -> 212 when Files' and House's blocks went token-only (stage 4, 1/6); 212 -> 206 when Decisions' and Her own time's blocks went token-only (stage 4, 2/6); 206 -> 194 when Music's and Stage's blocks went token-only and Stage's stop took the kit's danger colour (stage 4, 3/6); 194 -> 192 when Setup's marks became kit Chips and its block went token-only (stage 4, 4/6); 192 -> 186 when Story's lanes became kit Tabs and its block went token-only (stage 4, 5/6); stage 6 takes it to 0
 print("   %d literals in %d files (baseline %d)" % (count, len(where), RATCHET_BASELINE))
 for f, n in sorted(where.items(), key=lambda kv: -kv[1])[:8]:
     print("       %4d  %s" % (n, f))

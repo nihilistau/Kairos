@@ -45,7 +45,7 @@ Two facts that shape all of it, both found by looking rather than assuming:
                      |                               |
                body.read()                    GET /v1/telemetry/{now,history}
                body.present()                        |
-                     |                          body panel  ♥
+                     |                          the Body window
             her prefix + kairos
 ```
 
@@ -55,7 +55,7 @@ Two facts that shape all of it, both found by looking rather than assuming:
 | `harness/telemetry/ingest.py` | **THE door.** Anon gate, one clock, shape rules. Never raises. |
 | `harness/telemetry/body.py` | The seam: measurements → the few sentences she may read. |
 | `harness/telemetry/watch-agent/` | The Wear OS app and its gradle-free build. |
-| `ui/src/apps/Body.jsx` | The ♥ panel. |
+| `ui/src/apps/Body.jsx` | The Body window. |
 | `harness_tests/g_telemetry.py` | 113 checks. |
 
 ## What she is allowed to know
@@ -278,7 +278,7 @@ outright, the watch kept posting.
 
 ## The panel
 
-The **body** ♥ window shows the live tail, movement, state and history — and **the exact
+The **Body** window shows the live tail, movement, state and history — and **the exact
 sentence she is handed**. That is the most useful thing on it: it is the only place to see
 what she was told about your body before she says anything.
 

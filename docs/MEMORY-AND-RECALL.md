@@ -591,7 +591,7 @@ and a prefix that carries continuity (core + stable facts) AND growth (the weeks
 living lines) at once. Receipts: the `fold` step in reflect's output, the annotated
 retired list in the Memory panel, `provenance()`/`why` on any chapter.
 
-**The Story panel** (room dock, 2026-08-28) is the window onto all of this at once:
+**The Story window** (in the room since 2026-08-28) is the window onto all of this at once:
 what stands in her prefix line by line — each line attributed to the registry row it
 came from via `/v1/story`, which serves `self_block_lines()`, the SAME assembly
 `render_self_model()` joins, byte-checked by the gate — the chapters with the rows the

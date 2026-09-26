@@ -48,7 +48,8 @@ export const Select = (p) => <select {...p} className={'ui-field ui-field-select
  * second arrow press came from a button the tab order no longer had. The selected one
  * carries the mood underline. `label` names the list (aria-label). The tab in the tab
  * order is the CLAMPED index, so a value that is no longer among the tabs still leaves
- * one reachable (final review, M7). The strip scrolls sideways when it outruns its box
+ * one reachable (final review, M7) — and the SELECTION follows the same clamp, or a strip
+ * whose kind emptied on a later poll showed no selected tab at all (stage-4 review). The strip scrolls sideways when it outruns its box
  * (kit.css) — every caller gets that, not only the one that hit it first (Q3). */
 export function Tabs({ tabs, value, onChange, label }) {
   const refs = useRef([])
@@ -64,13 +65,16 @@ export function Tabs({ tabs, value, onChange, label }) {
   }
   return (
     <div className="ui-tabs" role="tablist" aria-label={label} onKeyDown={key}>
-      {tabs.map((t, k) => (
-        <button key={t.id} type="button" role="tab" aria-selected={t.id === value}
-                ref={b => { refs.current[k] = b }}
-                tabIndex={k === i ? 0 : -1}
-                className={'ui-tab' + (t.id === value ? ' ui-tab-on' : '')}
-                onClick={() => onChange(t.id)}>{t.label}</button>
-      ))}
+      {tabs.map((t, k) => {
+        const sel = k === i
+        return (
+          <button key={t.id} type="button" role="tab" aria-selected={sel}
+                  ref={b => { refs.current[k] = b }}
+                  tabIndex={sel ? 0 : -1}
+                  className={'ui-tab' + (sel ? ' ui-tab-on' : '')}
+                  onClick={() => onChange(t.id)}>{t.label}</button>
+        )
+      })}
     </div>
   )
 }

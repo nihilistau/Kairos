@@ -111,13 +111,13 @@ giving up quietly (`G-STORE-WRITES`).
 | Where | What |
 |---|---|
 | `harness/` | everything that runs: memory and recall (`skills/memory/` — eleven modules, one door; §3 has the map), the idle clock (`kairos/`), the wardrobe and her state (`control/`), the backends (`inference/`), the tools (`toolcore/`, `skills/`) |
-| `harness/server/` | **the gateway, in four modules.** `app.py` is the HTTP surface and the day boundary; `turn.py` is the turn lifecycle — `_settle_turn` is the one list of debts every turn owes, latched so that two callers who both believe they own the epilogue pay it once; `panels.py` is the room's read-only windows; `state.py` is the live state they share (reached as `state.X`, never imported by name). Split out of one 6000-line file in 2026-09-01 — read `turn.py`'s header first if you are changing what a turn does |
-| `ui/` | THE ROOM — the React/Vite desktop: chat, the dock, every panel. Built into `console/room/`; `ui/README.md` has the framework |
+| `harness/server/` | **the gateway, in six modules.** `app.py` is the HTTP surface; `day.py` is the day boundary — the record and what is made of it; `turn.py` is the turn lifecycle — `_settle_turn` is the one list of debts every turn owes, latched so that two callers who both believe they own the epilogue pay it once; `panels.py` is the room's read-only windows; `state.py` is the live state they share (reached as `state.X`, never imported by name); `knobs.py` is the restart-scope knob surface. Split out of one 6000-line file in 2026-09-01 — read `turn.py`'s header first if you are changing what a turn does |
+| `ui/` | THE ROOM — the React/Vite desktop: a top bar, loose desktop icons, every window (Chat among them), a taskbar; drawn from one kit (`ui/src/kit/`). Built into `console/room/`; `ui/README.md` has the framework |
 | `console/` | the committed room build the gateway serves. Do not hand-edit it — rebuild from `ui/` and let `G-ROOM-BUNDLE` prove they agree |
 | `profiles/` | one TOML per stack. `companion.toml` is the public default: `[engine].kind = "openai"`, gateway on :8810 |
 | `harness_tests/` | the gates. One file per invariant, standalone, exit code IS the verdict |
 | `gates/` | `GATE-INDEX.md` — a row per gate, and the parser every reader of it uses |
-| `docs/` | the written contracts: `SETUP`, `BACKENDS`, `MEMORY-AND-RECALL`, `OFF-BY-DEFAULT`, `CHANGELOG` |
+| `docs/` | the written contracts: `SETUP`, `BACKENDS`, `MEMORY-AND-RECALL`, `OFF-BY-DEFAULT`, `PANELS` (the changelog is `CHANGELOG.md` at the root) |
 | `tools/` | the operator's scripts — `sweep.py` (the whole offline suite) and the maintenance passes |
 | `persona-template/` | the shipped default persona. Copy it to `persona/` (gitignored) and it becomes yours |
 | `var/` | everything durable and nothing that is code: her stores, logs, `secrets/`. Gitignored |
@@ -212,7 +212,7 @@ CI runs the offline suite on every push (`.github/workflows/gates.yml`).
 why it is off, and **the condition that would arm it**. A feature turned off without a
 written arming condition never comes back — it becomes dead code nobody dares delete.
 
-Registration is not aliveness. An app can be in the dock, its toolset can return `[]`, and
+Registration is not aliveness. An app can have an icon on the desktop, its toolset can return `[]`, and
 the icon renders over nothing. If something looks wired but does nothing, check the profile
 before you debug the code.
 
@@ -220,7 +220,7 @@ before you debug the code.
 
 ## 6. KEEPING THIS FILE TRUE
 
-- **Behaviour a reader would notice gets a `docs/CHANGELOG.md` entry in the same commit.**
+- **Behaviour a reader would notice gets a `CHANGELOG.md` entry in the same commit.**
 - `g_docs_true` checks that shipped docs do not name gates, files or commands that are not
   here. It cannot check that a *sentence* is still true — that is on you.
 - If you find a claim in here that the code no longer supports, fix the file in the same

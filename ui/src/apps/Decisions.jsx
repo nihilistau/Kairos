@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { usePoll, Body } from './panel.jsx'
+import { Button, Chip, Input, State } from '../kit/parts.jsx'
 import * as api from '../api.js'
 
 /* DECISIONS — the things only he can settle, with a button each.
@@ -28,6 +29,10 @@ const KIND_HELP = {
   note: 'recorded for the record; nothing runs',
 }
 
+/* The kind's tone, beside its words (KIND_HELP): once is his to act on (warm, his
+ * colour), route runs code the moment he chooses (accent), note is recorded and quiet. */
+const KIND_TONE = { once: 'warm', route: 'accent', note: 'neutral' }
+
 function Card({ d, onDone }) {
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
@@ -46,7 +51,7 @@ function Card({ d, onDone }) {
   return (
     <div className="dec">
       <div className="dec-head">
-        <span className={'dec-kind dec-k-' + d.kind} title={KIND_HELP[d.kind] || ''}>{d.kind}</span>
+        <Chip tone={KIND_TONE[d.kind] || 'neutral'} title={KIND_HELP[d.kind] || ''}>{d.kind}</Chip>
         {d.area ? <span className="dec-area">{d.area}</span> : null}
         <span className="dec-title">{d.title}</span>
       </div>
@@ -54,14 +59,49 @@ function Card({ d, onDone }) {
       {d.detail ? <pre className="dec-detail">{d.detail}</pre> : null}
       <div className="dec-actions">
         {(d.options || []).map(o => (
-          <button key={o} disabled={!!busy} className={busy === o ? 'on' : ''}
-                  onClick={() => choose(o)}>{o}</button>
+          <Button key={o} size="sm" disabled={!!busy} aria-busy={busy === o ? 'true' : undefined}
+                  onClick={() => choose(o)}>{o}</Button>
         ))}
-        <input placeholder="why (optional, kept with the answer)" value={note}
+        <Input className="dec-why" aria-label="why (optional, kept with the answer)"
+               placeholder="why (optional, kept with the answer)" value={note}
                onChange={e => setNote(e.target.value)} />
-        {err ? <span className="err">{err}</span> : null}
+        {err ? <Chip tone="err" wrap>{err}</Chip> : null}
       </div>
     </div>
+  )
+}
+
+/* The window's body, split out so G-ROOM-KIT leg 11 can render it with a fixture. The
+ * head row was a .chips row, but it was never a filter: the count is always "on", and
+ * "decided" ADDS the kept verdicts below the open ones. So: a count chip, and a toggle
+ * that says whether it is pressed. No answer is primary — none of them is the default. */
+export function DecisionsView({ d, showPast, setShowPast, onDone }) {
+  const open = d.open || []
+  const past = d.decided || []
+  return (
+    <>
+      <div className="dec-bar">
+        <Chip tone="accent">{open.length + ' waiting on you'}</Chip>
+        <Button size="sm" variant="ghost" aria-pressed={showPast} onClick={() => setShowPast(!showPast)}>
+          {past.length + ' decided'}
+        </Button>
+      </div>
+      {open.length === 0 ? (
+        <State kind="empty">{'Nothing is waiting. Anything I cannot settle myself lands here rather than in a reply that scrolls away.'}</State>
+      ) : null}
+      {open.map(x => <Card key={x.id} d={x} onDone={onDone} />)}
+      {showPast && past.length ? <h4 className="muted">decided — kept, never removed</h4> : null}
+      {showPast ? past.slice().reverse().map(x => (
+        <div key={x.id} className="dec dec-done">
+          <div className="dec-head">
+            <Chip tone="accent">{x.choice}</Chip>
+            <span className="dec-title">{x.title}</span>
+          </div>
+          {x.note ? <div className="dec-body muted">{x.note}</div> : null}
+          <div className="muted">{String(x.decided_at || '').slice(0, 10)}</div>
+        </div>
+      )) : null}
+    </>
   )
 }
 
@@ -70,35 +110,8 @@ export default function Decisions() {
   const [showPast, setShowPast] = useState(false)
   return (
     <div className="pad">
-      <Body state={s}>{d => {
-        const open = d.open || []
-        const past = d.decided || []
-        return (
-          <>
-            <div className="chips">
-              <button className="on">{open.length} waiting on you</button>
-              <button className={showPast ? 'on' : ''} onClick={() => setShowPast(!showPast)}>
-                {past.length} decided</button>
-            </div>
-            {open.length === 0 ? (
-              <p className="muted">Nothing is waiting. Anything I cannot settle myself
-                lands here rather than in a reply that scrolls away.</p>
-            ) : null}
-            {open.map(x => <Card key={x.id} d={x} onDone={() => s.refresh && s.refresh()} />)}
-            {showPast && past.length ? <h4 className="muted">decided — kept, never removed</h4> : null}
-            {showPast ? past.slice().reverse().map(x => (
-              <div key={x.id} className="dec dec-done">
-                <div className="dec-head">
-                  <span className="dec-choice">{x.choice}</span>
-                  <span className="dec-title">{x.title}</span>
-                </div>
-                {x.note ? <div className="dec-body muted">{x.note}</div> : null}
-                <div className="muted">{String(x.decided_at || '').slice(0, 10)}</div>
-              </div>
-            )) : null}
-          </>
-        )
-      }}</Body>
+      <Body state={s}>{d => <DecisionsView d={d} showPast={showPast} setShowPast={setShowPast}
+                                           onDone={() => s.refresh && s.refresh()} />}</Body>
     </div>
   )
 }

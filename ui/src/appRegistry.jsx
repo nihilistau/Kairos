@@ -79,7 +79,7 @@ export const APPS = [
     blurb: "the room's weather in a frame — phase, her mood, whether anyone is about" },
   { id: 'apps', title: 'Apps', icon: 'apps', w: 480, h: 520, Component: Apps, css: 'ap',
     pinned: true,
-    blurb: 'every window there is, and which of them live in this dock — change it live' },
+    blurb: 'every window there is, and which of them live on this desktop — change it live' },
   { id: 'settings', title: 'Settings', icon: 'settings', w: 660, h: 620, Component: Settings, css: 'st',
     blurb: 'every knob, grouped — voice, search, research, kairos, the lot. live ones apply on the next call' },
   { id: 'setup', title: 'Setup', icon: 'setup', w: 660, h: 640, Component: Setup, css: 'su',

@@ -111,24 +111,23 @@ header { background: color-mix(in srgb, var(--panel) 78%, transparent);
   backdrop-filter: blur(14px); }
 
 /* ── PHASE 2 PANELS ────────────────────────────────────────────────────────── */
-.music .now { margin-bottom: 10px; }
-.music .now .t { color: var(--cyan); font-size: 14px; }
-.music .now .a { color: var(--muted); font-size: 11px; }
-.music .now .by { color: var(--gold); font-size: 10px; margin-top: 2px; }
-.music .controls { display: flex; gap: 6px; margin-bottom: 9px; }
-.music .controls button { background: none; border: 1px solid var(--line);
-  color: var(--ink); border-radius: 6px; padding: 5px 13px; cursor: pointer; }
-.music .controls button:hover { border-color: var(--cyan-dim); }
-.music .find { width: 100%; background: var(--bg); border: 1px solid var(--line);
-  border-radius: 6px; padding: 5px 8px; margin-bottom: 8px; }
-.music .find:focus { outline: none; border-color: var(--cyan-dim); }
-.music .track { display: flex; justify-content: space-between; gap: 10px;
-  padding: 3px 4px; cursor: pointer; border-radius: 4px; }
-.music .track:hover { background: #ffffff08; }
-.music .track.on { background: color-mix(in srgb, var(--cyan) 12%, transparent);
-  color: var(--cyan); }
-.music .track .ta { color: var(--muted); font-size: 11px; }
-.music .queue { margin-top: 8px; font-size: 11px; color: var(--muted); }
+/* music (mus-) — one player, two people */
+.mus-now { margin-bottom: 10px; }
+.mus-t { color: var(--accent); font-size: var(--fs-15); }
+.mus-a { color: var(--text-3); font-size: var(--fs-11); }
+.mus-by { color: var(--warm); font-size: var(--fs-11); margin-top: 2px; }
+.mus-err { margin-top: var(--sp-1); }
+.mus-ctl { display: flex; gap: 6px; margin-bottom: var(--sp-2); }
+.mus-find { margin-bottom: var(--sp-2); }
+/* .06, not .10: at .10 the artist's --text-3 measured 4.25:1 over --surface-2 (G-ROOM-TOKENS leg 1) */
+.mus-track.on { background: rgba(var(--accent-rgb), .06); border-radius: var(--r-sm); }
+.mus-tt { color: var(--text-1); }
+.mus-track.on .mus-tt { color: var(--accent); }
+.mus-ta { margin-left: var(--sp-2); color: var(--text-3); font-size: var(--fs-11); }
+/* heard, not seen: the track button's separator and its "now playing" (M3) */
+.mus-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+.mus-queue { margin-top: var(--sp-2); font-size: var(--fs-11); color: var(--text-3); }
 
 /* her journal — set as prose, not as data. It is the one thing in the room that
  * is writing rather than state, and rendering it in a table would be a category
@@ -142,25 +141,20 @@ header { background: color-mix(in srgb, var(--panel) 78%, transparent);
 .journal .entry.now p { color: var(--text-1); }
 .journal .foot { margin-top: 14px; font-size: 10px; font-style: italic; }
 
-.files .root { font-size: 10px; margin-bottom: 8px; word-break: break-all; }
-.files .file { display: flex; justify-content: space-between; gap: 10px;
-  padding: 3px 4px; border-radius: 4px; cursor: pointer; }
-.files .file:hover { background: #ffffff08; }
-.files .file.on { background: color-mix(in srgb, var(--cyan) 12%, transparent); }
-.files .file .fs { color: var(--muted); font-size: 10px; }
-.files .viewer { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
-.files .vh { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
-.files .vh b { flex: 1; color: var(--cyan); font-weight: 400; }
-.files .vh button { background: none; border: 1px solid var(--line); color: var(--muted);
-  border-radius: 5px; padding: 2px 9px; cursor: pointer; font-size: 11px; }
-.files textarea { width: 100%; min-height: 190px; background: var(--bg);
-  border: 1px solid var(--line); border-radius: 6px; padding: 8px;
-  font: 12px/1.5 ui-monospace, monospace; resize: vertical; }
-.files textarea:focus { outline: none; border-color: var(--cyan-dim); }
-.files .note { margin-top: 7px; font-size: 11px; color: var(--cyan); }
-.files.dragging { outline: 1px dashed var(--cyan-dim); outline-offset: -6px; }
-.files .dropzone { position: absolute; inset: 0; display: grid; place-items: center;
-  background: #0009; color: var(--cyan); pointer-events: none; }
+/* files (fl-) — the tree they share: drag a text file in, click one to read it */
+.fl-root { margin-bottom: var(--sp-2); font: 400 var(--fs-11)/1.4 var(--font-mono); color: var(--text-3);
+  overflow-wrap: anywhere; }
+.fl-path { font-family: var(--font-mono); font-size: var(--fs-12); }
+.fl-file.on { background: rgba(var(--accent-rgb), .06); border-radius: var(--r-sm); }  /* .06: as .mus-track.on */
+.fl-viewer { margin-top: var(--sp-3); padding-top: var(--sp-2); border-top: 1px solid var(--hair); }
+.fl-vh { display: flex; gap: var(--sp-2); align-items: center; margin-bottom: var(--sp-2); }
+.fl-open { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--accent);
+  font-family: var(--font-mono); font-size: var(--fs-12); }
+.fl-text { min-height: 190px; font: 400 var(--fs-12)/1.5 var(--font-mono); }
+.fl-note { margin-top: var(--sp-2); }
+.fl-dragging { outline: 1px dashed rgba(var(--accent-rgb), .5); outline-offset: -6px; }
+.fl-drop { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
+  background: color-mix(in srgb, var(--surface-0) 70%, transparent); color: var(--accent); }
 
 /* ── VIBRANCY PASS ─────────────────────────────────────────────────────────── */
 
@@ -286,41 +280,39 @@ main { display: block; }
 /* ── STAGE (stg-) ────────────────────────────────────────────────────────────
    The rung's hue runs cool-to-hot with the level, so where you are on the ladder
    is legible before you read a word of it. */
-.stg-stop { border-color: hsl(8 70% 55% / .6) !important; color: #ff9c9c !important; }
-.stg-stop:hover { background: hsl(8 70% 55% / .18) !important; }
-.stg-live { border: 1px solid hsl(var(--h) 45% 50% / .3); border-radius: 8px;
+.stg-bar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: var(--sp-2); }
+.stg-stop { margin-left: auto; }
+.stg-live { border: 1px solid hsl(var(--h) 45% 50% / .3); border-radius: var(--r-md);
   padding: 9px 11px; margin: 10px 0; background: hsl(var(--h) 45% 50% / .07); }
-.stg-live h4 { margin: 0 0 4px; font-size: 13px; }
-.stg-role { margin: 3px 0; font-size: 12px; opacity: .9; }
-.stg-nums { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 7px; font-size: 11px; opacity: .7; }
-.stg-nums .warn { color: #e8c877; opacity: 1; }
+.stg-live h4 { margin: 0 0 4px; font-size: var(--fs-13); }
+.stg-role { margin: 3px 0; font-size: var(--fs-12); color: var(--text-1); }
+.stg-nums { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 7px;
+  font-size: var(--fs-11); color: var(--text-2); }
 
 .stg-ladder { margin: 10px 0; }
 .stg-rung { display: flex; align-items: baseline; gap: 9px; padding: 4px 9px;
-  border-left: 3px solid hsl(var(--h) 65% 55% / .5); font-size: 12px; opacity: .55; }
+  border-left: 3px solid hsl(var(--h) 65% 55% / .5); font-size: var(--fs-12); opacity: .55; }
 .stg-rung.here { opacity: 1; background: hsl(var(--h) 60% 55% / .13);
   border-left-width: 5px; border-radius: 0 5px 5px 0; }
 .stg-rung.over { opacity: .3; }
 .stg-rung.over .stg-name { text-decoration: line-through; }
 .stg-n { width: 14px; text-align: right; opacity: .6; font-variant-numeric: tabular-nums; }
 .stg-name { min-width: 96px; color: hsl(var(--h) 75% 72%); }
-.stg-dwell { font-size: 11px; opacity: .75; }
+.stg-dwell { font-size: var(--fs-11); opacity: .75; }
 
 .stg-hooks h4 { margin: 12px 0 5px; font-size: 12px; text-transform: uppercase;
   letter-spacing: .04em; opacity: .8; }
-.stg-hook { font-size: 11.5px; padding: 4px 9px; margin: 3px 0; border-radius: 5px;
-  background: #ffffff07; border-left: 2px solid #ffffff1c; }
+.stg-hook { font-size: 11.5px; padding: 4px 9px; margin: 3px 0;
+  background: var(--hover-tint); border-left: 2px solid var(--hair-strong); border-radius: var(--r-sm); }
 .stg-hook.spent { opacity: .4; text-decoration: line-through; }
 
 .stg-deck { display: grid; gap: 7px; }
-.stg-card { border: 1px solid #ffffff14; border-radius: 7px; padding: 8px 10px;
-  display: grid; gap: 4px; font-size: 12px; }
-.stg-card:hover { border-color: #ffffff28; background: #ffffff06; }
-.stg-card button { justify-self: start; margin-top: 3px; }
-.stg-ct { font-weight: 600; }
-.stg-auth { margin-left: 7px; font-size: 10px; padding: 1px 5px; border-radius: 3px;
-  background: hsl(160 60% 45% / .2); color: #8fe0bd; font-weight: 400; }
-.stg-foot { margin-top: 12px; font-size: 11px; opacity: .55; }
+.stg-card { border: 1px solid var(--hair); border-radius: var(--r-md); padding: 8px 10px;
+  display: grid; gap: 4px; font-size: var(--fs-12); }
+.stg-card:hover { border-color: var(--hair-strong); background: var(--hover-tint); }
+.stg-begin { justify-self: start; margin-top: 3px; }
+.stg-ct { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-weight: 600; }
+.stg-foot { margin-top: 12px; color: var(--text-3); font-size: var(--fs-11); }
 
 /* ── GAMES (gm-) ─────────────────────────────────────────────────────────────
    The board is a plain 8-column grid. It knows nothing about chess: legal
@@ -636,40 +628,37 @@ main { display: block; }
    A record, not a workspace: nothing in this panel is editable, because a record
    he can rewrite is not a record. Five kinds, each from a store she already writes,
    composed at read time — see harness/control/agency_feed.py. */
-.ag-bar { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
-.ag-fil { background: transparent; border: 1px solid var(--line); color: var(--muted);
-  padding: 2px 9px; border-radius: 99px; cursor: pointer; font-size: 10px;
-  display: inline-flex; gap: 5px; align-items: center; }
-.ag-fil:hover:not(:disabled) { border-color: var(--cyan-dim); color: var(--ink); }
-.ag-fil:disabled { opacity: .3; cursor: default; }
-.ag-fil.on { color: var(--cyan); border-color: var(--cyan-dim); background: #46d9e614; }
-.ag-n { color: var(--off); font-variant-numeric: tabular-nums; }
-.ag-day { font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
-  color: var(--off); margin: 14px 0 6px; border-bottom: 1px dashed var(--line);
-  padding-bottom: 3px; }
-.ag-row { padding: 6px 0 7px 10px; border-left: 2px solid var(--line);
-  margin-bottom: 2px; }
-.ag-head { display: flex; align-items: baseline; gap: 7px; font-size: 10px;
-  color: var(--muted); }
+.ag-tabs { margin-bottom: var(--sp-3); }
+.ag-failed { margin-bottom: var(--sp-2); }
+.ag-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px;
+  vertical-align: 1px; flex: none; background: var(--text-3); }
+.ag-day { font-size: var(--fs-11); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3);
+  margin: 14px 0 6px; border-bottom: 1px dashed var(--hair-strong); padding-bottom: 3px; }
+.ag-row { padding: 6px 0 7px 10px; border-left: 2px solid var(--hair-strong); margin-bottom: 2px; }
+.ag-head { display: flex; align-items: center; gap: 7px; font-size: var(--fs-11); color: var(--text-2); }
 .ag-head .when { margin-left: auto; }
-.ag-ic { font-size: 11px; }
 .ag-kind { letter-spacing: .05em; }
-.ag-again, .ag-state { color: var(--off); font-style: italic; }
-.ag-txt { color: var(--ink); font-size: 12px; margin-top: 3px; white-space: pre-wrap; }
-.ag-sub { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.ag-again { color: var(--text-3); font-style: italic; }
+.ag-txt { color: var(--text-1); font-size: var(--fs-12); margin-top: 3px; white-space: pre-wrap; }
+.ag-sub { color: var(--text-2); font-size: var(--fs-11); margin-top: 2px; }
 /* THE KIND IS THE COLOUR OF THE RULE — an hour of her own, the paragraph that closes
-   her day, a change of clothes and a thing she wanted are four different evenings. */
-.ag-own_time { border-left-color: rgba(var(--es-rgb), .5); }
-.ag-own_time .ag-kind { color: var(--es); }
-.ag-journal  { border-left-color: #e8b64c66; }
-.ag-journal .ag-kind { color: var(--gold); }
-.ag-wore     { border-left-color: #c96ce066; }
+   her day, a change of clothes and a thing she wanted are four different evenings.
+   The kind is the colour of its dot, too (stage 4). */
+.ag-own_time { border-left-color: rgba(var(--accent-rgb), .5); }
+.ag-own_time .ag-kind { color: var(--accent); }
+.ag-journal  { border-left-color: rgba(var(--warm-rgb), .4); }
+.ag-journal .ag-kind { color: var(--warm); }
+.ag-wore     { border-left-color: rgba(var(--private-rgb), .4); }
 .ag-wore .ag-kind { color: var(--private); }
-.ag-wore .ag-txt { font-size: 11.5px; color: var(--muted); }
-.ag-asked    { border-left-color: #4ad98a66; }
+.ag-wore .ag-txt { font-size: 11.5px; color: var(--text-2); }
+.ag-asked    { border-left-color: rgba(var(--ok-rgb), .4); }
 .ag-asked .ag-kind { color: var(--ok); }
-.ag-note     { border-left-color: #46d9e666; }
-.ag-note .ag-kind { color: var(--cyan); }
+.ag-note     { border-left-color: rgba(var(--accent-rgb), .4); }
+.ag-note .ag-kind { color: var(--accent); }
+.ag-dot.ag-k-own_time, .ag-dot.ag-k-note { background: var(--accent); }
+.ag-dot.ag-k-journal { background: var(--warm); }
+.ag-dot.ag-k-wore { background: var(--private); }
+.ag-dot.ag-k-asked { background: var(--ok); }
 
 /* ── THE QUEUE, STAGED (2026-08-05) ───────────────────────────────────────────────
    A want is not one state. `delayed` is the one that needs to be visible — it used to
@@ -775,27 +764,25 @@ main { display: block; }
 /* story (sty-) — her prefix attributed, the chapters and their folds, the lanes */
 .sty { overflow-y: auto; height: 100%; font-size: 12.5px; }
 .sty-sect { margin-bottom: 14px; }
-.sty-h { text-transform: uppercase; font-size: 10px; letter-spacing: .12em;
-  opacity: .65; margin: 10px 0 6px; }
-.sty-n { margin-left: 8px; opacity: .6; letter-spacing: 0; }
-.sty-row { border-bottom: 1px solid rgba(128,128,128,.10); }
+.sty-h { text-transform: uppercase; font-size: var(--fs-11); letter-spacing: .12em; color: var(--text-3); margin: 10px 0 6px; }
+.sty-n { margin-left: var(--sp-2); letter-spacing: 0; color: var(--text-3); }
+.sty-hint { margin: 0 0 var(--sp-2); font-size: var(--fs-11); color: var(--text-3); }
+.sty-tabs { margin-bottom: var(--sp-2); }
+.sty-row { border-bottom: 1px solid var(--hair); }
 .sty-row.gone { opacity: .45; }
-.sty-line { display: flex; gap: 8px; align-items: baseline; padding: 5px 2px;
-  cursor: pointer; line-height: 1.35; }
-.sty-line:hover { background: rgba(128,128,128,.07); }
-.sty-core { color: var(--gold); flex: none; }
+.sty-line { display: flex; gap: var(--sp-2); align-items: baseline; width: 100%; padding: 5px 2px;
+  line-height: 1.35; text-align: left; font: inherit; color: inherit; background: none; border: none;
+  border-radius: var(--r-sm); }
+button.sty-line:hover { background: var(--hover-tint); }
+button.sty-line:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--mood-h) 70% 60% / .6); }
+.sty-core { color: var(--warm); flex: none; }
 .sty-text { flex: 1 1 auto; min-width: 0; }
-.sty-act { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-  padding: 4px 2px 8px; font-size: 11px; }
-.sty-act button { font-size: 11px; }
-.sty-act input { flex: 1 1 220px; min-width: 160px; font-size: 11px; }
-.sty-fold { margin: 2px 0 8px 14px; }
-.sty-fold summary { cursor: pointer; font-size: 11px; opacity: .6; }
-.sty-k { border-color: #3d4a5c; color: #8fb3d9; }
-.sty-lane { font-size: 11px; }
-.sty-lane.on { outline: 1px solid rgba(128,128,128,.5); }
-.sty-bk { margin-top: 12px; font-size: 11px; border-top: 1px solid rgba(128,128,128,.15);
-  padding-top: 8px; }
+.sty-act { display: flex; gap: var(--sp-2); align-items: center; flex-wrap: wrap; padding: 4px 2px var(--sp-2);
+  font-size: var(--fs-11); }
+.sty-fix { flex: 1 1 220px; min-width: 160px; }
+.sty-fold { margin: 2px 0 var(--sp-2) 14px; }
+.sty-fold summary { font-size: var(--fs-11); color: var(--text-3); }
+.sty-bk { margin-top: var(--sp-3); padding-top: var(--sp-2); font-size: var(--fs-11); border-top: 1px solid var(--hair); }
 
 /* journal (jr-) — the dedupe's furniture */
 .jr-recent { color: var(--accent); text-transform: uppercase; font-size: 9.5px;
@@ -871,33 +858,25 @@ main { display: block; }
  * scanning: one dot per section, one path per thing you have to create, and the
  * model ids as links rather than as text you have to retype into a search box. */
 .su { display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
-.su-lead { font-size: 12px; opacity: .7; line-height: 1.5; }
-.su-sec { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.su-lead { font-size: var(--fs-12); color: var(--text-2); line-height: 1.5; }
+.su-sec { border: 1px solid var(--hair-strong); border-radius: var(--r-md); padding: 10px var(--sp-3); }
 .su-head { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
-.su-title { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; opacity: .85; }
-.su-hint { font-size: 11.5px; opacity: .6; line-height: 1.45; margin: 6px 0 8px; }
-.su-note { font-size: 11.5px; opacity: .62; line-height: 1.45; margin: 6px 0 2px; }
+.su-title { font-size: var(--fs-11); letter-spacing: .12em; text-transform: uppercase; color: var(--text-1); }
+.su-hint { font-size: 11.5px; color: var(--text-2); line-height: 1.45; margin: 6px 0 var(--sp-2); }
+.su-note { font-size: 11.5px; color: var(--text-2); line-height: 1.45; margin: 6px 0 2px; }
 /* The dot IS the word — a coloured circle beside a label makes you learn a legend,
- * and nobody reads a legend in a setup screen. */
-.su-mark { font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase;
-           padding: 1px 7px; border-radius: 6px; border: 1px solid var(--edge, #444); }
-.su-mark.good { border-color: var(--ok); color: var(--ok); }
-.su-mark.warn { border-color: var(--gold); color: var(--gold); }
-.su-mark.bad  { border-color: var(--off); color: var(--muted); }
-.su-path { display: inline-block; font-family: ui-monospace, Menlo, Consolas, monospace;
-           font-size: 11px; background: #0006; border: 1px solid var(--line);
-           border-radius: 6px; padding: 1px 6px; margin: 2px 4px 2px 0;
+ * and nobody reads a legend in a setup screen — a kit Chip since stage 4. */
+.su-path { display: inline-block; font: 400 var(--fs-11)/1.4 var(--font-mono);
+           background: var(--surface-0); border: 1px solid var(--hair-strong);
+           border-radius: var(--r-sm); padding: 1px 6px; margin: 2px 4px 2px 0;
            /* A path that wraps mid-segment is a path you retype wrong. */
            white-space: nowrap; overflow-x: auto; max-width: 100%; vertical-align: middle; }
-.su-key { margin: 8px 0; padding: 8px 0 0; border-top: 1px dashed var(--line); }
+.su-key { margin: var(--sp-2) 0; padding: var(--sp-2) 0 0; border-top: 1px dashed var(--hair-strong); }
 .su-models { margin-top: 10px; }
-.su-model { margin: 8px 0; padding-left: 10px; border-left: 2px solid var(--line); }
-.su-id { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px;
-         color: var(--cyan); text-decoration: none; }
+.su-model { margin: var(--sp-2) 0; padding-left: 10px; border-left: 2px solid var(--hair-strong); }
+.su-model-h { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.su-id { font: 400 11.5px/1.4 var(--font-mono); color: var(--accent); text-decoration: none; }
 .su-id:hover { text-decoration: underline; }
-.su-fmt, .su-knob { font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase;
-                    padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line);
-                    opacity: .7; margin-left: 6px; }
 
 /* ── memory: re-filing a row (2026-08-23) ─────────────────────────────────────────── */
 /* The panel was read-only; these are the controls that let him act from it. Scoped
@@ -927,20 +906,16 @@ main { display: block; }
 .mem .c-st-inferred, .mem .c-st-disputed { opacity: .7; font-style: italic; }
 
 /* ── decisions: what is waiting on him (2026-08-23) ───────────────────────────────── */
-.dec { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
-.dec-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-.dec-title { font-weight: 600; }
-.dec-kind { font-size: 9px; padding: 0 6px; border-radius: 99px; border: 1px solid var(--line); }
-.dec-kind.dec-k-once  { color: var(--gold); }
-.dec-kind.dec-k-route { color: var(--cyan); }
-.dec-kind.dec-k-note  { opacity: .6; }
-.dec-area { font-size: 9px; opacity: .6; }
-.dec-body { margin: 6px 0; opacity: .9; line-height: 1.45; }
-.dec-detail { margin: 6px 0; padding: 6px 8px; background: var(--panel-2, rgba(255,255,255,.03));
-              border-radius: 6px; font-size: 10px; white-space: pre-wrap; overflow-x: auto; }
-.dec-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
-.dec-actions input { flex: 1; min-width: 120px; }
-.dec-choice { font-size: 9px; padding: 0 6px; border-radius: 99px; color: var(--cyan); }
+.dec-bar { display: flex; gap: var(--sp-2); align-items: center; flex-wrap: wrap; margin-bottom: var(--sp-2); }
+.dec { border: 1px solid var(--hair-strong); border-radius: var(--r-md); padding: var(--sp-2) 10px; margin: var(--sp-2) 0; }
+.dec-head { display: flex; gap: var(--sp-2); align-items: center; flex-wrap: wrap; }
+.dec-title { font-weight: 600; color: var(--text-1); }
+.dec-area { font-size: var(--fs-11); color: var(--text-3); }
+.dec-body { margin: 6px 0; line-height: 1.45; }
+.dec-detail { margin: 6px 0; padding: 6px var(--sp-2); background: var(--surface-1); border-radius: var(--r-sm);
+  font: 400 var(--fs-11)/1.45 var(--font-mono); white-space: pre-wrap; overflow-x: auto; }
+.dec-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: var(--sp-2); }
+.dec-why { flex: 1; min-width: 120px; }
 .dec-done { opacity: .55; }
 
 /* ── OFF THE RECORD (2026-08-23, his ask) ─────────────────────────────────────────
@@ -1030,33 +1005,21 @@ main { display: block; }
 .tel-terms li { list-style: '· '; }
 
 /* ── the house: a beachhead panel, three states and a link ────────────────────────── */
-.ha-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.ha-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
-/* THREE STATES, NOT TWO. "off" and "unreachable" are different problems with different
-   fixes, and one red dot for both sends you looking in the wrong place. */
-.ha-up   { background: #6ee7b7; box-shadow: 0 0 6px #6ee7b7; }
-.ha-down { background: #f87171; box-shadow: 0 0 6px #f87171; }
-.ha-off  { background: #6b7280; }
-.ha-state { font-size: 12px; letter-spacing: .04em; }
-.ha-link { margin-left: auto; font-size: 11px; opacity: .75; text-decoration: none; }
-.ha-link:hover { opacity: 1; text-decoration: underline; }
-.ha-why, .ha-dim, .ha-empty, .ha-foot {
-  font-size: 11px; line-height: 1.5; color: var(--dim, #8b8b8b);
-}
+.ha-head { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.ha-link { margin-left: auto; font-size: var(--fs-11); color: var(--accent); text-decoration: none; }
+.ha-link:hover { text-decoration: underline; }
+.ha-why, .ha-foot { font-size: var(--fs-11); line-height: 1.5; color: var(--text-3); }
 .ha-why { margin-bottom: 6px; }
-.ha-count { font-size: 11px; opacity: .8; margin-bottom: 8px; }
+.ha-count { font-size: var(--fs-11); color: var(--text-2); margin-bottom: var(--sp-2); }
 .ha-list { list-style: none; margin: 0 0 10px; padding: 0; }
-.ha-row {
-  display: grid; grid-template-columns: 1fr auto auto auto; gap: 6px;
-  align-items: baseline; font-size: 11px; padding: 3px 0;
-  border-bottom: 1px solid rgba(255,255,255,.05);
-}
-.ha-ent { font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; }
-.ha-arrow { opacity: .5; }
-.ha-kind { font-family: ui-monospace, monospace; opacity: .85; }
-.ha-val { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
-.ha-skip .ha-val { opacity: .6; font-style: italic; }
-.ha-foot { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.06); }
+.ha-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 6px; align-items: baseline;
+  font-size: var(--fs-11); padding: 3px 0; border-bottom: 1px solid var(--hair); }
+.ha-ent { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; color: var(--text-1); }
+.ha-arrow { color: var(--text-3); }
+.ha-kind { font-family: var(--font-mono); color: var(--text-2); }
+.ha-val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
+.ha-skip .ha-val { color: var(--text-3); font-style: italic; }
+.ha-foot { margin-top: var(--sp-2); padding-top: var(--sp-2); border-top: 1px solid var(--hair); }
 
 /* ── THE VIEW — the room's weather, framed ────────────────────────────────────
    A second render of the same `describeRoom` output as the full-bleed backdrop, which

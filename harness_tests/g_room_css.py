@@ -97,10 +97,11 @@ def family_of(c: str):
 # ── GRANDFATHERED ────────────────────────────────────────────────────────────────
 # Cross-owner names that predate the rule. RATCHET: shrink only. Each is a real
 # ambiguity, listed so it is visible rather than tolerated in silence.
+# `dragging` left 2026-09-26 (redesign stage 4): Files' drop outline is `fl-dragging` now,
+# so the shell's window drag is the only owner.
 GRANDFATHERED = frozenset({
-    "dragging",   # shell drags a window; Files drags a file onto a dropzone
-    "now",        # Journal "today"; Music "now playing"
-    "t",          # Board note text; Memory row text; Music track title
+    "now",        # Journal "today" (Music's "now playing" is `mus-now` since stage 4)
+    "t",          # Board note text; Memory row text (Music's track title left in stage 4)
 })
 GRANDFATHERED_MAX = len(GRANDFATHERED)   # frozen. Lowering this is the only edit allowed.
 

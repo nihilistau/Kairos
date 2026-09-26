@@ -88,6 +88,15 @@ input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px;
 .ui-btn-ghost:hover:not(:disabled) { color: var(--text-1); background: rgba(160, 190, 220, .07); border-color: transparent; }
 .ui-btn-danger { color: var(--err); border-color: rgba(var(--err-rgb), .35); background: transparent; }
 .ui-btn-danger:hover:not(:disabled) { background: rgba(var(--err-rgb), .12); border-color: rgba(var(--err-rgb), .6); }
+/* PRESSED — a toggle that is on (Decisions' "decided") reads as on: the secondary ground
+ * and border whatever its variant, full ink, and the mood underline the selected tab wears. */
+.ui-btn[aria-pressed="true"] { background: var(--hover-tint); border-color: var(--hair-strong); color: var(--text-1);
+  box-shadow: inset 0 -2px 0 hsl(var(--mood-h) 70% 65%); }
+/* the rule above ties .ui-btn:focus-visible on specificity and comes later, so its
+ * box-shadow ate the focus ring (WCAG 2.4.7): a focused pressed button wears both */
+.ui-btn[aria-pressed="true"]:focus-visible { box-shadow: inset 0 -2px 0 hsl(var(--mood-h) 70% 65%),
+  0 0 0 2px var(--surface-2), 0 0 0 4px hsl(var(--mood-h) 70% 60% / .6); }
+.ui-btn-ghost[aria-pressed="true"]:hover:not(:disabled) { border-color: var(--hair-strong); }
 
 /* FIELD */
 .ui-field { height: 32px; padding: 0 10px; border-radius: var(--r-sm); width: 100%;

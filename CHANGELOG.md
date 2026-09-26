@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.8.45 — eight more windows on the kit; the music chip no longer blanks the room (2026-09-26)
+
+Stage 4 of the room redesign. No server code changed.
+
+* **Eight windows on the kit:** Files, House, Decisions, Her own time, Music, Stage, Setup
+  and Story draw kit Chips, Buttons, fields and `State`. Their sentences about the
+  assistant are unchanged.
+  * **Files:** a text file's row is a button, so a keyboard reaches it. Save is the one
+    primary. The editor is named "the text of <path>". Notes are toned chips (saved and
+    added ok, refusals err).
+  * **House:** its three states are one chip (connected ok, unreachable err, not configured
+    quiet). The foot names the Body window instead of a retired ♥ icon.
+  * **Decisions:** the head row is a count chip and a toggle that shows it is pressed. An
+    answer in flight is marked `aria-busy`.
+  * **Her own time:** the filter is the kit's Tabs ("all N" plus one per kind). A second
+    click no longer toggles back to all, and a kind with no rows has no tab. Kinds are dots
+    in their own colour, not emoji. New role token: `--private-rgb`.
+  * **Music:** the controls drop ⏸ ▶ ⏭ for words. Play/pause is the one primary. The track
+    that is on wears a "now" chip, and tracks are keyboard-reachable rows.
+  * **Stage:** the status row is chips. Stop is the kit's danger button, still drawn only
+    while a scene is live.
+  * **Setup:** its marks are chips, and "needs attention" is the kit's warn.
+  * **Story:** the lanes are Tabs, and the window opens on the first lane. The lanes' note
+    is always shown. A line opens by a button with `aria-expanded`. Retire is danger and
+    still asks. The backup receipt is a chip.
+* **Fix: the music title chip threw on the server's track object** and unmounted the room
+  whenever music played with the Music window open. `musicLabel()` in `titleChips.jsx`
+  reads an object, a string or a top-level title. Each title chip now also renders inside its
+  own error boundary (`ChipBoundary` in `main.jsx`, which draws nothing on error), so a chip
+  that throws can no longer take the room down.
+* **The kit:** `Tabs` keeps exactly one selected tab when the selected id disappears (the
+  clamped index drives `aria-selected`, the on class and the tab order), and
+  `.ui-btn[aria-pressed="true"]` has a pressed style (the mood underline; a ghost also gets
+  the secondary ground and hair). A pressed button with keyboard focus keeps its focus ring.
+* **Fixes from the stage's review:** Her own time falls back to "all" (rows and tab) when the
+  chosen kind's tab disappears. Music's track buttons are named "title · artist" and the
+  playing one adds "now playing". The selected-row tint in Music and Files is .06, so
+  `--text-3` on it clears 4.5:1.
+* **Gates:** G-ROOM-KIT gains leg 11 (85 checks). Its retired scan covers 35 classes and
+  `.chips` in the stage-4 windows (Games, Ledger and Memory still draw `.chips`; the rule
+  stays until stages 5–6). The gate is 249/249. G-ROOM-CSS's grandfather table loses
+  `dragging`. The G-ROOM-TOKENS colour ratchet goes from 222 to 186, and its contrast leg
+  measures `--text-3` on every accent-tinted selected row.
+* **Packaging:** `pyproject.toml` no longer claims Windows-only. The launcher is portable
+  and the sp engine is not (`docs/BACKENDS.md`, G-BACKEND-SEAM §10), and the POSIX
+  classifier is added. The Apps window's blurb says desktop, not dock.
+
 ## 0.8.44 — the room gets a top bar; minimise flies to its button; seven apps on the kit (2026-09-26)
 
 Stage 3 of the room redesign.
