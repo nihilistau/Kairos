@@ -816,6 +816,10 @@ def build_env(c: dict) -> dict:
         # MoE ROUTE TRACE — the measurement that decides whether speculation can pay on
         # an expert-streaming model at all (see profiles/companion.toml [decode]).
         "SP_MOE_TRACE": b(dec.get("moe_trace", False)),
+        # SP_MOE_TRACE_FILE (2026-09-28) - when set, the trace goes to this file with the
+        # phase, a forward counter, a us stamp, gate weights and a resident-at-routing flag
+        # per expert (the hybrid CPU/GPU-offload measurement). Empty = old stderr lines.
+        "SP_MOE_TRACE_FILE": dec.get("moe_trace_file", "").replace("/", "\\"),
         # SP_G4_NAN_PROBE — a BISECTION TOOL, not a guard (2026-08-23). A CUDA fault
         # announces itself; a NaN rides the residual forward in silence and the first
         # thing that notices is something far downstream with no idea where it came
@@ -885,6 +889,26 @@ def build_env(c: dict) -> dict:
         # not allocate: those pages are already resident and read every token. May be
         # refused if the arena is file-backed; falls back to the ring, then to pageable.
         "SP_MOE_PIN_ARENA": b(dec.get("moe_pin_arena", True)),
+        # SP_MOE_PIN_SCALES (2026-09-28) - also cudaHostRegister the per-32-block f16 expert
+        # scales, so a miss no longer sends two PAGEABLE (host-blocking) copies. Needs moe_pin_arena.
+        "SP_MOE_PIN_SCALES": b(dec.get("moe_pin_scales", False)),
+        # SP_MOE_BUCKET_PIN (2026-09-28) - one pinned bucket table per layer (2 copies) instead
+        # of 2 pageable copies per active expert on the compute stream.
+        "SP_MOE_BUCKET_PIN": b(dec.get("moe_bucket_pin", False)),
+        # SP_G4_MOE_GROUPED (2026-09-28, step A) - one grouped launch for a decode layer's
+        # experts instead of ~56. 1 = serve, 2 = parity (both run, old served, bitwise compare).
+        "SP_G4_MOE_GROUPED": str(int(dec.get("moe_grouped", 0))),
+        # SP_G4_MOE_CPU (2026-09-28, step B/C) - experts not resident at routing are computed on
+        # the CPU (AVX-512 VNNI) instead of copied, then admitted to the cache asynchronously.
+        # 1 = serve, 2 = parity (GPU serves, the CPU recomputes the misses, relL2 logged).
+        "SP_G4_MOE_CPU": str(int(dec.get("moe_cpu", 0))),
+        "SP_G4_MOE_CPU_THREADS": str(int(dec.get("moe_cpu_threads", 4))),
+        "SP_G4_MOE_ADMIT_INFLIGHT": str(int(dec.get("moe_admit_inflight", 16))),
+        # SP_G4_SEG_GRAPH (2026-09-28, phase D) - per-layer segment CUDA graphs for the MoE decode
+        # step: the fixed kernel stretches are captured once and replayed. 1 = on.
+        "SP_G4_SEG_GRAPH": b(dec.get("seg_graph", False)),
+        # SP_G4_MOE_BISECT - ADR-013 per-op syncs at L==0 (were always on). A bisect tool.
+        "SP_G4_MOE_BISECT": b(dec.get("moe_bisect", False)),
         # SP_G4_ATTN_TILE — tile width for the decode attention. 0 = the flat kernel
         # byte for byte. Above 0, shared memory becomes tile+HD floats instead of
         # Pmax floats, which is what makes pmax a VRAM question instead of a 48 KB

@@ -174,10 +174,15 @@ check("...as does the one-time arena registration, double-checked",
       FN.get("moe_arena_pin_try", "").count("G4_MOE_SHARED_LOCK()") == 1
       and FN.get("moe_arena_pin_try", "").count("g_moe_arena_pinned >= 0") == 2,
       "a once-per-process init raced by two forwards can flip its own answer")
+# WIDENED 2026-09-28: the CPU-miss path admits experts to the cache from a second caller,
+# moe_admit_async (async copies on its own stream). The rule was never "only moe_resident",
+# it was "only under the lock": every caller of moe_stage must take G4_MOE_SHARED_LOCK itself.
+_stagers = sorted(n for n, b in FN.items() if n != "moe_stage" and "moe_stage(" in b)
 check("the staging ring is reachable only under that lock",
-      all("moe_stage(" not in b for n, b in FN.items()
-          if n not in ("moe_resident", "moe_stage")),
-      "moe_stage writes the shared slot; a caller outside the lock would race it")
+      all("G4_MOE_SHARED_LOCK();" in FN[n] for n in _stagers) and "moe_resident" in _stagers,
+      "moe_stage writes the shared slot; a caller outside the lock would race it: %s" % _stagers)
+check("...and the callers are the two that are meant to be",
+      _stagers == ["moe_admit_async", "moe_resident"], _stagers)
 print("\n3. THE ROUTES HOLD THE LOCK THEY SAY THEY HOLD")
 # RETARGETED 2026-08-30. This section asserted the 08-23 fix — the SESSION lock held
 # at statement level through the forward — and the 08-29 engine session PROVED that

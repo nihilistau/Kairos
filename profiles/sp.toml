@@ -133,6 +133,21 @@ eot_bias = 0.0                        # moot here (sp-only); kept so the schema 
 #   with it on; a scheduling change that moves the text means an expert was computed against
 #   weights that had not landed. Measured 1.078x on decode upstream, ranges non-overlapping.
 moe_overlap = 0                       # SP_G4_MOE_OVERLAP
+# The hybrid decode (2026-09-28/29; docs/DESIGN-2026-09-28-hybrid-moe-decode.md upstream). All
+# shipped at 0 here. Arming condition for each: run its parity mode (=2) on YOUR card and
+# weights first, and arm only on "0 not bit-identical"; every one of them is byte-identical upstream.
+#   moe_grouped: one launch for a decode layer's experts. Needs the expert cache on. +25% upstream.
+#   moe_cpu: experts not resident at routing computed on the CPU (needs AVX-512 VNNI; the GELU
+#     tables are built from YOUR GPU at start, so parity must be re-run on a different card). +7%.
+#   seg_graph: per-layer CUDA segment graphs for the MoE decode step. No parity mode: arm it and
+#     compare the greedy output hash with it off. +~10% upstream.
+#   moe_bisect: ADR-013 per-op syncs at layer 0. A fault-localisation tool; leave it off.
+moe_grouped = 0                       # SP_G4_MOE_GROUPED (2 = parity: old loop served, bitwise compare)
+moe_cpu = 0                           # SP_G4_MOE_CPU     (2 = parity: GPU served, CPU recomputes)
+moe_cpu_threads = 2                   # SP_G4_MOE_CPU_THREADS
+moe_admit_inflight = 16               # SP_G4_MOE_ADMIT_INFLIGHT
+seg_graph = false                     # SP_G4_SEG_GRAPH
+moe_bisect = false                    # SP_G4_MOE_BISECT
 # README's "Measured" table is those values; with the zeros below you are measuring the older
 # kernels, and comparing THAT to llama.cpp compares the wrong thing.
 attn_tile = 0                         # SP_G4_ATTN_TILE  — 1024 upstream; 0 is the flat kernel
