@@ -164,6 +164,19 @@ than `llama.cpp`, with decode **2.37× slower**, which is where the whole remain
 The table is in the engine README. It is still a different experiment from the tiering one
 above, and still not to be added to it.
 
+**Decode has since closed most of that gap (2026-09-28/29).** A profile over a real
+conversation showed the limiter was the host thread issuing the work, not the bus: ~2,750
+kernel launches per token on WDDM and a router sync per layer. The same pinned bench (depth
+~3.9k) went **17.5 -> 31.7 tok/s**, so `llama.cpp -ncmoe 8` is now **1.21x** faster at decode
+rather than 2.37x. Every step kept the greedy output byte-identical:
+- a 6 GB expert cache (was 4);
+- one grouped launch for a layer's resident experts;
+- the experts not resident at routing computed on the CPU, bit-exact against the GPU kernel down to its `tanhf`, while they are admitted to the cache in the background;
+- per-layer CUDA graphs.
+
+In her live sessions that is **~19-27 tok/s at a ~9k prefix, up from 12.5-16.5**. What is left,
+and the plan for it, is in the engine README.
+
 **Those are sp-daemon numbers, not a promise about your setup.** Kairos is engine-agnostic
 and most people will point it at LM Studio, `llama-server` or vLLM, where throughput is that
 server's business and not this framework's. What carries over is the shape of the problem:

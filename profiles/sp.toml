@@ -146,6 +146,7 @@ moe_grouped = 0                       # SP_G4_MOE_GROUPED (2 = parity: old loop 
 moe_cpu = 0                           # SP_G4_MOE_CPU     (2 = parity: GPU served, CPU recomputes)
 moe_cpu_threads = 2                   # SP_G4_MOE_CPU_THREADS
 moe_admit_inflight = 16               # SP_G4_MOE_ADMIT_INFLIGHT
+moe_evict_hl = 0                      # SP_MOE_EVICT_HL   (0 = LRU; >0 = decayed-frequency, half-life in tokens)
 seg_graph = false                     # SP_G4_SEG_GRAPH
 moe_bisect = false                    # SP_G4_MOE_BISECT
 # README's "Measured" table is those values; with the zeros below you are measuring the older

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.50 — the optional native engine's hybrid MoE decode is mapped from the profile (2026-09-29)
+
+* **`serve.py` maps the decode knobs of the optional native engine**
+  ([kairos-engine](https://github.com/nihilistau/kairos-engine) 0.7.0):
+  * `[kv] moe_cache_gb`;
+  * `[decode] moe_grouped`, `moe_cpu`, `moe_cpu_threads`, `moe_admit_inflight`, `seg_graph`, `moe_bisect`;
+  * `moe_evict_hl` (new: decayed-frequency expert eviction, 0 = LRU);
+  * the trace and pinning knobs.
+
+  Each is named in the `sp` profile at its off value, with the condition that would arm it.
+* **What they buy, on that engine's reference card** (RTX 2060 12 GB, Gemma-4-26B-A4B, depth ~3.9k):
+  * bench decode 17.5 -> 31.7 tok/s, output byte-identical at every step;
+  * `llama.cpp -ncmoe 8` is now 1.21x ahead on decode rather than 2.37x;
+  * `moe_evict_hl = 32` measured a further +10.6% and ships off.
+* **Nothing changes for an LM Studio / llama-server setup.** Unmapped keys are ignored by
+  construction, and these only reach a daemon that reads them.
+
 ## 0.8.49 — a gateway bounce keeps her undelivered lines (2026-09-27)
 
 * **Stopping or bouncing the gateway no longer loses what she has queued.** Every `serve.py`

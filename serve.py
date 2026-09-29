@@ -904,6 +904,9 @@ def build_env(c: dict) -> dict:
         "SP_G4_MOE_CPU": str(int(dec.get("moe_cpu", 0))),
         "SP_G4_MOE_CPU_THREADS": str(int(dec.get("moe_cpu_threads", 4))),
         "SP_G4_MOE_ADMIT_INFLIGHT": str(int(dec.get("moe_admit_inflight", 16))),
+        # SP_MOE_EVICT_HL (2026-09-29) - expert-cache eviction: 0 = LRU, > 0 = decayed-frequency
+        # eviction with that half-life in decode tokens (32 is the replay's best).
+        "SP_MOE_EVICT_HL": str(float(dec.get("moe_evict_hl", 0))),
         # SP_G4_SEG_GRAPH (2026-09-28, phase D) - per-layer segment CUDA graphs for the MoE decode
         # step: the fixed kernel stretches are captured once and replayed. 1 = on.
         "SP_G4_SEG_GRAPH": b(dec.get("seg_graph", False)),
