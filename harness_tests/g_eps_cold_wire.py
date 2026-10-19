@@ -80,8 +80,15 @@ else:
     check("a cold root is set on his profile, and mapped as written",
           bool(his["memory"].get("eps_cold_dir")) and henv.get("SP_EPS_COLD_DIR") == his["memory"]["eps_cold_dir"],
           henv.get("SP_EPS_COLD_DIR"))
-    check("...and it is NOT armed: the dry run comes first", henv.get("SP_EPS_COLD_ARMED") == "0",
-          henv.get("SP_EPS_COLD_ARMED"))
+    # ARMED BY THE OPERATOR (2026-10-20), after the dry run. Arming is his decision, not the
+    # code's, so the gate does not pin a state: it holds that whichever state the profile is
+    # in, the off-ledger says the same (an armed tier is recorded as ARMED in §19; an
+    # unarmed one is not).
+    _armed = henv.get("SP_EPS_COLD_ARMED") == "1"
+    _ledger = open(os.path.join(ROOT, "docs", "OFF-BY-DEFAULT.md"), encoding="utf-8").read()
+    _sec = next((l for l in _ledger.splitlines() if l.startswith("### 19.")), "")
+    check("...and its armed state is the one the off-ledger records",
+          _armed == ("**ARMED" in _sec), (henv.get("SP_EPS_COLD_ARMED"), _sec[:80]))
     check("...at the spec's thresholds",
           (henv.get("SP_EPS_COLD_AFTER_DAYS"), henv.get("SP_EPS_COLD_MIN_FREE_GB"),
            henv.get("SP_EPS_HOT_WARN_FREE_GB")) == ("30", "20", "30"))
