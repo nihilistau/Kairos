@@ -90,6 +90,17 @@ class InferenceResponse:
     kairos: Optional[Dict[str, Any]] = None
 
 
+class DaemonStreamError(RuntimeError):
+    """The daemon said, inside the stream, that the turn failed.
+
+    /v1/chat answers `200 OK` before it has done anything, so a prefill that fails later
+    arrives as `data: {"error": "..."}` and then the stream closes. chat_stream read only
+    `delta`s, so that line was dropped and the call returned EMPTY TEXT, as if it had worked
+    (2026-10-19: her boot logged "prefix is HOT" after the daemon had failed her prefix
+    twice, and any failed turn came back as silence). It raises now, the way an HTTP
+    failure already did."""
+
+
 # ──── Client ──────────────────────────────────────────────────────────────
 class SPDaemonClient:
     """Thin HTTP client over the Kairos daemon.
@@ -300,6 +311,9 @@ class SPDaemonClient:
                         if on_event:
                             on_event(StreamEvent("kairos", content=payload, chat_id=chat_id))
                         continue
+                    if (name == "message" and isinstance(evt, dict)
+                            and evt.get("error") and not evt.get("delta")):
+                        raise DaemonStreamError(str(evt["error"]))
                     delta = evt.get("delta", "")
                     if delta:
                         text_parts.append(delta)

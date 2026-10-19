@@ -88,3 +88,8 @@ MOOD_ROW = {"v": "", "at": 0.0}
 # {"warm": bool} so serve.py can hold "ready" until the prefix is hot. Cleared by the day
 # boundary and by /v1/shutdown.
 WARM = threading.Event()
+# WHETHER THE PREWARM WORKED (2026-10-19). WARM above is a GATE: it is released whether the
+# load-time prefill succeeded or not, so it cannot say which. This can: {"ok": bool,
+# "error": str, "at": epoch}, empty until the first prewarm finishes. /health reports it,
+# and serve.py reads it instead of reading the gate as success.
+PREWARM: dict = {}

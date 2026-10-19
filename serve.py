@@ -1538,6 +1538,64 @@ def _running_daemon_model() -> str:
         return ""
 
 
+# HER STACK TAKES ~22 GB OF WINDOWS COMMIT (measured 2026-10-19: 51.1 -> 28.8 GB when it
+# stopped). VRAM allocations reserve backing commit, the pinned expert arena is 12.85 GB, and
+# when the commit limit (RAM + pagefile) runs out, CUDA calls fail "out of memory" with VRAM
+# free. That took three boots in one afternoon, so the boot says the number before it starts.
+STACK_COMMIT_GB = 22.3
+
+
+def commit_headroom_gb():
+    """(free, limit) system commit in GB on Windows, else None. Read-only."""
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+
+        class _MS(ctypes.Structure):
+            _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                        ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                        ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                        ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                        ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+        m = _MS(); m.dwLength = ctypes.sizeof(_MS)
+        if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m)):
+            return None
+        return m.ullAvailPageFile / 2**30, m.ullTotalPageFile / 2**30
+    except Exception:
+        return None
+
+
+def report_commit_headroom() -> None:
+    h = commit_headroom_gb()
+    if h is None:
+        return
+    free, limit = h
+    print("[kairos serve] commit: %.1f GB free of a %.1f GB limit (her stack takes ~%.0f GB)"
+          % (free, limit, STACK_COMMIT_GB))
+    if free < STACK_COMMIT_GB + 2.0:
+        print("!! commit headroom is short: her daemon's batched prefill fails \"out of memory\" "
+              "with VRAM free when commit runs out. Raise the pagefile or close something first.")
+
+
+def prewarm_verdict(h: dict):
+    """What /health says about her prefix: ("waiting" | "hot" | "failed" | "unknown", message).
+
+    `warm` is the gateway's warm GATE, and the gate is released whether the load-time prefill
+    worked or not. Reading it as success is how a boot on 2026-10-19 printed "prefix HOT in
+    18s" over a daemon that had failed her prefix twice and could not open a 4-token scratch.
+    The gateway reports the outcome separately now (`prewarm`); an older gateway without it
+    reads "unknown", never "hot"."""
+    if not h.get("warm"):
+        return "waiting", ""
+    pw = h.get("prewarm")
+    if not isinstance(pw, dict) or "ok" not in pw:
+        return "unknown", "the gateway did not say whether the prefill worked"
+    if pw.get("ok"):
+        return "hot", ""
+    return "failed", str(pw.get("error") or "no error text")
+
+
 GATEWAY_PORT_DEFAULT = 8800   # a bare stop (no profile) flushes this one
 FLUSH_TIMEOUT_S = 5.0          # how long a stop waits for the gateway to write its outbox
 
@@ -1842,6 +1900,7 @@ def main() -> int:
             if _img.lower() != "sp-daemon.exe":
                 kill_image("sp-daemon.exe")
             time.sleep(1.0)
+        report_commit_headroom()
         if not launch_daemon(c, env):
             print("!! daemon did not come up — see var/daemon.boot.log (stdout) "
                   "and var/daemon.log")
@@ -1856,6 +1915,8 @@ def main() -> int:
     # readily. After a reboot there is no gateway and the guard fails open.
     guard_live_turn("--force" in sys.argv, c)
     stop(c)
+    if not external:
+        report_commit_headroom()      # after stop(): the old stack's commit is released
     if external:
         # THE ENGINE IS YOURS (2026-08-21, the engine-agnostic profile): the harness
         # starts nothing but itself. It does say whether the endpoint answers, once.
@@ -1904,18 +1965,29 @@ def main() -> int:
     if c["agent"].get("prewarm", False) and not external:
         print("[kairos serve] prefilling the persona+tools prefix (load-time; ~2-5 min cold)...", flush=True)
         t0 = time.time()
-        hot = False
+        verdict, why = "waiting", ""
         for _ in range(900):
             try:
                 h = json.loads(urllib.request.urlopen(
                     f"http://127.0.0.1:{c['serve']['gateway_port']}/health", timeout=3).read())
-                if h.get("warm"):
-                    hot = True
+                verdict, why = prewarm_verdict(h)
+                if verdict != "waiting":
                     break
             except Exception:
                 pass
             time.sleep(1)
-        print(f"[kairos serve] {'prefix HOT in %.0fs — first turn is fast' % (time.time() - t0) if hot else 'prewarm did not confirm; first turn may be slow'}")
+        if verdict == "hot":
+            print("[kairos serve] prefix HOT in %.0fs — first turn is fast" % (time.time() - t0))
+        elif verdict == "failed":
+            print("[kairos serve] !! PREWARM FAILED: the daemon did not take her prefix:")
+            print("     %s" % why)
+            print("   She is up but her turns will fail. See var/daemon.log; on Windows check the")
+            print("   commit limit first (2026-10-19: commit, not VRAM, was the cause).")
+            return 3
+        elif verdict == "unknown":
+            print("[kairos serve] prewarm finished, outcome not reported (%s)" % why)
+        else:
+            print("[kairos serve] prewarm did not confirm; first turn may be slow")
     print(f"[kairos serve] READY. the room: http://127.0.0.1:{c['serve']['gateway_port']}/room/")
     return 0
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.52 — a failed daemon turn raises; the boot says FAILED, not HOT; commit headroom (2026-10-19)
+
+* **`SPDaemonClient` raises `DaemonStreamError`** when the daemon reports an error inside the
+  `/v1/chat` stream (it returned empty text before, as if the turn had worked).
+* **The gateway records the load-time prefill's outcome** (`/health` -> `prewarm`), and
+  `serve.py` prints `PREWARM FAILED` with the daemon's error and exits 3 instead of reporting the
+  prefix hot.
+* **`serve.py` prints Windows commit headroom** before it starts the daemon, and warns when it is
+  short. A stack's VRAM and pinned memory are charged to commit, and running out makes CUDA fail
+  "out of memory" with VRAM free.
+
 ## 0.8.51 — host-free layer P1 (an instrument), and a decode knob for it (2026-10-19)
 
 * **`[decode].hf_p1`** (`SP_G4_HF_P1`, default 0) arms the host-free layer's P1 in the engine:

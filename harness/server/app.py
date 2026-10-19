@@ -2395,8 +2395,16 @@ def _prewarm() -> None:
                                   {"role": "user", "content": "ok"}], config=cfg)
             logger.info("[gateway] base snapshot ready in %.0fs; prefix is HOT — "
                         "turns are fast now.", time.time() - t1)
+            _state.PREWARM.update(ok=True, error="", at=time.time())
         except Exception as exc:
-            logger.warning("[gateway] pre-warm failed (non-fatal; first turn pays the prefill): %s", exc)
+            # SAY IT, AND RECORD IT (2026-10-19). This was a warning, and a daemon that had
+            # failed her prefix never reached it at all: the client returned empty text and
+            # the lines above announced "prefix is HOT". The client raises on the daemon's
+            # in-stream error now (DaemonStreamError), so a failure lands here, and /health
+            # carries it so serve.py can print FAILED instead of HOT.
+            _state.PREWARM.update(ok=False, error=str(exc)[:300], at=time.time())
+            logger.error("[gateway] PRE-WARM FAILED: the daemon did not take her prefix (%s). "
+                         "Her turns will fail until the daemon is healthy; see var/daemon.log.", exc)
         finally:
             _WARM.set()   # ALWAYS release the gate: a failed prewarm must not wedge the gateway
 
@@ -3516,6 +3524,9 @@ def _run_stdlib(host: str, port: int) -> None:
                                     "warm": _WARM.is_set() or not __import__(
                                         "harness.inference.backends", fromlist=["x"]).supports("warm"),
                                     "engine": _engine_info(),
+                                    # `warm` is the GATE (released on failure too); this says
+                                    # whether the prewarm actually worked (2026-10-19).
+                                    "prewarm": dict(_state.PREWARM) or None,
                                     "daemon": get_client().health()},
                 # THE LABEL THAT LIED (2026-07-29): the console hardcoded "the retired reference model"
                 # in its reply header, so a whole field session against the model was
