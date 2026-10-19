@@ -148,6 +148,7 @@ moe_cpu_threads = 2                   # SP_G4_MOE_CPU_THREADS
 moe_admit_inflight = 16               # SP_G4_MOE_ADMIT_INFLIGHT
 moe_evict_hl = 0                      # SP_MOE_EVICT_HL   (0 = LRU; >0 = decayed-frequency, half-life in tokens)
 hf_p1 = 0                             # SP_G4_HF_P1       (host-free layer P1: device top-8 speculation + parity log only)
+hf_p2 = 0                             # SP_G4_HF_P2       (host-free layer P2: 0 off, 1 serve, 2 parity; P2.0 = MID GPU timing only)
 seg_graph = false                     # SP_G4_SEG_GRAPH
 moe_bisect = false                    # SP_G4_MOE_BISECT
 # README's "Measured" table is those values; with the zeros below you are measuring the older

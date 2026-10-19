@@ -911,6 +911,10 @@ def build_env(c: dict) -> dict:
         # mapped for the GPU, a device top-8 speculation runs after each decode router, and the
         # host logs how often it disagrees with moe_topk_host. 0 = off (nothing changes).
         "SP_G4_HF_P1": str(int(dec.get("hf_p1", 0))),
+        # SP_G4_HF_P2 (2026-10-19) - host-free layer P2. 0 = off (nothing changes), 1 = serve,
+        # 2 = parity. As of P2.0 neither is built: 1 or 2 only allocates P2's mapped block, and
+        # 2 also times the decode MID on the GPU (printed every 256 tokens). Output is unchanged.
+        "SP_G4_HF_P2": str(int(dec.get("hf_p2", 0))),
         # SP_G4_SEG_GRAPH (2026-09-28, phase D) - per-layer segment CUDA graphs for the MoE decode
         # step: the fixed kernel stretches are captured once and replayed. 1 = on.
         "SP_G4_SEG_GRAPH": b(dec.get("seg_graph", False)),

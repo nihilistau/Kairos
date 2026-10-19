@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.53 — a decode knob for the host-free layer's P2 (off; a GPU timer so far) (2026-10-19)
+
+* **`[decode].hf_p2`** (`SP_G4_HF_P2`, default 0) is mapped for the optional native engine:
+  0 off, 1 serve, 2 parity. In the engine's first P2 step neither mode is built yet. 1 or 2
+  allocates P2's mapped block. 2 also times the decode MoE step on the GPU and prints the
+  GPU's idle time per token every 256 tokens. Output is unchanged either way.
+* **The engine allocates its grouped-expert decode scratch earlier**, in the first decode step
+  instead of the middle of a layer. Same buffers and sizes; no output change.
+
 ## 0.8.52 — a failed daemon turn raises; the boot says FAILED, not HOT; commit headroom (2026-10-19)
 
 * **`SPDaemonClient` raises `DaemonStreamError`** when the daemon reports an error inside the
