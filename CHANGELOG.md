@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.57 — the episode cold rule (2026-10-19)
+
+* **`lifecycle.EPS_COLD_RULE`**, the written rule for which KV episodes may leave the hot disk:
+  the row is tombstoned for more than 30 days, it is not core, and no live distillate names it.
+  Nothing uses it yet.
+
 ## 0.8.56 — a moved-to-cold episode is still found (2026-10-19)
 
 * **The episode readers learn a cold root.** When a row's episode is not where it was written

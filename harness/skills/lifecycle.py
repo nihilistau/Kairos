@@ -1318,3 +1318,71 @@ def orphaned_distillates(rows: Iterable[dict]) -> list[dict]:
         if all(_gone(s) for s in known):
             out.append(r)
     return out
+
+
+# ── THE EPISODE COLD RULE (D2, 2026-10-19) ─────────────────────────────────────────
+# Spec docs/superpowers/specs/2026-10-19-memory-direction-design.md §6 D2, confirmed §9:
+# an episode may leave the hot disk when its row has been tombstoned for more than 30 days,
+# is not core, and no live distillate names it in derived_from. A support folded into a
+# live distillate is named in that distillate's derived_from, so it stays hot: the fold law
+# (folded supports are standing) holds without a clause of its own.
+#
+# A FINITE TABLE (rule 5). The clauses are data, each with one test, evaluated in order;
+# the verdict is the first clause that keeps a row hot, or "cold". The newest stamp
+# governs (the youngest tombstone). A row with no stamp, or one _age_days cannot parse, has
+# no age and is never cold: an unreadable date must not send an episode to another disk.
+# quarantined_at is deliberately not a stamp here: quarantine is a review state that the
+# operator may reverse.
+#
+# after_days is the profile knob (Task 4 maps it); EPS_COLD_AFTER_DAYS is the spec's default.
+EPS_COLD_AFTER_DAYS = 30.0
+
+EPS_COLD_STAMPS = ("superseded_at", "retired_at", "forgotten_at")
+
+EPS_COLD_RULE = (
+    ("tombstoned", "the row is retired: lifecycle != 0, read through is_retired()"),
+    ("aged", "the newest of superseded_at / retired_at / forgotten_at present is MORE than "
+             "after_days old; a row with none of them is never cold"),
+    ("not_core", "the row's core field is falsy"),
+    ("no_live_dependent", "no LIVE row names it in derived_from; a support folded into a "
+                          "live distillate is still standing"),
+)
+
+
+def tombstone_age_days(row: dict, now: Optional[float] = None) -> Optional[float]:
+    """Days since the row's NEWEST tombstone stamp; None when it carries none."""
+    ages = [_age_days(row[k], now) for k in EPS_COLD_STAMPS if row.get(k)]
+    return min(ages) if ages else None
+
+
+def live_dependents(rows: Iterable[dict]) -> frozenset:
+    """Every row name a LIVE row names in derived_from."""
+    return frozenset(n for r in rows if not is_retired(r)
+                     for n in (r.get("derived_from") or ()) if n)
+
+
+_EPS_COLD_TESTS = {
+    "tombstoned": lambda r, deps, days, now: is_retired(r),
+    "aged": lambda r, deps, days, now: (tombstone_age_days(r, now) or 0.0) > days,
+    "not_core": lambda r, deps, days, now: not r.get("core"),
+    "no_live_dependent": lambda r, deps, days, now: r.get("name") not in deps,
+}
+assert list(_EPS_COLD_TESTS) == [c for c, _ in EPS_COLD_RULE], "EPS_COLD_RULE and its tests disagree"
+
+
+def eps_cold_verdict(row: dict, deps: frozenset, after_days: float = EPS_COLD_AFTER_DAYS,
+                     now: Optional[float] = None) -> str:
+    """"cold", or the id of the first EPS_COLD_RULE clause that keeps the row hot."""
+    for clause, _why in EPS_COLD_RULE:
+        if not _EPS_COLD_TESTS[clause](row, deps, after_days, now):
+            return clause
+    return "cold"
+
+
+def cold_episode_rows(rows: Iterable[dict], after_days: float = EPS_COLD_AFTER_DAYS,
+                      now: Optional[float] = None) -> list:
+    """The rows whose episode may leave the hot disk. Pure: no I/O, no store; the caller
+    (harness/maintenance/eps_cold.py) reads the rows through memory.all_rows()."""
+    rows = list(rows)
+    deps = live_dependents(rows)
+    return [r for r in rows if r.get("dir") and eps_cold_verdict(r, deps, after_days, now) == "cold"]
