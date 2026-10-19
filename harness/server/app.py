@@ -2832,6 +2832,11 @@ def _run_stdlib(host: str, port: int) -> None:
                                "prewarm_started": os.environ.get(
                                    "SP_GATEWAY_PREWARM") == "1",
                                "at": _t0_r}
+                    elif p == "/v1/maintenance/eps_cold":
+                        # THE EPISODE COLD TIER, by hand (D2). A DRY RUN unless the body
+                        # says {"dry_run": false}; a live pass is refused unless armed.
+                        from harness.maintenance import eps_cold as _ec
+                        res = _ec.run(dry_run=body.get("dry_run", True) is not False)
                     elif p == "/v1/maintenance/stats":
                         res = ops.stats()
                     elif p == "/v1/memory/add":
@@ -3747,6 +3752,11 @@ def _run_stdlib(host: str, port: int) -> None:
                 # can only be reached by POST is a trap; this is the fix.
                 "/v1/maintenance/stats": lambda: __import__(
                     "harness.maintenance.ops", fromlist=["x"]).stats(),
+                # THE EPISODE COLD TIER'S STATE, read-only (D2): off / dry-run / armed,
+                # whether the cold root exists, both disks' free space, the hot warning.
+                # The pass itself is POST only.
+                "/v1/maintenance/eps_cold": lambda: __import__(
+                    "harness.maintenance.eps_cold", fromlist=["x"]).status(),
                 # THE BOARD — notes/ideas/reminders, shared with her. Read side.
                 # HER OWN TIME. A read-only view that composes five stores she already
                 # writes — see harness/control/agency_feed.py for why it owns nothing.

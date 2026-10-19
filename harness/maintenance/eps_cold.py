@@ -198,8 +198,40 @@ def hot_free_warning(cfg: ColdConfig) -> str:
             "eps_hot_warn_free_gb = %g." % (cfg.hot, _size(free), cfg.hot_warn_free_gb))
 
 
+def _gb(n: Optional[int]) -> Optional[float]:
+    return None if n is None else round(n / GB, 2)
+
+
+def status(cfg: Optional[ColdConfig] = None) -> Dict[str, Any]:
+    """The tier's state, read-only: what the boot line prints and GET /v1/maintenance/eps_cold
+    answers. Touches nothing; the cold root is only asked about, never created."""
+    cfg = cfg or config()
+    cold_exists = bool(cfg.cold) and os.path.isdir(cfg.cold)
+    return {"ok": True, "state": "off" if not cfg.cold else ("armed" if cfg.armed else "dry-run"),
+            "hot": cfg.hot, "hot_free_gb": _gb(free_bytes(cfg.hot)),
+            "cold": cfg.cold, "cold_exists": cold_exists,
+            "cold_free_gb": _gb(free_bytes(cfg.cold)) if cold_exists else None,
+            "after_days": cfg.after_days, "min_free_gb": cfg.min_free_gb,
+            "hot_warn_free_gb": cfg.hot_warn_free_gb, "warning": hot_free_warning(cfg)}
+
+
+def _facts(st: Dict[str, Any]) -> str:
+    """The boot line's tail: ` | state=<off|dry-run|armed> hot=<root> hot_free=<n GB|unknown>`
+    and, when a root is set, ` cold_root=<exists|missing ...> cold_free=<n GB|unknown>`."""
+    def _f(gb: Optional[float]) -> str:
+        return "unknown" if gb is None else "%.2f GB" % gb
+    out = " | state=%s hot=%s hot_free=%s" % (st["state"], st["hot"] or "(none)", _f(st["hot_free_gb"]))
+    if st["cold"]:
+        out += " cold_root=%s cold_free=%s" % (
+            "exists" if st["cold_exists"] else
+            "missing (the operator creates it by hand; the mover never does)",
+            _f(st["cold_free_gb"]))
+    return out
+
+
 def boot_report() -> str:
-    """One line at gateway boot: off, dry run or armed, plus the hot-disk warning."""
+    """One line at gateway boot: off, dry run or armed; whether the cold root exists; free
+    space on both disks. The hot-disk warning, when it fires, is a second line."""
     cfg = config()
     if not cfg.cold:
         line = OFF_LINE
@@ -207,8 +239,10 @@ def boot_report() -> str:
         line = DRY_LINE % cfg.cold
     else:
         line = ARMED_LINE % cfg.cold
+    st = status(cfg)
+    line += _facts(st)
     _log.info(line)
-    warn = hot_free_warning(cfg)
+    warn = st["warning"]
     if warn:
         _log.warning(warn)
     return line + ("\n" + warn if warn else "")

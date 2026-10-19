@@ -86,6 +86,16 @@ auto_recall_default = false
 attr_gate = true
 attr_tau = 0.5
 l5_tau = 0.30
+# THE EPISODE COLD TIER (D2, docs/OFF-BY-DEFAULT.md section 19). OFF: no root, so nothing
+# moves, and the gateway's boot line says so with the arming condition. To tier, create a
+# folder on a disk with room by hand (a sibling of the episode root works on a one-disk
+# machine; the mover never creates it), set eps_cold_dir to it, read one dry run
+# (POST /v1/maintenance/eps_cold), then set eps_cold_armed = true.
+eps_cold_dir = ""
+eps_cold_armed = false
+eps_cold_after_days = 30      # tombstoned MORE than this many days (lifecycle.EPS_COLD_RULE)
+eps_cold_min_free_gb = 20     # refuse a move that would leave less than this on the cold disk
+eps_hot_warn_free_gb = 30     # warn at boot and nightly when the hot disk has less than this
 
 [agent]
 authority = "spine"

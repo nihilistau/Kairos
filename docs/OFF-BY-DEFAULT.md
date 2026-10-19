@@ -120,32 +120,46 @@ responsible for exactly one thing, which is whether she describes the outcome tr
 
 ### 19. `SP_EPS_COLD_ARMED` (`[memory].eps_cold_dir` + `eps_cold_armed`) — the episode cold tier *(recorded 2026-10-19)*
 
-**STATUS: OFF.** No profile sets a cold root, so nothing moves. Without `eps_cold_armed` a
-pass is a DRY RUN that lists what would move, with sizes, and moves nothing. **Not wired
-yet:** nothing calls the mover today; the nightly step, the maintenance route and the boot
-line arrive with D2 Task 4 (`docs/superpowers/plans/2026-10-19-memory-D2-episode-cold-tier.md`).
+**STATUS: OFF.** The public profile has no cold root: nothing moves, and the gateway's boot
+line says so with the arming condition. His profile sets a root and leaves
+`eps_cold_armed = false`, so the nightly pass is a DRY RUN that lists what would move, with
+sizes, and moves nothing.
 
-**What it is.** `harness/maintenance/eps_cold.py`. An episode directory moves from the hot
-root to `eps_cold_dir` when its row matches `lifecycle.EPS_COLD_RULE`: tombstoned more than
-`eps_cold_after_days` (30), not `core`, and named in no live row's `derived_from`, so a
-support folded into a live distillate stays. Each move is one append-only row of
-`var/memory/eps-moves.jsonl` (a basename and the tier names, never a path); the registry is
-never written. Both resolvers (`harness/skills/epdir.py`, `recall.rs::resolve_episode_dir`)
-find a moved episode through that ledger. A move is refused when the cold root does not exist
-(it is never created), when it is larger than the cold disk's free space, or when it would
-leave less than `eps_cold_min_free_gb` (20); the hot disk warns under `eps_hot_warn_free_gb`
-(30). The arming is checked at the write: `run()`, `move_one()` and `recover()` each refuse
-a live move unarmed.
+**What it is.** `harness/maintenance/eps_cold.py`, reached three ways:
+- the day boundary (`run_consolidation`, step `eps_cold`, after reflect and before the prefix
+  refresh);
+- `POST /v1/maintenance/eps_cold`, which is a dry run unless the body says
+  `{"dry_run": false}` (and a live pass is refused unless armed); `GET` on the same path
+  answers the state and moves nothing;
+- the gateway's boot line, printed before the day-boundary ticker's hour check:
+  `[eps-cold] OFF ...` / `DRY RUN ONLY ...` / `ARMED ...`, then
+  `| state=<off|dry-run|armed> hot=<root> hot_free=<n GB>`, and with a root set
+  `cold_root=<exists|missing ...> cold_free=<n GB|unknown>`. When the hot disk has less than
+  `eps_hot_warn_free_gb` free, a second `[eps-cold] WARNING` line follows.
+
+An episode directory moves from the hot root to `eps_cold_dir` when its row matches
+`lifecycle.EPS_COLD_RULE`: tombstoned more than `eps_cold_after_days` (30), not `core`, and
+named in no live row's `derived_from`, so a support folded into a live distillate stays. Each
+move is one append-only row of `var/memory/eps-moves.jsonl` (a basename and the tier names,
+never a path); the registry is never written. Both resolvers (`harness/skills/epdir.py`,
+`recall.rs::resolve_episode_dir`) find a moved episode through that ledger. A move is refused
+when the cold root does not exist (it is never created: the operator makes it by hand), when it
+is larger than the cold disk's free space, or when it would leave less than
+`eps_cold_min_free_gb` (20); the hot disk warns under `eps_hot_warn_free_gb` (30). The arming
+is checked at the write: `run()`, `move_one()` and `recover()` each refuse a live move unarmed.
 
 **Why off.** CAPABILITY: a cold root is a disk on someone else's machine, and this code cannot
-choose it (spec section 2, constraint 8). It moves her episodes between disks, so the first
-live pass waits until a dry run has been read with the operator.
+choose it (spec section 2, constraint 8). MEASURED on his: the hot disk had about 28 GB free on
+2026-10-19 and the store grows about 0.5 GB a day, so his root is set and dry-runs until he has
+read one.
 
-**What would arm it.** Public: create a folder with room (a sibling of the episode root works
-on a one-disk machine), set `eps_cold_dir` to it, read one dry run, set `eps_cold_armed = true`.
-His: the dry-run receipt read with the operator, then his OK (Tasks 6 and 7 of the D2 plan).
-Gates: `harness_tests/g_eps_cold_rule.py`, `harness_tests/g_eps_cold_move.py`,
-`harness_tests/g_eps_cold_resolve.py`.
+**What would arm it.** Public: create a folder with room by hand (a sibling of the episode root
+works on a one-disk machine), set `eps_cold_dir` to it, read one dry run, set
+`eps_cold_armed = true`. His: the operator creates the cold root, the dry-run receipt is read
+with him, then his OK (Tasks 6 and 7 of
+`docs/superpowers/plans/2026-10-19-memory-D2-episode-cold-tier.md`). Gates:
+`harness_tests/g_eps_cold_rule.py`, `harness_tests/g_eps_cold_move.py`,
+`harness_tests/g_eps_cold_resolve.py`, `harness_tests/g_eps_cold_wire.py`.
 
 ### 18. `voice.address_directly` — speak TO him, not about him *(recorded 2026-08-30)*
 

@@ -994,6 +994,20 @@ def run_consolidation(force: bool = False) -> Dict[str, Any]:
     except Exception as exc:
         out["steps"].append({"step": "reflect", "skipped": str(exc)[:140]})
 
+    # 2b. THE EPISODE COLD TIER (D2; docs/OFF-BY-DEFAULT.md section 19). Here, not in
+    # ops.reflect: reflect is also the on-demand mid-conversation button, and a copy of
+    # gigabytes belongs where the room has been quiet for SP_CONSOLIDATE_QUIET_S. Before
+    # the prefix refresh, so its disk work ends before the cold prefill and snapshot start.
+    # Off, it returns one line; with a root and unarmed, it is a dry run that only lists.
+    # Lists in the receipt are counted here; the route returns them whole.
+    try:
+        from harness.maintenance import eps_cold as _ec
+        _ecr = _ec.run()
+        out["steps"].append({"step": "eps_cold", **{k: (len(v) if isinstance(v, list) else v)
+                                                    for k, v in _ecr.items()}})
+    except Exception as exc:
+        out["steps"].append({"step": "eps_cold", "skipped": str(exc)[:140]})
+
     # 3. spine hygiene + flush receipts to the durable telemetry tier
     try:
         from harness.control.spine import run_tick, persist_receipts
@@ -1115,6 +1129,11 @@ def start_consolidation_ticker() -> None:
 
     Off unless the hour is set (>= 0). Polls slowly — the boundary is a date, not a
     deadline — and defers rather than interrupts when the room is not quiet."""
+    try:   # the cold tier's boot line (D2): off / dry run / armed, both disks, the warning
+        from harness.maintenance import eps_cold as _ec
+        _ec.boot_report()
+    except Exception as _swx:
+        _swallowed(logger, "start_consolidation_ticker.eps_cold", _swx, lane="server")
     try:
         hour = int(os.environ.get("SP_CONSOLIDATE_HOUR", "-1"))
     except ValueError:

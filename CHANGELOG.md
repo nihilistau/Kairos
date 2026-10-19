@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.60 — the episode cold tier, off by default (2026-10-19)
+
+* **`[memory].eps_cold_dir`** (default `""`, off) and **`eps_cold_armed`** (default false). Set
+  a cold root (a folder you create yourself), and the nightly pass lists which KV episodes the
+  cold rule would move, with sizes. Arm it, and they move there. The thresholds are knobs:
+  `eps_cold_after_days` (30), `eps_cold_min_free_gb` (20) and `eps_hot_warn_free_gb` (30).
+* **The gateway's boot line says whether the tier is off, a dry run or armed**, whether the cold
+  folder exists, and how much space both disks have; it warns when the episode disk is low.
+* **`POST /v1/maintenance/eps_cold`** runs the pass by hand. It is a dry run unless asked
+  otherwise. `GET` on the same path reports the state and moves nothing.
+
 ## 0.8.59 — the episode mover never deletes on a size match (2026-10-19)
 
 * Before the episode mover removes a hot copy, the cold copy must hold the same files with the
