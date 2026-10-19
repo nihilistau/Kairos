@@ -67,8 +67,13 @@ check("sp.toml writes the OFF state down, not by omission",
       sp_mem.get("eps_cold_dir") == "" and sp_mem.get("eps_cold_armed") is False, sp_mem)
 
 print("§2 his profile")
-if not os.path.exists(os.path.join(ROOT, "profiles", "companion.toml")):
-    omit("his profile", "profiles/companion.toml is not in this tree (the public export)")
+# THE EXPORT IS DETECTED BY ITS OWN MARKER, NOT BY A PROFILE'S ABSENCE (2026-10-19). The scrub
+# renames his profile to the public companion profile, which the export DOES ship (with no cold
+# root), so "is his profile here?" passed in Kairos and this leg failed there against the wrong
+# profile. KAIROS-SOURCE.txt exists only inside the export (the g_delegate / g_src_trap pattern).
+if (os.path.exists(os.path.join(ROOT, "KAIROS-SOURCE.txt"))
+        or not os.path.exists(os.path.join(ROOT, "profiles", "companion.toml"))):
+    omit("his profile", "this is the public export, or his profile is not in this tree")
 else:
     his = serve.load_profile("companion")
     henv = serve.build_env(his)
