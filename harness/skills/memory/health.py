@@ -111,6 +111,7 @@ def _registry_health():
         from harness.skills import epdir as _epdir
         _c = _epdir.census(eps)
         stats["eps_moved"], stats["eps_missing"] = _c[_epdir.MOVED], _c[_epdir.MISSING]
+        stats["eps_cold"] = _c[_epdir.COLD]
     except Exception as _swx:
         _sw(_log, "_registry_health.epdir", _swx, lane="skills")
     # `unminted` has been in this dict since it was written and has never reached a surface

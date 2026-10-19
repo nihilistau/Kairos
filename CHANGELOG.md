@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.56 — a moved-to-cold episode is still found (2026-10-19)
+
+* **The episode readers learn a cold root.** When a row's episode is not where it was written
+  and not under `[memory].eps_dir`, both the native engine's recall and the harness's reader
+  look under the cold root (the setting arrives with the cold tier's knobs, later). They look only for an episode the
+  move ledger `eps-moves.jsonl`, beside the registry, records. With no cold root nothing changes.
+* **A Windows-written episode path resolves on Linux.**
+
 ## 0.8.55 — no machine paths in the episode-resolver prose; its gate runs where the daemon is not shipped (2026-10-19)
 
 * The episode-root resolver's docstrings, its gate and the gate index described the move with one

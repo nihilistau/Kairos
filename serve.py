@@ -711,6 +711,11 @@ def build_env(c: dict) -> dict:
         # its own absolute dir, which goes stale when the episodes move (F: -> C:,
         # 2026-09-06): readers resolve it by name under this root (recall.rs, epdir.py).
         "SP_EPS_DIR": str(mem.get("eps_dir", "") or ""),
+        # THE EPISODE COLD ROOT (D2). Empty = OFF: no profile sets it yet, so nothing is
+        # read there. The resolvers (epdir.py, recall.rs) look under it only for an episode
+        # the move ledger eps-moves.jsonl names. The mover and its other knobs arrive with
+        # plan Task 4; this one is mapped now because the resolver already reads it.
+        "SP_EPS_COLD_DIR": str(mem.get("eps_cold_dir", "") or ""),
 
         # ── SEM (docs/SEMANTICS.md): S0 sidecar index + S1 semantic rank ───────────────────
         # S0 (mint/index): DERIVED data in its own file (harness/skills/semindex.py) —

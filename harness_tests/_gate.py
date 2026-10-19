@@ -218,6 +218,7 @@ _STORE_ENV = (
     "SP_CAPS_OKF_ROOT",
     "SP_PERSONA_FILE",           # persona.md - her voice, and the standing prefix
     "SP_EPS_DIR",                # minted episodes (11 MB each)
+    "SP_EPS_COLD_DIR",           # the episode cold tier's root (D2) - a gate must never move HER episodes
     "SP_AVATAR_DIR",             # her wardrobe, wants and clips
     "SP_LEDGER_FILE",
     "SP_TUNING_FILE",         # her live knobs - presence mode, kairos, voice
@@ -279,6 +280,8 @@ def sandbox(name: str = "gate", persona: str = "") -> str:
     os.environ["SP_TTS_CACHE"] = os.path.join(sb, "voice-cache")
     os.environ["SP_DELEGATE_WORKTREES"] = os.path.join(sb, "worktrees")
     os.environ["SP_EPS_DIR"] = os.path.join(sb, "episodes")
+    os.environ["SP_EPS_COLD_DIR"] = os.path.join(sb, "episodes-cold")
+    os.environ.pop("SP_EPS_COLD_ARMED", None)    # a gate arms the cold tier itself, or it dry-runs
     os.environ["SP_AVATAR_DIR"] = os.path.join(sb, "avatar")
     os.environ["SP_LEDGER_FILE"] = os.path.join(sb, "ledger.json")
     os.environ["SP_TUNING_FILE"] = os.path.join(sb, "tuning.json")
