@@ -118,7 +118,7 @@ responsible for exactly one thing, which is whether she describes the outcome tr
 
 ## The ledger
 
-### 19. `SP_EPS_COLD_ARMED` (`[memory].eps_cold_dir` + `eps_cold_armed`) — the episode cold tier *(recorded 2026-10-19)*
+### 19. the episode cold tier (`[memory].eps_cold_dir` + `eps_cold_armed`) *(recorded 2026-10-19)* — **ARMED in companion 2026-10-20 (operator), after a dry run of 167 episodes / 2.76 GB; the first pass moved all 167. Off in `sp` and wherever no cold root is set.**
 
 **STATUS: OFF.** The public profile has no cold root: nothing moves, and the gateway's boot
 line says so with the arming condition. His profile sets a root and leaves
