@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.54 — a moved episode store is still found; a missing episode is skipped and counted (2026-10-19)
+
+* **Episodes are found after `eps_dir` moves.** A registry row keeps the absolute directory its
+  episode was written to. When that directory no longer exists and one of the same name exists
+  under `[memory].eps_dir`, the native engine's recall and the harness's episode reader both use
+  that one. The registry is not rewritten.
+* **An episode that exists nowhere is skipped, and counted.** The engine leaves it out of recall
+  and logs `B3 EPISODE DIRS: N as written, M resolved under SP_EPS_DIR=..., K missing everywhere`
+  once at boot. `verify_registry` reports `eps_moved` and `eps_missing`.
+
 ## 0.8.53 — a decode knob for the host-free layer's P2 (off; a GPU timer so far) (2026-10-19)
 
 * **`[decode].hf_p2`** (`SP_G4_HF_P2`, default 0) is mapped for the optional native engine:

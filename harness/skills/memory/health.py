@@ -105,6 +105,14 @@ def _registry_health():
     stats = {"path": p, "rows": rows, "parsed": len(eps), "malformed": malformed,
              "exact_dups": exact_dups, "near_dups": near, "unminted": no_ep,
              "no_provenance": no_prov}
+    # Where the episodes are, once per process (harness/skills/epdir.py): rows whose
+    # dir names a root the store moved off, and rows whose episode exists nowhere.
+    try:
+        from harness.skills import epdir as _epdir
+        _c = _epdir.census(eps)
+        stats["eps_moved"], stats["eps_missing"] = _c[_epdir.MOVED], _c[_epdir.MISSING]
+    except Exception as _swx:
+        _sw(_log, "_registry_health.epdir", _swx, lane="skills")
     # `unminted` has been in this dict since it was written and has never reached a surface
     # or the verdict, which is how 253 consecutive unminted rows went unnoticed. The REASON
     # rides along now — when the engine has refused, that string is the whole diagnosis.

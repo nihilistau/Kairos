@@ -160,9 +160,14 @@ def hash_embed(text: str, dim: int = _HASH_DIM):
 
 def read_ep_l5(out_dir: str):
     """<out_dir>/ep.l5 — raw little-endian f32[512], already L2-normed by the engine.
-    Returns None when absent/short/non-finite: the caller degrades, never errors."""
+    Returns None when absent/short/non-finite: the caller degrades, never errors.
+    A row's `dir` may name a root the episodes have moved off: `epdir.resolve`."""
     try:
-        p = os.path.join(out_dir or "", "ep.l5")
+        from harness.skills import epdir as _epdir
+        out_dir, _how = _epdir.resolve(out_dir or "")
+        if out_dir is None:
+            return None
+        p = os.path.join(out_dir, "ep.l5")
         if not os.path.isfile(p):
             return None
         with open(p, "rb") as f:

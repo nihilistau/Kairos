@@ -76,6 +76,7 @@ built out of the tree's own usage rather than a list kept in the gate:
 | Store | Path | Format | Owner module |
 |---|---|---|---|
 | Fact registry | `var/memory/registry.jsonl` (path from `SP_RECALL_REGISTRY`, set in the live profile — `profiles/companion.toml` — and mapped to env by `serve.py`) | JSONL, one episode/fact per line | `harness/skills/memory/`, `harness/skills/lifecycle.py` |
+| Episode KV (`ep.k`, `ep.v`, `ep.l5`, ...) | `<eps_dir>/<episode>/` (`[memory].eps_dir` -> `SP_EPS_DIR`; on hers it moved drives on 2026-09-06) | one directory per minted fact; the row's `dir` names it | written by the daemon's `/v1/capture`; read by `recall.rs::load_registry_report` and `semindex.read_ep_l5`. A row's `dir` is absolute and is never rewritten: when it no longer exists, both readers look for the same name under `SP_EPS_DIR` (`recall.rs::resolve_episode_dir`, `harness/skills/epdir.py`), and a row found nowhere is skipped and counted (G-EPDIR-MOVED) |
 | Notes | `var/memory/notes.jsonl` | JSONL | `harness/skills/notes.py` |
 | Presence / attention ledger | `var/memory/presence.jsonl` | JSONL, one row per UTC day he was spoken to | `harness/model/presence.py` |
 | MEM-OKF knowledge stores | `memory-okf/` (LUT.md tier-0, `sum/` tier-1, `full/` tier-2, content-addressed), plus `memory-okf-self/`, `memory-okf-personality/`, `memory-okf-telemetry/` | Markdown + frontmatter, content-addressed by `sha256(body)[:16]` or C2 signature | `tools/okf_mem.py` |

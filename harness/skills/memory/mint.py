@@ -92,12 +92,14 @@ def eps_root() -> str:
     too slow to stream EXPERTS from, which is why that idea was measured and dropped.
     For an 11 MB write-once blob it is ample: ~37 ms to mint, ~8 ms to read back.
 
-    The row carries its own absolute `dir`, so moving the root does not orphan
-    anything already written -- old episodes stay where they are and are still found.
+    The row carries its own absolute `dir`. When the episodes themselves are moved
+    (F: -> C:, 2026-09-06) that dir goes stale, and readers resolve it by basename under
+    this root: harness/skills/epdir.py, which owns the variable.
     """
-    d = (os.environ.get("SP_EPS_DIR") or "").strip()
+    from harness.skills import epdir as _epdir
+    d = _epdir.configured_root()
     if d:
-        return d.replace("\\", "/").rstrip("/")
+        return d
     return os.path.join(os.path.dirname(_store._reg_path()), "eps").replace("\\", "/")
 
 

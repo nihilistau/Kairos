@@ -708,7 +708,8 @@ def build_env(c: dict) -> dict:
         # WHERE EPISODES LIVE. An episode is ep.k + ep.v at full depth per position:
         # mean 11.1 MB, written once, read only on a deep recall. That belongs OFF the
         # working drive. Empty = beside the registry, as it always was. The row carries
-        # its own absolute dir, so moving the root never orphans what is already written.
+        # its own absolute dir, which goes stale when the episodes move (F: -> C:,
+        # 2026-09-06): readers resolve it by name under this root (recall.rs, epdir.py).
         "SP_EPS_DIR": str(mem.get("eps_dir", "") or ""),
 
         # ── SEM (docs/SEMANTICS.md): S0 sidecar index + S1 semantic rank ───────────────────
