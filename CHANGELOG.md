@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.51 — host-free layer P1 (an instrument), and a decode knob for it (2026-10-19)
+
+* **`[decode].hf_p1`** (`SP_G4_HF_P1`, default 0) arms the host-free layer's P1 in the engine:
+  a device top-8 speculation after each decode router, checked against the host's exact
+  selection. It is measurement only and changes no output. Bench: 0 disagreements in 15,360
+  decode layers, output identical on and off.
+* **Commit, not VRAM:** on Windows, a stack that holds ~22 GB of system commit fails its first
+  batched prefill (`cublasSgemm status=13`, then `out of memory`) when the commit limit is close,
+  even with VRAM free. Size the pagefile so that RAM plus pagefile leaves room for the stack plus
+  everything else you run.
+
 ## 0.8.50 — the optional native engine's hybrid MoE decode is mapped from the profile (2026-09-29)
 
 * **`serve.py` maps the decode knobs of the optional native engine**
