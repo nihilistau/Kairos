@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.55 — no machine paths in the episode-resolver prose; its gate runs where the daemon is not shipped (2026-10-19)
+
+* The episode-root resolver's docstrings, its gate and the gate index described the move with one
+  machine's drive paths. They now say "the old root" and "the configured root".
+* G-EPDIR-MOVED omits its daemon leg, by name, in a tree that ships no daemon source, so it no
+  longer crashes here.
+
 ## 0.8.54 — a moved episode store is still found; a missing episode is skipped and counted (2026-10-19)
 
 * **Episodes are found after `eps_dir` moves.** A registry row keeps the absolute directory its

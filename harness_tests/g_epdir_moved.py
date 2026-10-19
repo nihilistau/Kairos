@@ -1,11 +1,11 @@
 """G-EPDIR-MOVED — an episode the store moved is still found; one that is gone is skipped. OFFLINE.
 
 THE FINDING (2026-10-19). On 2026-09-06 the operator moved her episode store from
-F:/kairos-eps to C:/kairos-eps (F: is a 27 GB drive). Registry rows are append-only and carry an ABSOLUTE
-`dir`, so 1,287 rows still named F:, where nothing is left:
+the old disk to a new root (the old one was too small). Registry rows are append-only and carry an ABSOLUTE
+`dir`, so 1,287 rows still named the old root, where nothing is left:
 
-    live         539 exist under C:/kairos-eps    216 exist nowhere
-    tombstoned   365 exist under C:/kairos-eps    167 exist nowhere
+    live         539 exist under the new root    216 exist nowhere
+    tombstoned   365 exist under the new root    167 exist nowhere
 
 Every one of the 383 that exist nowhere has npos=0: the KV was never minted, so nothing of
 hers was in them. The daemon read `dir` straight off the row and every ep.k / ep.l5 /
@@ -131,27 +131,33 @@ def _code(path):
 
 print("§4 the daemon side, one place")
 DSRC = os.path.join(ROOT, "engine", "tools", "sp_daemon", "src")
-rs = _code(os.path.join(DSRC, "recall.rs"))
-m = re.search(r"pub fn load_registry_report\b(.*?)\n}\n", rs, re.S)
-body = m.group(1) if m else ""
-i_res = body.find("resolve_episode_dir(")
-loads = [body.find(n) for n in ("load_episode_global_k(", "load_episode_l5key(", "load_episode_okf_policy(")]
-check("load_registry_report exists", bool(body))
-check("the row's dir is resolved before every episode load",
-      i_res >= 0 and all(i > i_res for i in loads), (i_res, loads))
-check("a Moved row loads from the resolved path, not the row's",
-      re.search(r"EpisodeDir::Moved\((\w+)\)\s*=>\s*\{[^}]*\b\1\s*\}", body) is not None
-      and re.search(r"let dir = resolved\b", body) is not None)
-check("a Missing row is skipped",re.search(r"EpisodeDir::Missing\s*=>\s*\{[^}]*continue", body) is not None)
-check("load_registry goes through load_registry_report",
-      re.search(r"pub fn load_registry\(.*?load_registry_report\(", rs, re.S) is not None)
-check("the daemon reader never writes the registry", "fs::write" not in body)
-readers = []
-for fn in os.listdir(DSRC):
-    if fn.endswith(".rs"):
-        for mm in re.finditer(r'get\("dir"\)', _code(os.path.join(DSRC, fn))):
-            readers.append(fn)
-check("no other daemon source reads a row's dir", readers == ["recall.rs"], readers)
+# THE PUBLIC TREE SHIPS NO DAEMON SOURCE (Kairos has no engine/). There the daemon leg has no
+# subject and is omitted, by name; everything else in this gate still runs.
+HAVE_DAEMON = os.path.exists(os.path.join(DSRC, "recall.rs"))
+rs = _code(os.path.join(DSRC, "recall.rs")) if HAVE_DAEMON else ""
+if HAVE_DAEMON:
+    m = re.search(r"pub fn load_registry_report\b(.*?)\n}\n", rs, re.S)
+    body = m.group(1) if m else ""
+    i_res = body.find("resolve_episode_dir(")
+    loads = [body.find(n) for n in ("load_episode_global_k(", "load_episode_l5key(", "load_episode_okf_policy(")]
+    check("load_registry_report exists", bool(body))
+    check("the row's dir is resolved before every episode load",
+          i_res >= 0 and all(i > i_res for i in loads), (i_res, loads))
+    check("a Moved row loads from the resolved path, not the row's",
+          re.search(r"EpisodeDir::Moved\((\w+)\)\s*=>\s*\{[^}]*\b\1\s*\}", body) is not None
+          and re.search(r"let dir = resolved\b", body) is not None)
+    check("a Missing row is skipped",re.search(r"EpisodeDir::Missing\s*=>\s*\{[^}]*continue", body) is not None)
+    check("load_registry goes through load_registry_report",
+          re.search(r"pub fn load_registry\(.*?load_registry_report\(", rs, re.S) is not None)
+    check("the daemon reader never writes the registry", "fs::write" not in body)
+    readers = []
+    for fn in os.listdir(DSRC):
+        if fn.endswith(".rs"):
+            for mm in re.finditer(r'get\("dir"\)', _code(os.path.join(DSRC, fn))):
+                readers.append(fn)
+    check("no other daemon source reads a row's dir", readers == ["recall.rs"], readers)
+else:
+    print("  omitted  §4: no daemon source in this tree (the public Kairos export)")
 
 print("§5 the harness side, one place")
 env_readers = []

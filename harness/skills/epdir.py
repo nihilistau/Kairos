@@ -1,8 +1,8 @@
 """epdir.py — where a registry row's episode actually is.
 
 THE EPISODE ROOT MOVED (2026-09-06; found stale 2026-10-19). The operator moved her
-episode store from F:/kairos-eps to C:/kairos-eps because F: is a 27 GB drive. Registry rows are
-append-only and carry an ABSOLUTE `dir`, so 1,287 rows still named F:, where nothing is
+episode store from one disk to another because the old one was too small. Registry rows are
+append-only and carry an ABSOLUTE `dir`, so 1,287 rows still named the old root, where nothing is
 left. The row is never rewritten: the path is resolved at READ, by basename under the
 configured root (`SP_EPS_DIR`). The daemon's twin is `recall.rs::resolve_episode_dir`;
 the rule is the same on both sides and each side has exactly one.
