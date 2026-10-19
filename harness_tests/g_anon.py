@@ -343,6 +343,23 @@ try:
 except Exception as _exc7:
     print("  (door drive for census failed: %s)" % _exc7)
 
+# D2: the episode cold tier's door, driven for real with the switch on. The fixture lives
+# OUTSIDE the sandbox (as §5b's telemetry does), so only a ledger row could reach the diff.
+import tempfile as _tf_ec                                                   # noqa: E402
+from harness.maintenance import eps_cold as _EC                             # noqa: E402
+_ec_root = _tf_ec.mkdtemp(prefix="g_anon_eps_")
+_ec_hot, _ec_cold = os.path.join(_ec_root, "hot"), os.path.join(_ec_root, "cold")
+os.makedirs(os.path.join(_ec_hot, "ep-anon"))
+os.makedirs(_ec_cold)
+with open(os.path.join(_ec_hot, "ep-anon", "ep.k"), "wb") as _f_ec:
+    _f_ec.write(b"k" * 64)
+_ec_cfg = _EC.ColdConfig(hot=_ec_hot, cold=_ec_cold, after_days=30.0, min_free_gb=0.0,
+                         hot_warn_free_gb=0.0, armed=True)
+_ec_r = _EC.move_one({"name": "r", "ep": "ep-anon", "src": os.path.join(_ec_hot, "ep-anon"),
+                      "bytes": 64, "files": 1}, _ec_cfg, dry_run=False)
+check("eps.move: an episode is not moved off the record", _ec_r.get("result") == "held"
+      and os.path.isdir(os.path.join(_ec_hot, "ep-anon")) and os.listdir(_ec_cold) == [], _ec_r)
+
 print("\n7. THE DOOR TABLE IS CLOSED")
 _held = AN.state()["held"]
 _missing = [d for d in AN.DOORS if d not in _held]

@@ -711,11 +711,17 @@ def build_env(c: dict) -> dict:
         # its own absolute dir, which goes stale when the episodes move (F: -> C:,
         # 2026-09-06): readers resolve it by name under this root (recall.rs, epdir.py).
         "SP_EPS_DIR": str(mem.get("eps_dir", "") or ""),
-        # THE EPISODE COLD ROOT (D2). Empty = OFF: no profile sets it yet, so nothing is
-        # read there. The resolvers (epdir.py, recall.rs) look under it only for an episode
-        # the move ledger eps-moves.jsonl names. The mover and its other knobs arrive with
-        # plan Task 4; this one is mapped now because the resolver already reads it.
+        # THE EPISODE COLD TIER (D2, docs/OFF-BY-DEFAULT.md section 19). Empty root = OFF:
+        # no profile sets it yet, so nothing moves and nothing is read there. A root without
+        # eps_cold_armed is a DRY RUN. harness/maintenance/eps_cold.py is the mover; the
+        # resolvers (epdir.py, recall.rs) look under the root only for an episode the move
+        # ledger eps-moves.jsonl names. Mapped now because the mover reads them; the profile
+        # keys, the nightly step and the route arrive with plan Task 4.
         "SP_EPS_COLD_DIR": str(mem.get("eps_cold_dir", "") or ""),
+        "SP_EPS_COLD_ARMED": b(mem.get("eps_cold_armed", False)),
+        "SP_EPS_COLD_AFTER_DAYS": str(mem.get("eps_cold_after_days", 30)),
+        "SP_EPS_COLD_MIN_FREE_GB": str(mem.get("eps_cold_min_free_gb", 20)),
+        "SP_EPS_HOT_WARN_FREE_GB": str(mem.get("eps_hot_warn_free_gb", 30)),
 
         # ── SEM (docs/SEMANTICS.md): S0 sidecar index + S1 semantic rank ───────────────────
         # S0 (mint/index): DERIVED data in its own file (harness/skills/semindex.py) —

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.8.59 — the episode mover never deletes on a size match (2026-10-19)
+
+* Before the episode mover removes a hot copy, the cold copy must hold the same files with the
+  same sha256 each. A mismatch keeps both copies and is reported as a conflict.
+* Recovery records only folders in the cold root that a memory row names; anything else there
+  is left alone and reported as foreign.
+* One episode that cannot be handled right now (a file held open) is skipped and reported;
+  the rest of the pass goes on.
+
+## 0.8.58 — the episode mover (2026-10-19)
+
+* **`harness/maintenance/eps_cold.py`** moves KV episodes that the cold rule names to a cold
+  root, through a crash-safe partial and an append-only move ledger. It refuses any move that
+  would cross a free-space floor, it moves nothing unless the cold tier is armed, and it is held
+  in anonymous mode. It is not wired to anything yet.
+* The cold tier's settings (`eps_cold_armed`, `eps_cold_after_days`, `eps_cold_min_free_gb`,
+  `eps_hot_warn_free_gb` under `[memory]`) are read now; none is set by default, so it stays off.
+
 ## 0.8.57 — the episode cold rule (2026-10-19)
 
 * **`lifecycle.EPS_COLD_RULE`**, the written rule for which KV episodes may leave the hot disk:

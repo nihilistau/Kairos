@@ -93,6 +93,9 @@ DOORS: Dict[str, tuple] = {
     # The receipt is the whole evidence the mode did anything; it speaks prose now.
     "notes.add":          ("note for the board", "notes for the board"),
     "conversation.store": ("kept piece of the conversation", "kept pieces of the conversation"),
+    # D2 (2026-10-19): the episode cold tier writes a ledger row per move and moves her
+    # episodes between disks. A dry run is a read and is not held.
+    "eps.move":           ("episode moved to the cold disk", "episodes moved to the cold disk"),
 }
 
 

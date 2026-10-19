@@ -118,6 +118,35 @@ responsible for exactly one thing, which is whether she describes the outcome tr
 
 ## The ledger
 
+### 19. `SP_EPS_COLD_ARMED` (`[memory].eps_cold_dir` + `eps_cold_armed`) — the episode cold tier *(recorded 2026-10-19)*
+
+**STATUS: OFF.** No profile sets a cold root, so nothing moves. Without `eps_cold_armed` a
+pass is a DRY RUN that lists what would move, with sizes, and moves nothing. **Not wired
+yet:** nothing calls the mover today; the nightly step, the maintenance route and the boot
+line arrive with D2 Task 4 (`docs/superpowers/plans/2026-10-19-memory-D2-episode-cold-tier.md`).
+
+**What it is.** `harness/maintenance/eps_cold.py`. An episode directory moves from the hot
+root to `eps_cold_dir` when its row matches `lifecycle.EPS_COLD_RULE`: tombstoned more than
+`eps_cold_after_days` (30), not `core`, and named in no live row's `derived_from`, so a
+support folded into a live distillate stays. Each move is one append-only row of
+`var/memory/eps-moves.jsonl` (a basename and the tier names, never a path); the registry is
+never written. Both resolvers (`harness/skills/epdir.py`, `recall.rs::resolve_episode_dir`)
+find a moved episode through that ledger. A move is refused when the cold root does not exist
+(it is never created), when it is larger than the cold disk's free space, or when it would
+leave less than `eps_cold_min_free_gb` (20); the hot disk warns under `eps_hot_warn_free_gb`
+(30). The arming is checked at the write: `run()`, `move_one()` and `recover()` each refuse
+a live move unarmed.
+
+**Why off.** CAPABILITY: a cold root is a disk on someone else's machine, and this code cannot
+choose it (spec section 2, constraint 8). It moves her episodes between disks, so the first
+live pass waits until a dry run has been read with the operator.
+
+**What would arm it.** Public: create a folder with room (a sibling of the episode root works
+on a one-disk machine), set `eps_cold_dir` to it, read one dry run, set `eps_cold_armed = true`.
+His: the dry-run receipt read with the operator, then his OK (Tasks 6 and 7 of the D2 plan).
+Gates: `harness_tests/g_eps_cold_rule.py`, `harness_tests/g_eps_cold_move.py`,
+`harness_tests/g_eps_cold_resolve.py`.
+
 ### 18. `voice.address_directly` — speak TO him, not about him *(recorded 2026-08-30)*
 
 **STATUS: OFF** (tuning knob, default `false`). Null floor: the system prefix is exactly
