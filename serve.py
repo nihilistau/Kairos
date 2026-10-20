@@ -937,6 +937,12 @@ def build_env(c: dict) -> dict:
         # Pmax floats, which is what makes pmax a VRAM question instead of a 48 KB
         # shared-memory question. Numerics differ (reduction order), so it is gated.
         "SP_G4_ATTN_TILE": str(int(dec.get("attn_tile", 0) or 0)),
+        # SP_G4_ATTN_SPLIT — split-K decode attention (flash-decoding), riding on the tiled
+        # path (attn_tile > 0). 0 = the tiled kernel serves; 1 = grid (KV head x position
+        # chunk), each block serving every query head of its KV head, then a combine; 2 =
+        # PARITY (tiled serves, split runs beside it, worst relL2 printed; forces the
+        # per-step path, so it is a measurement mode). Reduction order differs, so gated.
+        "SP_G4_ATTN_SPLIT": str(int(dec.get("attn_split", 0) or 0)),
         # SP_KV_PREFILL_CHUNK — feed a cold prompt to the BATCHED prefill N tokens at a
         # time. The batched path materialises O(n) f32 activation scratch (~156 KB/token
         # measured), so a long prompt declines on VRAM and falls to the per-token floor:

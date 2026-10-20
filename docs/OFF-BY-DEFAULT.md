@@ -36,6 +36,12 @@ are no longer "off", so they are deliberately not §-headed with their knob name
 asserts that no ledger section describes a knob that is actually ON, and it caught exactly that
 the moment these three flipped.
 
+**Armed 2026-10-20, operator's call, live profile `companion` (recorded 2026-10-20, off in `sp`):**
+
+| Knob | What it does now | Watch for |
+|---|---|---|
+| `attn_split` | Decode attention runs split-K (flash-decoding): blocks across KV head x position chunk, each K/V row read once for every query head that shares it, a parallel softmax, a per-head combine. Receipt `docs/BENCH-2026-10-20-split-k-decode-attention.md`: parity relL2 <= 1.9e-06 at 4.2k and 9k (1.4e-06 with the ring armed); decode 36.6 -> 32.8 ms/token at 4.2k and 63.2 -> 55.1 at 9k. | A `SPLIT-K declined` or `SPLIT-K LAUNCH FAILED` line in daemon.log (the first means the tiled kernel is serving that shape; the second means output is invalid). Greedy output differs from the tiled kernel's at near-tie words, by design. `attn_split = 2` re-runs the parity live. |
+
 **Armed 2026-08-29, the written condition met (audit night):**
 
 | Knob | What it does now | Watch for |

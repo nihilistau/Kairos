@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.61 — split-K decode attention, off by default (2026-10-20)
+
+* **`[decode].attn_split`** (default 0, off). With `attn_tile > 0`, `1` serves a split-K
+  ("flash-decoding") decode attention kernel. It splits the work across KV heads and chunks of
+  positions, reads each K/V row once for every query head that shares it, and runs the softmax
+  in parallel. `2` runs it beside the tiled kernel and prints the worst relative difference: the
+  tiled kernel still serves, so it is safe to try on a live stack.
+* Measured on a 12 GB RTX 2060: decode attention gets cheaper as context grows (about 4 ms/token
+  back at 4k context, 8 ms at 9k). The reduction order changes, so greedy output can differ at
+  near-tie words. That is why it ships off.
+
 ## 0.8.60 — the episode cold tier, off by default (2026-10-19)
 
 * **`[memory].eps_cold_dir`** (default `""`, off) and **`eps_cold_armed`** (default false). Set
