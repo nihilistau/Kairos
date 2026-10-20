@@ -43,6 +43,7 @@ the moment these three flipped.
 | `attn_split` | Decode attention runs split-K (flash-decoding): blocks across KV head x position chunk, each K/V row read once for every query head that shares it, a parallel softmax, a per-head combine. Receipt `docs/BENCH-2026-10-20-split-k-decode-attention.md`: parity relL2 <= 1.9e-06 at 4.2k and 9k (1.4e-06 with the ring armed); decode 36.6 -> 32.8 ms/token at 4.2k and 63.2 -> 55.1 at 9k. | A `SPLIT-K declined` or `SPLIT-K LAUNCH FAILED` line in daemon.log (the first means the tiled kernel is serving that shape; the second means output is invalid). Greedy output differs from the tiled kernel's at near-tie words, by design. `attn_split = 2` re-runs the parity live. |
 | `moe_overlap_prefill` | The batched prefill copies its missed experts on the second stream while the experts before them compute (the decode pipeline, for n_tok > 1). Receipt `docs/BENCH-2026-10-20-apex-break-even-and-prefill-profile.md`: 4.2k prefill 16.43 -> 13.95 s, 5k one-shot 21.4 -> 18.0 s, output byte-identical in 27 runs. | Her `BATCH-PREFILL-CONT` timings in daemon.log should drop ~15%; the prefix snapshot capture must still complete; any `gemma4-MoE` fault in a prefill. |
 | `attn_prefill_gemm` | Prefill attention runs as S = QK^T (batched fp16 GEMM), a masked fp32 softmax, then O = PV, per block of queries and per KV head, on all three prefill paths. Receipt `docs/BENCH-2026-10-20-prefill-gemm-attention.md`: 4.2k prefill 13.79 -> 6.49 s, 9k with the ring 40.7 -> 13.6 s; parity relL2 <= 5.7e-04. | `PREFILL GEMM ATTN declined` or `cublas failed` in daemon.log; `(tight)` VRAM budget lines (+~90 MB of scratch); her `BATCH-PREFILL-CONT` timings; the prefix snapshot capture completing. `attn_prefill_gemm = 2` re-runs parity live. |
+| `dequant_h8` | The prefill weight GEMMs dequantise Q4 -> fp16 eight weights per thread (armed 2026-10-21). Receipt: the dequant section of `docs/BENCH-2026-10-20-prefill-gemm-attention.md`: 4.2k prefill 6.40 -> 5.95 s; bitwise parity 0 of 2.69e11 weights differ. | Bit-identical by construction, so her output must not change; `dequant_h8 = 2` re-runs the bitwise check live. |
 
 **Armed 2026-08-29, the written condition met (audit night):**
 
@@ -125,18 +126,6 @@ responsible for exactly one thing, which is whether she describes the outcome tr
 ---
 
 ## The ledger
-
-### 23. the eight-wide Q4 dequant (`[decode].dequant_h8`) *(recorded 2026-10-20)*
-
-**STATUS: OFF** in both profiles. The per-weight dequant kernel serves the prefill weight GEMMs.
-
-**What it is.** `SP_G4_DEQ_H8` = 1 dequantises eight weights per thread with the same per-weight
-arithmetic; `2` is a bitwise parity check.
-
-**Why off (MEASURED).** Not yet chosen. It is bit-identical (0 of 2.69e11 weights differ) and 7%
-faster on a 4.2k prefill (`docs/BENCH-2026-10-20-prefill-gemm-attention.md`, the dequant section).
-
-**What would arm it.** The operator's call on that receipt.
 
 ### 19. the episode cold tier (`[memory].eps_cold_dir` + `eps_cold_armed`) *(recorded 2026-10-19)* — **ARMED in companion 2026-10-20 (operator), after a dry run of 167 episodes / 2.76 GB; the first pass moved all 167. Off in `sp` and wherever no cold root is set.**
 
