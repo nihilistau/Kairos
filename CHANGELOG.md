@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.63 — prefill attention as tensor-core GEMMs, off by default (2026-10-20)
+
+* **`[decode].attn_prefill_gemm`** (default 0, off; rides `attn_tile > 0`). `1` computes prefill attention
+  as two batched fp16 tensor-core GEMMs with an fp32 masked softmax between them, instead of one
+  block per query and head. `2` runs it beside the tiled kernels and prints the worst relative difference.
+* Measured on a 12 GB RTX 2060: a 4.2k-token prefill went from 13.8 s to 6.5 s, and a 9k-token prefill from
+  40.7 s to 13.6 s. Q and P become fp16 operands, so greedy output can differ at near-tie words. That
+  is why it ships off.
+
 ## 0.8.62 — the prefill copy overlap, off by default (2026-10-20)
 
 * **`[decode].moe_overlap_prefill`** (default false, off; needs `moe_overlap`). The batched prefill

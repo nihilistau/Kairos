@@ -948,6 +948,12 @@ def build_env(c: dict) -> dict:
         # PARITY (tiled serves, split runs beside it, worst relL2 printed; forces the
         # per-step path, so it is a measurement mode). Reduction order differs, so gated.
         "SP_G4_ATTN_SPLIT": str(int(dec.get("attn_split", 0) or 0)),
+        # SP_G4_ATTN_PF_GEMM — prefill attention as two tensor-core GEMMs (S = QK^T, masked
+        # softmax, O = PV), per block of queries and per KV head; rides the tiled path
+        # (attn_tile > 0) and its flat P == 0 sibling. 0 = the tiled kernels serve; 1 = the GEMM
+        # path serves; 2 = PARITY (tiled serves, GEMM beside it, worst relL2 printed). Q and P
+        # are fp16 operands (the gemm_f16 precision), so output moves at near-tie words.
+        "SP_G4_ATTN_PF_GEMM": str(int(dec.get("attn_prefill_gemm", 0) or 0)),
         # SP_KV_PREFILL_CHUNK — feed a cold prompt to the BATCHED prefill N tokens at a
         # time. The batched path materialises O(n) f32 activation scratch (~156 KB/token
         # measured), so a long prompt declines on VRAM and falls to the per-token floor:
