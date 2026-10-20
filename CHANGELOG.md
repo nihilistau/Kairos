@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.62 — the prefill copy overlap, off by default (2026-10-20)
+
+* **`[decode].moe_overlap_prefill`** (default false, off; needs `moe_overlap`). The batched prefill
+  copies its missed experts on a second stream while the experts before them compute, instead of
+  copying and computing strictly in series. Same experts, same order, same kernels, so the output is
+  unchanged.
+* Measured on a 12 GB RTX 2060 (PCIe 3.0 x8): a 4.2k-token prefill went from 16.4 s to 14.0 s.
+
 ## 0.8.61 — split-K decode attention, off by default (2026-10-20)
 
 * **`[decode].attn_split`** (default 0, off). With `attn_tile > 0`, `1` serves a split-K

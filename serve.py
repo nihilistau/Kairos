@@ -890,6 +890,11 @@ def build_env(c: dict) -> dict:
         # not known until layer L has produced its output, so only a layer's own copies can
         # be hidden behind its own compute.
         "SP_G4_MOE_OVERLAP": str(int(dec.get("moe_overlap", 0) or 0)),
+        # SP_G4_MOE_OVERLAP_PREFILL (2026-10-20) — the same two-pass pipeline for the batched
+        # prefill (n_tok > 1), which needs moe_overlap too. nsys had a 4,494-token prefill's
+        # expert copies at 4.44 s overlapped with 0.00 s of kernels. Same experts, same order,
+        # same kernels, so output is unchanged.
+        "SP_G4_MOE_OVERLAP_PREFILL": b(dec.get("moe_overlap_prefill", False)),
         "SP_KV_PREFILL_DP4A": b(dec.get("prefill_dp4a", False)),
         "SP_MOE_TIMING": b(dec.get("moe_timing", False)),
         # SP_MOE_PIN_STAGE — expert staging through a pinned ring instead of a pageable
