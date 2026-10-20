@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.65 — the prefill lane, off by default (2026-10-21)
+
+* **`[decode].moe_pf_lane`** (default 0, off). During a batched prefill, missed experts evict only from the top N
+  slots of the expert cache, so the rest (what decode had warmed) survives a long prompt. Output is unchanged.
+  Measured at 256 slots on a 12 GB RTX 2060: a 4.2k-token prefill went from 5.96 s to 5.40 s, and the decode
+  right after it from 34.3 to 26.8 ms/token.
+
 ## 0.8.64 — an eight-wide Q4 dequant, off by default (2026-10-20)
 
 * **`[decode].dequant_h8`** (default 0, off). The prefill weight GEMMs dequantise eight weights per GPU

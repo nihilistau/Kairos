@@ -895,6 +895,10 @@ def build_env(c: dict) -> dict:
         # expert copies at 4.44 s overlapped with 0.00 s of kernels. Same experts, same order,
         # same kernels, so output is unchanged.
         "SP_G4_MOE_OVERLAP_PREFILL": b(dec.get("moe_overlap_prefill", False)),
+        # SP_G4_MOE_PF_LANE (2026-10-21) — batched-prefill misses evict only from the top N slots
+        # of the expert cache, so the rest (what decode warmed) holds still across chunks: more hits
+        # per chunk, and the decode after a long prefill finds its experts still resident. 0 = off.
+        "SP_G4_MOE_PF_LANE": str(int(dec.get("moe_pf_lane", 0) or 0)),
         "SP_KV_PREFILL_DP4A": b(dec.get("prefill_dp4a", False)),
         "SP_MOE_TIMING": b(dec.get("moe_timing", False)),
         # SP_MOE_PIN_STAGE — expert staging through a pinned ring instead of a pageable
