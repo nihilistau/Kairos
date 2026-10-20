@@ -126,6 +126,18 @@ responsible for exactly one thing, which is whether she describes the outcome tr
 
 ## The ledger
 
+### 23. the eight-wide Q4 dequant (`[decode].dequant_h8`) *(recorded 2026-10-20)*
+
+**STATUS: OFF** in both profiles. The per-weight dequant kernel serves the prefill weight GEMMs.
+
+**What it is.** `SP_G4_DEQ_H8` = 1 dequantises eight weights per thread with the same per-weight
+arithmetic; `2` is a bitwise parity check.
+
+**Why off (MEASURED).** Not yet chosen. It is bit-identical (0 of 2.69e11 weights differ) and 7%
+faster on a 4.2k prefill (`docs/BENCH-2026-10-20-prefill-gemm-attention.md`, the dequant section).
+
+**What would arm it.** The operator's call on that receipt.
+
 ### 19. the episode cold tier (`[memory].eps_cold_dir` + `eps_cold_armed`) *(recorded 2026-10-19)* — **ARMED in companion 2026-10-20 (operator), after a dry run of 167 episodes / 2.76 GB; the first pass moved all 167. Off in `sp` and wherever no cold root is set.**
 
 **STATUS: OFF.** The public profile has no cold root: nothing moves, and the gateway's boot

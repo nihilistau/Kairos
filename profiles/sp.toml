@@ -167,6 +167,7 @@ moe_bisect = false                    # SP_G4_MOE_BISECT
 attn_tile = 0                         # SP_G4_ATTN_TILE  — 1024 upstream; 0 is the flat kernel
 attn_v2 = 0                           # SP_G4_ATTN_V2    — 1 upstream; 2 = parity, old served
 attn_prefill_gemm = 0                 # SP_G4_ATTN_PF_GEMM — prefill attention as tensor-core GEMMs (needs attn_tile > 0); 2 = parity
+dequant_h8 = 0                        # SP_G4_DEQ_H8 — eight-wide Q4 -> fp16 dequant, bit-identical; 2 = bitwise parity
 attn_split = 0                        # SP_G4_ATTN_SPLIT — split-K decode attention (needs attn_tile > 0); 2 = parity, tiled served
 gemm_f16 = 0                          # SP_G4_GEMM_F16   — 1 upstream; 2 = parity, fp32 served
 prefill_dp4a = false                  # SP_KV_PREFILL_DP4A — measured ~18% SLOWER and it moves

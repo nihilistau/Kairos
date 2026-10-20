@@ -137,16 +137,17 @@ this is a conversation and not a batch job.
 Measured on that card, with the optional Rust + CUDA engine. The first two columns are before and
 after the work that made it liveable — **the memory-tiering work, 2026-09-08 to 09-10**, which is
 about where the weights live and how often a token has to cross PCIe. The third is the same rows
-as they stand **today, 2026-09-29**, after the kernel work of 09-11/12 and the hybrid MoE decode
-of 09-28/29:
+as they stood on **2026-09-29**, after the kernel work of 09-11/12 and the hybrid MoE decode
+of 09-28/29. The fourth is **2026-10-20**, after split-K decode attention, the prefill copy overlap,
+tensor-core prefill attention and an eight-wide dequant:
 
-| | before (09-08) | after tiering (09-10) | **2026-09-29** |
-|---|---|---|---|
-| prefill (expert-major) | 230 ms/tok | 8 ms/tok | **~3.3–4.1 ms/tok** (304 tok/s at 3,720 tok on 09-12; the 3,932–4,128-tok bench prompts of 09-29 at 14–17 s) |
-| decode (resident hot-expert cache) | ~6 tok/s | 23.8 tok/s | **31.5 tok/s** at depth ~4k (5.5 GB cache, decayed-frequency eviction); 19–27 live at a ~9k prefix |
-| cold prefill, live gateway | 209 s | 25.5 s | not re-measured |
-| warm prefill | 25.5 s | ~1.0 s | not re-measured |
-| prewarm, 2,922 tok | 689 s | 29 s | not re-measured |
+| | before (09-08) | after tiering (09-10) | 2026-09-29 | **2026-10-20** |
+|---|---|---|---|---|
+| prefill (expert-major) | 230 ms/tok | 8 ms/tok | ~3.3–4.1 ms/tok (304 tok/s at 3,720 tok on 09-12; the 3,932–4,128-tok bench prompts of 09-29 at 14–17 s) | **~1.4 ms/tok: 4,204 tokens in 5.95 s (~707 tok/s); 9,027 in 13.6 s** |
+| decode (resident hot-expert cache) | ~6 tok/s | 23.8 tok/s | 31.5 tok/s at depth ~4k (5.5 GB cache, decayed-frequency eviction); 19–27 live at a ~9k prefix | **35.5 tok/s** at depth ~4.2k (6.0 GB cache, 4 CPU threads, split-K attention) |
+| cold prefill, live gateway | 209 s | 25.5 s | not re-measured | **15.1 s** for the 9,055-token persona prefix (55 s the same morning) |
+| warm prefill | 25.5 s | ~1.0 s | not re-measured | not re-measured |
+| prewarm, 2,922 tok | 689 s | 29 s | not re-measured | not re-measured |
 
 The one worth reading is the cache row: **33.4% of experts resident buys ~4×**, because MoE
 routing is skewed — capacity share is not hit rate.
@@ -178,8 +179,13 @@ rather than 2.37x. Every step kept the greedy output byte-identical:
 
 In her live sessions that is **~19-27 tok/s at a ~9k prefix, up from 12.5-16.5**. A
 decayed-frequency expert eviction (replacing LRU after a replay of the real routing trace)
-added +6-11% on top, depending on cache size. What is left, and the plan for it, is in the
-engine README.
+added +6-11% on top, depending on cache size.
+
+**2026-10-20.** Decode on the same bench is **35.5 tok/s**, at parity with `llama.cpp -ncmoe 14`'s 34.4 on
+this card, and prefill moved most: a 4,204-token prompt went from 16.4 s to 5.95 s, and a 9k one
+from 40.7 s to 13.6 s. Two of the steps change greedy text at near-tie words (split-K decode attention,
+and fp16-operand prefill attention); each has a parity mode and its receipt. The rest are byte- or
+bit-identical. The engine README's newest section has the table, and its `CHANGELOG.md` the list.
 
 **Those are sp-daemon numbers, not a promise about your setup.** Kairos is engine-agnostic
 and most people will point it at LM Studio, `llama-server` or vLLM, where throughput is that

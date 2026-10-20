@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.64 — an eight-wide Q4 dequant, off by default (2026-10-20)
+
+* **`[decode].dequant_h8`** (default 0, off). The prefill weight GEMMs dequantise eight weights per GPU
+  thread instead of one. The arithmetic per weight is the same, so the output is bit-identical (`2`
+  checks that bitwise). Measured on a 12 GB RTX 2060: a 4.2k-token prefill went from 6.4 s to 5.95 s.
+
 ## 0.8.63 — prefill attention as tensor-core GEMMs, off by default (2026-10-20)
 
 * **`[decode].attn_prefill_gemm`** (default 0, off; rides `attn_tile > 0`). `1` computes prefill attention

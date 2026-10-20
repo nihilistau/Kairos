@@ -954,6 +954,10 @@ def build_env(c: dict) -> dict:
         # path serves; 2 = PARITY (tiled serves, GEMM beside it, worst relL2 printed). Q and P
         # are fp16 operands (the gemm_f16 precision), so output moves at near-tie words.
         "SP_G4_ATTN_PF_GEMM": str(int(dec.get("attn_prefill_gemm", 0) or 0)),
+        # SP_G4_DEQ_H8 — the prefill weight GEMMs' Q4 -> fp16 dequant, eight weights per thread
+        # (one code load, one scale, one 16-byte store) instead of one. Same arithmetic per
+        # weight, so bit-identical; 2 = bitwise parity (per-weight kernel served).
+        "SP_G4_DEQ_H8": str(int(dec.get("dequant_h8", 0) or 0)),
         # SP_KV_PREFILL_CHUNK — feed a cold prompt to the BATCHED prefill N tokens at a
         # time. The batched path materialises O(n) f32 activation scratch (~156 KB/token
         # measured), so a long prompt declines on VRAM and falls to the per-token floor:
