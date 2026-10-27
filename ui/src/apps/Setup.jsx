@@ -90,6 +90,7 @@ function KeyRow({ label, k, why }) {
 export function SetupView({ d }) {
   const eng = d.engine || {}
   const xai = d.xai || {}
+  const cl = d.claude || {}
   const av = d.avatar || {}
   const side = d.sidecars || {}
   const models = d.models || {}
@@ -133,6 +134,21 @@ export function SetupView({ d }) {
         <Row k="web search" v={(xai.search || {}).backend || 'ddg'}
              tone={(xai.search || {}).armed ? 'good' : ''} />
         <Row k="research tier" v={(xai.research || {}).armed ? 'on' : 'off (ships off)'} />
+      </Section>
+
+      <Section title="2b · the Claude key"
+               state={(cl.key || {}).present && cl.sdk ? true : (cl.key || {}).present ? 'warn' : false}
+               hint="one key, three features: research, web search, and her one hard question (consult). Dark without it; everything else works anyway.">
+        <KeyRow label="Claude API key" k={cl.key}
+                why="get one at console.anthropic.com. Billed per call. ANTHROPIC_API_KEY is never read — the key goes in this file." />
+        <Row k="SDK installed" v={cl.sdk ? 'yes' : 'no  ·  pip install -e ".[claude]"'}
+             tone={cl.sdk ? 'good' : 'bad'} />
+        <Row k="research" v={(cl.research || {}).armed ? 'armed (' + ((cl.research || {}).model || '') + ')' : 'backend = ' + (((cl.research || {}).backend) || 'off')}
+             tone={(cl.research || {}).armed ? 'good' : ''} />
+        <Row k="web search" v={(cl.search || {}).armed ? 'armed (' + ((cl.search || {}).model || '') + ')' : 'backend = ' + (((cl.search || {}).backend) || 'ddg')}
+             tone={(cl.search || {}).armed ? 'good' : ''} />
+        <Row k="consult" v={(cl.consult || {}).armed ? 'armed (' + ((cl.consult || {}).model || '') + ')' : 'off'}
+             tone={(cl.consult || {}).armed ? 'good' : ''} />
       </Section>
 
       <Section title="3 · her identity"

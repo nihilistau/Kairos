@@ -38,8 +38,8 @@ def _ceiling():
         _swallowed(logger, "_ceiling", _swx, lane="skills")
     try:
         from harness.roleplay import engine as rp
-        from harness.server.app import _room_session
-        sc = rp.active(_room_session())
+        from harness.control import room as _room
+        sc = rp.active(_room.session())
         if sc is not None:
             rung = int(sc.heat.level)
     except Exception as _swx:

@@ -86,12 +86,28 @@ print("\n3. THE ANSWER GOES OUT BEFORE ANYTHING STOPS")
 h = APP.index('elif self.path == "/v1/system":')
 handler = APP[h:h + 1600]
 i_write = handler.index("self.wfile.write(payload)")
-i_spawn = handler.index("_do_restart(")
+# THE RESTART MOVED (2026-10-27, Launch window): the branch no longer calls _do_restart
+# itself. _system_op validates and RETURNS the restart as a callable (`after`); the branch
+# writes, flushes, and only then calls it. The ordering claim is the same, graded on the
+# new structure: the real handler's write and flush precede the `after()` call, and the
+# callable _system_op hands back is the restart, and only when the validation passed.
+i_spawn = handler.index("after()")
 check("the payload is written before the restart is triggered", i_write < i_spawn,
       "write@%d spawn@%d" % (i_write, i_spawn))
 check("...and flushed before it too", handler.index("flush()") < i_spawn)
+check("the handler triggers the restart only through the callable _system_op returned",
+      "= _system_op(" in handler and "_do_restart(" not in handler)
 check("the comment no longer contradicts the code",
       "ONLY NOW" in handler)
+k = APP.index("def _system_op")
+_k2 = APP.find("\ndef ", k + 1)
+sysop = APP[k:_k2 if _k2 > 0 else k + 2400]
+check("_system_op hands back _do_restart as the after-callable only when the spawn validated",
+      '_do_restart(full)) if res.get("ok") else None' in sysop)
+check("...and never runs the restart itself, on any path",
+      len(re.findall(r"_do_restart\(", sysop)) == 1 and "lambda: _do_restart(full)" in sysop)
+check("...refusals (bad op, mid-turn) return no callable",
+      sysop.count(", None\n") >= 2)
 # The validation half must not stop anything either.
 j = APP.index("def _spawn_restart")
 val = APP[j:j + 900]
@@ -104,7 +120,7 @@ check("stdio is not inherited", "DEVNULL" in win)
 
 print("\n5. the op is a finite set")
 check("only restart and restart_gateway are accepted",
-      'op in ("restart", "restart_gateway")' in APP)
+      'op not in ("restart", "restart_gateway")' in APP)      # _system_op, 2026-10-27
 check("anything else is refused with the valid set named",
       "op must be restart or restart_gateway" in APP)
 check("no command string is ever taken from the body",

@@ -172,6 +172,13 @@ class XaiResearcher(Researcher):
 
 
 def _xai_post(payload: dict, key: str, timeout: float) -> dict:
+    # ANONYMOUS MODE (2026-10-21). The second path out: research() is guarded, but the
+    # operator's manual research box (looking.his_research) calls the backend directly
+    # and used to reach api.x.ai with the mode on. Guarded where the socket opens, so
+    # no caller can route around it.
+    from harness.control import anon as _anon
+    if _anon.holds("net.research"):
+        raise PermissionError(_anon.WHY)
     import urllib.request
     body = json.dumps(payload).encode()
     req = urllib.request.Request(
@@ -218,16 +225,80 @@ def _parse_xai(obj) -> tuple:
     return text, sources[:8]
 
 
-def _receipt(ans: Answer, argv: List[str]) -> str:
-    """Every research call leaves one. The provenance survives whatever she says."""
+def _receipt(ans: Answer, argv: List[str], extra: Optional[dict] = None,
+             root: Optional[str] = None) -> str:
+    """Every research call leaves one. The provenance survives whatever she says.
+    `root` (2026-10-21): consult keeps its receipts in their own directory."""
+    d = root or RECEIPTS
     try:
-        os.makedirs(RECEIPTS, exist_ok=True)
-        p = os.path.join(RECEIPTS, f"r_{time.strftime('%Y%m%d-%H%M%S')}_{uuid.uuid4().hex[:6]}.json")
+        os.makedirs(d, exist_ok=True)
+        p = os.path.join(d, f"r_{time.strftime('%Y%m%d-%H%M%S')}_{uuid.uuid4().hex[:6]}.json")
         with open(p, "w", encoding="utf-8") as f:
-            json.dump({**asdict(ans), "argv": argv}, f, indent=2, ensure_ascii=False)
+            json.dump({**asdict(ans), "argv": argv, **(extra or {})}, f, indent=2, ensure_ascii=False)
         return p
     except OSError:
         return ""
+
+
+def _claude_model() -> str:
+    """Live knob first (override-only), then the profile's boot default, then sonnet."""
+    try:
+        from harness.tuning import registry as _t
+        v = str(_t.chosen("research.claude_model") or "").strip()
+        if v:
+            return v
+    except Exception as _swx:
+        _swallowed(_swlog, "_claude_model", _swx, lane="skills")
+    return (os.environ.get("SP_RESEARCH_CLAUDE_MODEL") or "claude-sonnet-5-5").strip()
+
+
+# depth -> (effort, web_fetch too?). Quick is a lookup, so it only searches.
+_CLAUDE_DEPTH = {"quick": ("low", False), "normal": ("medium", True), "thorough": ("high", True)}
+_CLAUDE_SYSTEM = ("You are a research assistant. Search the web, cite URLs, say where "
+                  "sources disagree and what is unsettled.")
+
+
+class ClaudeResearcher(Researcher):
+    """Claude with server-side web search (and fetch past `quick`), through the one door
+    in harness/skills/claude.py. Only the question and the depth hint leave the machine:
+    no persona, no memory, no transcript. Provenance is forced into the tool output like
+    every researcher; a refusal or a dead path is an ok=False Answer, never a sentence."""
+    name = "claude"
+
+    def available(self) -> bool:
+        from harness.skills import claude as _c
+        return _c.available()
+
+    def ask(self, question: str, depth: str = "normal") -> Answer:
+        from harness.skills import claude as _c
+        t0 = time.perf_counter()
+        model = _claude_model()
+        if depth not in _CLAUDE_DEPTH:
+            depth = "normal"
+        effort, fetch = _CLAUDE_DEPTH[depth]
+        tools = [{"type": "web_search_20260209", "name": "web_search"}]
+        if fetch:
+            tools.append({"type": "web_fetch_20260209", "name": "web_fetch"})
+        r = _c.ask([{"role": "user", "content": f"{DEPTHS[depth]['hint']}\n\n{question}"}],
+                   model=model, door="net.research", system=_CLAUDE_SYSTEM, tools=tools,
+                   effort=effort, max_tokens=16000, timeout=TIMEOUT)
+        dt = time.perf_counter() - t0
+        prov = f"researched by Claude ({model})"
+        if r.refusal:
+            return Answer(text=f"Claude declined ({r.refusal})", provenance=prov, ok=False,
+                          seconds=round(dt, 1), question=question)
+        text = (r.text or "").strip()
+        if not r.ok or not text:
+            return Answer(text=_c.last_error() or "no answer came back", provenance=prov,
+                          ok=False, seconds=round(dt, 1), question=question)
+        if r.stop_reason == "max_tokens":
+            text += "\n\n[truncated: the answer hit the token ceiling]"
+        ans = Answer(text=text, provenance=prov, seconds=round(dt, 1),
+                     question=question, sources=list(r.sources))
+        ans.receipt = _receipt(ans, ["claude", model, "web_search", depth],
+                               extra={"usage": r.usage, "stop_reason": r.stop_reason,
+                                      "claude_seconds": round(r.seconds, 1)})
+        return ans
 
 
 class SidecarResearcher(Researcher):
@@ -314,7 +385,10 @@ class SidecarResearcher(Researcher):
                       seconds=time.time() - t0, sources=read)
 
 
-_BACKEND: Optional[Researcher] = None
+# Set ONLY by set_backend() (tests, and the day there is a second implementation).
+# 2026-10-21: this used to be a memo of whatever _pick_backend() first returned, which
+# made the Live: claim on the research.backend knob false until a restart.
+_OVERRIDE: Optional[Researcher] = None
 
 
 def _pick_backend() -> Researcher:
@@ -332,6 +406,8 @@ def _pick_backend() -> Researcher:
         name = (os.environ.get("SP_RESEARCH_BACKEND") or "xai").strip().lower()
     if name == "sidecar":
         return SidecarResearcher()
+    if name == "claude":
+        return ClaudeResearcher()
     if name in ("xai", "grok"):        # "grok" spellings in old profiles mean the API now
         return XaiResearcher()
     # auto: the API when the key exists, else the local sidecar
@@ -342,17 +418,15 @@ def _pick_backend() -> Researcher:
 
 
 def backend() -> Researcher:
-    """The active researcher. Grok CLI is the first implementation; xAI API is the second."""
-    global _BACKEND
-    if _BACKEND is None:
-        _BACKEND = _pick_backend()
-    return _BACKEND
+    """The active researcher, re-picked on EVERY call so a knob flip lands on the next
+    question. An installed set_backend() override wins until set_backend(None)."""
+    return _OVERRIDE or _pick_backend()
 
 
-def set_backend(r: Researcher) -> None:
-    """For tests, and for the day there is a second implementation."""
-    global _BACKEND
-    _BACKEND = r
+def set_backend(r: Optional[Researcher]) -> None:
+    """For tests, and for the day there is a second implementation. None clears."""
+    global _OVERRIDE
+    _OVERRIDE = r
 
 
 def research(question: str, depth: str = "normal") -> str:

@@ -44,6 +44,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 _fd, _reg = tempfile.mkstemp(suffix=".jsonl")
 os.close(_fd)
 os.environ["SP_RECALL_REGISTRY"] = _reg
+os.environ["SP_LAUNCH_VAR"] = tempfile.mkdtemp(prefix="gate_launch_var_")   # a reply stamp writes config-fingerprints.jsonl; never hers
 os.environ["SP_DAEMON_URL"] = "http://127.0.0.1:9"      # discard port: never needs a GPU
 # SP_ENGINE_KIND: no capture attempt at all (2026-08-23). A dead SP_DAEMON_URL does
 # NOT make the KV mint cheap - _mint_now still opens a socket per write and Windows

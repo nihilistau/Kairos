@@ -86,6 +86,8 @@ DOORS: Dict[str, tuple] = {
     "voice.cache":      ("recording of her voice", "recordings of her voice"),
     "net.search":       ("web search", "web searches"),
     "net.research":     ("research question", "research questions"),
+    # consult (2026-10-21): her question to Claude, and his from the Research app
+    "net.consult":      ("question sent to another model", "questions sent to another model"),
     "net.provider":     ("request to a third party", "requests to a third party"),
     # ── DECLARED LATE (2026-08-29 audit, M5): both were GUARDED on 2026-08-28 and never
     # declared, so holds() held them fail-closed while the exit receipt said

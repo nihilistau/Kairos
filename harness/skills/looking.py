@@ -135,6 +135,11 @@ def his_search(query: str, n: int = 6) -> dict:
     q = (query or "").strip()
     if not q:
         return {"ok": False, "error": "empty query"}
+    # ANONYMOUS MODE (2026-10-21). search_web returns [] when held, which this box would
+    # have rendered as an ok search that found nothing. Say why instead.
+    from harness.control import anon as _anon
+    if _anon.holds("net.search"):
+        return {"ok": False, "error": _anon.WHY}
     from harness.skills import search as S
     t0 = time.time()
     try:
@@ -169,6 +174,10 @@ def his_research(query: str, depth: str = "normal") -> dict:
     q = (query or "").strip()
     if not q:
         return {"ok": False, "error": "empty question"}
+    # ANONYMOUS MODE (2026-10-21): his manual box is a network lookup too.
+    from harness.control import anon as _anon
+    if _anon.holds("net.research"):
+        return {"ok": False, "error": _anon.WHY}
     from harness.skills import research as R
     b = R.backend()
     if not b.available():
@@ -195,6 +204,41 @@ def his_research(query: str, depth: str = "normal") -> dict:
                            type(exc).__name__, exc)
             _swallowed(logger, "looking receipt stamp", exc, lane="looking")
     return {"ok": ans.ok, "text": ans.text, "sources": ans.sources,
+            "seconds": ans.seconds, "receipt": ans.receipt,
+            "provenance": ans.provenance}
+
+
+def his_consult(question: str) -> dict:
+    """The room's manual consult box (2026-10-21, the operator's ask): the same Claude door her
+    consult tool uses, asked by him. NOT gated on SP_CONSULT — that knob governs whether SHE
+    may reach for it; his click is the authorization. consult.ask(by="him") skips her session
+    doors (scene, intimate presence, her own time) and still refuses off the record, counting
+    that door itself, so it is not checked again here. The row is `by: him`; _NOW/_LAST stay
+    alone, as in his_search, because the taskbar chip reports HER activity."""
+    q = (question or "").strip()
+    if not q:
+        return {"ok": False, "error": "empty question"}
+    from harness.skills import consult as _CO
+    t0 = time.time()
+    try:
+        ans = _CO.ask(q, by="him")
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:200]}
+    # A refused door (off the record) or a missing key sent nothing and leaves no receipt;
+    # it is also not a look. Anything that went out has a receipt and gets a row, even a failure.
+    if ans.receipt or ans.ok:
+        _write({
+            "kind": "consult", "query": q[:240], "by": "him",
+            "started": t0, "ended": time.time(),
+            "seconds": round(time.time() - t0, 1),
+            "ok": bool(ans.ok), "title": q[:80],
+            "summary": (ans.text or "")[:800],
+            "sources": list(ans.sources or [])[:8],
+            "phase": "done",
+        })
+    if not ans.ok:
+        return {"ok": False, "error": ans.text, "receipt": ans.receipt}
+    return {"ok": True, "answer": ans.text, "sources": ans.sources,
             "seconds": ans.seconds, "receipt": ans.receipt,
             "provenance": ans.provenance}
 

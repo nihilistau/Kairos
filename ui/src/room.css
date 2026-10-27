@@ -455,6 +455,7 @@ main { display: block; }
 .rsc-t { flex: 1; min-width: 0; font-size: var(--fs-13); }
 .rsc-body { padding: 2px 10px 10px; border-top: 1px solid var(--hair); }
 .rsc-body pre { margin: 8px 0; white-space: pre-wrap; font: 400 var(--fs-12)/1.55 var(--font-mono); color: var(--text-2); }
+.rsc-answer { flex: 1 0 100%; margin: 8px 0 0; max-height: 40vh; overflow: auto; white-space: pre-wrap; font: 400 var(--fs-12)/1.55 var(--font-mono); color: var(--text-2); }
 .rsc-q { margin-top: 6px; font-size: var(--fs-11); color: var(--text-3); }
 .rsc-src { margin: 6px 0 0; padding-left: 18px; font-size: var(--fs-11); }
 .rsc-src a { color: var(--accent); }
@@ -636,11 +637,32 @@ main { display: block; }
 .st-label { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-weight: 500; color: var(--text-1); }
 .st-field { max-width: 160px; height: 28px; }
 .st-help { grid-column: 1 / -1; font-size: var(--fs-11); line-height: 1.4; color: var(--text-3); }
+/* the regrouped window (2026-10-27): a sidebar of six areas, search and the changed filter
+   on top, the selected area (or every match) on the right. */
+.st-win { display: flex; height: 100%; min-height: 0; }
+.st-side { flex: 0 0 200px; display: flex; flex-direction: column; gap: var(--sp-2);
+  padding: var(--sp-3); border-right: 1px solid var(--hair); overflow-y: auto; }
+.st-only { display: flex; gap: 6px; align-items: center; font-size: var(--fs-11); color: var(--text-2); }
+.st-areas { display: flex; flex-direction: column; gap: 2px; margin-top: var(--sp-2); }
+.st-area { display: flex; flex-direction: column; gap: 2px; text-align: left; cursor: var(--cur-hand);
+  background: none; border: 1px solid transparent; border-radius: var(--r-sm);
+  padding: var(--sp-2); color: var(--text-1); font: inherit; }
+.st-area small { font-size: var(--fs-11); color: var(--text-3); line-height: 1.3; }
+.st-area:hover { background: var(--hair); }
+.st-area.st-on { border-color: var(--accent); background: var(--hair); }
+.st-foot { margin-top: auto; font-size: var(--fs-11); color: var(--text-3); }
+.st-main { flex: 1; min-width: 0; padding: var(--sp-2) var(--sp-3); overflow-y: auto; }
+.st-area-h { margin: var(--sp-3) 0 0; font-size: var(--fs-13); color: var(--text-1); }
+.st-none { padding: var(--sp-4); color: var(--text-3); }
+.st-changed { grid-column: 1 / -1; font-size: var(--fs-11); color: var(--warn); }
+.st-link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent);
+  text-decoration: underline; cursor: var(--cur-hand); }
+.st-link:disabled { opacity: .5; cursor: var(--cur-no); }
 
 /* ── panel session (2026-08-21): apps launcher, voice + search windows, chips ── */
 
 /* the manual box — his lane into the shared ledger */
-.rsc-askrow { display: flex; gap: var(--sp-2); align-items: center; margin: 4px 0 var(--sp-3); }
+.rsc-askrow { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; margin: 4px 0 var(--sp-3); }
 .rsc-ask { flex: 1; }
 .rsc-err { color: var(--err); font-size: var(--fs-11); }
 
@@ -929,3 +951,44 @@ button.sty-line:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--m
 }
 .rv-k { color: var(--text-3); letter-spacing: .06em; }
 .rv-v { color: var(--text-1); }
+
+/* ── launch (ln-) — setups on top, one list of controls, the bar that says what a restart
+   would change. Chips, buttons, fields and tabs are the kit's. ── */
+.ln { display: flex; flex-direction: column; height: 100%; font-size: var(--fs-13); }
+.ln-head { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3);
+  font-weight: 600; color: var(--text-1); }
+.ln-setups { display: flex; flex-wrap: wrap; gap: var(--sp-2); padding: 0 var(--sp-3) var(--sp-2); align-items: center; }
+.ln-setup { display: inline-flex; align-items: center; gap: 4px; }
+.ln-mini { background: none; border: 0; padding: 0 2px; font-size: var(--fs-11); color: var(--text-3); }
+.ln-mini:hover { color: var(--text-1); text-decoration: underline; }
+.ln-dim { color: var(--text-3); }
+.ln-loaded { padding: 0 var(--sp-3) var(--sp-1); font-size: var(--fs-11); }
+.ln-note { margin: 0 var(--sp-3) var(--sp-2); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm);
+  border: 1px solid var(--hair); font-size: var(--fs-12); display: flex; gap: var(--sp-3); align-items: center; }
+.ln-note-err { color: var(--err); border-color: var(--err); }
+.ln-note-warn { color: var(--warn); border-color: var(--warn); }
+.ln-body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--sp-2) var(--sp-3); }
+.ln-label { margin: var(--sp-3) 0 var(--sp-1); font: 600 var(--fs-11)/1 var(--font-ui); letter-spacing: .12em;
+  text-transform: uppercase; color: var(--text-2); }
+.ln-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); padding: 3px 0; }
+.ln-pick, .ln-num { width: auto; max-width: 280px; }
+.ln-num { width: 110px; }
+.ln-lab { color: var(--text-1); }
+.ln-changed { color: var(--warn); font-size: var(--fs-11); }
+.ln-sec { margin: var(--sp-2) 0; }
+.ln-sec > summary { font-weight: 600; color: var(--text-2); }
+.ln-kv { display: grid; grid-template-columns: 1fr minmax(120px, 220px); gap: 2px var(--sp-3); align-items: center;
+  padding: var(--sp-1) 0; border-bottom: 1px solid var(--hair); }
+.ln-kv-k { font-family: var(--font-mono, monospace); font-size: var(--fs-12); color: var(--text-1); }
+.ln-help { grid-column: 1 / -1; font-size: var(--fs-11); line-height: 1.4; color: var(--text-3); }
+.ln-raw { min-height: 320px; font-family: var(--font-mono, monospace); font-size: var(--fs-12); white-space: pre; }
+.ln-rawbar { display: flex; gap: var(--sp-2); margin-top: var(--sp-2); }
+.ln-bar { margin: var(--sp-2) var(--sp-3) var(--sp-3); padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--warn); border-radius: var(--r-sm); display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3);
+  align-items: center; }
+.ln-count { font-weight: 600; color: var(--text-1); }
+.ln-cost { font-size: var(--fs-11); flex: 1; min-width: 160px; }
+.ln-acts { display: flex; gap: var(--sp-2); }
+.ln-prog { display: flex; flex-direction: column; gap: 2px; color: var(--text-1); }
+.ln-tail { font-size: var(--fs-11); color: var(--text-3); word-break: break-all; }
+.ln-log { display: block; white-space: pre-wrap; max-height: 160px; overflow-y: auto; }

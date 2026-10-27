@@ -63,6 +63,7 @@ SB = os.path.join(tempfile.gettempdir(), "_g_day_transcript")
 shutil.rmtree(SB, ignore_errors=True)
 os.makedirs(SB)
 os.environ["SP_RECALL_REGISTRY"] = os.path.join(SB, "registry.jsonl")
+os.environ["SP_LAUNCH_VAR"] = tempfile.mkdtemp(prefix="gate_launch_var_")   # a reply stamp writes config-fingerprints.jsonl; never hers
 
 PASS = FAIL = 0
 

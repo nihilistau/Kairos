@@ -98,12 +98,14 @@ git.** `var/` is gitignored in its entirety. Create the file, paste the key, res
 |---|---|---|
 | your inference endpoint | `var/secrets/engine.token` | only if your server requires auth (LM Studio's *require authentication*, or a cloud endpoint) |
 | **the xAI API key** | `var/secrets/Xapi.txt` | her voice, her face and wardrobe, live web search, the research tier |
+| **the Claude API key** | `var/secrets/claude.txt` | research and web search on Claude, and her one hard question to Claude (consult) |
 | a sidecar endpoint | whatever `[aux].api_key_file` names | only if your sidecar server requires auth |
 
 ```bash
 mkdir -p var/secrets
 printf '%s' 'sk-...' > var/secrets/engine.token     # no trailing newline needed; it is stripped
 printf '%s' 'xai-...' > var/secrets/Xapi.txt
+printf '%s' 'sk-ant-...' > var/secrets/claude.txt
 ```
 
 The paths are knobs, not conventions — `[engine].api_key_file` and `[xai].key_file` in the
@@ -111,6 +113,18 @@ profile. An absent file is not an error: it means no `Authorization` header and,
 that those four features stay dark. **The setup panel reports each key as present/absent
 and never returns a byte of it**, deliberately: a route that echoed a prefix "so you can
 check" is a route that writes your API key into a browser's network log.
+
+### The Claude key
+
+Console: <https://console.anthropic.com/> -> create a key -> paste it into `var/secrets/claude.txt`
+(`[claude].key_file` moves it). Install the optional SDK: `pip install -e ".[claude]"`; the setup
+panel shows *SDK installed* separately, because a key without the library is still a dead path.
+What it turns on: `[research].backend = "claude"`, `[search].backend = "claude"`, and `[consult]`
+(her one hard question; only the question leaves the machine). Billed per call.
+
+**`ANTHROPIC_API_KEY` and `ANTHROPIC_BASE_URL` are never read** — on a dev box they belong to other
+tools. The only environment spellings are `SP_CLAUDE_API_KEY` (the announced host-key exception,
+outranks the file) and `SP_CLAUDE_BASE_URL` (profile: `[claude].base_url`, empty = api.anthropic.com).
 
 ### Getting an xAI key
 

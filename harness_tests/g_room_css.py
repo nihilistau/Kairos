@@ -86,6 +86,9 @@ SHARED_FAMILIES = {
     "ui":  "shared:kit",          # no home app
 }
 SHARED_MODULES = {"panel", "knobs", "looks", "kit"}
+# A window split across files for length (Launch.jsx + LaunchSections.jsx) is ONE owner:
+# the second file is the same app's folded half, not a second author of its prefix.
+SPLIT_OF = {"launchsections": "launch"}
 
 
 def family_of(c: str):
@@ -156,8 +159,8 @@ for p in sorted(glob.glob(os.path.join(UI, "apps", "*.jsx"))):
     # by anyone and tripped the stale-SHARED check — the gate was right, the input
     # was wrong.
     key = ("shared:" + base.lower()) if base.lower() in SHARED_MODULES \
-        else "app:" + base.lower()
-    owners[key] = classes_in(io.open(p, encoding="utf-8").read())
+        else "app:" + SPLIT_OF.get(base.lower(), base.lower())
+    owners.setdefault(key, set()).update(classes_in(io.open(p, encoding="utf-8").read()))
 shell = set()
 for p in [os.path.join(UI, "main.jsx"), os.path.join(UI, "Chat.jsx")] + \
          sorted(glob.glob(os.path.join(UI, "room", "*.jsx"))):

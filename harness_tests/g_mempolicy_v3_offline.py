@@ -47,6 +47,7 @@ def main() -> int:
         for r in rows:
             f.write(json.dumps(r) + "\n")
     os.environ["SP_RECALL_REGISTRY"] = reg
+    os.environ["SP_LAUNCH_VAR"] = tempfile.mkdtemp(prefix="gate_launch_var_")   # a reply stamp writes config-fingerprints.jsonl; never hers
     os.environ["SP_SPINE_RECALL"] = "1"
     os.environ["SP_SPINE_TOOLSET"] = "0"
     os.environ["SP_GATEWAY_AUTHORITY"] = "spine"

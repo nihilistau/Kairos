@@ -237,6 +237,10 @@ FACTS: Dict[str, ToolFacts] = {
                           note="a delegated CONCLUSION may become her thinking; a "
                                "delegated FACT is never 'you told me'"),
 
+    "consult": ToolFacts("research", "world", arms="SP_CONSULT",
+                         note="one self-contained question out; its conclusion may become "
+                              "her thinking, its facts are never 'you told me'"),
+
     "delegate_code": ToolFacts("delegate", "machine", arms="SP_DELEGATE",
                                note="worktree only; SHE NEVER MERGES"),
 

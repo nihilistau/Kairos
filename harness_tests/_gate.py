@@ -229,10 +229,15 @@ _STORE_ENV = (
     # she had actually gone and read. g_looking.py had been redirecting it by hand on its
     # own line, which is exactly how a store ends up sandboxed in one gate and not another.
     "SP_RESEARCH_RECEIPTS",
+    "SP_CONSULT_RECEIPTS",      # her (and his) questions to Claude, one receipt each (2026-10-21)
     # Found by the same widened sweep, and writable like the rest of this list.
     "SP_MCP_PINS",              # the TOFU fingerprints -- a gate must not pin his servers
     "SP_TTS_CACHE",             # synthesised audio; regenerated, but not into his cache
     "SP_DELEGATE_WORKTREES",    # git worktrees a delegate agent creates
+    # The Launch window SAVES to these (profile edits, setups, launched.json, the change log),
+    # so a gate that reaches a launch route unredirected would edit her real companion.toml.
+    "SP_LAUNCH_PROFILES_DIR",   # profiles/ - the toml the Launch window edits in place
+    "SP_LAUNCH_VAR",            # var/ root for launched.json, launch-setups/, settings-changes.jsonl
 )
 
 
@@ -276,6 +281,7 @@ def sandbox(name: str = "gate", persona: str = "") -> str:
     # it would look exactly like real data forever after.
     os.environ["SP_TELEMETRY_DIR"] = os.path.join(sb, "telemetry")
     os.environ["SP_RESEARCH_RECEIPTS"] = os.path.join(sb, "research")
+    os.environ["SP_CONSULT_RECEIPTS"] = os.path.join(sb, "consult")
     os.environ["SP_MCP_PINS"] = os.path.join(sb, "mcp-pins.json")
     os.environ["SP_TTS_CACHE"] = os.path.join(sb, "voice-cache")
     os.environ["SP_DELEGATE_WORKTREES"] = os.path.join(sb, "worktrees")
@@ -286,6 +292,9 @@ def sandbox(name: str = "gate", persona: str = "") -> str:
     os.environ["SP_LEDGER_FILE"] = os.path.join(sb, "ledger.json")
     os.environ["SP_TUNING_FILE"] = os.path.join(sb, "tuning.json")
     os.environ["SP_BACKUP_DIR"] = os.path.join(sb, "backups")
+    os.environ["SP_LAUNCH_PROFILES_DIR"] = os.path.join(sb, "profiles")
+    os.makedirs(os.environ["SP_LAUNCH_PROFILES_DIR"], exist_ok=True)
+    os.environ["SP_LAUNCH_VAR"] = os.path.join(sb, "launch-var")
     os.environ["SP_PERSONA_FILE"] = os.path.join(sb, "persona.md")
     with open(os.environ["SP_PERSONA_FILE"], "w", encoding="utf-8") as f:
         f.write(persona or "She is dry and warm.\n\n## Personality state\nmood: neutral\n")

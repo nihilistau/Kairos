@@ -168,6 +168,35 @@ def main() -> int:
           loud.action == CONTINUE,
           "exactly what the knob's danger note warns about — and the operator can see it happen")
 
+    # ── THE SETTINGS WINDOW SHOWS EVERY KNOB, AND THE REGISTRY HAS NO TWINS (2026-10-27) ──
+    # Settings.jsx files each registry group under one of six areas via its AREAS constant.
+    # A group missing from AREAS would still render (the runtime "Other" area is the safety
+    # net so a new knob never vanishes) — which is exactly why THIS leg must fail on it:
+    # the net catching a group is a prompt to file it, not a pass. And two groups that
+    # differ only by dash or spacing were one section split in two ("Kairos - her own time"
+    # beside "Kairos — her own time"), invisible until someone read the page.
+    import re
+    ui_src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          "ui", "src", "apps", "Settings.jsx")
+    with open(ui_src, encoding="utf-8") as fh:
+        jsx = fh.read()
+    m = re.search(r"const AREAS\s*=\s*\[(.*?)\n\]", jsx, re.S)
+    check("Settings.jsx declares an AREAS constant", bool(m))
+    mapped = set()
+    if m:
+        for blk in re.findall(r"groups:\s*\[(.*?)\]", m.group(1), re.S):
+            mapped.update(a or b for a, b in re.findall(r"'([^']*)'|\"([^\"]*)\"", blk))
+    reg_groups = sorted({k["group"] for k in s["knobs"]})
+    for g in reg_groups:
+        check(f"registry group is filed under an area in AREAS: {g}", g in mapped)
+    check("AREAS names no group the registry lacks (a typo hides its knobs)",
+          mapped <= set(reg_groups), sorted(mapped - set(reg_groups)))
+    norm = {}
+    for g in reg_groups:
+        norm.setdefault(re.sub(r"[\s\-–—]+", " ", g).strip().lower(), []).append(g)
+    twins = [v for v in norm.values() if len(v) > 1]
+    check("no two registry groups differ only by dash or spacing", not twins, twins)
+
     print(f"\nG-TUNING: {'PASS' if not FAIL else 'FAIL'} ({len(PASS)}/{len(PASS)+len(FAIL)})")
     return 0 if not FAIL else 1
 

@@ -58,6 +58,7 @@ SB = os.path.join(tempfile.gettempdir(), "_g_anon")
 shutil.rmtree(SB, ignore_errors=True)
 os.makedirs(SB)
 os.environ["SP_RECALL_REGISTRY"] = os.path.join(SB, "registry.jsonl")
+os.environ["SP_LAUNCH_VAR"] = tempfile.mkdtemp(prefix="gate_launch_var_")   # a reply stamp writes config-fingerprints.jsonl; never hers
 os.environ["SP_PERSONALITY_TIER"] = os.path.join(SB, "personality")
 os.environ["SP_DECISIONS"] = os.path.join(SB, "decisions.jsonl")
 os.environ["SP_RESEARCH_RECEIPTS"] = os.path.join(SB, "research")
@@ -218,6 +219,9 @@ try:
     check("search: the query does not leave", _S.search_web("something private") == [])
     _rr = _R.research("something private")
     check("research: the question does not leave", "off the record" in _rr, _rr)
+    from harness.skills import consult as _CO    # noqa: E402
+    _co = _CO.consult("something private")
+    check("consult: the question does not leave", AN.WHY in _co, _co)
     check("xai: the ONE door out of that module refuses",
           _X._post("/images/generations", {"prompt": "something private"}) is None)
     check("...and so does the multipart upload, which does not go through it",
@@ -262,7 +266,7 @@ finally:
     _u.urlopen = _real_urlopen
 check("...and every egress door is declared, like every other door",
       all(d in AN.DOORS for d in ("net.voice", "net.search", "net.research",
-                                  "net.provider", "voice.cache")))
+                                  "net.consult", "net.provider", "voice.cache")))
 
 print("\n4. WHAT SHE IS TOLD")
 check("she is told, in one line on his turn", AN.note() == AN.NOTE and AN.NOTE)
@@ -469,5 +473,28 @@ try:
           _padd.get("ok") is False and _padd.get("held") is True, _padd)
 finally:
     AN.leave()
+
+print()
+print("12. HIS BOXES ARE HELD TOO (2026-10-21)")
+# The operator's manual boxes are network lookups with their own entry points; the mode
+# held HER tools and left these open (research reached api.x.ai through its own client).
+# One list, one loop: a new box (consult, Task 7) is a new tuple, not a new section.
+import urllib.request as _ur  # noqa: E402
+_net = []
+_real_urlopen = _ur.urlopen
+_ur.urlopen = lambda *a, **k: (_net.append(a), (_ for _ in ()).throw(AssertionError("network")))[1]
+_boxes = [("research", lambda: LK.his_research("what is RMSNorm")),
+          ("search", lambda: LK.his_search("RMSNorm")),
+          ("consult", lambda: LK.his_consult("what is RMSNorm"))]
+AN.enter()
+try:
+    for _nm, _call in _boxes:
+        _res = _call()
+        check("his three boxes are held: %s" % _nm,
+              _res.get("ok") is False and AN.WHY in str(_res.get("error")), _res)
+    check("...and no socket was opened by any of them", not _net, _net)
+finally:
+    AN.leave()
+    _ur.urlopen = _real_urlopen
 
 finish("G-ANON")

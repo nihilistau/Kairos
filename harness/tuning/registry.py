@@ -255,14 +255,14 @@ KNOBS: list[Knob] = [
          "Even with the time free she does not always feel like doing something. 0 = never.",
          min=0.0, max=1.0, step=0.05),
     # ── SOMETHING SHE DID NOT GO LOOKING FOR (2026-08-23, the operator's ask) ──────────────────
-    Knob("kairos.discover_chance", "Kairos - her own time",
+    Knob("kairos.discover_chance", "Kairos — her own time",
          "Chance her own time is spent reading something random", "float", 0.0,
          "The discovery act is already one of nine in the rotation, so it comes round on "
          "about 11% of her own-time turns by itself. This is an EXTRA chance to pick it "
          "out of turn - 0 means rotation only, which is the honest default until there is "
          "a reason to want more. 1.0 would make every own-time turn a random article.",
          min=0.0, max=1.0, step=0.05),
-    Knob("kairos.discover_tool", "Kairos - her own time",
+    Knob("kairos.discover_tool", "Kairos — her own time",
          "Offer read_something_new", "bool", True,
          "The verb itself. The live tool set is already ~18 and a small model picks reliably from "
          "about six, so this is the trim if selection suffers - turning it off also makes "
@@ -541,7 +541,7 @@ KNOBS: list[Knob] = [
     # list, so any environment read here would be evaluated once at import and frozen for
     # the process — which is precisely the pattern G-KNOBS §2 rejects. The per-model value
     # belongs to the profile; this is only the floor under a caller who has no profile.
-    Knob("decode.eot_bias", "Decode", "End-of-turn bias", "float", 0.0,
+    Knob("decode.eot_bias", "Decode — sampling", "End-of-turn bias", "float", 0.0,
          "A nudge on the stop token so she actually ends her turn instead of running on. "
          "This is what makes 'cut off' turns cut off — kairos.continue_margin is measured "
          "AGAINST it, so if you change this, RE-RUN THE CALIBRATION. "
@@ -686,7 +686,7 @@ KNOBS: list[Knob] = [
          "trades looping against her being able to say a word twice on purpose.",
          min=1.0, max=2.0, step=0.05),
 
-    Knob("decode.no_repeat_ngram", "Decode", "No-repeat n-gram", "int", 0,
+    Knob("decode.no_repeat_ngram", "Decode — sampling", "No-repeat n-gram", "int", 0,
          "Bans re-emitting any N-token sequence already in context. MUST STAY 0. At 3 it "
          "banned her from quoting a number back to you — she wanted '7' with a logit "
          "margin of 9.0 and the sampler masked it, so '4471' came out '4417'. It garbled "
@@ -799,17 +799,40 @@ KNOBS: list[Knob] = [
          min=0.7, max=1.3, step=0.05),
     # ── RESEARCH ─────────────────────────────────────────────────────────────────
     Knob("research.backend", "Research", "Backend", "enum", "xai",
-         "xai = Grok's Responses API with web_search (citations back). sidecar = "
+         "xai = Grok's Responses API with web_search (citations back). claude = "
+         "Claude with server-side web search (needs var/secrets/claude.txt). sidecar = "
          "the local LFM pipeline (no key, no cloud). Live: the next research call "
          "reads it.",
-         choices=["xai", "sidecar"]),
+         choices=["xai", "claude", "sidecar"]),
+    Knob("research.claude_model", "Research", "Claude model", "enum", "claude-sonnet-5-5",
+         "Which Claude answers when Backend is claude. Sonnet is the everyday one; Opus "
+         "is slower and dearer. Live: the next research call reads it.",
+         choices=["claude-sonnet-5-5", "claude-opus-5-5"], env="SP_RESEARCH_CLAUDE_MODEL"),
     # ── WEB SEARCH ───────────────────────────────────────────────────────────────
     Knob("search.backend", "Web search", "Engine", "enum", "xai",
          "Where web_search looks. xai = Grok live search (best results, ~5-15 s). "
          "ddg = instant and free. brave/tavily/searxng need their keys. The "
          "Wikipedia blend rides on top of all of them. Live: her next search "
          "reads it.",
-         choices=["xai", "ddg", "brave", "tavily", "searxng"]),
+         choices=["xai", "claude", "ddg", "brave", "tavily", "searxng"]),
+    Knob("search.claude_model", "Web search", "Claude model", "enum", "claude-haiku-5-5",
+         "Which Claude searches when Engine is claude. Haiku is the cheap lookup; Sonnet "
+         "reads results more carefully and costs more. Live: her next search reads it.",
+         choices=["claude-haiku-5-5", "claude-sonnet-5-5"], env="SP_SEARCH_CLAUDE_MODEL"),
+    # ── CONSULT (2026-10-21): her one hard question to Claude ─────────────────────────
+    Knob("consult.model", "Consult", "Model", "enum", "claude-opus-5-5",
+         "Which Claude she asks. Opus reasons hardest; Sonnet is quicker and cheaper; Fable "
+         "is the long-form writer. Live: her next consult reads it.",
+         choices=["claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-1"],
+         env="SP_CONSULT_MODEL"),
+    Knob("consult.effort", "Consult", "Effort", "enum", "high",
+         "How hard Claude thinks before answering. Higher is slower and costs more. Live: "
+         "her next consult reads it.",
+         choices=["low", "medium", "high", "xhigh", "max"], env="SP_CONSULT_EFFORT"),
+    Knob("consult.own_time", "Consult", "Allowed in her own time", "bool", True,
+         "Off: consult refuses in turns she starts herself (own time, check-ins, presence "
+         "modes) and answers only while he is talking to her. The tool stays listed either "
+         "way. Live: checked at each call."),
 ]
 
 

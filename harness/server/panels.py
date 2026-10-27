@@ -299,6 +299,34 @@ def _setup_json() -> Dict[str, Any]:
                      "armed": (os.environ.get("SP_RESEARCH", "") or "").lower()
                      in ("1", "true", "yes")},
     }
+    # ── THE OPTIONAL CLAUDE SURFACE (2026-10-21) ────────────────────────────────────
+    # One key, three features (research, web search, consult). The key rides the same
+    # announced HOST_KEYS exception as xAI's: SP_CLAUDE_API_KEY outranks the file.
+    # `sdk` is its own fact — a key without the optional library is still a dead path,
+    # and the fix (pip install) differs from the fix for a missing key.
+    ckey = _setup_key("SP_CLAUDE_KEY_FILE", "var/secrets/claude.txt")
+    if not ckey["present"] and (os.environ.get("SP_CLAUDE_API_KEY") or "").strip():
+        ckey.update({"present": True, "path": "(host environment)", "bytes": 0})
+    try:
+        from harness.skills import claude as _claude_t
+        csdk = _claude_t._sdk() is not None
+    except Exception as _swx:
+        _swallowed(logger, "_setup_json.claude_sdk", _swx, lane="server")
+        csdk = False
+    cready = bool(ckey["present"] and csdk)
+    out["claude"] = {
+        "key": ckey,
+        "sdk": csdk,
+        "research": {"backend": os.environ.get("SP_RESEARCH_BACKEND", ""),
+                     "model": os.environ.get("SP_RESEARCH_CLAUDE_MODEL", ""),
+                     "armed": cready and os.environ.get("SP_RESEARCH", "0") == "1"   # research.py ARMED: the tool is absent without it
+                              and os.environ.get("SP_RESEARCH_BACKEND", "") == "claude"},
+        "search": {"backend": os.environ.get("SP_SEARCH_BACKEND", "ddg"),
+                   "model": os.environ.get("SP_SEARCH_CLAUDE_MODEL", ""),
+                   "armed": cready and os.environ.get("SP_SEARCH_BACKEND", "") == "claude"},
+        "consult": {"model": os.environ.get("SP_CONSULT_MODEL", ""),
+                    "armed": cready and os.environ.get("SP_CONSULT", "") == "1"},
+    }
     # ── THE CPU SIDECARS ────────────────────────────────────────────────────────────
     aux_on = (os.environ.get("SP_AUX", "") or "").lower() in ("1", "true", "yes")
     out["sidecars"] = {"enabled": aux_on,
@@ -755,6 +783,22 @@ def _voice_record_status() -> Dict[str, Any]:
         return {"total": 0, "error": str(exc)}
 
 
+def _consult_json() -> Dict[str, Any]:
+    """What his consult box needs to say about itself: whether SHE may use it (armed), whether
+    Claude is reachable at all (available/why), and the model his click would go to."""
+    out: Dict[str, Any] = {"armed": False, "available": False, "model": "", "why": ""}
+    try:
+        from harness.skills import claude as _c
+        from harness.skills import consult as _co
+        out["armed"] = _co.armed()
+        out["available"] = bool(_c.available())
+        out["why"] = _c.why_unavailable() or ""
+        out["model"] = _co._model()
+    except Exception as exc:
+        out["why"] = str(exc)[:200]
+    return out
+
+
 def _research_json() -> Dict[str, Any]:
     """The research window: receipts from the paid tier, hers AND his (`by` says
     whose). Plain web_search rows moved to /v1/search when the search panel became
@@ -762,8 +806,8 @@ def _research_json() -> Dict[str, Any]:
     try:
         from harness.skills import looking as L
         st = L.status()
-        looks = [r for r in L.list_looks(60) if r.get("kind") == "research"][:40]
-        return {"ok": True, **st, "looks": looks}
+        looks = [r for r in L.list_looks(60) if r.get("kind") in ("research", "consult")][:40]
+        return {"ok": True, **st, "looks": looks, "consult": _consult_json()}
     except Exception as exc:
         return {"ok": False, "error": str(exc)[:200], "looks": [], "inflight": None}
 
@@ -774,7 +818,7 @@ def _search_json() -> Dict[str, Any]:
     try:
         from harness.skills import looking as L
         st = L.status()
-        looks = [r for r in L.list_looks(60) if r.get("kind") != "research"][:40]
+        looks = [r for r in L.list_looks(60) if r.get("kind") not in ("research", "consult")][:40]
         return {"ok": True, **st, "looks": looks}
     except Exception as exc:
         return {"ok": False, "error": str(exc)[:200], "looks": [], "inflight": None}

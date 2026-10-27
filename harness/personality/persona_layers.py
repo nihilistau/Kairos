@@ -78,6 +78,8 @@ KNOBS: Dict[str, str] = {
     "house_hands": "SP_HOUSE_HANDS",
     # the research tier — the honesty rule ships WITH the capability, never after it
     "research": "SP_RESEARCH",
+    # consult (2026-10-21) — what it is for and what never goes in it, with the tool
+    "consult": "SP_CONSULT",
 }
 
 _FM = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.DOTALL)

@@ -237,7 +237,7 @@ try:
     check("...writes the row by=him", r["row"].get("by") == "him", r.get("row"))
     check("...and never touches the in-flight chip (hers)",
           not L._NOW and L._LAST is None)   # the empty per-thread map (audit B10)
-    S6._BACKEND = None
+    S6.set_backend(None)
 finally:
     if _old6 is None:
         os.environ.pop("SP_RESEARCH_RECEIPTS", None)

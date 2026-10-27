@@ -267,6 +267,9 @@ export default function Chat() {
           unprompted: r.role === 'assistant' && r.unprompted ? true : undefined,
           // ...wearing the chip it wore live: which kind of own time, and why
           kind: r.kind, why: r.why, oid: r.oid,
+          // which configuration produced her reply (rows from before the stamp have none)
+          setup: r.role === 'assistant' ? r.setup : undefined,
+          cfg: r.role === 'assistant' ? r.cfg : undefined,
         })))
         scroll()
       } catch (_) { /* gateway down: an empty log is all there is to show */ }
@@ -389,6 +392,16 @@ export default function Chat() {
       if (onMood) onMood(null, false)   // she has finished: the ONLY place thinking ends
       // the tail — whatever closed the reply without a sentence end behind it
       if (spokenText) spoken.current = speech.flush(spokenText, spoken.current)
+      // WHICH CONFIGURATION SPOKE: one status read AFTER thinking has ended and the tail
+      // is flushed, never awaited: a slow or hung fetch must not hold either. The chip wears
+      // the setup and cfg the gateway is running now; a failed read leaves it off.
+      api.launchStatus().then(st => {
+        if (st && st.setup) setTurns(h => {
+          const i = h.length - 1
+          if (i < 0 || h[i].role !== 'assistant' || h[i].restored) return h
+          return [...h.slice(0, i), { ...h[i], setup: st.setup, cfg: st.cfg }]
+        })
+      }).catch(() => { /* no chip is better than a wrong one */ })
     }
   }
 
@@ -482,6 +495,8 @@ export default function Chat() {
                 a record of the evening. */}
             <div className="turn-head">
               {t.unprompted ? <TurnTag t={t} /> : null}
+              {t.role === 'assistant' && t.setup
+                ? <Chip tone="neutral" title={t.cfg ? 'cfg ' + t.cfg : ''}>{t.setup}</Chip> : null}
               <When at={t.at} />
             </div>
             {t.img ? <img className="thumb" src={t.img} alt="" /> : null}

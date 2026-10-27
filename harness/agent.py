@@ -473,6 +473,15 @@ def all_tools() -> List[ToolSpec]:
     except Exception as exc:
         import logging
         logging.getLogger(__name__).warning("research unavailable: %s", exc)
+    # CONSULT (SP_CONSULT=1 and a Claude key): one hard question to Claude. EXTRA tier
+    # beside research, for the same reason — minutes, and off the machine.
+    try:
+        from harness.skills.consult import consult_tools
+        names = {sp.name for sp in specs}
+        specs = specs + [t for t in consult_tools() if t.name not in names]
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("consult unavailable: %s", exc)
     # MUSIC — hers to put on, under the same discipline as the camera: cooldowns,
     # and a persona line saying it is an act rather than a reflex. now_playing is
     # uncooled because knowing what is on is not an intervention.

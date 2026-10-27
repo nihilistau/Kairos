@@ -330,6 +330,78 @@ class XaiSearcher(Searcher):
             return []
 
 
+def _claude_model() -> str:
+    """Live knob first (override-only), then the profile's boot default, then haiku:
+    a search is a lookup, so the cheap model is the default."""
+    try:
+        from harness.tuning import registry as _t
+        v = str(_t.chosen("search.claude_model") or "").strip()
+        if v:
+            return v
+    except Exception as _swx:
+        _swallowed(_swlog, "_claude_model", _swx, lane="skills")
+    return (os.environ.get("SP_SEARCH_CLAUDE_MODEL") or "claude-haiku-5-5").strip()
+
+
+class ClaudeSearcher(Searcher):
+    """Claude's server-side web search as a SEARCH ENGINE (2026-10-21), the sibling of
+    XaiSearcher: one call, strict-JSON instruction, rows capped the same way. Only the
+    query leaves the machine. Empty on ANY failure (no key, refusal, unparseable) so
+    the ddg floor catches it. Haiku can only run the basic search tool; the dated
+    20260209 tool is Opus/Sonnet's, so the tool type follows the model."""
+    name = "claude"
+
+    def available(self) -> bool:
+        try:
+            from harness.skills import claude as _c
+            return _c.available()
+        except Exception as _swx:
+            _swallowed(_swlog, "available", _swx, lane="skills")
+            return False
+
+    def search(self, query, n=5):
+        try:
+            from harness.skills import claude as _c
+            n = max(1, int(n))
+            model = _claude_model()
+            tool = ("web_search_20250305" if "haiku" in model.lower()
+                    else "web_search_20260209")
+            r = _c.ask([{"role": "user", "content":
+                         "Web-search this query and return the %d most useful "
+                         "results as STRICT JSON — an array of objects with keys "
+                         "title, url, snippet (snippet <= 200 chars, factual, "
+                         "from the page). No prose before or after the JSON.\n\n"
+                         "Query: %s" % (n, query)}],
+                       model=model, door="net.search",
+                       tools=[{"type": tool, "name": "web_search", "max_uses": 3}],
+                       effort="low", max_tokens=4000, timeout=60.0)
+            if r.refusal or not r.ok:
+                return []
+            txt = r.text or ""
+            out = []
+            i, j = txt.find("["), txt.rfind("]")
+            try:
+                rows = json.loads(txt[i:j + 1]) if i >= 0 and j > i else []
+            except ValueError:
+                rows = []
+            for row in rows[:n] if isinstance(rows, list) else []:
+                if isinstance(row, dict) and str(row.get("url") or "").startswith("http"):
+                    out.append({"title": str(row.get("title") or row["url"])[:200],
+                                "url": row["url"],
+                                "snippet": str(row.get("snippet") or "")[:300]})
+            if out:
+                return out
+            # No usable JSON: the citations are still real pages Claude read.
+            seen = []
+            for u in r.sources:
+                if isinstance(u, str) and u.startswith("http") and u not in seen:
+                    seen.append(u)
+            return [{"title": u[:200], "url": u, "snippet": ""} for u in seen[:n]]
+        except Exception as _swx:
+            _swallowed(_swlog, "search", _swx, lane="skills")
+            return []
+
+
 _ENGINES = {
     "ddg": DuckDuckGoSearcher,
     "brave": BraveSearcher,
@@ -337,9 +409,12 @@ _ENGINES = {
     "searxng": SearXNGSearcher,
     "wikipedia": WikipediaSearcher,   # selectable outright; also blended below
     "xai": XaiSearcher,               # Grok live search — the operator's default
+    "claude": ClaudeSearcher,         # Claude server-side web search (needs the key file)
 }
 
-_BACKEND: Optional[Searcher] = None
+# Set ONLY by set_backend(). 2026-10-21: was a first-pick memo, which made the
+# search.backend knob's "Live:" claim false until a restart.
+_OVERRIDE: Optional[Searcher] = None
 # The blend's wiki, as a seam: G-SEARCH is OFFLINE and stubs this — a gate that hits
 # the live encyclopedia is measuring Wikimedia's uptime, not this module.
 _WIKI = WikipediaSearcher
@@ -372,15 +447,14 @@ def _pick() -> Searcher:
 
 
 def backend() -> Searcher:
-    global _BACKEND
-    if _BACKEND is None:
-        _BACKEND = _pick()
-    return _BACKEND
+    """Re-picked on every call so a knob flip lands on the next search; an installed
+    set_backend() override wins until set_backend(None)."""
+    return _OVERRIDE or _pick()
 
 
-def set_backend(s: Searcher) -> None:
-    global _BACKEND
-    _BACKEND = s
+def set_backend(s: Optional[Searcher]) -> None:
+    global _OVERRIDE
+    _OVERRIDE = s
 
 
 def random_article() -> dict:

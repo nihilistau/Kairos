@@ -161,5 +161,181 @@ ok("https://example.test/rmsnorm" in got.sources, "citations survive")
 ok(got.receipt, "and a receipt is written")
 ok("not your memory" in got.for_model(), "the honesty line is on the tool output")
 
+print()
+print("10. THE PROVIDER PICK IS LIVE, AND OFF THE RECORD HOLDS HIS BOX TOO (2026-10-21)")
+import urllib.request  # noqa: E402
+from harness.tuning import registry as _TUNE  # noqa: E402
+from harness.control import anon as _AN  # noqa: E402
+from harness.skills import looking as _LK  # noqa: E402
+
+R.set_backend(None)       # the override earlier sections installed would mask the knob
+_TUNE.set_many({"research.backend": "sidecar"})
+_n1 = R.backend().name
+_TUNE.set_many({"research.backend": "xai"})
+_n2 = R.backend().name
+_TUNE.reset("research.backend")
+ok(_n1 == "sidecar" and _n2 == "xai",
+   "knob flip is live", "sidecar -> %r, xai -> %r (same process, no set_backend)" % (_n1, _n2))
+
+
+class _Fake2(R.Researcher):
+    name = "fake2"
+    def available(self): return True
+    def ask(self, question, depth="normal"): return R.Answer(text="x", provenance="fake2")
+
+
+R.set_backend(_Fake2())
+_TUNE.set_many({"research.backend": "sidecar"})
+ok(R.backend().name == "fake2", "set_backend still outranks the knob")
+R.set_backend(None)
+ok(R.backend().name == "sidecar", "set_backend(None) clears the override")
+_TUNE.reset("research.backend")
+
+_calls = []
+_real_urlopen = urllib.request.urlopen
+
+
+def _spy(*a, **k):
+    _calls.append(a)
+    raise AssertionError("network touched")
+
+
+urllib.request.urlopen = _spy
+_AN.enter("him")
+try:
+    _r = _LK.his_research("what is RMSNorm")
+    ok(_r.get("ok") is False and _AN.WHY in str(_r.get("error")) and not _calls,
+       "his research is held in OTR", "%r calls=%d" % (_r, len(_calls)))
+    try:
+        R._xai_post({"q": 1}, "test-key", 1.0)
+        _raised = False
+    except PermissionError as _e:
+        _raised = _AN.WHY in str(_e)
+    except Exception:
+        _raised = False          # the socket was reached: the guard is gone
+    ok(_raised and not _calls,
+       "his research is held in OTR: _xai_post itself refuses (the second path out)",
+       "calls=%d" % len(_calls))
+finally:
+    _AN.leave()
+    urllib.request.urlopen = _real_urlopen
+
+print()
+print("11. CLAUDE IS A RESEARCHER TOO (2026-10-21) -- only the question leaves, depth picks effort+tools")
+from types import SimpleNamespace as _NS  # noqa: E402
+from harness.skills import claude as _CL  # noqa: E402
+
+_CCALLS: list = []
+_CQUEUE: list = []
+
+
+def _cmsg(text="Claude says X.", stop="end_turn", cat=None):
+    return _NS(content=[_NS(type="text", text=text, citations=[_NS(url="https://example.test/c")])],
+               stop_reason=stop, stop_details=_NS(category=cat) if cat else None,
+               model="claude-sonnet-5-5",
+               usage=_NS(input_tokens=3, output_tokens=4, cache_read_input_tokens=0))
+
+
+class _CStream:
+    def __init__(self, m): self.m = m
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+    def get_final_message(self): return self.m
+
+
+class _CMessages:
+    def stream(self, **kw):
+        _CCALLS.append(dict(kw, messages=list(kw["messages"])))
+        return _CStream(_CQUEUE.pop(0))
+
+
+_CL._CLIENT_FACTORY = lambda key, base: _NS(beta=_NS(messages=_CMessages()))
+_CL._sdk = lambda: object()
+_had_ck = {k: os.environ.pop(k, None) for k in ("SP_CLAUDE_API_KEY", "ANTHROPIC_API_KEY")}
+os.environ["SP_CLAUDE_API_KEY"] = "k"
+os.environ["SP_CLAUDE_KEY_FILE"] = os.path.join(ROOT, "nonexistent-claude-key")
+
+R.set_backend(None)
+_TUNE.set_many({"research.backend": "claude"})
+_cb = R.backend()
+ok(_cb.name == "claude" and isinstance(_cb, R.ClaudeResearcher),
+   "research.backend=claude picks ClaudeResearcher", repr(_cb))
+ok(_cb.available(), "and it is available with a key")
+
+_CCALLS.clear(); _CQUEUE.append(_cmsg())
+_ca = R.ClaudeResearcher().ask("what is RMSNorm", "normal")
+_fm = _ca.for_model()
+ok(_ca.ok and "not your memory" in _fm and "Claude" in _fm,
+   "claude researcher answers with provenance", _fm[:90])
+ok("https://example.test/c" in _ca.sources and _ca.receipt, "citations survive and a receipt is written")
+try:
+    _rj = json.load(open(_ca.receipt, encoding="utf-8"))
+except Exception:
+    _rj = {}
+ok(_rj.get("argv") == ["claude", "claude-sonnet-5-5", "web_search", "normal"],
+   "receipt argv names claude, the model, the tool and the depth", str(_rj.get("argv")))
+
+_WS = {"type": "web_search_20260209", "name": "web_search"}
+_WF = {"type": "web_fetch_20260209", "name": "web_fetch"}
+_shape = {}
+for _d in ("quick", "normal", "thorough"):
+    _CCALLS.clear(); _CQUEUE.append(_cmsg())
+    R.ClaudeResearcher().ask("q", _d)
+    _shape[_d] = (_CCALLS[0]["output_config"]["effort"], _CCALLS[0].get("tools"))
+ok(_shape == {"quick": ("low", [_WS]), "normal": ("medium", [_WS, _WF]),
+              "thorough": ("high", [_WS, _WF])},
+   "depth maps to effort and tools", str(_shape))
+
+_CCALLS.clear(); _CQUEUE.append(_cmsg())
+R.ClaudeResearcher().ask("what is RMSNorm", "quick")
+_c0 = _CCALLS[0]
+ok(_c0["messages"] == [{"role": "user", "content": "%s\n\nwhat is RMSNorm" % R.DEPTHS["quick"]["hint"]}]
+   and _c0.get("system") == ("You are a research assistant. Search the web, cite URLs, say where "
+                             "sources disagree and what is unsettled."),
+   "only the question is sent", str(_c0["messages"]) + " | " + str(_c0.get("system"))[:80])
+
+_CCALLS.clear(); _CQUEUE.append(_cmsg(text="", stop="refusal", cat="cyber"))
+_cr = R.ClaudeResearcher().ask("q", "quick")
+ok(_cr.ok is False and "cyber" in _cr.text and _cr.for_model().startswith("[research failed:"),
+   "refusal is an honest failure", repr(_cr.text))
+
+_CCALLS.clear(); _CQUEUE.append(_cmsg(text=""))
+_ce = R.ClaudeResearcher().ask("q", "quick")
+ok(_ce.ok is False and _ce.for_model().startswith("[research failed:"),
+   "an empty answer is a failure, not a blank sentence", repr(_ce.text))
+
+_CCALLS.clear(); _CQUEUE.append(_cmsg(stop="max_tokens"))
+_ct = R.ClaudeResearcher().ask("q", "quick")
+try:
+    _tj = json.load(open(_ct.receipt, encoding="utf-8"))
+except Exception:
+    _tj = {}
+ok(_ct.ok and "truncated" in _ct.text.lower() and _tj.get("stop_reason") == "max_tokens"
+   and "usage" in _tj and "seconds" in _tj,
+   "a max_tokens stop is flagged truncated, and the receipt records usage/seconds/stop_reason",
+   repr(_ct.text[-60:]) + str(sorted(_tj)))
+
+_TUNE.set_many({"research.claude_model": "claude-opus-5-5"})
+_CCALLS.clear(); _CQUEUE.append(_cmsg())
+R.ClaudeResearcher().ask("q", "quick")
+_TUNE.reset("research.claude_model")
+ok(_CCALLS[0]["model"] == "claude-opus-5-5", "research.claude_model knob picks the model", _CCALLS[0]["model"])
+
+# picked but keyless: honest, and nothing reaches xai
+os.environ.pop("SP_CLAUDE_API_KEY", None)
+_calls.clear()
+urllib.request.urlopen = _spy
+try:
+    _CCALLS.clear()
+    _kr = R.research("q")
+finally:
+    urllib.request.urlopen = _real_urlopen
+ok(_kr.startswith("[research unavailable") and "claude" in _kr and not _calls and not _CCALLS,
+   "picked but keyless is honest", "%r calls=%d" % (_kr, len(_calls)))
+_TUNE.reset("research.backend")
+for _k, _v in _had_ck.items():
+    if _v is not None:
+        os.environ[_k] = _v
+
 print(f"\nG-RESEARCH: {_P} pass, {_F} fail")
 sys.exit(1 if _F else 0)

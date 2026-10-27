@@ -1022,6 +1022,13 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
         #   worth_saying / solo vetoes   SPENDS  the F4/2026-08-20 cases, now by rule
         #   spoken                       SPENDS  note_spoke still owns the speech facts
         _meter = [True]
+        # HER OWN TIME IS MARKED (2026-10-21). The consult tool refuses here when the operator
+        # has switched that off; it can only know from a per-context flag, because the tool
+        # runs many frames below this one. Every unprompted generation passes through
+        # _fire_inner (the only _arm callers are the tick and the mode kick), so this is the
+        # one place. Reset in the finally below - never assumed False.
+        from harness.control import lane as _lane
+        _lane_tok = _lane.set_unprompted(True)
         try:
             # EVERYTHING SHE SAYS IN A DRIVEN SESSION IS DRIVEN (2026-09-02).
             #
@@ -1051,6 +1058,7 @@ def _arm(session, imp, reply_text, generate, margin, notes=None, insight=None) -
                 if _syn_tok is not None:
                     _M_syn.reset_synthetic(_syn_tok)
         finally:
+            _lane.reset(_lane_tok)
             if _meter[0]:
                 with _LOCK:
                     _spend_attempt(_STATE[session], imp.action)

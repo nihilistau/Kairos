@@ -419,8 +419,13 @@ def build_env(c: dict) -> dict:
     #     set SP_PASSTHROUGH=SP_XBAR_ROW,SP_ARM_DUMP   ->  those two survive, and are ANNOUNCED.
     #
     # You may still do anything you like. You may no longer do it by accident.
-    e = {k: v for k, v in os.environ.items() if not k.startswith("SP_")}
+    e = {k: v for k, v in os.environ.items() if not k.startswith("SP_") and not k.startswith("ANTHROPIC_")}
     stripped = sorted(k for k in os.environ if k.startswith("SP_"))
+    # ANTHROPIC_* are another tool's (the launching Claude Code shell's), and the SDK reads
+    # ANTHROPIC_CUSTOM_HEADERS into every request whatever api_key=/base_url= say (found by
+    # the 2026-10-21 final review). Dropped wholesale, announced, no passthrough: the gateway
+    # takes its Claude key from SP_CLAUDE_API_KEY / the key file only.
+    stripped_anthropic = sorted(k for k in os.environ if k.startswith("ANTHROPIC_"))
     passthrough = [s.strip() for s in os.environ.get("SP_PASSTHROUGH", "").split(",") if s.strip()]
     for name in passthrough:
         if name in os.environ:
@@ -428,13 +433,13 @@ def build_env(c: dict) -> dict:
             stripped.remove(name) if name in stripped else None
     # ── HOST KEYS: adopted from the shell, and SAID OUT LOUD (2026-08-19) ────────────
     # Secrets are deliberately NOT profile values — a key in committed toml is a leak —
-    # so these four cross the door from the host environment (the mapping below reads
+    # so these five cross the door from the host environment (the mapping below reads
     # os.environ for them AFTER the strip). That is a designed exception, and it was a
     # silent one: the banner counted them among the STRIPPED while they were being
     # forwarded, so the door's own receipt lied. G-ONEDOOR §2 exempts exactly this
     # tuple, derived from this file. Add a key here and it is announced; add a reader
     # elsewhere and the gate fails.
-    HOST_KEYS = ("SP_XAI_API_KEY", "SP_SEARCH_BRAVE_KEY", "SP_SEARCH_TAVILY_KEY",
+    HOST_KEYS = ("SP_XAI_API_KEY", "SP_CLAUDE_API_KEY", "SP_SEARCH_BRAVE_KEY", "SP_SEARCH_TAVILY_KEY",
                  "SP_SEARCH_SEARXNG_URL")
     adopted = [k for k in HOST_KEYS if os.environ.get(k)]
     for name in adopted:
@@ -444,6 +449,9 @@ def build_env(c: dict) -> dict:
         print("[serve] STRIPPED %d inherited SP_* var(s) — the profile is the authority, not your "
               "shell:\n         %s" % (len(stripped), ", ".join(stripped)))
         print("         (to keep one deliberately: set SP_PASSTHROUGH=NAME1,NAME2)")
+    if stripped_anthropic:
+        print("[serve] STRIPPED %d inherited ANTHROPIC_* var(s) — Claude reaches her only through "
+              "SP_CLAUDE_*:\n         %s" % (len(stripped_anthropic), ", ".join(stripped_anthropic)))
     if passthrough:
         # ── IT SAID "unmapped" WITHOUT CHECKING, AND THAT COST A NIGHT (2026-09-11) ──────
         # This announced every REQUESTED name as a deliberate, unmapped passthrough. But the
@@ -1196,15 +1204,28 @@ def build_env(c: dict) -> dict:
         # from the host env at boot (XAI_API_KEY / SP_XAI_API_KEY).
         "SP_RESEARCH_BACKEND": (c.get("research", {}).get("backend") or "grok"),
         "SP_RESEARCH_XAI_MODEL": (c.get("research", {}).get("xai_model") or "grok-4-1-fast"),
+        "SP_RESEARCH_CLAUDE_MODEL": (c.get("research", {}).get("claude_model") or "claude-sonnet-5-5"),
         # #41-aux: the LOCAL researcher's synthesis model (SidecarResearcher —
         # backend "sidecar", or "auto" when grok/xai are unavailable). The 2.6B is
         # tool/agent-trained and JIT-loads on the chat door; empty = the aux default.
         "SP_AUX_RESEARCH_MODEL": (c.get("research", {}).get("sidecar_model") or ""),
+        # CONSULT (2026-10-21): her one hard question to Claude. Off unless the profile arms it
+        # (companion does); absent without a Claude key. Receipts beside research's.
+        "SP_CONSULT": b(c.get("consult", {}).get("enabled", False)),
+        "SP_CONSULT_MODEL": (c.get("consult", {}).get("model") or "claude-opus-5-5"),
+        "SP_CONSULT_EFFORT": (c.get("consult", {}).get("effort") or "high"),
+        "SP_CONSULT_RECEIPTS": os.path.join(VAR, "consult"),
         # ── THE xAI API (2026-08-21, operator: "use the API instead of the cli").
         # ONE key, as a FILE under var/secrets/ (this repo is public): research,
         # her voice (Ara), and the image/video generator all read it through
         # harness/skills/xai.py. The CLI's auth.json dependency is gone.
         "SP_XAI_KEY_FILE": (c.get("xai", {}).get("key_file") or ""),
+        # ── CLAUDE (2026-10-21): the key is a FILE (harness/skills/claude.py); only the
+        # host env SP_CLAUDE_API_KEY may carry a value. ANTHROPIC_API_KEY is never read.
+        "SP_CLAUDE_KEY_FILE": (c.get("claude", {}).get("key_file") or ""),
+        "SP_CLAUDE_API_KEY": os.environ.get("SP_CLAUDE_API_KEY") or "",
+        # empty = the module's default (https://api.anthropic.com); the one base-url override.
+        "SP_CLAUDE_BASE_URL": (c.get("claude", {}).get("base_url") or ""),
         "SP_TTS_METHOD": (c.get("tts", {}).get("method") or ""),
         "SP_TTS_XAI_VOICE": (c.get("tts", {}).get("xai_voice") or "ara"),
         "SP_TTS_SPEED": str(c.get("tts", {}).get("speed", 1.0)),   # her pace (knob voice.speed)
@@ -1217,6 +1238,7 @@ def build_env(c: dict) -> dict:
         "SP_SEARCH_BACKEND": (c.get("search", {}).get("backend") or "ddg"),
         # which Grok answers the live-search engine (harness/skills/search.py XaiSearcher)
         "SP_SEARCH_XAI_MODEL": (c.get("search", {}).get("xai_model") or "grok-4-1-fast"),
+        "SP_SEARCH_CLAUDE_MODEL": (c.get("search", {}).get("claude_model") or "claude-haiku-5-5"),
         "SP_SEARCH_BRAVE_KEY": (os.environ.get("SP_SEARCH_BRAVE_KEY")
                                 or os.environ.get("BRAVE_API_KEY") or ""),
         "SP_SEARCH_TAVILY_KEY": (os.environ.get("SP_SEARCH_TAVILY_KEY")
@@ -2029,6 +2051,13 @@ def main() -> int:
             print("[kairos serve] prewarm finished, outcome not reported (%s)" % why)
         else:
             print("[kairos serve] prewarm did not confirm; first turn may be slow")
+    # WHAT SHE WAS LAUNCHED WITH (2026-10-27): the Launch window and the per-reply stamp read
+    # var/launched.json. A failure to record it must never stop her coming up.
+    try:
+        from harness.launch.stamp import write_launched
+        write_launched(c, env, os.environ.get("SP_LAUNCH_SETUP", "custom"))
+    except Exception as e:
+        print(f"[kairos serve] warning: could not record launched.json ({e})")
     print(f"[kairos serve] READY. the room: http://127.0.0.1:{c['serve']['gateway_port']}/room/")
     return 0
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.8.69 — Launch fixes (2026-10-27)
+
+* **The Launch window works without its optional install**: Settings, Voice, Search and restart never need `tomlkit`; the Launch routes answer 503 with the install line. Restarts are written to the change log, setup names that would share a file are refused, and loading a setup changes only the values it sets — the model path keeps its separators and quoting.
+
+## 0.8.68 — the Launch window (2026-10-27)
+
+* **A Launch window in the room**: saved setups, her model and kernels as labelled controls, a full restart through `/v1/system` that refuses while she is mid-turn, and every reply stamped with the setup and configuration fingerprint that produced it. Settings is regrouped into six areas with search. Needs `tomlkit` (`pip install -e ".[launch]"`).
+
+## 0.8.67 — Claude as a provider, and a consult tool (2026-10-21)
+
+* **Claude can be the research and the web-search provider.** `[research].backend = "claude"` and
+  `[search].backend = "claude"` send only the question to Claude's server-side web search, through one transport
+  (`harness/skills/claude.py`). The key is a file, `var/secrets/claude.txt`; `ANTHROPIC_API_KEY` and
+  `ANTHROPIC_BASE_URL` are never read. Optional install: `pip install -e ".[claude]"`. Both backends are live knobs.
+* **A `consult` tool**: one self-contained hard question to Claude, off by default (`[consult].enabled`). It refuses
+  off the record, during a roleplay scene or an intimate presence mode, and (optionally) in her own time; every call
+  that reaches the wire leaves a receipt in `var/consult/`.
+* **The Research app has a research / consult switch** for your own questions to Claude.
+* **Off the record now holds manual research** too, and provider picks take effect on the next call.
+* **Setup panel: a Claude section** (key present/absent, SDK installed, what is armed); the key is never returned.
+
 ## 0.8.65 — the prefill lane, off by default (2026-10-21)
 
 * **`[decode].moe_pf_lane`** (default 0, off). During a batched prefill, missed experts evict only from the top N

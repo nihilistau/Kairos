@@ -36,6 +36,12 @@ are no longer "off", so they are deliberately not §-headed with their knob name
 asserts that no ledger section describes a knob that is actually ON, and it caught exactly that
 the moment these three flipped.
 
+**Armed 2026-10-21, operator's call, live profile `companion` (off in code, in `serve.py`'s default, and in `sp`):**
+
+| Knob | What it does now | Watch for |
+|---|---|---|
+| `SP_CONSULT` (`[consult].enabled`) | Her `consult` tool: one self-contained question to Claude (`harness/skills/consult.py`), answer back with research's provenance line, a receipt in `var/consult/` per call, refused at call time off the record, in a roleplay scene, in an intimate presence mode, and in her own time when `consult.own_time` is off. Arming condition, met 2026-10-21: a Claude key on file (`var/secrets/claude.txt`) and the operator's say-so; without the key the tool is absent. Gate: `harness_tests/g_consult.py`. | What she actually sends: the receipts carry the question, and it must stand alone (no names, no private detail). The cost: uncapped by design, so watch `usage` in the receipts. A fact from an answer reappearing as "you told me". |
+
 **Armed 2026-10-20, operator's call, live profile `companion` (recorded 2026-10-20, off in `sp`):**
 
 | Knob | What it does now | Watch for |
@@ -127,6 +133,15 @@ responsible for exactly one thing, which is whether she describes the outcome tr
 ---
 
 ## The ledger
+
+### 20. the phone app's second model — OBLITERATED E4B as B in the blind A/B *(recorded 2026-10-26, parked by the operator)*
+
+| | |
+|---|---|
+| **Code** | `phone/` reads every `*.litertlm` in the app's `models/` dir; B exists the moment a second file is pushed there. Nothing to switch. The phone holds only stock E4B, so A and B both draw it. |
+| **Gate** | `phone/app/src/test/java/xyz/kairosai/her/BlindPickTest.kt` (one model: both letters draw it). A device check proves the arm, see below. |
+| **Why off** | **MEASURED, 2026-10-26: the converter produces broken Gemma 4 E4B models.** `litert-torch-nightly` 0.11.0.dev20261025 (V2 streaming, Python 3.12, tf-nightly 2.23) converted `OBLITERATUS/gemma-4-E4B-it-OBLITERATED`. The file loads on the S22's GPU and replies in word salad that loops with no end of turn. Each fix was tested on the phone, one change at a time, by unpacking and repacking with `litert-lm-builder`. None helped: int4 → wi8_emb4 (6.4 GB), the stock file's chat template, stock's SentencePiece tokenizer. **The positive control settled it:** `google/gemma-4-E4B-it` through the identical pipeline loads, then gives two different prompts the same sentence. So the conversion is broken, not the OBLITERATED weights. Google's working stock file was built with a different tool (LiteRT-LM 1.5.0 format, 10 graphs against our 3). The V1 path needs float32, because bf16 fails in `inline_consts`, and float32 needs more than WSL's 23 GB. The ready-made heretic `.litertlm` is 8.35 GB (int8), too big for the phone. |
+| **What would arm it** | **A converter release that passes the control first:** `google/gemma-4-E4B-it` converted with it answers two different prompts coherently and differently on the phone. Only then convert OBLITERATED (the downloaded `gemma-4-E4B-it-OBLITERATED-hf` weights on the models drive), keep the converted file at 5 GB or less, push it as `models/gemma-4-E4B-it-OBLITERATED.litertlm`, and check it the same way. Alternatives, each needing his say: the V1 path in float32, after raising WSL's memory in `.wslconfig`. That restart briefly takes down the `homeassistant` distro, so ask first. Or an uncensored E4B `.litertlm` of 5 GB or less that someone else has already converted. The broken files and the control are kept on the models drive (`oblit-litertlm*`, `oblit-wi4-*`, `control-*`) for comparison. |
 
 ### 19. the episode cold tier (`[memory].eps_cold_dir` + `eps_cold_armed`) *(recorded 2026-10-19)* — **ARMED in companion 2026-10-20 (operator), after a dry run of 167 episodes / 2.76 GB; the first pass moved all 167. Off in `sp` and wherever no cold root is set.**
 

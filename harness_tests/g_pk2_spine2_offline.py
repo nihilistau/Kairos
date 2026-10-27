@@ -14,6 +14,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 REG = os.path.join(tempfile.gettempdir(), "sp_pk2_spine2.jsonl")
 PERSONA = os.path.join(tempfile.gettempdir(), "sp_pk2_spine2_persona.md")
 os.environ["SP_RECALL_REGISTRY"] = REG
+os.environ["SP_LAUNCH_VAR"] = tempfile.mkdtemp(prefix="gate_launch_var_")   # a reply stamp writes config-fingerprints.jsonl; never hers
 os.environ["SP_PERSONA_FILE"] = PERSONA
 os.environ["SP_DAEMON_URL"] = "http://127.0.0.1:59999"
 open(REG, "w").close()

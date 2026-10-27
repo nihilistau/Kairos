@@ -72,6 +72,7 @@ from harness.loud import swallowed as _swallowed
 # `app._CHAT_SESSIONS` keep working. `state.LAST_TURN_AT` is the exception and must be
 # reached through the module — it is a rebindable scalar, and an alias would snapshot it.
 from harness.server import state as _state
+from harness.control import room as _room
 
 
 # ──── THE SAMPLER-DEFAULT SEAM (ADR-013) ─────────────────────────────────
@@ -206,7 +207,7 @@ def _session_of(body: Dict[str, Any]) -> str:
         if v:
             # The panels' idea of "the" session follows the conversation that is
             # actually happening — see _room_session().
-            _LAST_SESSION["id"] = str(v)
+            _room.set_session(str(v))         # -> harness/control/room.py (the one store)
             return str(v)
     return "default"
 
@@ -418,6 +419,7 @@ _voice_corpus = _panels._voice_corpus
 _voice_record_status = _panels._voice_record_status
 _research_json = _panels._research_json
 _search_json = _panels._search_json
+_consult_json = _panels._consult_json
 _narrative_json = _panels._narrative_json
 _files_json = _panels._files_json
 _room_pulse = _panels._room_pulse
@@ -520,13 +522,72 @@ def _do_restart(full: bool) -> None:
     flags = 0
     if os.name == "nt":
         flags = getattr(subprocess, "DETACHED_PROCESS", 0) |                 getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    # THE RELAUNCH'S OUTPUT IS KEPT (2026-10-27). It went to DEVNULL, so a restart that
+    # died at the schema check left nothing to read; the Launch window tails this file.
+    # Opened append, in the child's hands, and closed here once Popen has its own copy.
+    env = dict(os.environ)
     try:
-        subprocess.Popen(argv, cwd=_ROOT_DIR, stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
-                         creationflags=flags, close_fds=True,
+        from harness.server import launch_routes as _lr
+        env["SP_LAUNCH_SETUP"] = _lr.restart_env_setup()
+    except Exception as _swx:
+        env["SP_LAUNCH_SETUP"] = "custom"
+        _swallowed(logger, "_do_restart", _swx, lane="server")
+    out = subprocess.DEVNULL
+    try:
+        from harness.launch import var_dir as _var_dir
+        os.makedirs(_var_dir(), exist_ok=True)
+        out = open(os.path.join(_var_dir(), "serve-restart.log"), "ab")
+    except Exception as _swx:
+        _swallowed(logger, "_do_restart", _swx, lane="server")
+    try:
+        subprocess.Popen(argv, cwd=_ROOT_DIR, stdout=out,
+                         stderr=subprocess.STDOUT if out is not subprocess.DEVNULL
+                         else subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+                         creationflags=flags, close_fds=True, env=env,
                          start_new_session=(os.name != "nt"))
     except Exception as exc:
         logger.warning("[system] restart spawn failed: %s", exc)
+    finally:
+        if out is not subprocess.DEVNULL:
+            out.close()
+
+
+def _system_op(body: Dict[str, Any]):
+    """/v1/system -> (status, response, after). `after` is the restart to run once the
+    response has been written, or None. A restart of either kind is refused while she is mid-turn,
+    BEFORE _spawn_restart: it cuts the turn off, and nothing is spawned on a refusal."""
+    op = str(body.get("op") or "").strip().lower()
+    full = (op == "restart")
+    if op not in ("restart", "restart_gateway"):
+        return 400, {"ok": False, "error": "op must be restart or restart_gateway"}, None
+    # BOTH ops: a gateway bounce kills the turn in flight just as a full restart does.
+    from harness.server import launch_routes as _lr
+    refusal = _lr.restart_refusal()
+    if refusal is not None:
+        return refusal[0], refusal[1], None
+    res = _spawn_restart(full)                  # validate only; nothing is stopped yet
+    return (200 if res.get("ok") else 400), res, ((lambda: _do_restart(full)) if res.get("ok") else None)
+
+
+def _tuning_op(path: str, body: Dict[str, Any]):
+    """/v1/tuning and /v1/tuning/reset -> (status, response). Every knob that moves is
+    logged to var/settings-changes.jsonl as old -> new."""
+    from harness.tuning import registry as _tune
+    from harness.launch import changes as _ch      # NOT launch_routes: that chain may want tomlkit
+    try:
+        if path == "/v1/tuning":
+            vals = body.get("values", {})
+            old = {k: _tune.get(k) for k in vals}
+            _tune.set_many(vals)
+            _ch.log_tuning(old, {k: _tune.get(k) for k in vals})
+        else:
+            key = body.get("key", "")
+            old = _tune.get(key)
+            _tune.reset(key)
+            _ch.log_tuning({key: old}, {key: _tune.get(key)})
+        return 200, {"ok": True, **_tune.schema()}
+    except ValueError as exc:
+        return 400, {"ok": False, "error": str(exc)}
 
 
 
@@ -636,8 +697,11 @@ def _room_session() -> str:
 
     Now it follows _session_of's record of the last real session named by a chat body.
     Before any turn it is still "default" — which is also where boot-time seeds go, and
-    scheduler.drain() delivers that no-owner queue to the first real listener."""
-    return _LAST_SESSION["id"]
+    scheduler.drain() delivers that no-owner queue to the first real listener.
+
+    Read and written through harness/control/room.py since 2026-10-21, so the panels here and
+    the tools that ask room.session() cannot read two different answers."""
+    return _room.session()
 
 
 def _roleplay_on() -> bool:
@@ -2995,18 +3059,21 @@ def _run_stdlib(host: str, port: int) -> None:
                 self.wfile.write(payload)
             # TUNING: set / reset a knob. Live from the next turn — config that needs a
             # restart is config nobody tunes.
-            elif self.path in ("/v1/tuning", "/v1/tuning/reset"):
-                from harness.tuning import registry as _tune
-                body = self._body()
-                code, res = 200, {}
+            elif self.path in ("/v1/launch/edit", "/v1/launch/raw", "/v1/launch/setup"):
+                from harness.server import launch_routes as _lr
                 try:
-                    if self.path == "/v1/tuning":
-                        _tune.set_many(body.get("values", {}))
-                    else:
-                        _tune.reset(body.get("key", ""))
-                    res = {"ok": True, **_tune.schema()}
+                    code, res = {"/v1/launch/edit": _lr.post_edit,
+                                 "/v1/launch/raw": _lr.post_raw,
+                                 "/v1/launch/setup": _lr.post_setup}[self.path](self._body())
                 except ValueError as exc:
                     code, res = 400, {"ok": False, "error": str(exc)}
+                payload = json.dumps(res).encode()
+                self.send_response(code); _cors(self)
+                self.send_header("Content-Type", "application/json"); self.end_headers()
+                self.wfile.write(payload)
+            elif self.path in ("/v1/tuning", "/v1/tuning/reset"):
+                body = self._body()
+                code, res = _tuning_op(self.path, body)
                 payload = json.dumps(res).encode()
                 self.send_response(code); _cors(self)
                 self.send_header("Content-Type", "application/json"); self.end_headers()
@@ -3151,7 +3218,7 @@ def _run_stdlib(host: str, port: int) -> None:
                 self.send_response(200 if res.get("ok") else 400); _cors(self)
                 self.send_header("Content-Type", "application/json"); self.end_headers()
                 self.wfile.write(payload)
-            elif self.path in ("/v1/search/run", "/v1/research/run"):
+            elif self.path in ("/v1/search/run", "/v1/research/run", "/v1/consult/run"):
                 # ── HIS OWN LOOKUPS (2026-08-21, the operator's ask: "a place that I can use them
                 # to search and research manually"). Synchronous on purpose: the panel
                 # holds a busy state and the answer IS the response. Both write into
@@ -3164,6 +3231,9 @@ def _run_stdlib(host: str, port: int) -> None:
                     if self.path == "/v1/search/run":
                         res = _Lk.his_search(body.get("query") or "",
                                              int(body.get("n") or 6))
+                    elif self.path == "/v1/consult/run":
+                        # his box to Claude (2026-10-21): billed, uncapped, logged, his click
+                        res = _Lk.his_consult(body.get("query") or "")
                     else:
                         res = _Lk.his_research(body.get("query") or "",
                                                str(body.get("depth") or "normal"))
@@ -3350,15 +3420,9 @@ def _run_stdlib(host: str, port: int) -> None:
                 # this very process; replying afterwards is replying from a socket that
                 # is already gone.
                 body = self._body()
-                op = str(body.get("op") or "").strip().lower()
-                full = (op == "restart")
-                if op in ("restart", "restart_gateway"):
-                    res = _spawn_restart(full)          # validate only; nothing is stopped yet
-                else:
-                    res = {"ok": False,
-                           "error": "op must be restart or restart_gateway"}
+                code, res, after = _system_op(body)
                 payload = json.dumps(res).encode()
-                self.send_response(200 if res.get("ok") else 400); _cors(self)
+                self.send_response(code); _cors(self)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(payload)))
                 self.end_headers(); self.wfile.write(payload)
@@ -3367,8 +3431,8 @@ def _run_stdlib(host: str, port: int) -> None:
                 except Exception as _swx:
                     _swallowed(logger, "_dispatch_post", _swx, lane="server")
                 # ONLY NOW. The socket has the answer; it is safe to stop the process.
-                if res.get("ok"):
-                    _do_restart(full)
+                if after is not None:
+                    after()
                 return
             elif self.path == "/v1/games":
                 # new | move | drop. `drop` really deletes a finished match, and that is
@@ -4001,6 +4065,13 @@ def _run_stdlib(host: str, port: int) -> None:
                 except Exception as exc:
                     logger.warning("[music] %s", exc)
                     _safe_error(self, 500)
+                return
+            if _base in ("/v1/launch", "/v1/launch/status"):
+                from harness.server import launch_routes as _lr
+                code, res = (_lr.get_launch if _base == "/v1/launch" else _lr.get_status)()
+                self.send_response(code); _cors(self)
+                self.send_header("Content-Type", "application/json"); self.end_headers()
+                self.wfile.write(json.dumps(res).encode())
                 return
             fn = _json_routes.get(_base)
             if fn is not None:

@@ -61,14 +61,15 @@ export function AskRow({ placeholder, busyLabel, run, onDone }) {
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [ans, setAns] = useState('')
   const go = async () => {
     const query = q.trim()
     if (!query || busy) return
-    setBusy(true); setErr('')
+    setBusy(true); setErr(''); setAns('')
     try {
       const r = await run(query)
       if (r && r.ok === false) setErr(r.error || 'failed')
-      else setQ('')
+      else { setQ(''); if (r && typeof r.answer === 'string') setAns(r.answer) }
       onDone && onDone()
     } catch (e) {
       setErr(String(e).slice(0, 120))
@@ -84,6 +85,9 @@ export function AskRow({ placeholder, busyLabel, run, onDone }) {
         {busy ? busyLabel : 'go'}
       </Button>
       {err ? <span className="rsc-err" role="alert">{err}</span> : null}
+      {/* consult returns {answer}; the ledger row's summary is capped at 800 chars, so the
+          whole answer is shown here, scrollable (2026-10-21, final review). */}
+      {ans ? <pre className="rsc-answer" aria-label="Claude's answer">{ans}</pre> : null}
     </div>
   )
 }

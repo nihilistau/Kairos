@@ -35,11 +35,11 @@ export function KnobControl({ k, busy, onSet }) {
   }
   if (k.type === 'str') {
     // a free-text knob (the first: presence.cue, 2026-08-22) — committed on blur like the numbers
-    return <Input className="st-field" type="text" defaultValue={k.value || ''} disabled={dis} maxLength={200}
+    return <Input key={String(k.value)} className="st-field" type="text" defaultValue={k.value || ''} disabled={dis} maxLength={200}
                   aria-label={k.label}
                   onBlur={e => { if (e.target.value !== (k.value || '')) onSet(k.key, e.target.value) }} />
   }
-  return <Input className="st-field" type="number" defaultValue={k.value} disabled={dis} aria-label={k.label}
+  return <Input key={String(k.value)} className="st-field" type="number" defaultValue={k.value} disabled={dis} aria-label={k.label}
                 min={k.min ?? undefined} max={k.max ?? undefined}
                 step={k.step ?? undefined}
                 onBlur={e => {
@@ -49,18 +49,48 @@ export function KnobControl({ k, busy, onSet }) {
                 }} />
 }
 
-export function KnobRow({ k, busy, onSet }) {
+// A value as the operator reads it, for "changed from <default>": on/off for a switch,
+// numbers as they are, a string quoted, and an empty one said out loud.
+export function fmtVal(k, v) {
+  if (k.type === 'bool') return v ? 'on' : 'off'
+  if (k.type === 'str') return v ? '"' + v + '"' : '(empty)'
+  return String(v)
+}
+
+/* `onReset` and `onLaunch` are the Settings window's: with them an overridden row says
+ * "changed from <default> · reset", and a profile-scope row shows no control at all, only
+ * "set at launch → open Launch". Without them (the Voice and Search panels) the row is what
+ * it always was. */
+export function KnobRow({ k, busy, onSet, onReset, onLaunch }) {
+  if (onLaunch && k.scope === 'profile') {
+    return (
+      <div className="st-row" title={k.danger || ''}>
+        <div className="st-label">{k.label}</div>
+        <div className="st-ctl">
+          <button type="button" className="st-link" onClick={onLaunch}>set at launch → open Launch</button>
+        </div>
+        <div className="st-help">{k.help}</div>
+      </div>
+    )
+  }
   return (
     <div className="st-row" title={k.danger || ''}>
       <div className="st-label">
         {k.label}
         <Chip tone={k.scope === 'live' ? 'ok' : 'warn'}>{k.scope === 'live' ? 'live' : 'restart to change'}</Chip>
         {k.provenance === 'measured' ? <Chip tone="accent" title={k.receipt}>measured</Chip> : null}
-        {k.overridden ? <Chip tone="mood">changed</Chip> : null}
+        {k.overridden && !onReset ? <Chip tone="mood">changed</Chip> : null}
         {k.engine ? <Chip title="only the sp-daemon backend honours this knob; under an OpenAI-compatible engine it is moot">{k.engine}-daemon only</Chip> : null}
       </div>
       <div className="st-ctl"><KnobControl k={k} busy={busy} onSet={onSet} /></div>
       <div className="st-help">{k.help}</div>
+      {k.overridden && onReset ? (
+        <div className="st-changed">
+          changed from {fmtVal(k, k.default)} ·{' '}
+          <button type="button" className="st-link" disabled={busy === k.key}
+                  onClick={() => onReset(k.key)}>reset</button>
+        </div>
+      ) : null}
     </div>
   )
 }

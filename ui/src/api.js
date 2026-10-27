@@ -64,6 +64,24 @@ export const kairosOutbox = () => get('/v1/kairos/outbox?session=' + encodeURICo
  * from the durable transcript — so a refresh or a bounce no longer empties the log
  * while the server remembers everything. */
 export const day = () => get('/v1/day')
+/* which setup and fingerprint her next reply will wear (Launch: stamp every reply) */
+export const launchStatus = () => get('/v1/launch/status')
+/* THE LAUNCH WINDOW. These keep the HTTP status next to the body, because the window
+ * must tell 409 (the file changed / she is mid-turn) from 400 (tomllib's message). */
+async function postS(path, body) {
+  const r = await fetch(BASE + path, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  let j = {}
+  try { j = await r.json() } catch { /* a dying gateway answers with nothing */ }
+  return { status: r.status, ...j }
+}
+export const launch      = () => get('/v1/launch')
+export const launchEdit  = (edits, base_hash) => postS('/v1/launch/edit', { edits, base_hash })
+export const launchRaw   = (text, base_hash) => postS('/v1/launch/raw', { text, base_hash })
+export const launchSetup = (b) => postS('/v1/launch/setup', b)
+export const launchRestart = () => postS('/v1/system', { op: 'restart' })
 /* THE WARDROBE. One reader for the stage and the panel, so they can never disagree
  * about what she is wearing. */
 export const wardrobe = () => get('/v1/wardrobe')
@@ -103,6 +121,7 @@ export const wardrobeAccept   = (id)   => post('/v1/wardrobe/want/accept', { id,
 // 2026-08-21: the settings window — the whole tuning registry, live
 export const tuning    = () => get('/v1/tuning')
 export const tuningSet = (values) => post('/v1/tuning', { values })
+export const tuningReset = (key) => post('/v1/tuning/reset', { key })
 /* HIS OWN LOOKUPS (2026-08-21) — the manual boxes in the search and research
  * panels. Synchronous: the response IS the answer, so these can take a while
  * (search ~10-25 s, research up to a couple of minutes). Rows land in the same
@@ -113,6 +132,7 @@ export const searchRun   = (query, n) => post('/v1/search/run', { query, n })
 export const catalog   = () => get('/v1/catalog')
 export const catalogOp = (b) => post('/v1/catalog', b)
 export const researchRun = (query, depth) => post('/v1/research/run', { query, depth })
+export const consultRun  = (query) => post('/v1/consult/run', { query })
 
 /* STOPPING HER. Three modes, and the mode IS the confirmation in the UI — see main.jsx.
  * `all` takes the gateway with it, so this request is the last one that will succeed;

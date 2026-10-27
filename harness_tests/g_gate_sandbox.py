@@ -78,6 +78,7 @@ NOT_A_STORE = {
     "SP_AUX_API_KEY_FILE": "a credential, read-only",
     "SP_HA_TOKEN_FILE": "a credential, read-only",
     "SP_XAI_KEY_FILE": "a credential, read-only",
+    "SP_CLAUDE_KEY_FILE": "a credential, read-only",
     "SP_AUX_INDEX_DIR": "a rebuildable index, and every aux gate points it at a temp dir",
     "SP_MUSIC_DIR": "his media library, read-only",
     "SP_LIBRARY_DIR": "her shelf of texts, read-only",
@@ -201,5 +202,50 @@ for _w in ("memory-okf-personality", "var/memory", "persona.md"):
 check("the sweep runs it, so the proof is one command",
       "audit" in io.open(os.path.join(ROOT, "tools", "sweep.py"),
                          encoding="utf-8").read())
+
+print("\n6. A GATE THAT WRITES A REPLY ROW CANNOT STAMP HER REAL FINGERPRINT STORE")
+# (2026-10-27.) `_append_day_turn` stamps each assistant row via `stamp.current_stamp()`,
+# which APPENDS to `var/config-fingerprints.jsonl` under `SP_LAUNCH_VAR`. Five gates reached
+# it without redirecting that root and wrote a fingerprint of a fixture config into the store
+# the room reads. Rule, by tokens (a docstring or comment naming the function is not a call):
+# any gate that uses the NAME `_append_day_turn` must call `sandbox()` at column 0 or set
+# `SP_LAUNCH_VAR`; and the five that reach it through the app without naming it are pinned.
+import tokenize  # noqa: E402
+
+STAMP_PINNED = ["g_anon.py", "g_mempolicy_v3_offline.py", "g_pk2_spine2_offline.py",
+                "g_day_transcript.py", "g_secret.py"]
+
+
+def _stamp_safe(src: str) -> bool:
+    return bool(re.search(r"(?m)^(?:[A-Za-z_]\w*\s*=\s*)?_?sandbox\(", src)
+                or re.search(r"(?m)^\s*os\.environ\[[\"']SP_LAUNCH_VAR[\"']\]\s*=", src))
+
+
+def _names(src: str) -> set:
+    try:
+        return {t.string for t in tokenize.generate_tokens(io.StringIO(src).readline)
+                if t.type == tokenize.NAME}
+    except (tokenize.TokenError, IndentationError):
+        return set()
+
+
+_gdir = os.path.join(ROOT, "harness_tests")
+_callers = []
+for fn in sorted(os.listdir(_gdir)):
+    if not (fn.startswith(("g_", "h_")) and fn.endswith(".py")) or fn == "g_gate_sandbox.py":
+        continue
+    src = io.open(os.path.join(_gdir, fn), encoding="utf-8", errors="replace").read()
+    if "_append_day_turn" in _names(src):
+        _callers.append(fn)
+        check("%-34s redirects SP_LAUNCH_VAR (sandbox or its own)" % fn, _stamp_safe(src))
+check("the census found the gates that call _append_day_turn", len(_callers) >= 3, _callers)
+for fn in STAMP_PINNED:
+    p = os.path.join(_gdir, fn)
+    if not os.path.exists(p):
+        if os.path.exists(os.path.join(ROOT, "engine")):
+            check("%-34s still exists" % fn, False, "deleted?")
+        continue
+    check("%-34s redirects SP_LAUNCH_VAR (pinned)" % fn,
+          _stamp_safe(io.open(p, encoding="utf-8", errors="replace").read()))
 
 finish("G-GATE-SANDBOX")

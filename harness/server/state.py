@@ -49,8 +49,10 @@ from typing import Any, Dict
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # The most recent REAL session a chat body named. "default" only until the first turn.
-# (Read by `_room_session`, which is how `harness/skills/wardrobe.py` asks which session.)
-LAST_SESSION: Dict[str, str] = {"id": "default"}
+# OWNED BY harness/control/room.py since 2026-10-21 — this is the SAME dict, not a copy, so
+# tools can ask room.session() without importing the gateway (see room.py's docstring).
+from harness.control import room as _room   # noqa: E402
+LAST_SESSION: Dict[str, str] = _room.LAST
 
 # GENERATE-NOW: one background job at a time, status readable by the wardrobe panel.
 GEN_JOB: Dict[str, Any] = {"running": False, "what": "", "started": 0.0,

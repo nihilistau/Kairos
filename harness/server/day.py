@@ -252,13 +252,26 @@ def _append_day_turn(user_text: str, final: str,
         # own-time line wears, and `oid` matches the outbox message it was also sent as.
         _aown = ({"unprompted": True, **{k: own[k] for k in ("oid", "kind", "why")
                                          if own.get(k)}} if own is not None else {})
+        # WHICH CONFIGURATION SPOKE (2026-10-27). Her row says which setup and which 8-hex
+        # fingerprint she was running, so a change in her wording can be traced to a knob.
+        # Taken when the row is WRITTEN: a knob moved mid-turn is attributed to this row,
+        # and its settings-changes line carries the time. A failing stamp costs the stamp,
+        # never the row.
+        try:
+            from harness.launch import stamp as _stamp
+            _s = _stamp.current_stamp()
+            _astamp = {"setup": _s["setup"], "cfg": _s["cfg"]}
+        except Exception as _stx:
+            _swallowed(logger, "_append_day_turn", _stx, lane="server")
+            _astamp = {}
         with open(p, "a", encoding="utf-8") as f:
             if user:
                 f.write(json.dumps({"role": "user", "content": user, "at": _at,
                                     **_extra}) + "\n")
             if rec:
                 f.write(json.dumps({"role": "assistant", "content": rec, "at": _at,
-                                    **_extra, **_amark, **_aacts, **_aown}) + "\n")
+                                    **_extra, **_amark, **_aacts, **_aown,
+                                    **_astamp}) + "\n")
     except Exception as exc:
         logger.warning("[gateway] could not append the day transcript: %s", exc)
 

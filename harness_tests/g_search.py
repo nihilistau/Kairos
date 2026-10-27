@@ -4,8 +4,9 @@ THE BUG CLASS. Two tools that both "search" is how she picks the wrong one,
 or invents a finding when the one she picked is empty. web_search is the
 name. The engines live behind it. Empty is empty.
 
-xAI is a researcher, not a searcher — that is G-RESEARCH. Putting it here
-would make a list of links cost a model call.
+xAI and Claude are BOTH researchers (G-RESEARCH) and searchers (XaiSearcher,
+ClaudeSearcher, each behind its own transport door, never a raw URL in search.py);
+the engine that costs a model call is opt-in by backend name, never the default.
 
     python harness_tests/g_search.py
 """
@@ -16,6 +17,11 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, "harness_tests"))
+# SANDBOX FIRST (2026-10-21): section 11 flips the search.backend knob, which writes
+# the tuning store; without this it would write HER live var/tuning.json.
+from _gate import sandbox  # noqa: E402
+sandbox("g_search")
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 os.environ["SP_DAEMON_URL"] = "http://127.0.0.1:9"
 os.environ.pop("SP_SEARCH_BACKEND", None)
@@ -58,7 +64,7 @@ S._WIKI = _NoWiki
 
 print("1. THE DEFAULT IS THE FLOOR")
 S.set_backend(None) if hasattr(S, "set_backend") else None
-S._BACKEND = None
+S.set_backend(None)
 b = S.backend()
 check("default backend is ddg", b.name == "ddg", b.name)
 check("ddg is always available", S.DuckDuckGoSearcher().available())
@@ -119,29 +125,29 @@ check("the agent still offers one web_search, not a second name",
 print("\n4. AUTO PICKS A KEYED ENGINE, DEFAULT DOES NOT SURPRISE-BILL")
 os.environ["SP_SEARCH_BACKEND"] = "auto"
 os.environ["SP_SEARCH_BRAVE_KEY"] = "test-key"
-S._BACKEND = None
+S.set_backend(None)
 b_auto = S._pick()
 check("auto with a brave key picks brave", b_auto.name == "brave", b_auto.name)
 os.environ["SP_SEARCH_BACKEND"] = "ddg"
-S._BACKEND = None
+S.set_backend(None)
 b_def = S._pick()
 check("explicit ddg does not pick brave even with a key",
       b_def.name == "ddg", b_def.name)
 os.environ["SP_SEARCH_BACKEND"] = "brave"
 os.environ.pop("SP_SEARCH_BRAVE_KEY", None)
-S._BACKEND = None
+S.set_backend(None)
 b_miss = S._pick()
 check("a named engine with no key falls to ddg",
       b_miss.name == "ddg", b_miss.name)
 os.environ.pop("SP_SEARCH_BACKEND", None)
-S._BACKEND = None
+S.set_backend(None)
 
 
-print("\n5. xAI IS NOT A SEARCHER")
+print("\n5. THE PAID ENGINES GO THROUGH THEIR OWN DOORS")
 src_s = open(os.path.join(ROOT, "harness", "skills", "search.py"), encoding="utf-8").read()
 check("search.py does not call api.x.ai",
       "api.x.ai" not in src_s)
-check("xAI is a Researcher, not a Searcher",
+check("xAI also has a Researcher (research.py), beside its Searcher",
       "class XaiResearcher" in open(os.path.join(ROOT, "harness", "skills", "research.py"),
                                     encoding="utf-8").read())
 
@@ -204,7 +210,7 @@ st = open(os.path.join(ROOT, "harness", "skills", "system_tools.py"),
 check("web_search keeps a shipped extract instead of re-scraping the page",
       'not hits[0].get("extract")' in st)
 S._WIKI = _NoWiki
-S._BACKEND = None
+S.set_backend(None)
 
 print("\n8. GROK LIVE SEARCH IS AN ENGINE — and the panel's override-only rule holds")
 # 2026-08-21, operator: "adding xAI as a search provider and as default". Default
@@ -223,6 +229,143 @@ os.environ.pop("SP_XAI_KEY_FILE", None)
 check("the tuning knob is consulted override-only (tune.chosen, never get)",
       'chosen("search.backend")' in open(os.path.join(ROOT, "harness", "skills",
                                          "search.py"), encoding="utf-8").read())
+
+print()
+print("11. THE ENGINE PICK IS LIVE (2026-10-21)")
+from harness.tuning import registry as _TUNE  # noqa: E402
+S.set_backend(None)
+os.environ["SP_XAI_API_KEY"] = "test-key"      # xai must be AVAILABLE or _pick falls to ddg
+_TUNE.set_many({"search.backend": "xai"})
+_nx = S.backend().name
+_TUNE.set_many({"search.backend": "ddg"})
+_nd = S.backend().name
+_TUNE.reset("search.backend")
+os.environ.pop("SP_XAI_API_KEY", None)
+check("knob flip is live", _nx == "xai" and _nd == "ddg",
+      "xai -> %r, ddg -> %r (same process, no set_backend)" % (_nx, _nd))
+
+print()
+print("12. CLAUDE IS AN ENGINE TOO (2026-10-21) -- strict-JSON rows, tool type follows the model")
+import json  # noqa: E402
+from types import SimpleNamespace as _NS  # noqa: E402
+from harness.skills import claude as _CL  # noqa: E402
+
+_CCALLS: list = []
+_CQUEUE: list = []
+
+
+def _cmsg(text, stop="end_turn", cat=None, urls=()):
+    return _NS(content=[_NS(type="text", text=text,
+                            citations=[_NS(url=u) for u in urls])],
+               stop_reason=stop, stop_details=_NS(category=cat) if cat else None,
+               model="claude-haiku-5-5",
+               usage=_NS(input_tokens=3, output_tokens=4, cache_read_input_tokens=0))
+
+
+class _CStream:
+    def __init__(self, m): self.m = m
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+    def get_final_message(self): return self.m
+
+
+class _CMessages:
+    def stream(self, **kw):
+        _CCALLS.append(dict(kw, messages=list(kw["messages"])))
+        return _CStream(_CQUEUE.pop(0))
+
+
+_CL._CLIENT_FACTORY = lambda key, base: _NS(beta=_NS(messages=_CMessages()))
+_CL._sdk = lambda: object()
+_had_ck = {k: os.environ.pop(k, None) for k in ("SP_CLAUDE_API_KEY", "ANTHROPIC_API_KEY",
+                                                 "SP_SEARCH_CLAUDE_MODEL")}
+os.environ["SP_CLAUDE_API_KEY"] = "k"
+os.environ["SP_CLAUDE_KEY_FILE"] = os.path.join(ROOT, "nonexistent-claude-key")
+
+check("claude is a registered engine that satisfies the Searcher protocol",
+      "claude" in S._ENGINES and issubclass(S.ClaudeSearcher, S.Searcher)
+      and S.ClaudeSearcher.name == "claude")
+check("a keyed claude engine reports available", S.ClaudeSearcher().available())
+
+_rows_json = json.dumps([
+    {"title": "A page", "url": "https://a.example/x", "snippet": "from a"},
+    {"title": "no url", "url": "", "snippet": "dropped"},
+    {"title": "T" * 500, "url": "http://b.example/y", "snippet": "S" * 500},
+])
+_CCALLS.clear(); _CQUEUE.append(_cmsg("Here you go:\n" + _rows_json + "\nHope that helps."))
+_rows = S.ClaudeSearcher().search("rmsnorm", 5)
+check("claude searcher returns rows",
+      len(_rows) == 2 and _rows[0] == {"title": "A page", "url": "https://a.example/x",
+                                       "snippet": "from a"}
+      and _rows[1]["url"] == "http://b.example/y"
+      and len(_rows[1]["title"]) == 200 and len(_rows[1]["snippet"]) == 300, str(_rows)[:200])
+_c0 = _CCALLS[0]
+check("claude searcher sends only the query, low effort",
+      _c0["output_config"]["effort"] == "low" and "rmsnorm" in _c0["messages"][0]["content"]
+      and len(_c0["messages"]) == 1, str(_c0["messages"])[:120])
+
+_TOOL_H = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}]
+_TOOL_S = [{"type": "web_search_20260209", "name": "web_search", "max_uses": 3}]
+_shape = {}
+for _m in ("claude-haiku-5-5", "claude-sonnet-5-5"):
+    os.environ["SP_SEARCH_CLAUDE_MODEL"] = _m
+    _CCALLS.clear(); _CQUEUE.append(_cmsg(_rows_json))
+    S.ClaudeSearcher().search("q", 3)
+    _shape[_m] = (_CCALLS[0]["model"], _CCALLS[0].get("tools"))
+os.environ.pop("SP_SEARCH_CLAUDE_MODEL", None)
+check("haiku gets the basic tool",
+      _shape["claude-haiku-5-5"] == ("claude-haiku-5-5", _TOOL_H), str(_shape))
+check("sonnet gets the 20260209 tool",
+      _shape["claude-sonnet-5-5"] == ("claude-sonnet-5-5", _TOOL_S), str(_shape))
+
+_CCALLS.clear(); _CQUEUE.append(_cmsg(_rows_json))
+S.ClaudeSearcher().search("q", 3)
+check("model defaults to haiku", _CCALLS[0]["model"] == "claude-haiku-5-5", _CCALLS[0]["model"])
+_TUNE.set_many({"search.claude_model": "claude-sonnet-5-5"})
+_CCALLS.clear(); _CQUEUE.append(_cmsg(_rows_json))
+S.ClaudeSearcher().search("q", 3)
+_TUNE.reset("search.claude_model")
+check("search.claude_model knob picks the model (override-only, live)",
+      _CCALLS[0]["model"] == "claude-sonnet-5-5", _CCALLS[0]["model"])
+
+_CCALLS.clear(); _CQUEUE.append(_cmsg("No JSON, sorry, see sources.",
+                                      urls=("https://s.example/1", "https://s.example/1",
+                                            "https://s.example/2")))
+_srows = S.ClaudeSearcher().search("q", 5)
+check("no JSON in the text falls back to the sources, title = url",
+      [r["url"] for r in _srows] == ["https://s.example/1", "https://s.example/2"]
+      and _srows[0]["title"] == "https://s.example/1", str(_srows))
+
+_CCALLS.clear(); _CQUEUE.append(_cmsg("", stop="refusal", cat="cyber"))
+_refused = S.ClaudeSearcher().search("q", 5)
+_CCALLS.clear(); _CQUEUE.append(_cmsg("[this is not json ]["))
+_garbage = S.ClaudeSearcher().search("q", 5)
+S._WIKI = _NoWiki
+S.DuckDuckGoSearcher = Floor
+S.set_backend(S.ClaudeSearcher())
+_CCALLS.clear(); _CQUEUE.append(_cmsg("", stop="refusal", cat="cyber"))
+_floored = S.search_web("kairos")
+S.DuckDuckGoSearcher = _real
+S.set_backend(None)
+check("empty on failure so ddg floors",
+      _refused == [] and _garbage == [] and _floored
+      and _floored[0]["snippet"] == "from the floor", str((_refused, _garbage, _floored[:1])))
+
+_CCALLS.clear()
+S.set_backend(None)
+_TUNE.set_many({"search.backend": "claude"})
+_picked = S.backend().name
+os.environ.pop("SP_CLAUDE_API_KEY")
+_keyless = S.backend().name
+_TUNE.reset("search.backend")
+os.environ["SP_CLAUDE_API_KEY"] = "k"
+check("search.backend=claude is picked live; keyless falls to the ddg floor",
+      _picked == "claude" and _keyless == "ddg", "%s / %s" % (_picked, _keyless))
+os.environ.pop("SP_CLAUDE_API_KEY", None)
+os.environ.pop("SP_CLAUDE_KEY_FILE", None)
+for _k, _v in _had_ck.items():
+    if _v is not None:
+        os.environ[_k] = _v
 
 print("\nG-SEARCH  %d/%d" % (PASS, PASS + FAIL))
 sys.exit(1 if FAIL else 0)

@@ -30,6 +30,7 @@ import Stage from './apps/Stage.jsx'
 import Games from './apps/Games.jsx'
 import Wardrobe from './apps/Wardrobe.jsx'
 import Settings from './apps/Settings.jsx'
+import Launch from './apps/Launch.jsx'
 import Setup from './apps/Setup.jsx'
 import Agency from './apps/Agency.jsx'
 import Research from './apps/Research.jsx'
@@ -80,8 +81,10 @@ export const APPS = [
   { id: 'apps', title: 'Apps', icon: 'apps', w: 480, h: 520, Component: Apps, css: 'ap',
     pinned: true,
     blurb: 'every window there is, and which of them live on this desktop — change it live' },
-  { id: 'settings', title: 'Settings', icon: 'settings', w: 660, h: 620, Component: Settings, css: 'st',
-    blurb: 'every knob, grouped — voice, search, research, kairos, the lot. live ones apply on the next call' },
+  { id: 'settings', title: 'Settings', icon: 'settings', w: 780, h: 640, Component: Settings, css: 'st',
+    blurb: 'every knob in six areas, with search — the ones that apply live. live ones apply on the next call' },
+  { id: 'launch', title: 'Launch', icon: 'launch', w: 680, h: 680, Component: Launch, css: 'ln',
+    blurb: 'her model and kernels, saved setups, and a restart that applies them — what runs now vs what is saved' },
   { id: 'setup', title: 'Setup', icon: 'setup', w: 660, h: 640, Component: Setup, css: 'su',
     blurb: 'what is configured and what is not — your endpoint, your keys, her face, the model cards. reads only' },
   { id: 'voice', title: 'Voice', icon: 'voice', w: 560, h: 460, Component: Voice, css: 'vc',
