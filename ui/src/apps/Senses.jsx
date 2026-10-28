@@ -44,7 +44,10 @@ export function VoiceView({ d }) {
   return (
     <>
       <h4>her voice</h4>
-      <Row k="backend" v={d.backend + (d.live && d.live.method === 'local' && d.live.local_gguf ? ' · ' + d.live.local_gguf : '')} tone={d.warm ? 'ok' : ''} />
+      {/* (2026-10-29) `local` is no longer a method: lfm3 and voxtral are both local voices.
+          `backend` is voxtral's chain, so its gguf rides on that row only when voxtral speaks. */}
+      <Row k="backend" v={d.backend + (d.live && d.live.method === 'voxtral' && d.live.local_gguf ? ' · ' + d.live.local_gguf : '')} tone={d.warm ? 'ok' : ''} />
+      {d.live ? <Row k="speaking as" v={d.live.speaking_as || d.live.method} /> : null}
       <Row k="warm" v={String(d.warm)} tone={d.warm ? 'ok' : 'off'} />
       <Row k="cached lines" v={d.cached} />
     </>

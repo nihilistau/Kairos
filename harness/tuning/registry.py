@@ -322,9 +322,10 @@ KNOBS: list[Knob] = [
     Knob("aux.chat_model", "Aux — the quiet librarians", "Judge / extract model", "enum",
          "liquidai/lfm2.5-1.2b-instruct",
          "The small instruct model on the chat door (LM Studio). Choices are what the door "
-         "lists right now; the profile's is the boot default.",
+         "lists right now, plus lfm3-1.7b-uncensored (its own CPU door) when its file is on disk; "
+         "the profile's is the boot default.",
          choices=["liquidai/lfm2.5-1.2b-instruct"],
-         choices_fn=lambda: __import__("harness.sidecar.client", fromlist=["x"]).list_models()),
+         choices_fn=lambda: __import__("harness.sidecar.client", fromlist=["x"]).chat_choices()),
     Knob("aux.embed_model", "Aux — the quiet librarians", "Embedding model (restart)", "enum", "",
          "The GGUF the embed sidecar is launched with at boot ([aux].embed_gguf). Choices are the "
          "embedding / ColBERT *.gguf files beside the current one.", scope="profile",
@@ -781,11 +782,19 @@ KNOBS: list[Knob] = [
     # bounce, no restart. The env spellings remain the boot defaults only.
     Knob("voice.enabled", "Voice", "Voice", "bool", True,
          "Whether she speaks out loud at all. Off = text only, instantly."),
+    # (2026-10-29, LFM3) three engines, not two: lfm3 and voxtral are both local. A stored
+    # `local` from before still reads, as the profile's [tts].local (SP_TTS_LOCAL) —
+    # tts.live_voice() resolves it; that default is the profile's, not a knob.
     Knob("voice.method", "Voice", "Provider", "enum", "xai",
-         "xai = Ara through api.x.ai (~1 s/sentence, zero VRAM). local = the "
-         "voxtral chain (slower, offline-capable). A dark xai falls through to "
-         "local on its own.",
-         choices=["xai", "local"]),
+         "xai = Ara through api.x.ai (~1 s/sentence, zero VRAM). lfm3 = LFM3-Audio on "
+         "this machine's CPU (offline). voxtral = the older local chain (slow). A voice "
+         "that fails falls to the profile's local voice, then voxtral, and the room is "
+         "told which one spoke and why.",
+         choices=["xai", "lfm3", "voxtral"]),
+    Knob("voice.lfm3_voice", "Voice", "LFM3 voice", "enum", "female",
+         "Which LFM3-Audio voice speaks when the provider is lfm3 (or a fallback lands "
+         "there). Cached audio is keyed per voice.",
+         choices=["female", "male"]),
     Knob("voice.xai_voice", "Voice", "xAI voice", "enum", "ara",
          "Which built-in xAI voice speaks. Cached audio is keyed per voice, so "
          "switching never serves the old voice.",
@@ -797,6 +806,18 @@ KNOBS: list[Knob] = [
          "How fast she speaks through the xAI voice (1.0 = natural). Live: the next "
          "sentence honours it. Her [pause]/<slow> tags ride on top of this.",
          min=0.7, max=1.3, step=0.05),
+    # HER EARS (2026-10-29): read by the ROOM, not by Python — ui/src/room/ears.js reads both
+    # through GET /v1/tuning when Chat opens and when the Models window flips the mode. The
+    # room's mic is the only listener; always-listening ships off (docs/OFF-BY-DEFAULT.md).
+    Knob("ears.mode", "Voice", "Ears", "enum", "push",
+         "push = the mic in Chat listens only while you hold it open (click to talk, click to "
+         "send). always = the room listens whenever Chat is open and sends each line you say "
+         "after a pause; it ignores the mic while she is speaking. Localhost only.",
+         choices=["push", "always"]),
+    Knob("ears.silence_ms", "Voice", "Ears: pause that ends a line", "int", 800,
+         "Always-listening only: how long a quiet stretch (ms) ends what you were saying and "
+         "sends it. Shorter answers faster and cuts you off mid-thought more often.",
+         min=300, max=3000, step=100),
     # ── RESEARCH ─────────────────────────────────────────────────────────────────
     Knob("research.backend", "Research", "Backend", "enum", "xai",
          "xai = Grok's Responses API with web_search (citations back). claude = "

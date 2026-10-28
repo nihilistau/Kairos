@@ -1,7 +1,7 @@
 ---
 type: reference
 title: "PANELS — every window in the room, what it reads, and what it can change"
-status: LIVE (re-checked against ui/src/api.js and appRegistry.jsx 2026-09-26, after redesign stage 3)
+status: LIVE (re-checked against ui/src/api.js and appRegistry.jsx 2026-10-29, after the Models window and the folders + dock)
 ---
 
 # PANELS
@@ -27,10 +27,12 @@ once (`ui/src/main.jsx` and `ui/src/room/`):
 
 | Surface | Reads | Controls | Notes |
 |---|---|---|---|
-| **the desktop icons** (`room/DeskIcons.jsx`) | the registry | open a window | Loose, draggable, positions kept per browser (`deskIcons.js`). Double-click (or Enter) opens, a single click selects. Which apps get an icon is the Apps window's list (`dockPrefs.js` — the file kept its name when the dock went, 2026-09-23). |
+| **the desktop icons** (`room/DeskIcons.jsx`) | the registry | open a window | Loose, draggable, positions kept per browser (`deskIcons.js`). Double-click (or Enter) opens, a single click selects. Which apps get an icon is the Apps window's list (`deskVisibility.js`, formerly `dockPrefs.js`). |
+| **the folders** (`room/Folder.jsx`) | the registry's `group`, `desktopLayout.js` | which folder an app is in | Five folders (Her, Together, Look it up, Home, System), each one desk icon showing its first four apps' glyphs; an app in a folder has no loose icon. Double-click (or Enter) opens a frosted panel of its apps beside it: arrows move, Enter or double-click opens an app, Escape or a click elsewhere closes. Drag an app out onto the desktop to make it a loose icon, or onto a folder to move it in (one drag controller, `room/deskDrag.js`). Folder positions keep with the icons' (`folder:<id>`). A hidden app is hidden inside its folder too. |
+| **the dock** (`room/Dock.jsx`) | `desktopLayout.js` (`sp-dock-items`), the window manager | open or focus an app | Bottom centre, above every normal window: six apps to start (Chat, Voice, Music, Search, Memory, Models), 1 to 8, each an alias (it stays in its folder). One click (or Enter) opens or brings back; a dot under any app with a window; the tile under the pointer magnifies and glows in her mood colour. Drag apps on, along and off it (the same drag controller). Slides away while a window is maximised; back while the pointer rests at the bottom edge. The Apps window adds to it, and offers the folders upgrade's one-time "undo — put my icons back". |
 | **the top bar** (`room/TopBar.jsx`) | `/v1/room/pulse`, `/health`, `/v1/system` | the stack light | Her on the left (the mood pill, her voice word and the presence note), her day in the centre ("you spoke …", "her day ends in …" / "her day closed — she has written", "next look …", from `room/facts.js`), the machine on the right (the profile chip, "up …" — the gateway's uptime — the stack light, "backup in …"). |
 | **the stack light** (`room/StackLight.jsx`) | `/health` | bounce, restart | A disclosure, opened by a click when the stack is restartable and idle: *bounce* (the gateway only, seconds, keeps the model warm) and *restart* (reloads the model, ~2 min, asks first). |
-| **the taskbar** (the footer in `main.jsx`) | `/v1/room/pulse` | windows, off the record, Shut down | The KAIROS mark and the Console link; a button per open window (clicking the focused one minimises it, and a minimised window flies to its button); the looked-up, in-scene and off-the-record chips (`room/TaskChips.jsx`, `room/Anon.jsx`); **Anonymous / Off the record** ([`ANON-MODE.md`](ANON-MODE.md)); **Shut down** (*her only* / *everything* / *kill*); the clock and date. |
+| **the taskbar** (the footer in `main.jsx`) | `/v1/room/pulse`, `/v1/models/status` | windows, off the record, Shut down | The KAIROS mark and the Console link; a button per open window (clicking the focused one minimises it, and a minimised window flies to its button); the strip of model lights (`room/ModelStrip.jsx`), one per job (green loaded, cyan pulsing loading, grey off, amber missing or error; a click opens Models; hidden at phone width); the voice chip that says why she went quiet, until clicked; the looked-up, in-scene and off-the-record chips (`room/TaskChips.jsx`, `room/Anon.jsx`); **Anonymous / Off the record** ([`ANON-MODE.md`](ANON-MODE.md)); **Shut down** (*her only* / *everything* / *kill*); the clock and date. |
 | **the portrait** (`room/Portrait.jsx`) | the pulse and her live mood | drag, resize | Her current still or loop, captioned with her mood and what she has on. |
 
 At phone width (≤620px) every window fills the desktop and loses its resize grips; the bars
@@ -41,7 +43,7 @@ entry of `CHANGELOG.md`).
 
 | Window | Reads | Writes | Notes |
 |---|---|---|---|
-| **Chat** | `/v1/chat` (SSE), `/v1/day`, `/v1/kairos/outbox`, `/v1/anon` | a message | The conversation, and a window like the others since 2026-09-23 — it opens itself when nothing else is open. It is a client: it renders a stream and decides nothing. The day is read back on mount, into an empty log only, and restored turns are display, never re-sent as prompt. |
+| **Chat** | `/v1/chat` (SSE), `/v1/day`, `/v1/kairos/outbox`, `/v1/anon`, `/v1/listen` | a message | The conversation, and a window like the others since 2026-09-23 — it opens itself when nothing else is open. It is a client: it renders a stream and decides nothing. The mic beside send is push-to-talk (`ears.mode = always` is the option, off by default): LFM3-Audio transcribes it on this machine and the text goes through the same `send()` as a typed line; the audio is never written down, and the mic is disabled off this machine. The day is read back on mount, into an empty log only, and restored turns are display, never re-sent as prompt. |
 | **Body** | `/v1/telemetry/now`, `/v1/telemetry/history` | — | His heart and his movement, live, plus **the exact sentence she is handed** about them. That last part is the most useful widget in the room: it is the only place to see what she was told about your body *before* she says anything. Same seam as her prefix (`body.read()`/`present()`), so the window and she can never describe two different people. |
 | **Memory** | `/v1/memory`, `/v1/memory/why` | relabel, add, retire | Live rows and retired ones, because rendering the dead is what makes "nothing is ever deleted" legible rather than merely true. A row she *concluded* carries a **why** button: what it was drawn from, each support's current liveness, and what would be orphaned if you retired it. |
 | **Journal** | `/v1/narrative` | **none** | What she writes at the end of a day. Hers. You can only read it. |
@@ -73,11 +75,12 @@ entry of `CHANGELOG.md`).
 | **Senses** | `/v1/senses`, `/v1/speak/status` | — | What she can see and hear, which eyes she is using, and what the room has looked like. |
 | **The room** | `/v1/senses` | — | Her hourly notes on the room. The eye waits for quiet before it looks. |
 | **The view** | `/v1/room/pulse` | — | The room's weather in a frame — phase, her mood, whether anyone is about. The same `describeRoom` output the backdrop paints, with the reading written underneath. |
-| **Voice** | `/v1/speak/status`, `/v1/tuning` | on/off, provider, pace, test | Her voice, live, and a button to hear it. |
-| **Music** | `/v1/music` | control | The record player — hers to reach for too. Starts without a desktop icon; its tools are dark when the profile sets `[music].enabled = false` (the private stack's does, since 2026-08-25). |
+| **Voice** | `/v1/speak/status`, `/v1/tuning` | on/off, provider, pace, ears, test | Her voice, live, and a button to hear it. Provider is `xai` (Grok / Ara), `lfm3` (LFM3-Audio on the CPU) or `voxtral`; a failed voice falls back and the room is told which one spoke and why. The ears knobs (`push` or `always`, and the pause that ends a line) sit here too. |
+| **Models** | `/v1/models/status`, `POST /v1/models/test` | the librarian, voice and eyes pickers (the same knobs Settings writes); test | One row per model job — her mind, the librarian, the memory index, her ears, her voice, her eyes — with the model behind it, a `loaded` / `loading` / `off` / `missing` / `error` pill and its reason, and a **Test** (the voice speaks a sample through her one queue; the ears transcribe a bundled clip, or **● Record** three seconds of your mic and send it nowhere; the librarian answers one word). The mind and the memory index are read-only here (they change at a restart; the mind row links to Launch). No key and no audio in the status payload. |
+| **Music** | `/v1/music` | control | The record player — hers to reach for too. Lives in the Together folder; its tools are dark when the profile sets `[music].enabled = false` (the private stack's does, since 2026-08-25). |
 | **Librarians** | `/v1/aux` | rebuild | The small CPU models that embed, retrieve, judge and read for her. |
-| **Games** | `/v1/games` | play | A board you both touch; the rules belong to the engine, not the page. Starts without a desktop icon; its tools are dark unless `SP_GAMES` is on. |
-| **Apps** | — | which apps have a desktop icon | Every window there is, always listed; tick one to keep its icon on the desktop. Per browser, live. It is pinned: it cannot hide itself, because it is the way back. |
+| **Games** | `/v1/games` | play | A board you both touch; the rules belong to the engine, not the page. Lives in the Together folder; its tools are dark unless `SP_GAMES` is on. |
+| **Apps** | — | which apps have a desktop icon; add to / remove from the dock | Every window there is, always listed; tick one to keep its icon on the desktop. Per browser, live. Each row can add the app to the dock or take it off; once after the folders upgrade it offers "undo — put my icons back". It is pinned: it cannot hide itself, because it is the way back. |
 
 ---
 
@@ -89,7 +92,8 @@ entry of `CHANGELOG.md`).
 2. A door in `ui/src/api.js` — **one file on purpose**, so a route is never invented in two
    places with two spellings.
 3. A row in `appRegistry.jsx` (`id`, `title` in sentence case, `icon` — a glyph name in
-   `ui/src/kit/icons.jsx`, `w`, `h`, `Component`, `css`, `blurb`; `dock: false` if it should
+   `ui/src/kit/icons.jsx`, `w`, `h`, `Component`, `css`, `blurb`; `group` — one of `her`, `together`, `lookup`, `home`, `system`, the desktop folder it sits in
+   (without one it lands loose on the desktop); `dock: false` if it should
    start without a desktop icon; optional `TitleChip`).
 4. Styles in `ui/src/room.css` under the window's own `css` prefix (G-ROOM-CSS), colours from
    `ui/src/kit/tokens.css` only (G-ROOM-TOKENS fails on any raw colour literal elsewhere).

@@ -36,6 +36,16 @@ main { flex: 1; position: relative; overflow: hidden; }
   border-radius: var(--r-md); line-height: 1.5; }
 .composer .chat-tool { width: 40px; height: 40px; border-radius: var(--r-md); }
 .composer .chat-send { height: 40px; padding: 0 18px; border-radius: var(--r-md); font-size: var(--fs-13); }
+/* HIS EARS (2026-10-29): the mic glows warm while it is open — a ring that breathes, so an open
+   mic is never a state he has to hover to discover. Still under reduced motion (the ring stays). */
+.composer .chat-mic-on { color: var(--warm); border-color: var(--warm);
+  box-shadow: 0 0 0 2px rgba(var(--warm-rgb), .35); animation: chat-mic-pulse 1.6s ease-in-out infinite; }
+@keyframes chat-mic-pulse { 0%,100% { box-shadow: 0 0 0 2px rgba(var(--warm-rgb), .35) }
+                            50% { box-shadow: 0 0 0 5px rgba(var(--warm-rgb), .12) } }
+.chat-ears-err { font-size: var(--fs-11); color: var(--warn); padding: 0 2px 6px; }
+@media (prefers-reduced-motion: reduce) {
+  .composer .chat-mic-on { animation: none; }
+}
 
 /* panels */
 .pad { padding: 11px 13px; }
@@ -679,12 +689,19 @@ main { display: block; }
 /* apps launcher (ap-) — the list that decides the desktop icons */
 .ap { overflow-y: auto; height: 100%; }
 .ap-note { margin-bottom: var(--sp-3); font-size: var(--fs-11); color: var(--text-3); }
-.ap-row { display: grid; grid-template-columns: auto auto auto 1fr; gap: var(--sp-3); align-items: center;
+.ap-row { display: grid; grid-template-columns: auto auto auto 1fr auto; gap: var(--sp-3); align-items: center;
   padding: 6px var(--sp-1); border-bottom: 1px solid var(--hair); cursor: var(--cur-hand); }
 .ap-row:hover { background: var(--hover-tint); }
 .ap-ic { width: 20px; display: grid; place-items: center; color: var(--text-2); }
 .ap-ti { font-weight: 500; color: var(--text-1); }
 .ap-blurb { font-size: var(--fs-11); line-height: 1.35; color: var(--text-3); }
+/* the folders upgrade's one-time undo, and a refused add-to-dock (2026-10-29) */
+.ap-undo { margin-bottom: var(--sp-3); padding: var(--sp-3); border-radius: var(--r-md);
+  border: 1px solid rgba(var(--accent-rgb), .35); background: rgba(var(--accent-rgb), .06); }
+.ap-undo-t { font-size: var(--fs-12); line-height: 1.45; color: var(--text-1); }
+.ap-undo-b { display: flex; gap: var(--sp-2); margin-top: var(--sp-2); }
+.ap-hint { font-size: var(--fs-11); color: var(--warn); }
+.ap-hint:empty { display: none; }
 
 /* story (sty-) — her prefix attributed, the chapters and their folds, the lanes */
 .sty { overflow-y: auto; height: 100%; font-size: 12.5px; }
@@ -992,3 +1009,35 @@ button.sty-line:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--m
 .ln-prog { display: flex; flex-direction: column; gap: 2px; color: var(--text-1); }
 .ln-tail { font-size: var(--fs-11); color: var(--text-3); word-break: break-all; }
 .ln-log { display: block; white-space: pre-wrap; max-height: 160px; overflow-y: auto; }
+
+/* ── MODELS (2026-10-29, mockup A) ─────────────────────────────────────────────
+   One row per model job: label · model (+ picker) · state + Test. The state chip and the
+   buttons are the kit's; this section is only the grid, the meta lines and the load bar. */
+.mdl-head { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-2); }
+.mdl-list { border: 1px solid var(--hair-strong); border-radius: var(--r-md); background: var(--surface-1); }
+.mdl-slot { display: grid; grid-template-columns: 112px 1fr auto; gap: 10px; align-items: center;
+  padding: 10px 12px; border-bottom: 1px solid var(--hair); }
+.mdl-slot:last-child { border-bottom: 0; }
+.mdl-lbl { color: var(--text-2); font-size: var(--fs-11); text-transform: uppercase; letter-spacing: .06em; }
+.mdl-mid { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.mdl-name { font-weight: 600; color: var(--text-1); overflow-wrap: anywhere; }
+.mdl-sel { max-width: 100%; align-self: flex-start; }
+.mdl-meta { color: var(--text-3); font-size: var(--fs-11); font-family: var(--font-mono); overflow-wrap: anywhere; }
+.mdl-why { color: var(--warn); font-size: var(--fs-11); overflow-wrap: anywhere; }
+.mdl-test { color: var(--ok); font-size: var(--fs-11); font-family: var(--font-mono); overflow-wrap: anywhere; }
+.mdl-test-bad { color: var(--warn); }
+.mdl-link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent);
+  text-decoration: underline; }
+.mdl-end { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.mdl-bar { height: 4px; border-radius: 2px; background: var(--surface-3); overflow: hidden; margin-top: 2px; }
+.mdl-bar i { display: block; height: 100%; background: var(--accent); }
+/* no number from the door: an indeterminate sweep, not a made-up percentage */
+.mdl-bar i.mdl-bar-ind { width: 35%; animation: mdl-sweep 1.4s ease-in-out infinite; }
+@keyframes mdl-sweep { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+@media (max-width: 480px) {
+  .mdl-slot { grid-template-columns: 1fr auto; }
+  .mdl-lbl { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mdl-bar i.mdl-bar-ind { animation: none; width: 100%; background: var(--accent-dim); }
+}

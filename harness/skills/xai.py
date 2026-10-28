@@ -99,10 +99,24 @@ def last_error() -> str:
     return _LAST_ERROR[0]
 
 
+# HER VOICE'S OWN REASON (2026-10-29). tts() never went through _post and never set
+# _LAST_ERROR, so tts.py's fallback reported "no audio" — or worse, a stale reason left by
+# an unrelated image/video call — when Grok answered 402. A slot of its own cannot be
+# clobbered by those calls; tts.py's one lock keeps two sentences from sharing it.
+_TTS_ERROR: List[str] = [""]
+
+
+def tts_last_error() -> str:
+    return _TTS_ERROR[0]
+
+
 def _post(path: str, body: dict, timeout: float = 120.0) -> Optional[dict]:
-    # ANONYMOUS MODE (2026-08-24). THE ONE DOOR OUT of this module: tts, image,
-    # image_edit, video_submit and upload all reach api.x.ai through here, so one
-    # guard covers every one of them including the ones added next year. A prompt
+    # ANONYMOUS MODE (2026-08-24). THE DOOR for the JSON calls: image, image_edit,
+    # and video_submit reach api.x.ai through here, so one guard covers every one of
+    # them including the ones added next year. tts() does NOT (and upload_image has
+    # its own guard): tts builds its own request, so it carries no guard and relies on its caller
+    # (harness/voice/tts.py) checking the off-the-record hold first (corrected
+    # 2026-10-29; this comment used to say tts went through here). A prompt
     # for a picture of her, written during a private hour, is that hour described
     # in words and handed to somebody else.
     from harness.control import anon as _anon
@@ -163,7 +177,9 @@ def tts(text: str, voice_id: str = "", fmt: str = "wav",
         speed: float = 1.0, timeout: float = 60.0) -> bytes:
     """Text -> audio bytes in `fmt` (wav for the room's player, mp3 if asked).
     b'' on any failure — the voice stack falls through to the local method."""
+    _TTS_ERROR[0] = ""
     if not (text or "").strip():
+        _TTS_ERROR[0] = "nothing to say"
         return b""
     body = {
         "text": text[:15000],
@@ -178,6 +194,7 @@ def tts(text: str, voice_id: str = "", fmt: str = "wav",
     # yet ship, and a probe against the real API beats a probe against its manual.
     k = api_key()
     if not k:
+        _TTS_ERROR[0] = "no api key"
         return b""
     try:
         req = urllib.request.Request(
@@ -186,17 +203,28 @@ def tts(text: str, voice_id: str = "", fmt: str = "wav",
                      "Authorization": "Bearer " + k})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             raw = r.read()
-    except Exception as _swx:
-        _swallowed(_swlog, "tts", _swx, lane="skills")
+    except urllib.error.HTTPError as e:      # mirrors _post: the code AND what the API said
+        try:
+            _TTS_ERROR[0] = ("http %d: " % e.code) + e.read().decode("utf-8", "replace")[:300]
+        except Exception as _swx:
+            _swallowed(_swlog, "tts", _swx, lane="skills")
+            _TTS_ERROR[0] = "http %d" % e.code
+        return b""
+    except Exception as exc:
+        _TTS_ERROR[0] = "%s: %s" % (type(exc).__name__, str(exc)[:200])
         return b""
     if not raw:
+        _TTS_ERROR[0] = "empty reply"
         return b""
     if raw[:4] in (b"RIFF", b"ID3\x03", b"ID3\x04") or raw[:2] == b"\xff\xfb" \
             or raw[:4] == b"OggS":
         return raw
     try:
         d = json.loads(raw.decode("utf-8", "replace"))
-        return base64.b64decode(d.get("audio", "")) if d.get("audio") else b""
+        if not d.get("audio"):
+            _TTS_ERROR[0] = "no audio in reply"
+            return b""
+        return base64.b64decode(d["audio"])
     except Exception as _swx:
         _swallowed(_swlog, "tts", _swx, lane="skills")
         return raw          # unknown container: hand it to the player as-is

@@ -11,8 +11,8 @@
  * appears in a sensible place instead of at 0,0 under the brand, and one he has already
  * placed never moves because the registry grew.
  *
- * Deliberately NOT merged into dockPrefs.js. That file answers "which apps earn a
- * slot"; this one answers "where does this icon sit". One store for two questions is
+ * Deliberately NOT merged into deskVisibility.js. That file answers "which apps get a
+ * desktop icon"; this one answers "where does this icon sit". One store for two questions is
  * how a toggle starts silently moving things.
  */
 const KEY = 'sp-desk-icons'
@@ -55,3 +55,15 @@ export function subscribe(fn) { listeners.add(fn); return () => listeners.delete
 let version = 0
 const bump = () => { version++; listeners.forEach(fn => fn()) }
 export const getVersion = () => version
+
+/* PUT BACK EXACTLY. desktopLayout's undo hands over the raw 'sp-desk-icons' string it saved
+ * before the folders upgrade (or null if there was none); this writes it back untouched and
+ * drops the in-memory copy, so the icons are where he left them without a reload. */
+export function restoreRaw(raw) {
+  cache = null
+  try {
+    if (raw == null) localStorage.removeItem(KEY)
+    else localStorage.setItem(KEY, raw)
+  } catch { /* private mode */ }
+  bump()
+}

@@ -26,16 +26,47 @@ import { isProbe } from './probe.js'
 const MAX_CHARS = 240          // mirrors SP_TTS_MAX_CHARS; the server refuses above it
 const ENDS = /([.!?…]+)(\s+|$)/
 
-let queue = []                 // [{text}]
+let queue = []                 // [{text, got?}] — `got` is a fetched sentence kept for a retry
 let playing = false
-let current = null             // the Audio playing now
+let current = null             // {a, done}: the Audio playing now, and how to release its wait
 let enabled = true             // mirrors voice.enabled, refreshed by status()
 let lastStatusAt = 0
+/* WHY SHE IS QUIET, OR WHO SPOKE INSTEAD (2026-10-29). Grok went silent on him and the room
+ * said nothing: every failure here was `.catch(() => null)` or an onerror that resolved
+ * quietly, so a 402 from the API and a muted tab looked identical to "she had nothing to say".
+ * Every failure path now sets `reason`; the taskbar's VoiceChip shows it. `kind` is 'fail'
+ * (she did not speak) or 'note' (she spoke, through a different voice than the one chosen). */
+let reason = ''
+let reasonKind = ''
+let reasonAt = 0
+let blockedItem = null         // the sentence autoplay refused, waiting for his first click
+let epoch = 0                  // bumped by stop(): a sentence fetched before a hush is not played
+/* HELD WHILE HE TALKS (final review, 2026-10-29). Barge-in hushed her ONCE — and her reply was
+ * still streaming, so feed() queued the next sentence and she spoke again into his push-to-talk
+ * recording. ears.js holds her for as long as the line is being recorded; under the hold
+ * say() (and so feed()/flush(), whose cursors still advance) drops what it is given. */
+let held = false
 const listeners = new Set()
 
 export function onChange(fn) { listeners.add(fn); return () => listeners.delete(fn) }
 const emit = () => listeners.forEach(fn => { try { fn(state()) } catch (_) {} })
-export function state() { return { playing, queued: queue.length, enabled } }
+export function state() { return { playing, queued: queue.length, enabled, reason, reasonKind, reasonAt } }
+
+function fail(why) { reason = String(why || 'speak failed'); reasonKind = 'fail'; reasonAt = Date.now(); emit() }
+function note(why) { reason = why; reasonKind = 'note'; reasonAt = Date.now(); emit() }
+/* A clean sentence clears the reason — but not one he has had under ten seconds to read. */
+function clear() { if (reason && Date.now() - reasonAt > 10000) { reason = ''; reasonKind = ''; emit() } }
+/* He has read it (the VoiceChip's click). */
+export function dismiss() { reason = ''; reasonKind = ''; emit() }
+
+/* "xai: http 402: out of credit" -> "spoke with lfm3 — Grok: http 402: out of credit". The
+ * header names the engine that failed first; xai is Grok to him, any other keeps its name. */
+export function fallbackNote(backend, fell) {
+  const m = /^\s*([\w-]+):\s*([\s\S]*)$/.exec(String(fell || ''))
+  const who = !m || m[1] === 'xai' ? 'Grok' : m[1]
+  const why = m ? m[2] : String(fell || '')
+  return `spoke with ${backend || 'another voice'} — ${who}: ${why}`
+}
 
 /* Sentence split that keeps a tag attached to the sentence it belongs to — a [laugh]
  * at the end of a line stays with that line, a <soft> wrapper is not cut in half. */
@@ -78,44 +109,103 @@ async function refreshStatus() {
     const r = await fetch('/v1/speak/status')
     const d = await r.json()
     enabled = !(d && d.live && d.live.enabled === false)
-  } catch (_) { /* leave it as it was */ }
+  } catch (e) { fail('voice status unreadable: ' + (e.message || e)) }   // leave `enabled` as it was
   emit()
   return enabled
 }
 
+function speakFailed(status, why) {
+  return new Error('speak failed: ' + status + ' ' + String(why || '').replace(/\s+/g, ' ').slice(0, 200))
+}
+
+/* One sentence -> {url, note}. Throws an Error whose message IS the reason he reads. */
 async function fetchWav(text) {
   const r = await fetch('/v1/speak', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text }),
+  }).catch(e => { throw speakFailed('network', e.message || e) })
+  if (!r.ok) {
+    const t = await r.text()
+    let why
+    try { why = JSON.parse(t).error } catch (e) { throw speakFailed(r.status, t) }
+    if (/^voice is off/.test(why || '')) throw new Error('voice is switched off')
+    throw speakFailed(r.status, why || t)
+  }
+  const fell = r.headers.get('X-TTS-Fallback') || ''
+  return { url: URL.createObjectURL(await r.blob()),
+           note: fell ? fallbackNote(r.headers.get('X-TTS-Backend') || '', fell) : '' }
+}
+
+/* A promise that never rejects: {v} or {e}. The prefetch may be abandoned by stop(), and an
+ * abandoned rejection would otherwise surface as an unhandled one with no reason shown. */
+const settle = p => p.then(v => ({ v }), e => ({ e }))
+
+/* Play one url; resolves 'ended' | 'stopped' | 'failed' | 'blocked'. */
+function play(url) {
+  return new Promise(res => {
+    const a = new Audio(url)
+    current = { a, done: res }
+    a.onended = () => res('ended')
+    a.onerror = () => { fail('speak failed: playback ' + ((a.error && a.error.message) || 'the audio would not decode')); res('failed') }
+    a.play().catch(e => {
+      // A hush during a pending play() rejects it with AbortError — that is the hush, not a
+      // failure (final review, 2026-10-29), and neither is anything from an Audio stop() let go.
+      if ((e && e.name === 'AbortError') || !current || current.a !== a) return
+      if (e && e.name === 'NotAllowedError') res('blocked')
+      else { fail('speak failed: playback ' + ((e && e.message) || e)); res('failed') }
+    })
   })
-  if (!r.ok) throw new Error('speak ' + r.status)
-  return URL.createObjectURL(await r.blob())
+}
+
+/* AUTOPLAY. A browser refuses sound until the page has had a click; the room used to drop
+ * the sentence silently. Now the sentence is kept (its audio already fetched), the reason
+ * says what to do, and his first click or key anywhere in the room plays it — once per
+ * refusal — and the rest of the queue follows. */
+function blocked(item) {
+  blockedItem = item
+  fail('autoplay blocked — click the room once')
+  const unlock = () => {
+    document.removeEventListener('pointerdown', unlock, true)
+    document.removeEventListener('keydown', unlock, true)
+    const it = blockedItem
+    blockedItem = null
+    if (it) { queue.unshift(it); pump() }
+  }
+  document.addEventListener('pointerdown', unlock, true)
+  document.addEventListener('keydown', unlock, true)
 }
 
 async function pump() {
-  if (playing) return
+  if (playing || blockedItem) return
   playing = true; emit()
-  let ahead = null           // the prefetch promise for the next piece
+  let ahead = null           // {item, p}: the prefetch for the NEXT item, tied to that item
+  const drop = a => { if (a) a.p.then(r => { if (r.v) URL.revokeObjectURL(r.v.url) }) }
   try {
     while (queue.length) {
-      if (!(await refreshStatus())) { queue = []; break }
       const item = queue.shift()
-      const url = await (ahead || fetchWav(item.text)).catch(() => null)
-      ahead = queue.length ? fetchWav(queue[0].text).catch(() => null) : null
-      if (!url) continue
-      await new Promise(res => {
-        const a = new Audio(url)
-        current = a
-        a.onended = a.onerror = () => { URL.revokeObjectURL(url); current = null; res() }
-        a.play().catch(() => { current = null; res() })
-      })
+      if (!item) break                     // a hush emptied the queue under us
+      const at = epoch                     // taken before any await: a hush from here on drops it
+      if (!item.now && !(await refreshStatus())) { queue = []; fail('voice is switched off'); break }
+      if (ahead && ahead.item !== item) { drop(ahead); ahead = null }
+      const got = item.got ? { v: item.got }
+        : await (ahead ? ahead.p : settle(fetchWav(item.text)))
+      // a wav already in hand (playNow, a retry) is never fetched again
+      ahead = queue.length && !queue[0].got ? { item: queue[0], p: settle(fetchWav(queue[0].text)) } : null
+      if (got.e) { fail(got.e.message || String(got.e)); continue }
+      if (at !== epoch) { URL.revokeObjectURL(got.v.url); continue }   // hushed while it was fetched
+      item.got = got.v
+      const how = await play(item.got.url)
+      current = null
+      if (how === 'blocked') { blocked(item); break }
+      URL.revokeObjectURL(item.got.url)
+      if (how === 'ended') { if (item.got.note) note(item.got.note); else clear() }
     }
-  } finally { playing = false; current = null; emit() }
+  } finally { drop(ahead); playing = false; current = null; emit() }
 }
 
 /* Queue text to be spoken, in order behind whatever is queued. */
 export function say(text) {
-  if (isProbe()) return   // a probe tab never speaks (probe.js)
+  if (isProbe() || held) return   // a probe tab never speaks (probe.js); nor does she over him
   const parts = sentences(text)
   if (!parts.length) return
   queue.push(...parts.map(t => ({ text: t })))
@@ -123,10 +213,36 @@ export function say(text) {
   pump()
 }
 
+/* Hush. RELEASES the wait on the playing sentence: pause() fires no `ended`, so before
+ * 2026-10-29 a hush left pump() awaiting forever with `playing` stuck true — which the
+ * mic's gate (ears.js) would have read as "she is speaking" for the rest of the session. */
 export function stop() {
   queue = []
-  if (current) { try { current.pause() } catch (_) {} current = null }
+  epoch += 1
+  if (blockedItem) { URL.revokeObjectURL(blockedItem.got.url); blockedItem = null }
+  if (current) {
+    const c = current; current = null
+    // let go of its handlers FIRST: pause() rejects a pending play(), and the revoke that
+    // follows can fire onerror — neither is a reason he should read (final review, 2026-10-29)
+    c.a.onerror = null; c.a.onended = null
+    c.a.pause(); c.done('stopped')
+  }
   emit()
+}
+
+/* Hold her (on) while he records a line; release (off) when it is sent or abandoned. */
+export function hold(on) { held = !!on; emit() }
+
+/* A WAV ALREADY IN HAND, played through THIS queue (final review, 2026-10-29). The Models
+ * window's voice Test used its own `new Audio`: it could overlap her speech, and the mic's gate
+ * (ears.js, which reads `playing` here) never saw it — so always-listening heard "This is how
+ * I sound right now." as his turn. It queues behind whatever she is saying, and is not
+ * re-synthesised. `now` skips the voice.enabled check: he asked for this one by clicking. */
+export function playNow(url) {
+  if (isProbe() || held || !url) return
+  queue.push({ text: '', got: { url, note: '' }, now: true })
+  emit()
+  pump()
 }
 
 /* INCREMENTAL: feed the growing reply and speak each sentence the moment it is

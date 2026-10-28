@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePoll } from '../apps/panel.jsx'
 import * as api from '../api.js'
 import { Chip, Button } from '../kit/parts.jsx'
+import * as speech from './speech.js'
 
 /* THE TASKBAR'S CHIPS (moved out of main.jsx, redesign stage 2) — kit Chips, like every
  * window's title chip, so "a glance at state" has one shape wherever it sits.
@@ -51,4 +52,28 @@ export function SceneChip() {
       </Button>
     </span>
   )
+}
+
+/* WHY SHE IS QUIET (2026-10-29). Grok went silent on him and nothing in the room said why —
+ * the player swallowed every failure. speech.js now keeps a reason; this shows it until he
+ * clicks it (a click is also what unblocks autoplay, so the advice and the cure are one tap).
+ * warn when she did not speak; warm when she spoke through a different voice than the one
+ * chosen ("spoke with lfm3 — Grok: http 402: ..."). Nothing to say: no chip. */
+export function VoiceChipView({ v, onDismiss }) {
+  if (!v || !v.reason) return null
+  return (
+    <span className="tb-voice">
+      <Chip tone={v.reasonKind === 'note' ? 'warm' : 'warn'} dot title={v.reason + ' — click to dismiss'}
+            onClick={onDismiss}>
+        <span className="tb-chip-k">voice</span>
+        <span className="tb-chip-q">{' '}{v.reason.length > 64 ? v.reason.slice(0, 63) + '…' : v.reason}</span>
+      </Chip>
+    </span>
+  )
+}
+
+export function VoiceChip() {
+  const [v, setV] = useState(speech.state())
+  useEffect(() => speech.onChange(setV), [])
+  return <VoiceChipView v={v} onDismiss={() => speech.dismiss()} />
 }

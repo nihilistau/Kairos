@@ -590,6 +590,45 @@ def _tuning_op(path: str, body: Dict[str, Any]):
         return 400, {"ok": False, "error": str(exc)}
 
 
+# ── HER EARS IN THE ROOM (2026-10-29) ───────────────────────────────────────────────
+# POST /v1/listen: his voice from the room's mic, as raw WAV bytes, back as text. The room
+# then sends that text through the SAME send() a typed line uses, so off the record,
+# history and queuing are the typed path's — this door hears, it does not take a turn.
+#
+# WRITES NOTHING. The audio is read into memory, resampled in memory (lfm3._to_16k_mono)
+# and dropped; there is no log line of what he said, because a transcript in gateway.log
+# is a recording by another name. Not an anon door for the same reason: nothing here
+# records, and transcription is local (the LFM3-Audio sidecar on this machine).
+#
+# THE CAP IS CHECKED BEFORE THE READ. 2 MB is ~65 s of 16 kHz mono PCM — longer than any
+# push-to-talk line — and a declared length above it is refused 413 without allocating it.
+# The over-cap body is drained in 64 KB pieces up to the gateway's own body cap so the
+# browser reads the 413 instead of a reset socket; past that cap it is not read at all.
+_LISTEN_MAX_BYTES = 2 * 1024 * 1024
+
+
+def _listen_op(length: int, read):
+    """(declared Content-Length, the socket's read) -> (status, response)."""
+    if length > _LISTEN_MAX_BYTES:
+        left = length if length <= int(os.environ.get("SP_MAX_BODY_BYTES", str(8 * 1024 * 1024))) else 0
+        while left > 0:
+            got = read(min(65536, left))
+            if not got:
+                break
+            left -= len(got)
+        return 413, {"ok": False, "error": "recording too long: %.1f MB is over the %d MB limit (about a minute)"
+                     % (length / 1048576.0, _LISTEN_MAX_BYTES // 1048576)}
+    raw = read(length) if length > 0 else b""
+    if not raw:
+        return 400, {"ok": False, "error": "no audio in the request"}
+    from harness.voice import lfm3 as _lfm3
+    try:
+        return 200, {"ok": True, "text": _lfm3.transcribe(raw)}
+    except _lfm3.LFM3Error as exc:
+        why = str(exc)
+        return (400 if why.startswith("not a PCM WAV") else 503), {"ok": False, "error": "ears: " + why}
+    except Exception as exc:
+        return 500, {"ok": False, "error": "ears: %s" % type(exc).__name__}
 
 
 # ── GENERATE-NOW (2026-08-21): one background job at a time, status readable ────────
@@ -2766,6 +2805,23 @@ def _run_stdlib(host: str, port: int) -> None:
                 self.end_headers()
                 self.wfile.write(payload)
 
+            elif self.path == "/v1/models/test":
+                # THE MODELS WINDOW'S TEST BUTTON (2026-10-29): one small real request per
+                # job; the answer says who answered and how long it took. Only job=voice
+                # carries audio (`audio_b64`, the wav it tested) — the status route never does.
+                body = self._body()
+                try:
+                    from harness.server import models_status as _ms
+                    res = _ms.test(str(body.get("job") or ""))
+                except Exception as exc:
+                    res = {"ok": False, "seconds": 0.0, "result": str(exc)[:200]}
+                payload = json.dumps(res).encode()
+                self.send_response(200); _cors(self)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
             elif self.path == "/v1/anon":
                 # ANONYMOUS MODE (2026-08-23, the operator's ask). One verb, and the ANSWER IS THE
                 # STATE — not {"ok": true}. The room paints the whole shell from it, and a
@@ -3317,6 +3373,14 @@ def _run_stdlib(host: str, port: int) -> None:
                     _settle_turn("[voice message]", _v_fin, capture=False,
                                  latch=_v_latch)
                     _sd_turn_end()
+            elif self.path == "/v1/listen":  # HIS VOICE IN — raw WAV bytes -> text (_listen_op)
+                code, res = _listen_op(int(self.headers.get("Content-Length", 0) or 0), self.rfile.read)
+                payload = json.dumps(res).encode()
+                self.send_response(code); _cors(self)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
             elif self.path == "/v1/speak":  # SPEECH OUT — one utterance -> audio/wav
                 # Deliberately ONE utterance per call, not one reply. Long input on
                 # this build does not degrade, it blows up (a 20 s paragraph ran 47
@@ -3336,6 +3400,12 @@ def _run_stdlib(host: str, port: int) -> None:
                     # so the console can show cache hits and real synthesis cost
                     self.send_header("X-TTS-Cached", "1" if meta.get("cached") else "0")
                     self.send_header("X-TTS-Seconds", str(meta.get("seconds", 0)))
+                    # WHO SPOKE AND WHY NOT GROK (2026-10-29): Grok went silent on him and
+                    # nothing said so. The engine that made this audio, and each one that
+                    # failed first with its reason ("" when none did). One line, latin-1: header-safe.
+                    self.send_header("X-TTS-Backend", str(meta.get("backend", "")))
+                    self.send_header("X-TTS-Fallback", " ".join(str(meta.get("fell_back_from", "")).split())
+                                     .encode("latin-1", "replace").decode("latin-1")[:300])
                     self.end_headers()
                     self.wfile.write(wav)
                 except Exception as exc:
@@ -3732,6 +3802,10 @@ def _run_stdlib(host: str, port: int) -> None:
                 "/v1/system": _system_json,
                 "/v1/presence": _presence_json,
                 "/v1/aux": _aux_json,
+                # EVERY MODEL JOB IN ONE SHAPE (2026-10-29): the Models window and the
+                # taskbar strip. One reader over the owners' own status calls.
+                "/v1/models/status": lambda: __import__(
+                    "harness.server.models_status", fromlist=["x"]).snapshot(),
                 "/v1/ledger": lambda: {
                     "ok": True,
                     "entries": __import__(

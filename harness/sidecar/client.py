@@ -42,6 +42,35 @@ def chat_model() -> str:
         return os.environ.get("SP_AUX_CHAT_MODEL", "liquidai/lfm2.5-1.2b-instruct")
 
 
+# 2026-10-29: LFM3-1.7B-Uncensored is an OPTION for the librarian, served by its own
+# llama-server door (serve.py, SP_LFM3_CHAT_URL, CPU) — not by LM Studio. One picker, two
+# doors: this id routes there; every other id keeps going to the chat door. The default
+# stays liquidai/lfm2.5-1.2b-instruct. LM Studio was dark when this landed, so the id is ours.
+LFM3_CHAT_ID = "lfm3-1.7b-uncensored"
+_LFM3_SAMPLING = {"temperature": 0.1, "top_k": 50, "repeat_penalty": 1.1}
+
+
+def _lfm3_url() -> str:
+    """'' when the profile names a host other than this machine (final review, 2026-10-29):
+    serve.py binds the door to 127.0.0.1 regardless, so a far URL is a door nobody started,
+    and the librarian's prompt (his evening) must not go there. '' is a dead door."""
+    u = os.environ.get("SP_LFM3_CHAT_URL", "http://127.0.0.1:8814").rstrip("/")
+    from harness.voice.lfm3 import on_this_machine
+    return u if on_this_machine(u) else ""
+
+
+def lfm3_offered() -> bool:
+    """The 1.7B is offered only when its GGUF is on disk (SP_LFM3_CHAT_GGUF)."""
+    p = os.environ.get("SP_LFM3_CHAT_GGUF", "")
+    return bool(p) and os.path.exists(p)
+
+
+def chat_choices() -> List[str]:
+    """The picker's list: the chat door's live models, plus the LFM3 option when its file exists."""
+    ids = list_models()
+    return ids + [LFM3_CHAT_ID] if lfm3_offered() and LFM3_CHAT_ID not in ids else ids
+
+
 def _api_key() -> str:
     """Bearer token for the chat door (LM Studio requires one since ~0.3.3x).
     A FILE path, not the token itself — the profile is committed to a public
@@ -141,9 +170,20 @@ def chat(messages: List[dict], max_tokens: int = 256, temperature: float = 0.0,
     """One aux completion. Returns '' on any failure. The aux model's words are
     NEVER her words — callers fold the result into context or judgments, they do
     not emit it as speech."""
-    body = {"model": model or chat_model(), "messages": messages,
+    mdl = model or chat_model()
+    body = {"model": mdl, "messages": messages,
             "max_tokens": max_tokens, "temperature": temperature}
-    d = _post(_chat_url() + "/v1/chat/completions", body, _TIMEOUT_CHAT, auth=True)
+    if mdl == LFM3_CHAT_ID:
+        # its own door, no LM Studio bearer; the callers' default temperature (0.0) is not an
+        # explicit ask, so the suggested sampling stands unless a non-default one was passed.
+        if temperature == 0.0:
+            body["temperature"] = _LFM3_SAMPLING["temperature"]
+        body["top_k"] = _LFM3_SAMPLING["top_k"]
+        body["repeat_penalty"] = _LFM3_SAMPLING["repeat_penalty"]
+        door = _lfm3_url()
+        d = _post(door + "/v1/chat/completions", body, _TIMEOUT_CHAT) if door else None
+    else:
+        d = _post(_chat_url() + "/v1/chat/completions", body, _TIMEOUT_CHAT, auth=True)
     if not d:
         return ""
     try:

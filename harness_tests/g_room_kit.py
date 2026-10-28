@@ -750,7 +750,11 @@ const out = {
 """)
 check("the apps probe rendered (5-7)", "_error" not in d, d.get("_error", ""))
 g = lambda k: grab(d, k)
-check("Apps says desktop, not dock — the dock is gone", "desktop" in g("apps") and "dock" not in g("apps"))
+# The dock came back (2026-10-29, task 3) as its own furniture: the checkbox still says DESKTOP
+# (it decides the desktop icons, nothing else), and "dock" appears only on the add-to-dock buttons.
+check("Apps' show/hide says desktop; dock is only the add-to-dock button",
+      "desktop" in g("apps") and 'aria-label="show Journal on the desktop"' in g("apps")
+      and not re.search(r'aria-label="show [^"]*dock', g("apps")))
 check("Apps' checkboxes are named by their app", g("apps").count('aria-label="') >= 20)
 check("Librarians' state is a kit chip — warn while one door is dark",
       "ui-tone-warn" in g("lib") and "armed" in g("lib"))
@@ -1860,9 +1864,11 @@ check("a probe tab never drains her outbox: the poller's effect returns before i
                 _chat8, re.S) is not None)
 check("the chat root says the mode, so a live check can confirm it before opening anything",
       re.search(r"className=\"chat\"\s+data-probe=\{PROBE \? '1' : undefined\}", _chat8) is not None)
-check("a probe tab cannot speak: say() returns before it queues anything",
-      re.search(r"export function say\(text\)\s*\{\s*if\s*\(isProbe\(\)\)\s*return\b",
-                _code("ui/src/room/speech.js")) is not None)
+check("a probe tab cannot speak: say() and playNow() return before they queue anything",
+      re.search(r"export function say\(text\)\s*\{\s*if\s*\(isProbe\(\)(\s*\|\|\s*held)?\)\s*return\b",
+                _code("ui/src/room/speech.js")) is not None
+      and re.search(r"export function playNow\(url\)\s*\{\s*if\s*\(isProbe\(\)[^)]*\)\s*return\b",
+                    _code("ui/src/room/speech.js")) is not None)
 _outbox_callers = sorted(os.path.relpath(p, os.path.join(ROOT, "ui", "src")).replace(os.sep, "/")
                          for p in glob.glob(os.path.join(ROOT, "ui", "src", "**", "*.js*"), recursive=True)
                          if "kairosOutbox(" in _code(os.path.relpath(p, ROOT)))
@@ -1885,8 +1891,14 @@ check("a probe tab reports no position: the position effect returns before its t
 # was not true of. Its pure parts are drawn with fixtures, and Chat itself is drawn once (an
 # empty log: effects never run in a server render, so nothing is fetched, polled or spoken).
 d = render(r"""
-import Chat, { Acts, TurnTag, Attached, Speaker, SendStop } from '../ui/src/Chat.jsx'
+import Chat, { Acts, TurnTag, Attached, Speaker, SendStop, Mic } from '../ui/src/Chat.jsx'
+import { VoiceChipView } from '../ui/src/room/TaskChips.jsx'
+import { fallbackNote } from '../ui/src/room/speech.js'
+import { toWav, allowed } from '../ui/src/room/ears.js'
 const noop = () => {}
+const ear = (o) => ({ listening: false, recording: false, hearing: false, mode: 'push', error: '', ...o })
+const wav = toWav([new Float32Array(4800).fill(0.5), new Float32Array(4800).fill(-0.5)], 48000)
+const dv = new DataView(wav.buffer)
 const ev = [
   { tool: { name: 'board', result: 'three notes on the board' } },
   { image: { seen: 'a desk lamp and a mug of tea' } },
@@ -1910,6 +1922,20 @@ const out = {
   spk_off: html(h(Speaker, { voice: { enabled: false, playing: false } })),
   send: html(h(SendStop, { busy: false, onSend: noop, onStop: noop })),
   stop: html(h(SendStop, { busy: true, onSend: noop, onStop: noop })),
+  mic_idle: html(h(Mic, { ear: ear(), here: true, onClick: noop })),
+  mic_rec: html(h(Mic, { ear: ear({ listening: true, recording: true }), here: true, onClick: noop })),
+  mic_hear: html(h(Mic, { ear: ear({ hearing: true }), here: true, onClick: noop })),
+  mic_always: html(h(Mic, { ear: ear({ mode: 'always', listening: true }), here: true, onClick: noop })),
+  mic_away: html(h(Mic, { ear: ear(), here: false, onClick: noop })),
+  vc_none: html(h(VoiceChipView, { v: { reason: '' }, onDismiss: noop })),
+  vc_fail: html(h(VoiceChipView, { v: { reason: 'autoplay blocked — click the room once', reasonKind: 'fail' }, onDismiss: noop })),
+  vc_note: html(h(VoiceChipView, { v: { reason: fallbackNote('lfm3', 'xai: http 402: out of credit'), reasonKind: 'note' }, onDismiss: noop })),
+  fb_other: fallbackNote('voxtral', 'lfm3: loading; xai: no api key'),
+  here: { local: allowed({ hostname: 'localhost' }), lo: allowed({ hostname: '127.0.0.1' }), v6: allowed({ hostname: '[::1]' }),
+          lan: allowed({ hostname: '192.168.1.20' }), name: allowed({ hostname: 'kairos.local' }), node: allowed() },
+  wav: { riff: String.fromCharCode(...wav.slice(0, 4)), wave: String.fromCharCode(...wav.slice(8, 12)),
+         rate: dv.getUint32(24, true), ch: dv.getUint16(22, true), bits: dv.getUint16(34, true),
+         data: dv.getUint32(40, true), len: wav.length, first: dv.getInt16(44, true), last: dv.getInt16(wav.length - 2, true) },
 }
 """)
 check("the chat probe rendered", "_error" not in d, d.get("_error", ""))
@@ -1920,7 +1946,35 @@ check("the composer is kit parts: attach a named icon button, her voice a named 
       and '<textarea class="ui-field ui-field-area chat-text" placeholder="talk to her"></textarea>' in g("chat")
       and g("chat").count("ui-btn-primary") == 1
       and re.search(r'class="ui-btn ui-btn-primary ui-btn-md chat-send">send<', g("chat")) is not None
-      and g("chat").count("<button") == 3)
+      and re.search(r'<button type="button" class="ui-btn ui-btn-secondary ui-btn-md ui-btn-icon chat-tool chat-mic" aria-label="talk to her" aria-pressed="false" disabled="" title="voice input needs this machine&#x27;s browser"><svg', g("chat")) is not None
+      and g("chat").count("<button") == 4)
+check("his mic: a named toggle, pressed only while it listens, the titles verbatim, off this machine disabled with the reason",
+      'aria-pressed="false"' in g("mic_idle") and 'title="talk to her — click, speak, click again"' in g("mic_idle")
+      and "disabled" not in g("mic_idle") and "chat-mic-on" not in g("mic_idle")
+      and 'aria-pressed="true"' in g("mic_rec") and 'title="listening — click to send"' in g("mic_rec")
+      and "chat-mic chat-mic-on" in g("mic_rec")
+      and 'title="hearing you…"' in g("mic_hear") and 'disabled=""' in g("mic_hear")
+      and 'aria-pressed="true"' in g("mic_always") and 'title="listening — click to stop listening"' in g("mic_always")
+      and 'disabled=""' in g("mic_away") and "this machine&#x27;s browser" in g("mic_away")
+      and re.search(r'<path class="ui-ic-d" d="([^"]*)"', g("mic_rec")).group(1)
+      != re.search(r'<path class="ui-ic-d" d="([^"]*)"', g("mic_idle")).group(1))
+_here = d.get("here") or {}
+check("the mic is this machine's only: localhost, 127.0.0.1 and [::1] — not the LAN, not a name, not node",
+      _here == {"local": True, "lo": True, "v6": True, "lan": False, "name": False, "node": False}, _here)
+_w = d.get("wav") or {}
+check("his line is a 16 kHz mono 16-bit WAV, decimated 3:1 from 48 kHz, in memory",
+      _w.get("riff") == "RIFF" and _w.get("wave") == "WAVE" and _w.get("rate") == 16000 and _w.get("ch") == 1
+      and _w.get("bits") == 16 and _w.get("data") == 3200 * 2 and _w.get("len") == 44 + 6400
+      and _w.get("first") == 16383
+      and _w.get("last") == -0x4000, _w)
+check("her voice's reason: no chip with nothing to say; a failure warns, a fallback is warm and names Grok",
+      g("vc_none") == ""
+      and re.search(r'<span class="tb-voice"><button type="button" class="ui-chip ui-tone-warn ui-chip-btn" title="autoplay blocked — click the room once — click to dismiss">', g("vc_fail")) is not None
+      and "> autoplay blocked — click the room once</span>" in g("vc_fail")
+      and 'class="ui-chip ui-tone-warm ui-chip-btn"' in g("vc_note")
+      and "spoke with lfm3 — Grok: http 402: out of credit" in g("vc_note"))
+check("...and a fallback from a voice that is not Grok keeps its own name",
+      d.get("fb_other") == "spoke with voxtral — lfm3: loading; xai: no api key", d.get("fb_other"))
 check("while she generates, send is stop, in danger, and nothing is primary",
       re.search(r'class="ui-btn ui-btn-danger ui-btn-md chat-send">stop<', g("stop")) is not None
       and "ui-btn-primary" not in g("stop") and ">send<" not in g("stop"))
@@ -1971,6 +2025,460 @@ RETIRED_S6 |= {"act", "act-tool", "act-look", "act-persona", "act-notice", "act-
                "kairos-tag", "k-solo", "k-muse", "k-remind", "k-expand", "k-spoke", "k-continue", "k-mode",
                "tool-btn", "spk", "send"}
 
+# HIS MIC OPENS ONCE (Task 7 review fix, 2026-10-29). getUserMedia waits on a permission
+# prompt; a second click, two sync()s, or a release() during that wait used to open a SECOND
+# stream whose tracks nothing could stop (the browser's mic light stayed on after Chat closed).
+# Driven under node with a getUserMedia whose promise this probe resolves by hand.
+d = render(r"""
+import * as ears from '../ui/src/room/ears.js'
+const tick = (ms = 5) => new Promise(r => setTimeout(r, ms))
+const docL = {}
+globalThis.document = { addEventListener(t, f) { (docL[t] = docL[t] || []).push(f) },
+                        removeEventListener(t, f) { docL[t] = (docL[t] || []).filter(x => x !== f) } }
+globalThis.location = { hostname: 'localhost' }
+globalThis.window = globalThis
+const gum = { calls: 0, pend: [] }, tracks = [], ctxs = [], procs = []
+Object.defineProperty(globalThis, 'navigator', { configurable: true, writable: true, value: { mediaDevices: {
+  getUserMedia: () => { gum.calls++; return new Promise(r => gum.pend.push(r)) } } } })
+class FakeCtx {
+  constructor() { this.sampleRate = 48000; this.state = 'running'; this.destination = {}; ctxs.push(this) }
+  createMediaStreamSource() { return { connect() {}, disconnect() {} } }
+  createScriptProcessor() { const n = { connect() {}, disconnect() {}, onaudioprocess: null }; procs.push(n); return n }
+  close() { this.closed = true; return Promise.resolve() }
+  resume() { return Promise.resolve() }
+}
+globalThis.AudioContext = FakeCtx
+const stream = () => { const t = { stopped: false, stop() { this.stopped = true } }; tracks.push(t); return { getTracks: () => [t] } }
+const out = {}
+// every open still at the prompt is answered, so a regression shows as a count, not a hang
+const answer = () => { const n = tracks.length; while (gum.pend.length) gum.pend.shift()(stream()); return n }
+const stoppedFrom = n => tracks.slice(n).map(t => t.stopped)
+// (a) two push-to-talk clicks while the prompt is up
+let c0 = gum.calls, x0 = ctxs.length, p0 = procs.length
+const a1 = ears.start(), a2 = ears.start()
+await tick()
+const callsA = gum.calls - c0
+const na = answer()
+const ra = [await a1, await a2]
+out.two = { calls: callsA, ctxs: ctxs.length - x0, procs: procs.length - p0, listening: ears.state().listening, ok: ra }
+ears.release()
+out.two_closed = { stopped: stoppedFrom(na), listening: ears.state().listening }
+// (b) release() while the prompt is up: the stream that arrives later is stopped at once
+c0 = gum.calls; x0 = ctxs.length
+const b1 = ears.start()
+await tick()
+ears.release()
+const nb = answer()
+const rb = await b1
+await tick()
+out.cancel = { ok: rb, stopped: stoppedFrom(nb), listening: ears.state().listening,
+               ctxs: ctxs.length - x0, calls: gum.calls - c0 }
+// (c) Chat's sync racing the Models window's: two always-on opens, one stream; off stops it
+c0 = gum.calls; x0 = ctxs.length
+const c1 = ears.setAlways(true), c2 = ears.setAlways(true)
+await tick()
+const callsC = gum.calls - c0
+const nc = answer()
+await c1; await c2
+out.always = { calls: callsC, ctxs: ctxs.length - x0, listening: ears.state().listening }
+await ears.setAlways(false)
+out.always_off = { stopped: stoppedFrom(nc), listening: ears.state().listening }
+""")
+check("the mic-open probe rendered", "_error" not in d, d.get("_error", ""))
+check("two clicks while the prompt is up open ONE stream, one AudioContext, one processor",
+      d.get("two") == {"calls": 1, "ctxs": 1, "procs": 1, "listening": True, "ok": [True, True]}, d.get("two"))
+check("...and closing it stops that stream's tracks",
+      d.get("two_closed") == {"stopped": [True], "listening": False}, d.get("two_closed"))
+check("a release() while the prompt is up: the late stream is stopped at once and the mic never opens",
+      d.get("cancel") == {"ok": False, "stopped": [True], "listening": False, "ctxs": 0, "calls": 1}, d.get("cancel"))
+check("two always-on syncs at once open one stream, and turning it off stops it",
+      d.get("always") == {"calls": 1, "ctxs": 1, "listening": True}
+      and d.get("always_off") == {"stopped": [True], "listening": False}, (d.get("always"), d.get("always_off")))
+
+# HER PLAYER, DRIVEN (Task 7 review fix, 2026-10-29). Audio, fetch and URL are stubbed; the probe
+# decides when each sentence's fetch lands and when each Audio ends. Every speech.js leg before
+# this read source; these run the queue.
+d = render(r"""
+import * as speech from '../ui/src/room/speech.js'
+const tick = (ms = 5) => new Promise(r => setTimeout(r, ms))
+const docL = {}
+globalThis.document = { addEventListener(t, f) { (docL[t] = docL[t] || []).push(f) },
+                        removeEventListener(t, f) { docL[t] = (docL[t] || []).filter(x => x !== f) } }
+const fire = t => [...(docL[t] || [])].forEach(f => f({ type: t }))
+const audios = []
+let maxLive = 0, block = 0
+class FakeAudio {
+  constructor(url) { this.url = url; this.paused = true; this.onended = null; this.onerror = null; audios.push(this) }
+  play() {
+    if (block) { block--; const e = new Error('play() needs a gesture'); e.name = 'NotAllowedError'; return Promise.reject(e) }
+    this.paused = false
+    maxLive = Math.max(maxLive, audios.filter(a => !a.paused).length)
+    return Promise.resolve()
+  }
+  pause() { this.paused = true }
+  end() { this.paused = true; if (this.onended) this.onended() }
+}
+globalThis.Audio = FakeAudio
+URL.createObjectURL = b => 'blob:' + b.text
+URL.revokeObjectURL = () => {}
+const fetches = []
+globalThis.fetch = (u, o) => {
+  if (u === '/v1/speak/status') return Promise.resolve({ ok: true, json: async () => ({ live: { enabled: true } }) })
+  const text = JSON.parse(o.body).text
+  return new Promise(r => fetches.push({ text, go: () => r({ ok: true, status: 200,
+    headers: { get: k => (k === 'X-TTS-Backend' ? 'xai' : k === 'X-TTS-Fallback' ? '' : null) },
+    blob: async () => ({ text }) }) }))
+}
+const live = () => audios.filter(a => !a.paused).map(a => a.url)
+const out = {}
+// (a) say -> hush while she plays -> say: the second sentence plays, and the player lets go after
+speech.say('One.')
+await tick(); fetches[0].go(); await tick()
+out.a_one = live()
+speech.stop()
+await tick()
+out.a_after_stop = { playing: speech.state().playing, live: live() }
+speech.say('Two.')
+await tick(); if (fetches[1]) fetches[1].go(); await tick()
+out.a_two = live()
+if (audios[1]) audios[1].end()
+await tick()
+out.a_done = { playing: speech.state().playing, maxLive }
+// (b) hush while a sentence is being fetched: it never plays
+speech.say('Three.')
+await tick()
+speech.stop()
+if (fetches[2]) fetches[2].go()
+await tick()
+out.b = { played: audios.some(a => a.url === 'blob:Three.'), playing: speech.state().playing }
+// (c) autoplay refused: the reason says what to do; his first click plays that sentence
+block = 1
+speech.say('Four.')
+await tick(); if (fetches[3]) fetches[3].go(); await tick()
+out.c_blocked = { reason: speech.state().reason, live: live(), playing: speech.state().playing }
+fire('pointerdown')
+await tick()
+out.c_click = { live: live(), fetches: fetches.length }
+if (audios.length) audios[audios.length - 1].end()
+await tick()
+out.c_done = { playing: speech.state().playing, maxLive }
+""")
+check("the player probe rendered", "_error" not in d, d.get("_error", ""))
+check("a hush lets go of the player: say -> stop while she plays -> say, and the second sentence plays",
+      d.get("a_one") == ["blob:One."]
+      and d.get("a_after_stop") == {"playing": False, "live": []}
+      and d.get("a_two") == ["blob:Two."]
+      and d.get("a_done") == {"playing": False, "maxLive": 1},
+      {k: d.get(k) for k in ("a_one", "a_after_stop", "a_two", "a_done")})
+check("a sentence hushed while it was being fetched never plays",
+      d.get("b") == {"played": False, "playing": False}, d.get("b"))
+check("autoplay refused: the reason says click the room, and his first click plays that same sentence",
+      (d.get("c_blocked") or {}).get("reason") == "autoplay blocked — click the room once"
+      and (d.get("c_blocked") or {}).get("live") == [] and (d.get("c_blocked") or {}).get("playing") is False
+      and d.get("c_click") == {"live": ["blob:Four."], "fetches": 4}
+      and d.get("c_done") == {"playing": False, "maxLive": 1},
+      {k: d.get(k) for k in ("c_blocked", "c_click", "c_done")})
+
+# ONE VOICE, AND NOT OVER HIM (final whole-branch review, 2026-10-29). Driven under node like the
+# player probe above. (1) the Models voice Test plays through speech.js's queue (playNow), so it
+# never overlaps her and the always-mode mic's gate sees it; (3) a hush during a pending play()
+# is not a failure he reads; (6) while he records a push-to-talk line her still-streaming reply
+# stays quiet, and speaks again once he sends; (11) a hush between say() and the pump's first
+# await leaves no TypeError behind.
+d = render(r"""
+import * as speech from '../ui/src/room/speech.js'
+import * as ears from '../ui/src/room/ears.js'
+const tick = (ms = 5) => new Promise(r => setTimeout(r, ms))
+const unhandled = []
+process.on('unhandledRejection', e => unhandled.push(String(e && e.message || e)))
+const docL = {}
+globalThis.document = { addEventListener(t, f) { (docL[t] = docL[t] || []).push(f) },
+                        removeEventListener(t, f) { docL[t] = (docL[t] || []).filter(x => x !== f) } }
+globalThis.location = { hostname: 'localhost' }
+globalThis.window = globalThis
+const procs = []
+Object.defineProperty(globalThis, 'navigator', { configurable: true, writable: true, value: { mediaDevices: {
+  getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }) } } })
+globalThis.AudioContext = class {
+  constructor() { this.sampleRate = 16000; this.state = 'running'; this.destination = {} }
+  createMediaStreamSource() { return { connect() {}, disconnect() {} } }
+  createScriptProcessor() { const n = { connect() {}, disconnect() {}, onaudioprocess: null }; procs.push(n); return n }
+  close() { return Promise.resolve() }
+  resume() { return Promise.resolve() }
+}
+const audios = []
+let maxLive = 0, pend = false
+class FakeAudio {
+  constructor(url) { this.url = url; this.paused = true; this.onended = null; this.onerror = null; audios.push(this) }
+  play() {
+    this.paused = false
+    maxLive = Math.max(maxLive, audios.filter(a => !a.paused).length)
+    if (!pend) return Promise.resolve()
+    // a real element's play() stays pending until it can play; pause() rejects it with AbortError
+    return new Promise((_, rej) => { this.rej = rej })
+  }
+  pause() {
+    this.paused = true
+    if (this.rej) { const e = new Error('The play() request was interrupted by a call to pause()'); e.name = 'AbortError'; this.rej(e); this.rej = null }
+  }
+  end() { this.paused = true; if (this.onended) this.onended() }
+}
+globalThis.Audio = FakeAudio
+URL.createObjectURL = b => 'blob:' + b.text
+// revoking the url an element is still holding fires its onerror, as a browser does
+URL.revokeObjectURL = u => audios.filter(a => a.url === u && a.onerror).forEach(a => a.onerror())
+const fetches = []
+globalThis.fetch = (u, o) => {
+  if (u === '/v1/speak/status') return Promise.resolve({ ok: true, json: async () => ({ live: { enabled: true } }) })
+  if (u === '/v1/listen') return Promise.resolve({ ok: true, json: async () => ({ ok: true, text: 'turn it down' }) })
+  if (u === '/v1/tuning') return new Promise(() => {})
+  const text = JSON.parse(o.body).text
+  return new Promise(r => fetches.push({ text, go: () => r({ ok: true, status: 200,
+    headers: { get: k => (k === 'X-TTS-Backend' ? 'xai' : k === 'X-TTS-Fallback' ? '' : null) },
+    blob: async () => ({ text }) }) }))
+}
+const live = () => audios.filter(a => !a.paused).map(a => a.url)
+const goAll = () => fetches.filter(f => !f.done).forEach(f => { f.done = true; f.go() })
+const out = {}
+const TEST = 'data:audio/wav;base64,UklGRg=='
+// (1) always-listening, she is speaking, he clicks the voice Test
+await ears.setAlways(true)
+speech.say('One.')
+await tick(); goAll(); await tick()
+speech.playNow(TEST)
+await tick()
+out.t_queued = { live: live(), gated: ears.gated() }
+audios[audios.length - 1].end()
+await tick()
+out.t_plays = { live: live(), gated: ears.gated(), playing: speech.state().playing,
+                fetched: fetches.map(f => f.text) }
+audios[audios.length - 1].end()
+await tick()
+out.t_done = { playing: speech.state().playing, maxLive }
+await ears.setAlways(false)
+// (3) a hush while play() is still pending
+speech.dismiss()
+pend = true
+speech.say('Two.')
+await tick(); goAll(); await tick()
+const pendingOne = live()
+speech.stop()
+await tick()
+pend = false
+out.hush = { pending: pendingOne, reason: speech.state().reason, playing: speech.state().playing }
+// (11) a hush between say() and the pump's first await
+speech.say('Three.')
+speech.stop()
+await tick(); goAll(); await tick()
+out.early = { unhandled: unhandled.slice(), playing: speech.state().playing, played: audios.some(a => a.url === 'blob:Three.') }
+// (6) push-to-talk while her reply is still streaming in
+speech.say('Four.')
+await tick(); goAll(); await tick()
+const before = live()
+const opened = await ears.start()
+const nf = fetches.length
+const cur = speech.feed('Five. Six. ', 0)
+await tick()
+out.ptt = { before, opened, after_start: live(), cursor: cur, queued: speech.state().queued, fetched: fetches.length - nf }
+procs[procs.length - 1].onaudioprocess({ inputBuffer: { getChannelData: () => new Float32Array(1600).fill(0.1) } })
+const said = await ears.stopAndSend()
+speech.feed('Seven. ', 0)
+await tick(); goAll(); await tick()
+out.sent = { said, live: live() }
+audios[audios.length - 1].end(); await tick()
+// ...and a recording abandoned (Chat closed) lets her speak again too
+await ears.start()
+speech.feed('Eight. ', 0)
+await tick()
+const heldN = fetches.length
+ears.release()
+speech.feed('Nine. ', 0)
+await tick(); goAll(); await tick()
+out.released = { held_fetched: fetches.slice(nf).some(f => f.text === 'Eight.'), live: live(), all: fetches.length > heldN }
+audios[audios.length - 1].end(); await tick()
+out.maxLive = maxLive
+""")
+check("the one-voice probe rendered", "_error" not in d, d.get("_error", ""))
+check("the voice Test queues BEHIND her sentence (never two at once) and the always-mode mic is gated throughout",
+      d.get("t_queued") == {"live": ["blob:One."], "gated": True}
+      and d.get("t_plays") == {"live": ["data:audio/wav;base64,UklGRg=="], "gated": True, "playing": True,
+                               "fetched": ["One."]}
+      and d.get("t_done") == {"playing": False, "maxLive": 1},
+      {k: d.get(k) for k in ("t_queued", "t_plays", "t_done")})
+check("a hush while play() is still pending is not a failure: the reason stays empty",
+      d.get("hush") == {"pending": ["blob:Two."], "reason": "", "playing": False}, d.get("hush"))
+check("a hush between say() and the pump's first await leaves no error behind and plays nothing",
+      d.get("early") == {"unhandled": [], "playing": False, "played": False}, d.get("early"))
+check("push-to-talk hushes her AND holds her: her streaming reply queues nothing while he records",
+      d.get("ptt") == {"before": ["blob:Four."], "opened": True, "after_start": [], "cursor": 11, "queued": 0,
+                       "fetched": 0}, d.get("ptt"))
+check("...and once his line is sent, her next sentence speaks",
+      d.get("sent") == {"said": "turn it down", "live": ["blob:Seven."]}, d.get("sent"))
+check("...and an abandoned recording (Chat closed) releases the hold too",
+      d.get("released") == {"held_fetched": False, "live": ["blob:Nine."], "all": True}
+      and d.get("maxLive") == 1, (d.get("released"), d.get("maxLive")))
+
+# WHEN HE STARTS TALKING, HER REPLY STOPS (2026-10-29, operator: "yes stop her reply when you
+# speak"). Driven under node like the probes above. Push-to-talk start, and always-mode's
+# speech onset, cut her CURRENT reply: abort() once (the same control as the stop button), her
+# voice stops, and nothing more of that reply is spoken — not while he records, and NOT after
+# the hold is released (before, feed()/flush() resumed it the moment he sent). A mic opened
+# while she is idle aborts nothing; a cough shorter than a line does not cut her.
+d = render(r"""
+import * as speech from '../ui/src/room/speech.js'
+import * as ears from '../ui/src/room/ears.js'
+import * as reply from '../ui/src/room/reply.js'
+const tick = (ms = 5) => new Promise(r => setTimeout(r, ms))
+globalThis.document = { addEventListener() {}, removeEventListener() {} }
+globalThis.location = { hostname: 'localhost' }
+globalThis.window = globalThis
+const procs = []
+Object.defineProperty(globalThis, 'navigator', { configurable: true, writable: true, value: { mediaDevices: {
+  getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }) } } })
+globalThis.AudioContext = class {
+  constructor() { this.sampleRate = 16000; this.state = 'running'; this.destination = {} }
+  createMediaStreamSource() { return { connect() {}, disconnect() {} } }
+  createScriptProcessor() { const n = { connect() {}, disconnect() {}, onaudioprocess: null }; procs.push(n); return n }
+  close() { return Promise.resolve() }
+  resume() { return Promise.resolve() }
+}
+const audios = []
+class FakeAudio {
+  constructor(url) { this.url = url; this.paused = true; this.onended = null; this.onerror = null; audios.push(this) }
+  play() { this.paused = false; return Promise.resolve() }
+  pause() { this.paused = true }
+  end() { this.paused = true; if (this.onended) this.onended() }
+}
+globalThis.Audio = FakeAudio
+URL.createObjectURL = b => 'blob:' + b.text
+URL.revokeObjectURL = () => {}
+const fetches = []
+globalThis.fetch = (u, o) => {
+  if (u === '/v1/speak/status') return Promise.resolve({ ok: true, json: async () => ({ live: { enabled: true } }) })
+  if (u === '/v1/listen') return Promise.resolve({ ok: true, json: async () => ({ ok: true, text: 'turn it down' }) })
+  if (u === '/v1/tuning') return new Promise(() => {})
+  const text = JSON.parse(o.body).text
+  return new Promise(r => fetches.push({ text, go: () => r({ ok: true, status: 200,
+    headers: { get: () => '' }, blob: async () => ({ text }) }) }))
+}
+const live = () => audios.filter(a => !a.paused).map(a => a.url)
+const goAll = () => fetches.filter(f => !f.done).forEach(f => { f.done = true; f.go() })
+const frame = (v, n = 1600) => ({ inputBuffer: { getChannelData: () => new Float32Array(n).fill(v) } })
+const out = {}
+// (1) push-to-talk while her reply is streaming and she is speaking its first sentence
+let aborts = 0
+const r = reply.begin(() => { aborts += 1 })
+let c = reply.feed(r, 'One. ', 0)
+await tick(); goAll(); await tick()
+const before = live()
+await ears.start()
+const onStart = { aborts, live: live(), cut: r.cut }   // the mic itself cut her, before anything else
+reply.interrupt()                      // Chat's heard() asks again while busy: still ONE abort
+out.ptt = { before, ...onStart, again: aborts }
+procs[procs.length - 1].onaudioprocess(frame(0.1))
+const said = await ears.stopAndSend()  // the hold is released here
+const nf = fetches.length
+c = reply.feed(r, 'One. Two. Three. ', c)
+reply.flush(r, 'One. Two. Three. Four', c)
+await tick(); goAll(); await tick()
+out.after = { said, fetched: fetches.slice(nf).map(f => f.text), live: live(), aborts }
+reply.end(r)
+// her NEXT reply speaks as ever
+const r1 = reply.begin(() => {})
+reply.feed(r1, 'Next. ', 0)
+await tick(); goAll(); await tick()
+out.next = live()
+audios.forEach(a => a.end()); await tick()
+reply.end(r1)
+// (2) a mic opened while she is idle aborts nothing
+let idle = 0
+const r0 = reply.begin(() => { idle += 1 }); reply.end(r0)
+await ears.start()
+out.idle = { aborts: idle, interrupted: reply.interrupt() }
+ears.release()
+// (2b) a DENIED mic permission still stops her reply (ANON-MODE.md says so)
+const gum = navigator.mediaDevices.getUserMedia
+navigator.mediaDevices.getUserMedia = async () => { const e = new Error('denied'); e.name = 'NotAllowedError'; throw e }
+let denied = 0
+const rd = reply.begin(() => { denied += 1 })
+const okd = await ears.start()
+out.denied = { opened: okd, aborts: denied, cut: rd.cut, error: ears.state().error.slice(0, 26) }
+navigator.mediaDevices.getUserMedia = gum
+reply.end(rd)
+// (3) always-mode: his speech onset cuts the reply streaming between her sentences
+await tick(350)                        // past the 300 ms tail after her last sentence
+const heard = []
+const offU = ears.onUtterance(s => heard.push(s))
+await ears.setAlways(true)
+let onset = 0
+const r2 = reply.begin(() => { onset += 1 })
+const p = procs[procs.length - 1]
+p.onaudioprocess(frame(0.1))           // 100 ms: a cough, not yet a line
+out.cough = onset
+p.onaudioprocess(frame(0.1)); p.onaudioprocess(frame(0.1))   // 300 ms of him: a line
+out.onset = { aborts: onset, cut: r2.cut, gated: ears.gated() }
+const n2 = fetches.length
+reply.feed(r2, 'Later. ', 0)
+reply.flush(r2, 'Later. Still', 7)
+await tick(850)                        // his line ends after ears.silence_ms of quiet
+p.onaudioprocess(frame(0))
+await tick(20)
+out.always = { heard, fetched: fetches.length - n2, aborts: onset }
+reply.end(r2)
+offU(); await ears.setAlways(false)
+""")
+check("the barge-in probe rendered", "_error" not in d, d.get("_error", ""))
+check("push-to-talk during her streaming reply: abort() ONCE, her voice stops",
+      d.get("ptt") == {"before": ["blob:One."], "aborts": 1, "live": [], "cut": True, "again": 1}, d.get("ptt"))
+check("...and the rest of THAT reply is never spoken, even after his line is sent; his line is heard",
+      d.get("after") == {"said": "turn it down", "fetched": [], "live": [], "aborts": 1}, d.get("after"))
+check("...while her NEXT reply speaks as ever", d.get("next") == ["blob:Next."], d.get("next"))
+check("a mic opened while she is idle aborts nothing",
+      d.get("idle") == {"aborts": 0, "interrupted": False}, d.get("idle"))
+check("a denied mic permission still stops her reply, and says why",
+      d.get("denied") == {"opened": False, "aborts": 1, "cut": True, "error": "the microphone is blocked "}, d.get("denied"))
+check("always-mode: a cough does not cut her; his speech onset does, once, and her reply speaks no more",
+      d.get("cough") == 0 and d.get("onset") == {"aborts": 1, "cut": True, "gated": False}
+      and d.get("always") == {"heard": ["turn it down"], "fetched": 0, "aborts": 1},
+      (d.get("cough"), d.get("onset"), d.get("always")))
+
+# READY MEANS LOADED AND WELL; A SPOKEN LINE JOINS THE BOX (final review, 2026-10-29).
+d = render(r"""
+import { ModelsView } from '../ui/src/apps/Models.jsx'
+import { readyCount } from '../ui/src/room/ModelStrip.jsx'
+import { heardLine } from '../ui/src/Chat.jsx'
+const jobs = [{ id: 'mind', title: 'Her mind', state: 'loaded', choices: [] },
+              { id: 'voice', title: 'Her voice', state: 'loaded', degraded: true, why: 'last request failed: http 402', choices: [] }]
+const out = {
+  view: html(h(ModelsView, { d: { jobs }, busy: '', onPick() {}, onTest() {}, tests: {}, note: '', here: false, onRecord() {} })),
+  count: readyCount(jobs), well: readyCount([jobs[0]]),
+  hl: [heardLine('', 'turn it down'), heardLine('the lamp is ', 'turn it down'), heardLine('typed', ''),
+       heardLine('turn it down', 'and the music')],
+}
+""")
+check("the ready-count probe rendered", "_error" not in d, d.get("_error", ""))
+_view = re.sub(r"<!-- -->", "", g("view"))
+check("a degraded row is not ready: '1 of 2 ready', amber",
+      d.get("count") == 1 and d.get("well") == 1
+      and re.search(r'<span class="ui-chip ui-tone-warn"[^>]*>.*?1 of 2 ready', _view) is not None, (d.get("count"), _view[:300]))
+check("...and the taskbar strip counts with the same function",
+      "readyCount(jobs)" in _code("ui/src/room/ModelStrip.jsx")
+      and "j.state === 'loaded' && !j.degraded" in _code("ui/src/room/ModelStrip.jsx"))
+check("a spoken line is appended to his draft, never replacing it",
+      d.get("hl") == ["turn it down", "the lamp is turn it down", "typed", "turn it down and the music"], d.get("hl"))
+_chat_now = re.sub(r"(?<![:'\"])//[^\n]*", "", re.sub(r"/\*.*?\*/", "", io.open(os.path.join(ROOT, "ui", "src", "Chat.jsx"), encoding="utf-8").read().replace('accept="image/*"', 'accept=""'), flags=re.S))
+check("a line said while she answers CUTS her reply and is sent the moment the abort lands (2026-10-29)",
+      "const line = heardLine(textNow.current, said)" in _chat_now
+      and re.search(r"if \(busy \|\| abort\.current\) \{ reply\.interrupt\(\); heardWaiting\.current = true; return \}", _chat_now) is not None
+      and re.search(r"useEffect\(\(\) => \{\s*if \(busy \|\| !heardWaiting\.current\) return\s*heardWaiting\.current = false\s*send\(textNow\.current\)\s*\}, \[busy\]\)", _chat_now) is not None)
+check("...and Chat speaks her reply ONLY through the cuttable reply (feed, flush), begun on the stop button's abort",
+      re.search(r"const r = reply\.begin\(\(\) => ac\.abort\(\)\)", _chat_now) is not None
+      and "reply.feed(r, spokenText, spoken.current)" in _chat_now
+      and "reply.flush(r, spokenText, spoken.current)" in _chat_now and "reply.end(r)" in _chat_now
+      and "speech.feed(" not in _chat_now and "speech.flush(" not in _chat_now)
+check("...and an interrupted reply keeps its text and says so, as a stopped one does",
+      "'interrupted — you started talking'" in _chat_now and "'stopped'" in _chat_now)
+
 # THE PORTRAIT'S DEFAULT FITS THE DESKTOP (stage 6, final wave): at 375 it ran 120..460.
 d = render(r"""
 import { defaultBox } from '../ui/src/room/Portrait.jsx'
@@ -1986,6 +2494,728 @@ check("the portrait's default box lies inside the desktop at every width; wide i
 check("...and on mount the default is fitted to the desktop's own box, not the window's",
       re.search(r"const b = b0\.fresh \? defaultBox\(a\) : b0", _code("ui/src/room/Portrait.jsx")) is not None
       and "{ ...defaultBox(area(null)), fresh: true }" in _code("ui/src/room/Portrait.jsx"))
+
+# ── DESKTOP FOLDERS + DOCK, the layout store (2026-10-29, task 1) ──
+# desktopLayout.js is driven under node with a Map-backed localStorage; each scenario writes
+# the storage it needs and the store reads it fresh (it keeps no cache of its own).
+d = render(r"""
+const mem = new Map()
+globalThis.localStorage = { getItem: k => mem.has(k) ? mem.get(k) : null,
+  setItem: (k, v) => { mem.set(k, String(v)) }, removeItem: k => { mem.delete(k) } }
+import { APPS, FOLDERS, DEFAULT_DOCK } from '../ui/src/appRegistry.jsx'
+import * as L from '../ui/src/desktopLayout.js'
+import * as V from '../ui/src/deskVisibility.js'
+import * as I from '../ui/src/deskIcons.js'
+const wipe = () => { mem.clear(); V.resetCache(); I.restoreRaw(null) }
+const out = {}
+const ids = APPS.map(a => a.id), fids = FOLDERS.map(f => f.id)
+out.badGroup = APPS.filter(a => a.group != null && !fids.includes(a.group)).map(a => a.id)
+out.folders = FOLDERS.map(f => f.id + ':' + f.title)
+out.groups = Object.fromEntries(fids.map(f => [f, APPS.filter(a => a.group === f).map(a => a.id)]))
+out.chat = L.folderOf('chat')
+out.dockDefault = L.dockItems()
+out.defaultConst = DEFAULT_DOCK
+// unknown ids are skipped
+mem.set('sp-dock-items', JSON.stringify(['chat', 'nope', 'models', 'chat']))
+mem.set('sp-desk-folders', JSON.stringify({ ghost: 'her', journal: 'nowhere' }))
+out.dockUnknown = L.dockItems()
+out.herWithGhost = L.appsIn('her')
+out.journalBadFolder = L.folderOf('journal')
+wipe()
+// the limits
+while (L.dockItems().length < 8) { const x = L.dockAdd(ids.find(i => !L.dockItems().includes(i))); if (!x.ok) break }
+out.eight = L.dockItems().length
+out.ninth = L.dockAdd(ids.find(i => !L.dockItems().includes(i)))
+out.dup = L.dockAdd(L.dockItems()[0])
+out.unknownAdd = L.dockAdd('nope')
+while (L.dockItems().length > 1) L.dockRemove(L.dockItems()[0])
+out.lastLeft = L.dockItems()
+out.removeLast = L.dockRemove(L.dockItems()[0])
+out.afterLast = L.dockItems()
+wipe()
+// alias semantics
+const before = L.folderOf('journal')
+const add = L.dockAdd('journal', 0)
+out.alias = { before, add, atZero: L.dockItems()[0], inFolder: L.folderOf('journal'), listed: L.appsIn('her').includes('journal') }
+L.dockRemove('journal')
+out.aliasAfter = { inFolder: L.folderOf('journal'), listed: L.appsIn('her').includes('journal') }
+L.dockAdd('journal', 0)
+L.dockMove(0, 2)
+out.moved = L.dockItems()
+wipe()
+// corrupt storage
+for (const k of ['sp-dock-items', 'sp-desk-folders', 'sp-desk-migrated-v1', 'sp-dock-hidden', 'sp-desk-icons']) mem.set(k, '{not json')
+out.corrupt = { dock: L.dockItems(), her: L.appsIn('her'), canUndo: L.canUndoMigration(), folder: L.folderOf('journal') }
+mem.set('sp-dock-items', '"a string"'); mem.set('sp-desk-folders', '[1,2]')
+out.wrongShape = { dock: L.dockItems(), folder: L.folderOf('journal') }
+wipe()
+// hidden apps are hidden in folders (registry defaults: music/games start hidden; then he hides journal)
+out.togetherDefault = L.appsIn('together')
+mem.set('sp-dock-hidden', JSON.stringify(['music', 'journal'])); V.resetCache()
+out.togetherHidden = L.appsIn('together')
+out.herHidden = L.appsIn('her')
+out.pinnedKept = L.appsIn('system').includes('apps')
+mem.set('sp-dock-hidden', JSON.stringify(['apps'])); V.resetCache()
+out.pinnedStill = L.appsIn('system').includes('apps')
+wipe()
+// moving
+L.moveToFolder('journal', 'home'); out.moved1 = { f: L.folderOf('journal'), home: L.appsIn('home').includes('journal'), her: L.appsIn('her').includes('journal') }
+L.moveToFolder('journal', null);   out.moved2 = { f: L.folderOf('journal'), her: L.appsIn('her').includes('journal') }
+L.moveToFolder('chat', 'her');     out.moved3 = L.folderOf('chat')
+L.moveToFolder('chat', 'nowhere'); out.moved4 = L.folderOf('chat')
+wipe()
+// migration: old positions kept, undo restores them exactly
+const old = JSON.stringify({ journal: { x: 40, y: 90 }, memory: { x: 300, y: 12 }, chat: { x: 5, y: 6 } })
+mem.set('sp-desk-icons', old)
+out.canBefore = L.canUndoMigration()
+L.migrateOnce()
+out.afterMig = { icons: mem.get('sp-desk-icons'), can: L.canUndoMigration(), f: L.folderOf('journal'), her: L.appsIn('her').includes('journal') }
+L.migrateOnce(); out.idempotent = { can: L.canUndoMigration() }
+L.moveToFolder('journal', 'home')
+I.place('journal', 700, 700)          // he keeps arranging after the upgrade
+L.undoMigration()
+out.afterUndo = { icons: mem.get('sp-desk-icons'), cache: JSON.stringify(I.positions()), can: L.canUndoMigration(),
+                  folder: L.folderOf('journal'), loose: ids.filter(i => L.folderOf(i) !== null) }
+L.migrateOnce(); out.noRemigrate = { f: L.folderOf('journal'), icons: mem.get('sp-desk-icons') }
+out.old = old
+wipe()
+// a fresh browser: nothing to restore; dismissing ends the offer
+L.migrateOnce(); out.freshCan = L.canUndoMigration()
+mem.set('sp-desk-migrated-v1', JSON.stringify({ icons: old, undone: false })); out.hasBackup = L.canUndoMigration()
+L.dismissUndo(); out.dismissed = L.canUndoMigration()
+// onChange
+wipe()
+let ticks = 0; const un = L.onChange(() => ticks++)
+L.dockAdd('journal'); L.moveToFolder('memory', null); un(); L.dockAdd('agency')
+out.ticks = ticks
+""")
+check("the layout-store probe rendered", "_error" not in d, d.get("_error", ""))
+_exp_groups = {"her": ["journal", "agency", "memory", "decisions", "wardrobe", "presence"],
+               "together": ["music", "games", "story", "stage"],
+               "lookup": ["search", "research", "librarians", "files", "board"],
+               "home": ["house", "body", "senses", "roomview", "room"],
+               "system": ["settings", "models", "launch", "setup", "voice", "tools", "ledger", "apps"]}
+_got_groups = d.get("groups") or {}
+check("every app has a known group or none",
+      d.get("badGroup") == [] and {k: sorted(v) for k, v in _got_groups.items()} == {k: sorted(v) for k, v in _exp_groups.items()}
+      and d.get("folders") == ["her:Her", "together:Together", "lookup:Look it up", "home:Home", "system:System"],
+      (d.get("badGroup"), _got_groups, d.get("folders")))
+check("chat has no group", "_error" not in d and "chat" in d and d.get("chat") is None, d.get("chat", "<missing>"))
+check("default dock is chat voice music search memory models",
+      d.get("dockDefault") == ["chat", "voice", "music", "search", "memory", "models"] == d.get("defaultConst"), d.get("dockDefault"))
+check("unknown ids are skipped (dock, folders) and repeats collapse",
+      d.get("dockUnknown") == ["chat", "models"] and "ghost" not in (d.get("herWithGhost") or ["ghost"])
+      and d.get("journalBadFolder") == "her", (d.get("dockUnknown"), d.get("herWithGhost"), d.get("journalBadFolder")))
+_ninth, _last = d.get("ninth") or {}, d.get("removeLast") or {}
+check("dock refuses a ninth and the last (with a reason)",
+      d.get("eight") == 8 and _ninth.get("ok") is False and len(_ninth.get("why") or "") > 3
+      and (d.get("dup") or {}).get("ok") is False and (d.get("unknownAdd") or {}).get("ok") is False
+      and len(d.get("lastLeft") or []) == 1 and _last.get("ok") is False and len(_last.get("why") or "") > 3
+      and d.get("afterLast") == d.get("lastLeft"), (d.get("eight"), _ninth, _last))
+_al = d.get("alias") or {}
+check("alias: docking keeps folder membership, and so does undocking",
+      _al.get("before") == "her" and (_al.get("add") or {}).get("ok") is True and _al.get("atZero") == "journal"
+      and _al.get("inFolder") == "her" and _al.get("listed") is True
+      and d.get("aliasAfter") == {"inFolder": "her", "listed": True}
+      and d.get("moved") == ["chat", "voice", "journal", "music", "search", "memory", "models"], (d.get("alias"), d.get("moved")))
+check("corrupt storage falls back to defaults",
+      d.get("corrupt") == {"dock": ["chat", "voice", "music", "search", "memory", "models"],
+                           "her": ["wardrobe", "memory", "decisions", "agency", "journal", "presence"],  # registry order
+                           "canUndo": False, "folder": "her"}
+      and (d.get("wrongShape") or {}).get("dock") == ["chat", "voice", "music", "search", "memory", "models"]
+      and (d.get("wrongShape") or {}).get("folder") == "her", (d.get("corrupt"), d.get("wrongShape")))
+check("a fresh browser shows music and games in Together; his stored hides still hide; a pinned app is never hidden",
+      d.get("togetherDefault") == ["music", "story", "stage", "games"]
+      and d.get("togetherHidden") == ["story", "stage", "games"]
+      and "journal" not in (d.get("herHidden") or ["journal"]) and "memory" in (d.get("herHidden") or [])
+      and d.get("pinnedKept") is True and d.get("pinnedStill") is True,
+      (d.get("togetherDefault"), d.get("togetherHidden"), d.get("herHidden"), d.get("pinnedStill")))
+check("moving: folder to folder, to loose, never to a folder that is not there",
+      d.get("moved1") == {"f": "home", "home": True, "her": False}
+      and d.get("moved2") == {"f": None, "her": False} and d.get("moved3") == "her" and d.get("moved4") == "her",
+      (d.get("moved1"), d.get("moved2"), d.get("moved3"), d.get("moved4")))
+_am, _au = d.get("afterMig") or {}, d.get("afterUndo") or {}
+check("migration keeps old positions and undo restores them exactly",
+      d.get("canBefore") is False and _am.get("icons") == d.get("old") and _am.get("can") is True and _am.get("f") == "her"
+      and (d.get("idempotent") or {}).get("can") is True
+      and _au.get("icons") == d.get("old") and _au.get("cache") == d.get("old") and _au.get("can") is False,
+      (d.get("old"), _am, _au))
+check("...undo returns every app to a loose icon, and a later load does not migrate again",
+      _au.get("folder") is None and _au.get("loose") == [] and (d.get("noRemigrate") or {}).get("f") is None
+      and (d.get("noRemigrate") or {}).get("icons") == d.get("old"), (_au.get("loose"), d.get("noRemigrate")))
+check("a fresh browser has nothing to undo; a real backup can be dismissed",
+      d.get("freshCan") is False and d.get("hasBackup") is True and d.get("dismissed") is False,
+      (d.get("freshCan"), d.get("hasBackup"), d.get("dismissed")))
+check("onChange fires per change and stops after unsubscribe", d.get("ticks") == 2, d.get("ticks"))
+_src_files = glob.glob(os.path.join(ROOT, "ui", "src", "**", "*.js*"), recursive=True)
+check("deskVisibility keeps sp-dock-hidden, and dockPrefs is gone from the source",
+      "sp-dock-hidden" in _code("ui/src/deskVisibility.js") and not os.path.exists(os.path.join(ROOT, "ui", "src", "dockPrefs.js"))
+      and _src_files and all("dockPrefs" not in _code(os.path.relpath(f, ROOT)) for f in _src_files))
+
+# ── DESKTOP FOLDERS, on the desktop (2026-10-29, task 2) ──
+# DeskIcons is server-rendered against a Map-backed localStorage; the folder panel's dismissal,
+# its keyboard, and the shared drag controller are driven under node with stub documents and
+# rects. No DOM here, so each behaviour lives in a function the component calls — and these
+# legs call that same function, never a copy of it.
+d = render(r"""
+const mem = new Map()
+globalThis.localStorage = { getItem: k => mem.has(k) ? mem.get(k) : null,
+  setItem: (k, v) => { mem.set(k, String(v)) }, removeItem: k => { mem.delete(k) } }
+globalThis.window = { innerWidth: 1440, innerHeight: 900, addEventListener() {}, removeEventListener() {} }
+import { APPS, FOLDERS } from '../ui/src/appRegistry.jsx'
+import * as L from '../ui/src/desktopLayout.js'
+import * as V from '../ui/src/deskVisibility.js'
+import * as I from '../ui/src/deskIcons.js'
+import * as drag from '../ui/src/room/deskDrag.js'
+import DeskIcons, { clampAll, folderZone, panelZone, dropLoose, ICON_W, ICON_H } from '../ui/src/room/DeskIcons.jsx'
+import { FolderIcon, FolderPanel, panelKey, panelPos, watchDismiss } from '../ui/src/room/Folder.jsx'
+const wipe = () => { mem.clear(); V.resetCache(); I.restoreRaw(null) }
+const out = {}
+const labels = (s) => [...s.matchAll(/class="dsk-lb">([^<]*)</g)].map(m => m[1])
+// (1) folders render instead of their apps
+wipe()
+out.fresh = html(h(DeskIcons))
+out.freshLabels = labels(out.fresh)
+out.foldCount = (out.fresh.match(/class="dsk-icon dsk-fold[ "]/g) || []).length
+const her = out.fresh.split('aria-label="Her folder')[1] || ''
+out.herGlyphs = (her.split('</button>')[0].match(/dsk-fold-g/g) || []).length
+L.moveToFolder('journal', null)
+out.outLabels = labels(html(h(DeskIcons)))
+wipe()
+// (2) the panel: rendered, and dismissed by Escape and an outside click — never mid-drag
+const herApps = L.appsIn('her').map(id => APPS.find(a => a.id === id))
+out.panel = html(h(FolderPanel, { folder: FOLDERS[0], apps: herApps, pos: { x: 10, y: 10 },
+  area: { w: 1200, h: 800 }, onClose() {}, onOpenApp() {}, onItemDown() {} }))
+const docL = {}
+const fdoc = { addEventListener(t, f) { (docL[t] = docL[t] || []).push(f) },
+               removeEventListener(t, f) { docL[t] = (docL[t] || []).filter(x => x !== f) } }
+const fire = (t, e) => (docL[t] || []).slice().forEach(f => f(e))
+let closes = 0, busy = false
+const INSIDE = { id: 'inside' }, OUTSIDE = { id: 'outside' }
+const un = watchDismiss(fdoc, { inside: t => t === INSIDE, close: () => { closes++ }, busy: () => busy })
+const ev = (o) => ({ preventDefault() {}, stopPropagation() {}, ...o })
+fire('keydown', ev({ key: 'a' }));          out.afterA = closes
+fire('keydown', ev({ key: 'Escape' }));     out.afterEsc = closes
+fire('mousedown', ev({ target: INSIDE }));  out.afterInside = closes
+fire('mousedown', ev({ target: OUTSIDE })); out.afterOutside = closes
+busy = true
+fire('keydown', ev({ key: 'Escape' })); fire('mousedown', ev({ target: OUTSIDE })); out.whileBusy = closes
+busy = false
+un()
+fire('keydown', ev({ key: 'Escape' })); out.afterUnsub = closes
+out.leftover = Object.values(docL).reduce((n, a) => n + a.length, 0)
+// (3) drag: out of a folder makes a loose icon at the drop point; onto a folder moves it in
+wipe()
+const layer = { left: 100, top: 34, width: 1000, height: 700 }
+const homeRect = { left: 300, top: 300, width: 88, height: 84 }
+const panelRect = { left: 600, top: 100, width: 260, height: 220 }
+const inR = (r) => (x, y) => x >= r.left && x < r.left + r.width && y >= r.top && y < r.top + r.height
+const offHome = drag.addZone(folderZone('home', inR(homeRect)))
+const offPanel = drag.addZone(panelZone('her', inR(panelRect)))
+const run = (item, pts, hooks = {}) => { const c = drag.start(item, pts[0][0], pts[0][1], hooks)
+  for (const p of pts.slice(1, -1)) c.move(p[0], p[1]); const last = pts[pts.length - 1]; return c.up(last[0], last[1]) }
+const toDesk = (x, y) => dropLoose('journal', x, y, layer)
+out.r1 = run({ kind: 'app', id: 'journal', from: 'her' }, [[650, 150], [660, 160], [500, 400], [500, 400]], { onDrop: toDesk })
+out.loose = { f: L.folderOf('journal'), pos: I.posOf('journal'), her: L.appsIn('her').includes('journal') }
+out.r2 = run({ kind: 'app', id: 'journal', from: null }, [[500, 400], [520, 410], [320, 330], [320, 330]], { onDrop: () => { out.wrongDrop = true } })
+out.inHome = { f: L.folderOf('journal'), home: L.appsIn('home').includes('journal') }
+out.r3 = run({ kind: 'app', id: 'memory', from: 'her' }, [[650, 150], [652, 151], [651, 152]], { onClick: () => { out.clicked = true }, onDrop: () => { out.wrongDrop = true } })
+out.r4 = run({ kind: 'app', id: 'memory', from: 'her' }, [[650, 150], [700, 200], [700, 200]], { onDrop: () => { out.wrongDrop = true } })
+out.memStill = L.folderOf('memory')
+out.r5 = run({ kind: 'folder', id: 'folder:her' }, [[10, 10], [320, 330], [320, 330]], { onDrop: () => { out.folderDesk = true } })
+out.edge = (dropLoose('agency', 5000, 5000, layer), I.posOf('agency'))
+offHome(); offPanel()
+out.zonesAfter = drag.zoneAt(320, 330, { kind: 'app', id: 'x', from: null })
+// (4) folders clamp on resize, the same rule as the icons
+wipe()
+I.place('folder:her', 3000, 3000); I.place('journal', 2000, 10)
+clampAll(800, 600)
+out.clamped = { her: I.posOf('folder:her'), journal: I.posOf('journal') }
+// (5) keyboard: Enter opens a folder; arrows move inside the panel, Enter opens an app
+let opened = 0
+const icon = FolderIcon({ folder: FOLDERS[0], apps: herApps, pos: { x: 0, y: 0 }, onOpen: () => { opened++ }, onDown() {} })
+icon.props.onKeyDown(ev({ key: 'Enter' })); icon.props.onKeyDown(ev({ key: 'x' }))
+out.iconOpened = opened
+icon.props.onDoubleClick(ev({})); out.iconDbl = opened
+out.keys = { right: panelKey('ArrowRight', 0, 6), left0: panelKey('ArrowLeft', 0, 6), down: panelKey('ArrowDown', 1, 6),
+             downEdge: panelKey('ArrowDown', 4, 6), up: panelKey('ArrowUp', 4, 6), end: panelKey('End', 0, 6),
+             home: panelKey('Home', 5, 6), enter: panelKey('Enter', 2, 6), other: panelKey('q', 2, 6) }
+out.pos = { right: panelPos({ x: 20, y: 20 }, 6, { w: 1200, h: 800 }), flip: panelPos({ x: 1100, y: 20 }, 6, { w: 1200, h: 800 }),
+            low: panelPos({ x: 20, y: 760 }, 6, { w: 1200, h: 800 }), phone: panelPos({ x: 200, y: 20 }, 6, { w: 375, h: 700 }) }
+""")
+check("the folders probe rendered", "_error" not in d, d.get("_error", ""))
+check("folders render instead of their apps",
+      d.get("foldCount") == 5 and d.get("freshLabels") == ["Her", "Together", "Look it up", "Home", "System"]
+      and d.get("herGlyphs") == 4, (d.get("foldCount"), d.get("freshLabels"), d.get("herGlyphs")))
+check("...and an app taken out of its folder is a loose icon again",
+      d.get("outLabels") == ["Her", "Together", "Look it up", "Home", "System", "Journal"], d.get("outLabels"))
+_pn = grab(d, "panel")
+check("the open panel is a named group of its apps, the first one in the tab order",
+      'aria-label="Her"' in _pn and _pn.count('class="dsk-fold-item') == 6 and _pn.count('tabindex="0"') == 1
+      and ">Journal<" in _pn and "dsk-fold-panel" in _pn, _pn[:300])
+check("panel closes on Escape and outside click",
+      (d.get("afterA"), d.get("afterEsc"), d.get("afterInside"), d.get("afterOutside")) == (0, 1, 1, 2),
+      (d.get("afterA"), d.get("afterEsc"), d.get("afterInside"), d.get("afterOutside")))
+check("...but not while a drag is in flight, and never after it is unwatched",
+      d.get("whileBusy") == 2 and d.get("afterUnsub") == 2 and d.get("leftover") == 0,
+      (d.get("whileBusy"), d.get("afterUnsub"), d.get("leftover")))
+_lp = (d.get("loose") or {}).get("pos") or {}
+check("drag out makes a loose icon",
+      d.get("r1") == "desk" and (d.get("loose") or {}).get("f") is None and (d.get("loose") or {}).get("her") is False
+      and _lp == {"x": round(500 - 100 - 88 / 2), "y": round(400 - 34 - 84 / 2)}, (d.get("r1"), d.get("loose")))
+check("...dropping on a folder moves it in; a click is a click; a drop back inside its own panel changes nothing",
+      d.get("r2") == "zone:folder:home" and d.get("inHome") == {"f": "home", "home": True}
+      and d.get("r3") == "click" and d.get("clicked") is True and d.get("r4") == "zone:panel:her"
+      and d.get("memStill") == "her" and not d.get("wrongDrop"),
+      (d.get("r2"), d.get("inHome"), d.get("r3"), d.get("r4"), d.get("memStill"), d.get("wrongDrop")))
+check("...a folder is never dropped into a folder, a loose drop stays on the desktop, and zones unregister",
+      d.get("r5") == "desk" and d.get("folderDesk") is True and d.get("zonesAfter") is None
+      and d.get("edge") == {"x": 1000 - 88 - 8, "y": 700 - 84 - 8}, (d.get("r5"), d.get("edge"), d.get("zonesAfter")))
+check("folders clamp on resize",
+      d.get("clamped") == {"her": {"x": 800 - 88 - 8, "y": 600 - 84 - 8}, "journal": {"x": 800 - 88 - 8, "y": 10}},
+      d.get("clamped"))
+_k = d.get("keys") or {}
+check("folder keyboard: Enter opens, arrows move",
+      d.get("iconOpened") == 1 and d.get("iconDbl") == 2
+      and _k.get("right") == {"i": 1} and _k.get("left0") == {"i": 0} and _k.get("down") == {"i": 4}
+      and _k.get("downEdge") == {"i": 4} and _k.get("up") == {"i": 1} and _k.get("end") == {"i": 5}
+      and _k.get("home") == {"i": 0} and _k.get("enter") == {"i": 2, "open": True} and _k.get("other") is None,
+      (d.get("iconOpened"), d.get("iconDbl"), _k))
+_pp = d.get("pos") or {}
+check("the panel opens beside its folder and stays on the desktop",
+      _pp.get("right", {}).get("x") == 20 + 88 + 8 and _pp.get("flip", {}).get("x", 9999) + _pp.get("flip", {}).get("w", 0) <= 1100
+      and _pp.get("low", {}).get("y", 9999) + _pp.get("low", {}).get("h", 0) <= 800 - 8
+      and 0 <= _pp.get("phone", {}).get("x", -1) and _pp.get("phone", {}).get("x", 0) + _pp.get("phone", {}).get("w", 9999) <= 375,
+      _pp)
+# EVERY NEW ANIMATION IS IN REDUCED MOTION: each dsk-fold rule that animates or transitions is
+# named again inside a prefers-reduced-motion block that turns that property off.
+_shell_css = re.sub(r"/\*.*?\*/", "", io.open(os.path.join(ROOT, "ui/src/room/shell.css"), encoding="utf-8").read(), flags=re.S)
+_rm_off = {"animation": set(), "transition": set()}
+for _mq in re.finditer(r"@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{(.*?)\}\s*\}", _shell_css, re.S):
+    for _rule in re.finditer(r"([^{}]+)\{([^{}]*)\}", _mq.group(1) + "}"):
+        for _p in _rm_off:
+            if re.search(_p + r"\s*:\s*none", _rule.group(2)):
+                _rm_off[_p] |= {s.strip() for s in _rule.group(1).split(",")}
+_no_media = re.sub(r"@media[^{]*\{(?:[^{}]*\{[^{}]*\})*\s*\}", "", _shell_css)
+_animated = [(s.strip(), p) for r in re.finditer(r"([^{}@]+)\{([^{}]*)\}", _no_media)
+             for p in ("animation", "transition") if re.search(r"(?<![\w-])" + p + r"\s*:\s*(?!none)", r.group(2))
+             for s in r.group(1).split(",") if "dsk-fold" in s]
+_missing = [x for x in _animated if x[0] not in _rm_off[x[1]]]
+check("new animations are in reduced-motion", bool(_animated) and not _missing, (_animated, _missing))
+
+# ── THE DOCK (2026-10-29, task 3) ──
+# Dock.jsx is server-rendered against a Map-backed localStorage and the real window manager;
+# its press (deskDrag.begin) is driven through stub window events, its drop zone through
+# deskDrag.start, and the Apps window's buttons are found in AppsView's element tree and
+# pressed. No DOM: each behaviour is a function the component calls, and these legs call it.
+d = render(r"""
+const mem = new Map()
+globalThis.localStorage = { getItem: k => mem.has(k) ? mem.get(k) : null,
+  setItem: (k, v) => { mem.set(k, String(v)) }, removeItem: k => { mem.delete(k) } }
+const wl = {}
+globalThis.window = { innerWidth: 1440, innerHeight: 900,
+  addEventListener(t, f) { (wl[t] = wl[t] || []).push(f) },
+  removeEventListener(t, f) { wl[t] = (wl[t] || []).filter(x => x !== f) },
+  matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }) }
+globalThis.document = { body: { classList: { add() {}, remove() {} } } }
+import { APPS, FOLDERS } from '../ui/src/appRegistry.jsx'
+import * as L from '../ui/src/desktopLayout.js'
+import * as V from '../ui/src/deskVisibility.js'
+import * as I from '../ui/src/deskIcons.js'
+import * as wm from '../ui/src/windowManager.js'
+import * as drag from '../ui/src/room/deskDrag.js'
+import Dock, { DockView, DockItem, dockShown, dockZone, dockPress, insertAt, HINT } from '../ui/src/room/Dock.jsx'
+import DeskIcons, { folderZone, dropOnlyPos } from '../ui/src/room/DeskIcons.jsx'
+import Apps, { AppsView, appsProps } from '../ui/src/apps/Apps.jsx'
+const wipe = () => { mem.clear(); V.resetCache(); I.restoreRaw(null) }
+const closeAll = () => wm.getWindows().map(w => w.appId).forEach(id => wm.close(id))
+const out = {}
+const app = (id) => APPS.find(a => a.id === id)
+const ev = (o) => ({ button: 0, preventDefault() {}, stopPropagation() {}, ...o })
+const fireW = (t, e) => (wl[t] || []).slice().forEach(f => f(e))
+const items = (s) => [...s.matchAll(/class="(dock-item[^"]*)"[^>]*data-app="(\w+)"/g)].map(m => [m[2], m[1]])
+const inR = (r) => (x, y) => x >= r.left && x < r.left + r.width && y >= r.top && y < r.top + r.height
+// (1) the six defaults, in order
+wipe()
+out.fresh = html(h(Dock))
+out.freshIds = items(out.fresh).map(x => x[0])
+// (2) a single click opens; a second click focuses the same window; a minimised one comes back
+const hints = []
+const deps = { onHint: (t) => hints.push(t), onGhost() {}, onDrag() {} }
+const press = (a, i, from, to) => {
+  dockPress(a, i, ev({ clientX: from[0], clientY: from[1] }), deps)
+  if (to[0] !== from[0] || to[1] !== from[1]) fireW('mousemove', ev({ clientX: to[0], clientY: to[1] }))
+  fireW('mouseup', ev({ clientX: to[0], clientY: to[1] }))
+}
+press(app('chat'), 0, [520, 820], [520, 820])
+press(app('chat'), 0, [520, 820], [521, 821])
+out.chatWins = wm.getWindows().filter(w => w.appId === 'chat').length
+wm.minimize('chat', { delay: 0 })
+press(app('chat'), 0, [520, 820], [520, 820])
+out.chatBack = wm.getWindows().filter(w => w.appId === 'chat').map(w => w.minimized)
+let kOpened = 0
+const di = DockItem({ app: app('voice'), index: 1, open: false, onOpen: () => { kOpened++ }, onDown() {} })
+di.props.onKeyDown(ev({ key: 'Enter' })); di.props.onKeyDown(ev({ key: 'x' })); di.props.onKeyDown(ev({ key: ' ' }))
+out.kOpened = kOpened
+out.itemTag = di.type
+out.listeners = Object.values(wl).reduce((n, a) => n + a.length, 0)
+// (3) the dot: any app with a window, minimised included
+wm.open('voice', app('voice')); wm.open('music', app('music')); wm.minimize('music', { delay: 0 })
+out.dots = Object.fromEntries(items(html(h(Dock))))
+out.isOpen = { music: wm.isOpen('music'), search: wm.isOpen('search') }
+out.musicLabel = (html(h(Dock)).match(/aria-label="(Music[^"]*)"/) || [])[1]
+// (4) hidden while a window is maximised (a minimised maximised one does not count)
+out.beforeMax = html(h(Dock)).includes('dock-hidden')
+wm.maximize('voice')
+out.maxed = wm.anyMaximized()
+out.whileMax = /class="dock[ "][^"]*dock-hidden/.test(html(h(Dock)))
+wm.minimize('voice', { delay: 0 })
+out.minMax = wm.anyMaximized()
+out.afterMin = html(h(Dock)).includes('dock-hidden')
+out.shown = {
+  none: dockShown({ maxed: false }), maxed: dockShown({ maxed: true }),
+  edge: dockShown({ maxed: true, near: true }), over: dockShown({ maxed: true, over: true }),
+  drag: dockShown({ maxed: true, dragging: true }), focus: dockShown({ maxed: true, focused: true }),
+}
+closeAll()
+// (5) drag on, drag off, reorder — and the refusals, with a hint
+wipe(); hints.length = 0
+const dockRect = { left: 500, top: 800, width: 400, height: 60 }
+const centers = () => L.dockItems().map((_, i) => 525 + 50 * i)
+const homeRect = { left: 300, top: 300, width: 88, height: 84 }
+const offDock = drag.addZone(dockZone({ hit: inR(dockRect), indexAt: (x) => insertAt(x, centers()), onHint: (t) => hints.push(t) }))
+const offHome = drag.addZone(folderZone('home', inR(homeRect)))
+const run = (item, pts, hooks = {}) => { const c = drag.start(item, pts[0][0], pts[0][1], hooks)
+  for (const p of pts.slice(1, -1)) c.move(p[0], p[1]); const last = pts[pts.length - 1]; return c.up(last[0], last[1]) }
+out.on = run({ kind: 'app', id: 'journal', from: 'her' }, [[100, 100], [140, 140], [560, 820], [560, 820]],
+             { onZone: (z) => { out.onZoneAlias = z.alias === true } })
+out.onDock = L.dockItems(); out.onFolder = L.folderOf('journal')
+out.re = run({ kind: 'dock', id: 'chat', index: 0 }, [[525, 820], [560, 820], [710, 820], [710, 820]])
+out.reDock = L.dockItems()
+press(app('search'), L.dockItems().indexOf('search'), [700, 820], [100, 100])
+out.offDock = L.dockItems()
+press(app('memory'), L.dockItems().indexOf('memory'), [700, 820], [320, 330])
+out.offOnFolder = { dock: L.dockItems().includes('memory'), folder: L.folderOf('memory') }
+out.hintsOk = hints.slice()
+wipe(); hints.length = 0
+L.dockAdd('journal'); L.dockAdd('agency')
+out.full = L.dockItems().length
+out.ninth = run({ kind: 'app', id: 'decisions', from: 'her' }, [[100, 100], [140, 140], [560, 820], [560, 820]])
+out.ninthDock = L.dockItems().length
+out.ninthHint = hints.slice()
+mem.set('sp-dock-items', JSON.stringify(['chat'])); hints.length = 0
+press(app('chat'), 0, [525, 820], [100, 100])
+out.last = L.dockItems(); out.lastHint = hints.slice()
+offDock(); offHome()
+out.hintView = html(h(DockView, { apps: [app('chat')], openIds: new Set(), hidden: false, hint: HINT.full }))
+out.ins = [insertAt(400, [525, 575]), insertAt(550, [525, 575]), insertAt(900, [525, 575])]
+// (6) the store's version, one tick per change
+wipe()
+const v0 = L.getVersion(); L.dockAdd('journal'); out.ver = L.getVersion() - v0
+// (7) the Apps window: add to dock; the undo, its words, and what it does
+wipe()
+mem.set('sp-desk-icons', JSON.stringify({ journal: { x: 300, y: 200 } })); I.restoreRaw(mem.get('sp-desk-icons'))
+L.migrateOnce()
+out.apps = html(h(Apps))
+const find = (el, pred) => {
+  if (!el || typeof el !== 'object') return null
+  if (Array.isArray(el)) { for (const x of el) { const r = find(x, pred); if (r) return r } return null }
+  if (el.props && pred(el.props)) return el
+  return find(el.props && el.props.children, pred)
+}
+let appsHint = null
+const view = () => AppsView(appsProps((t) => { appsHint = t }))
+const addJ = find(view(), p => p['aria-label'] === 'add Journal to the dock')
+if (addJ) addJ.props.onClick()
+out.addedJ = L.dockItems().includes('journal')
+out.inDockJ = !!find(view(), p => p['aria-label'] === 'remove Journal from the dock')
+L.dockAdd('agency')
+const addD = find(view(), p => p['aria-label'] === 'add Decisions to the dock')
+if (addD) addD.props.onClick()
+out.appsFullHint = appsHint
+const undo = find(view(), p => p.children === 'undo — put my icons back')
+if (undo) undo.props.onClick()
+out.undone = { can: L.canUndoMigration(), pos: I.posOf('journal'), f: L.folderOf('journal'), stillOffered: !!find(view(), p => p.children === 'undo — put my icons back') }
+// (8) after the undo, empty folders stay off his restored column — except as drop targets mid-drag
+const folds = (s) => (s.match(/class="dsk-icon dsk-fold[ "]/g) || []).length
+out.undoFolds = folds(html(h(DeskIcons)))
+const c = drag.start({ kind: 'app', id: 'journal', from: null }, 0, 0, {})
+c.move(40, 40)
+out.dragFolds = folds(html(h(DeskIcons)))
+c.cancel()
+out.afterFolds = folds(html(h(DeskIcons)))
+L.moveToFolder('journal', 'her')
+out.oneFold = folds(html(h(DeskIcons)))
+wipe()
+out.notUndoneEmpty = (() => { for (const id of L.appsIn('home')) L.moveToFolder(id, null); return folds(html(h(DeskIcons))) })()
+// (9) (into Home, the fourth empty folder: unpinned it would jump to the first folder slot) a drop-only folder that takes a drop stays exactly where it was drawn, and no loose icon moves
+const posOfFolder = (s, title) => { const m = s.match(new RegExp('style="left:(\\d+)px;top:(\\d+)px[^"]*" aria-label="' + title + ' folder')); return m ? [+m[1], +m[2]] : null }
+const loosePos = (s) => Object.fromEntries([...s.matchAll(/<button class="dsk-icon(?![^"]*dsk-fold)[^"]*" style="left:(\d+)px;top:(\d+)px[^>]*>(?:(?!<\/button>).)*?class="dsk-lb">([^<]*)</g)].map(m => [m[3], [+m[1], +m[2]]]))
+wipe()
+mem.set('sp-desk-icons', JSON.stringify({ journal: { x: 300, y: 200 } })); I.restoreRaw(mem.get('sp-desk-icons'))
+L.migrateOnce(); L.undoMigration()
+const c2 = drag.start({ kind: 'app', id: 'journal', from: null }, 300, 200, {})
+c2.move(340, 240)
+const during = html(h(DeskIcons))
+out.pinDrawn = posOfFolder(during, 'Home')
+out.pinLooseBefore = loosePos(during)
+const homeZone = drag.addZone(folderZone('home', (x, y) => x >= 900 && y >= 500, null, () => dropOnlyPos('home', 900)))
+out.pinDrop = c2.up(950, 550)
+homeZone()
+const after = html(h(DeskIcons))
+out.pinAfter = posOfFolder(after, 'Home')
+out.pinLooseAfter = loosePos(after)
+out.pinIn = L.folderOf('journal')
+// (10) the refusal words live in the store, once: callers show r.why and never re-check the limit
+wipe()
+for (const id of APPS.map(a => a.id)) if (L.dockItems().length < L.DOCK_MAX) L.dockAdd(id)
+const outsider = APPS.map(a => a.id).find(id => !L.dockItems().includes(id))
+out.words = { max: L.DOCK_MAX, full: L.DOCK_HINT.full, last: L.DOCK_HINT.last,
+              addWhy: L.dockAdd(outsider).why, removeWhy: (mem.set('sp-dock-items', JSON.stringify(['chat'])), L.dockRemove('chat').why) }
+""")
+check("the dock probe rendered", "_error" not in d, d.get("_error", ""))
+check("dock renders the six defaults",
+      d.get("freshIds") == ["chat", "voice", "music", "search", "memory", "models"]
+      and 'aria-label="Dock"' in grab(d, "fresh"), d.get("freshIds"))
+check("single click opens or focuses",
+      d.get("chatWins") == 1 and d.get("chatBack") == [False] and d.get("kOpened") == 2
+      and d.get("itemTag") == "button" and d.get("listeners") == 0,
+      (d.get("chatWins"), d.get("chatBack"), d.get("kOpened"), d.get("itemTag"), d.get("listeners")))
+_dots = d.get("dots") or {}
+check("dot for open and minimised apps",
+      "dock-open" in _dots.get("voice", "") and "dock-open" in _dots.get("music", "")
+      and "dock-open" not in _dots.get("search", "x dock-open")
+      and d.get("isOpen") == {"music": True, "search": False} and "open" in (d.get("musicLabel") or ""),
+      (_dots, d.get("isOpen"), d.get("musicLabel")))
+_sh = d.get("shown") or {}
+check("hides while a window is maximised",
+      d.get("beforeMax") is False and d.get("maxed") is True and d.get("whileMax") is True
+      and d.get("minMax") is False and d.get("afterMin") is False
+      and _sh == {"none": True, "maxed": False, "edge": True, "over": True, "drag": True, "focus": True},
+      (d.get("beforeMax"), d.get("maxed"), d.get("whileMax"), d.get("minMax"), d.get("afterMin"), _sh))
+check("drag on adds an alias at the hovered index; drag within reorders; drag off removes",
+      d.get("on") == "zone:dock" and d.get("onZoneAlias") is True
+      and d.get("onDock") == ["chat", "journal", "voice", "music", "search", "memory", "models"]
+      and d.get("onFolder") == "her"
+      and d.get("re") == "zone:dock" and d.get("reDock") == ["journal", "voice", "music", "chat", "search", "memory", "models"]
+      and "search" not in (d.get("offDock") or ["search"])
+      and d.get("offOnFolder") == {"dock": False, "folder": "her"} and d.get("hintsOk") == [],
+      (d.get("on"), d.get("onDock"), d.get("re"), d.get("reDock"), d.get("offDock"), d.get("offOnFolder"), d.get("hintsOk")))
+check("refuses ninth / last with a hint",
+      d.get("full") == 8 and d.get("ninth") == "zone:dock" and d.get("ninthDock") == 8
+      and d.get("ninthHint") == ["the dock holds 8"]
+      and d.get("last") == ["chat"] and d.get("lastHint") == ["the dock needs at least one"]
+      and 'class="dock-hint"' in grab(d, "hintView") and "the dock holds 8" in grab(d, "hintView")
+      and 'role="status"' in grab(d, "hintView") and d.get("ins") == [0, 1, 2],
+      (d.get("full"), d.get("ninth"), d.get("ninthDock"), d.get("ninthHint"), d.get("last"), d.get("lastHint"), d.get("ins")))
+check("desktopLayout.getVersion ticks once per change, and DeskIcons keeps no counter of its own",
+      d.get("ver") == 1 and "layoutV" not in _code("ui/src/room/DeskIcons.jsx")
+      and "layout.getVersion" in _code("ui/src/room/DeskIcons.jsx") and "layout.getVersion" in _code("ui/src/room/Dock.jsx"),
+      d.get("ver"))
+_ud = d.get("undone") or {}
+_ap = grab(d, "apps")
+check("Apps window can add to dock and undo the migration",
+      "undo — put my icons back" in _ap and "old icon positions" in _ap and "replaced" in _ap
+      and d.get("addedJ") is True and d.get("inDockJ") is True and d.get("appsFullHint") == "the dock holds 8"
+      and _ud == {"can": False, "pos": {"x": 300, "y": 200}, "f": None, "stillOffered": False},
+      (d.get("addedJ"), d.get("inDockJ"), d.get("appsFullHint"), _ud, _ap[:200]))
+check("after the undo, empty folders are not drawn — except as drop targets while a drag is in flight",
+      (d.get("undoFolds"), d.get("dragFolds"), d.get("afterFolds"), d.get("oneFold"), d.get("notUndoneEmpty")) == (0, 5, 0, 1, 5),
+      (d.get("undoFolds"), d.get("dragFolds"), d.get("afterFolds"), d.get("oneFold"), d.get("notUndoneEmpty")))
+
+_pl_b, _pl_a = d.get("pinLooseBefore") or {}, d.get("pinLooseAfter") or {}
+_pl_b = {k: v for k, v in _pl_b.items() if k != "Journal"}
+check("after the undo, a drop-only folder that takes a drop stays where it was drawn, and no loose icon moves",
+      d.get("pinDrop") == "zone:folder:home" and d.get("pinIn") == "home" and d.get("pinDrawn") is not None
+      and d.get("pinAfter") == d.get("pinDrawn") and len(_pl_b) >= 20 and _pl_a == _pl_b,
+      (d.get("pinDrop"), d.get("pinIn"), d.get("pinDrawn"), d.get("pinAfter"),
+       sorted(k for k in _pl_b if _pl_a.get(k) != _pl_b[k]), len(_pl_b)))
+_w = d.get("words") or {}
+_callers = {f: _code(f) for f in ("ui/src/room/Dock.jsx", "ui/src/apps/Apps.jsx")}
+_recheck = sorted(f for f, src in _callers.items() if re.search(r"DOCK_MAX|DOCK_MIN|DOCK_HINT\.(full|last)", src))
+check("the refusal words are the store's, once: dockAdd/dockRemove say them, no caller re-checks the limit",
+      _w.get("full") == "the dock holds %s" % _w.get("max") and _w.get("addWhy") == _w.get("full")
+      and _w.get("last") == "the dock needs at least one" and _w.get("removeWhy") == _w.get("last")
+      and not _recheck and all("r.why" in src for src in _callers.values()),
+      (_w, _recheck))
+
+# ── FINAL REVIEW FIXES (2026-10-29): keyboard-only dock focus, a lost mouseup, a handled Escape,
+#    the Apps window's remove-from-dock toggle and its undo copy ──
+fx = render(r"""
+const mem = new Map()
+globalThis.localStorage = { getItem: k => mem.has(k) ? mem.get(k) : null,
+  setItem: (k, v) => { mem.set(k, String(v)) }, removeItem: k => { mem.delete(k) } }
+const wl = {}
+globalThis.window = { innerWidth: 1440, innerHeight: 900,
+  addEventListener(t, f) { (wl[t] = wl[t] || []).push(f) },
+  removeEventListener(t, f) { wl[t] = (wl[t] || []).filter(x => x !== f) },
+  matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }) }
+globalThis.document = { body: { classList: { add() {}, remove() {} } } }
+import * as L from '../ui/src/desktopLayout.js'
+import * as drag from '../ui/src/room/deskDrag.js'
+import { dockShown, keyboardFocus } from '../ui/src/room/Dock.jsx'
+import { watchDismiss } from '../ui/src/room/Folder.jsx'
+import Apps, { AppsView, appsProps } from '../ui/src/apps/Apps.jsx'
+const out = {}
+const nl = () => Object.values(wl).reduce((n, a) => n + a.length, 0)
+const fireW = (t, e) => (wl[t] || []).slice().forEach(f => f(e))
+const ev = (o) => ({ button: 0, buttons: 1, preventDefault() {}, stopPropagation() {}, ...o })
+// (1) only keyboard focus calls the dock back over a maximised window
+const focusEv = (visible) => ({ target: { matches: (s) => s === ':focus-visible' && visible } })
+out.focus = { mouse: dockShown({ maxed: true, focused: keyboardFocus(focusEv(false)) }),
+              keys: dockShown({ maxed: true, focused: keyboardFocus(focusEv(true)) }),
+              broken: keyboardFocus({ target: { matches() { throw new Error('old engine') } } }) }
+// (2) a lost mouseup
+const log = []
+const mk = (tag) => ({ onDrop: () => log.push(tag + ':drop'), onZone: () => log.push(tag + ':zone'),
+  onClick: () => log.push(tag + ':click'), onCancel: () => log.push(tag + ':cancel') })
+const item = { kind: 'dock', id: 'chat', index: 0 }
+out.base = nl()
+drag.begin(item, ev({ clientX: 10, clientY: 10 }), mk('a'))
+fireW('mousemove', ev({ clientX: 80, clientY: 80 }))
+out.armed = { dragging: drag.dragging(), n: nl() }
+fireW('mousemove', ev({ clientX: 90, clientY: 90, buttons: 0 }))
+fireW('mouseup', ev({ clientX: 90, clientY: 90 }))
+out.noButtons = { log: log.slice(), dragging: drag.dragging(), n: nl() }
+log.length = 0
+drag.begin(item, ev({ clientX: 10, clientY: 10 }), mk('b'))
+fireW('mousemove', ev({ clientX: 80, clientY: 80 }))
+fireW('blur', {})
+fireW('mouseup', ev({ clientX: 90, clientY: 90 }))
+out.blur = { log: log.slice(), dragging: drag.dragging(), n: nl() }
+log.length = 0
+drag.begin(item, ev({ clientX: 10, clientY: 10 }), mk('c'))
+fireW('mousemove', ev({ clientX: 80, clientY: 80 }))
+const n1 = nl()
+drag.begin(item, ev({ clientX: 10, clientY: 10 }), mk('d'))
+out.second = { log: log.slice(), same: nl() === n1 }
+fireW('mousemove', ev({ clientX: 80, clientY: 80 }))
+fireW('mouseup', ev({ button: 2, buttons: 2, clientX: 90, clientY: 90 }))
+out.rightUp = { log: log.slice(), dragging: drag.dragging() }
+fireW('mouseup', ev({ clientX: 90, clientY: 90 }))
+out.finish = { log: log.slice(), dragging: drag.dragging(), n: nl() }
+// (3) an Escape somebody else handled is theirs
+const docL = {}
+const fdoc = { addEventListener(t, f) { (docL[t] = docL[t] || []).push(f) },
+               removeEventListener(t, f) { docL[t] = (docL[t] || []).filter(x => x !== f) } }
+let closes = 0
+watchDismiss(fdoc, { inside: () => false, close: () => { closes++ } })
+const esc = (o) => (docL.keydown || []).forEach(f => f({ key: 'Escape', ...o }))
+esc({ defaultPrevented: true }); out.handled = closes
+esc({ defaultPrevented: false }); out.free = closes
+// (4) the Apps window: a keyboard-reachable remove-from-dock toggle, with the store's words
+mem.clear()
+const find = (el, pred) => {
+  if (!el || typeof el !== 'object') return null
+  if (Array.isArray(el)) { for (const x of el) { const r = find(x, pred); if (r) return r } return null }
+  if (el.props && pred(el.props)) return el
+  return find(el.props && el.props.children, pred)
+}
+let said = null
+const view = () => AppsView(appsProps((t) => { said = t }))
+const rm = find(view(), p => p['aria-label'] === 'remove Chat from the dock')
+out.rm = { found: !!rm, disabled: !!(rm && rm.props.disabled), before: L.dockItems().length }
+L.dockAdd('journal')
+find(view(), p => p['aria-label'] === 'remove Journal from the dock').props.onClick({ preventDefault() {} })
+out.removed = { in: L.dockItems().includes('journal'), said }
+mem.set('sp-dock-items', JSON.stringify(['chat']))
+find(view(), p => p['aria-label'] === 'remove Chat from the dock').props.onClick()
+out.last = { dock: L.dockItems(), said }
+// (5) the undo copy says Music and Games now show
+mem.clear(); mem.set('sp-desk-icons', JSON.stringify({ journal: { x: 300, y: 200 } }))
+L.migrateOnce()
+out.copy = html(h(Apps))
+""")
+check("the final-fix probe rendered", "_error" not in fx, fx.get("_error", ""))
+check("dock: only keyboard focus calls it back over a maximised window",
+      (fx.get("focus") or {}) == {"mouse": False, "keys": True, "broken": False}
+      and "setFocused(keyboardFocus(e))" in _code("ui/src/room/Dock.jsx"),
+      fx.get("focus"))
+check("a lost mouseup cancels the drag: no buttons held, window blur, a second begin; a right-button up is ignored",
+      fx.get("armed") == {"dragging": True, "n": fx.get("base", 0) + 4}
+      and fx.get("noButtons") == {"log": ["a:cancel"], "dragging": False, "n": fx.get("base")}
+      and fx.get("blur") == {"log": ["b:cancel"], "dragging": False, "n": fx.get("base")}
+      and fx.get("second") == {"log": ["c:cancel"], "same": True}
+      and (fx.get("rightUp") or {}).get("log") == ["c:cancel"] and fx["rightUp"].get("dragging") is True
+      and fx.get("finish") == {"log": ["c:cancel", "d:drop"], "dragging": False, "n": fx.get("base")},
+      {k: fx.get(k) for k in ("base", "armed", "noButtons", "blur", "second", "rightUp", "finish")})
+check("an Escape another handler already took does not close the folder panel",
+      fx.get("handled") == 0 and fx.get("free") == 1, (fx.get("handled"), fx.get("free")))
+_rm, _rl = fx.get("rm") or {}, fx.get("removed") or {}
+check("Apps window: 'remove from dock' is a live toggle that says the store's words",
+      _rm.get("found") is True and _rm.get("disabled") is False
+      and _rl.get("in") is False and _rl.get("said") == ""
+      and (fx.get("last") or {}).get("dock") == ["chat"]
+      and (fx.get("last") or {}).get("said") == "the dock needs at least one",
+      (_rm, _rl, fx.get("last")))
+check("the undo copy says Music and Games now show",
+      "Music and Games now show" in grab(fx, "copy"), grab(fx, "copy")[:200])
+
+# The dock's CSS: z, magnify, glow, phone width, reduced motion — read off shell.css.
+_sc = re.sub(r"/\*.*?\*/", "", io.open(os.path.join(ROOT, "ui/src/room/shell.css"), encoding="utf-8").read(), flags=re.S)
+
+
+def _top_rules(css):
+    """(selector, body) of every rule outside @media."""
+    flat = re.sub(r"@media[^{]*\{(?:[^{}]*\{[^{}]*\})*\s*\}", "", css)
+    flat = re.sub(r"@keyframes[^{]*\{(?:[^{}]*\{[^{}]*\})*\s*\}", "", flat)
+    return [(" ".join(s.split()), b) for sels, b in re.findall(r"([^{}@]+)\{([^{}]*)\}", flat) for s in sels.split(",")]
+
+
+def _media_rules(css, cond):
+    """(selector, body) of every rule inside an @media whose condition matches `cond`."""
+    outr = []
+    for mq in re.finditer(r"@media\s*([^{]*)\{((?:[^{}]*\{[^{}]*\})*)\s*\}", css):
+        if re.search(cond, mq.group(1)):
+            outr += [(" ".join(s.split()), b) for sels, b in re.findall(r"([^{}]+)\{([^{}]*)\}", mq.group(2))
+                     for s in sels.split(",")]
+    return outr
+
+
+def _prop(body, name):
+    m = re.search(r"(?<![\w-])" + name + r"\s*:\s*([^;]+)", body)
+    return m.group(1).strip() if m else None
+
+
+_top = _top_rules(_sc)
+_z = lambda sel: next((int(_prop(b, "z-index")) for s, b in _top if s == sel and _prop(b, "z-index")), None)
+_dock_pos = next((_prop(b, "position") for s, b in _top if s == ".dock" and _prop(b, "position")), None)
+_main = _code("ui/src/main.jsx")
+check("z above normal windows",
+      _dock_pos == "fixed" and (_z(".desktop") or 99) < (_z(".dock") or 0) < (_z(".taskbar") or 0)
+      and re.search(r"</main>\s*(?:\{\s*\}\s*)*<Dock\s*/>", _main) is not None
+      and next((_prop(b, "position") for s, b in _top if s == ".desktop"), None) == "fixed",
+      (_dock_pos, _z(".desktop"), _z(".dock"), _z(".taskbar")))
+# MAGNIFY: every rule that names a hovered dock item changes its tile by transform alone.
+_MAG = re.compile(r"dock-item:hover|:has\(\s*\+\s*\.dock-item:hover\)|:has\(\s*\+\s*\.dock-item\s*\+\s*\.dock-item:hover\)")
+_mag = [(s, b) for s, b in _top if _MAG.search(s) and "dock-tile" in s]
+_scales = [float(x) for s, b in _mag for x in re.findall(r"scale\(([\d.]+)\)", b)]
+_geom = [(s, p) for s, b in _mag for p in ("width", "height", "margin", "left", "top", "padding", "font-size")
+         if _prop(b, p) is not None]
+_tile_tr = next((_prop(b, "transition") for s, b in _top if s == ".dock-tile"), "") or ""
+_rm = {"animation": set(), "transition": set()}
+for s, b in _media_rules(_sc, r"prefers-reduced-motion:\s*reduce"):
+    for p in _rm:
+        if re.search(p + r"\s*:\s*none", b):
+            _rm[p].add(s)
+_dock_anim = [(s, p) for s, b in _top if "dock" in s
+              for p in ("animation", "transition") if _prop(b, p) and _prop(b, p) != "none"]
+_dock_missing = [x for x in _dock_anim if x[0] not in _rm[x[1]]]
+_glow = [s for s, b in _mag if "hsl(var(--mood-h) 70% 60% / .7)" in b]
+_trs = [t.strip().split()[0] for t in _tile_tr.split(",") if t.strip()]
+check("magnify is transform-only and in reduced-motion",
+      len(_mag) >= 3 and _scales and max(_scales) <= 1.45 and any(1 < x < max(_scales) for x in _scales)
+      and not _geom and _glow and _trs and set(_trs) <= {"transform", "box-shadow", "border-color"}
+      and "var(--dur-" in _tile_tr and "var(--ease-" in _tile_tr
+      and _dock_anim and not _dock_missing,
+      {"mag": [s for s, _ in _mag], "scales": _scales, "geom": _geom, "glow": _glow, "tile_tr": _tile_tr,
+       "missing": _dock_missing})
+_phone = _media_rules(_sc, r"max-width:\s*620px")
+_flat_ph = {s for s, b in _phone if _prop(b, "transform") == "none"}
+_tip_off = any(s == ".dock-tip" and _prop(b, "display") == "none" for s, b in _phone)
+check("phone width: no magnify",
+      _mag and all(s in _flat_ph for s, _ in _mag) and _tip_off,
+      {"magnified": [s for s, _ in _mag if s not in _flat_ph], "tip_off": _tip_off})
 
 # ── leg 13's retired scan — keep this block last, directly above finish(GATE) ──
 _drawn6 = set()

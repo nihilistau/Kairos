@@ -37,6 +37,88 @@
 .dsk-icon:focus-visible { outline: none; }
 .dsk-icon:focus-visible .dsk-tile { box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 4px hsl(var(--mood-h) 70% 60% / .7); }
 
+/* ── FOLDERS (2026-10-29, his approved mockup) — room/Folder.jsx. A folder is a desk icon
+   whose tile is a 2×2 of its apps' glyphs on a cyan tint; open, its apps fan out in a
+   frosted panel beside it. */
+.dsk-fold-tile { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+  gap: 3px; padding: 7px; place-items: center;
+  background: rgba(var(--accent-rgb), .08); border-color: rgba(var(--accent-rgb), .3); }
+.dsk-fold-g { display: grid; place-items: center; width: 100%; height: 100%;
+  border-radius: 4px; background: rgba(var(--accent-rgb), .07); color: var(--tile-ink); }
+.dsk-fold-open .dsk-tile { border-color: rgba(var(--accent-rgb), .6); }
+.dsk-fold-drop .dsk-tile { border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .25), var(--el-1); transform: scale(1.06); }
+.dsk-fold-panel { position: absolute; z-index: 2; padding: 12px;
+  background: rgba(var(--surface-1-rgb), .92); backdrop-filter: blur(8px);
+  border: 1px solid rgba(var(--accent-rgb), .35); border-radius: var(--r-lg); box-shadow: var(--el-2);
+  transform-origin: top left; animation: dsk-fold-in var(--dur-base) var(--ease-out); }
+@keyframes dsk-fold-in { from { opacity: 0; transform: scale(.96) translateY(-4px); } }
+.dsk-fold-h { height: 24px; font: 600 11px/16px var(--font-ui); color: var(--accent);
+  letter-spacing: .06em; text-transform: uppercase; }
+.dsk-fold-grid { display: grid; grid-template-columns: repeat(3, 76px); gap: 4px; }
+.dsk-fold-item { display: flex; flex-direction: column; align-items: center; gap: 5px;
+  width: 76px; height: 80px; padding: 4px 2px; background: transparent; border: none;
+  border-radius: var(--r-md); color: var(--text-1); cursor: var(--cur-hand); user-select: none; }
+.dsk-fold-item .dsk-tile { width: 44px; height: 44px; border-radius: var(--r-md); }
+.dsk-fold-item .dsk-lb { max-width: 72px; }
+.dsk-fold-item:hover .dsk-tile { border-color: rgba(var(--accent-rgb), .35); transform: translateY(-1px); }
+.dsk-fold-item:focus-visible { outline: none; }
+.dsk-fold-item:focus-visible .dsk-tile { box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 4px hsl(var(--mood-h) 70% 60% / .7); }
+.dsk-fold-empty { width: 228px; padding: 8px 0; font: 400 12px/1.4 var(--font-ui); color: var(--text-3); }
+.dsk-icon.dsk-fold-ghost { z-index: 3; pointer-events: none; }
+
+/* ── THE DOCK (2026-10-29, his approved mockup) — room/Dock.jsx. Bottom centre, above the
+   taskbar; mounted OUTSIDE .desktop, whose stacking context (z 10) holds every window, so
+   z 50 puts it above all of them and under the taskbar (z 60), behind which it slides away
+   while a window is maximised. MAGNIFY IS TRANSFORM ONLY: the button keeps its box, the tile
+   scales from its foot — 1.45 under the pointer, 1.2 beside it (nudged outward so the two
+   never touch), the next pair nudged a little more; nothing re-lays out. */
+.dock { position: fixed; left: 50%; bottom: calc(var(--tb-h) + 10px); z-index: 50;
+  display: flex; align-items: flex-end; gap: 10px; padding: 7px 10px; border-radius: 18px;
+  background: rgba(var(--surface-1-rgb), .6); backdrop-filter: blur(12px);
+  border: 1px solid rgba(var(--hair-rgb), .18); box-shadow: 0 0 24px hsl(var(--mood-h) 70% 60% / .12);
+  transform: translateX(-50%); transition: transform var(--dur-slow) var(--ease-out); }
+.dock.dock-hidden { transform: translate(-50%, calc(100% + 16px)); }
+.dock.dock-over { border-color: rgba(var(--accent-rgb), .6); }
+.dock-item { position: relative; display: grid; place-items: center; width: 40px; height: 40px;
+  padding: 0; background: transparent; border: none; cursor: var(--cur-hand); user-select: none; }
+.dock-tile { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center;
+  color: var(--tile-ink); background: var(--surface-3); border: 1px solid rgba(var(--hair-rgb), .18);
+  transform-origin: 50% 100%;
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out); }
+.dock-item:hover .dock-tile { transform: translateY(-6px) scale(1.45);
+  border-color: hsl(var(--mood-h) 70% 60% / .7); box-shadow: 0 0 18px hsl(var(--mood-h) 70% 60% / .7); }
+.dock-item:hover + .dock-item .dock-tile { transform: translate(6px, -2px) scale(1.2); }
+.dock-item:has(+ .dock-item:hover) .dock-tile { transform: translate(-6px, -2px) scale(1.2); }
+.dock-item:hover + .dock-item + .dock-item .dock-tile { transform: translateX(4px); }
+.dock-item:has(+ .dock-item + .dock-item:hover) .dock-tile { transform: translateX(-4px); }
+.dock-item:focus-visible { outline: none; }
+.dock-item:focus-visible .dock-tile { box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 4px hsl(var(--mood-h) 70% 60% / .7); }
+/* the dot sits on the button, not the tile, so it stays put while the tile grows */
+.dock-open::after { content: ''; position: absolute; bottom: -6px; left: 50%; width: 4px; height: 4px;
+  margin-left: -2px; border-radius: 50%; background: hsl(var(--mood-h) 80% 70%);
+  box-shadow: 0 0 6px hsl(var(--mood-h) 80% 60%); }
+.dock-tip { position: absolute; bottom: calc(100% + 26px); left: 50%; transform: translateX(-50%);
+  white-space: nowrap; pointer-events: none; visibility: hidden; padding: 2px 8px; border-radius: 6px;
+  font: 400 11px/1.4 var(--font-ui); color: var(--text-1); background: var(--surface-1);
+  border: 1px solid rgba(var(--hair-rgb), .18); }
+.dock-item:hover .dock-tip, .dock-item:focus-visible .dock-tip { visibility: visible; }
+.dock-lift .dock-tile { border-style: dashed; }
+/* where a drop lands: a bar before the entry it would go in front of, or after the last */
+.dock-at::before { content: ''; position: absolute; left: -7px; top: 4px; bottom: 4px; width: 3px;
+  border-radius: 2px; background: var(--accent); }
+.dock.dock-at-end::after { content: ''; align-self: stretch; width: 3px; margin: 4px 0;
+  border-radius: 2px; background: var(--accent); }
+.dock-hint { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  white-space: nowrap; padding: 3px 10px; border-radius: var(--r-pill);
+  font: 500 11.5px/1.4 var(--font-ui); color: var(--warn); background: var(--surface-1);
+  border: 1px solid rgba(var(--warn-rgb), .4); }
+.dock-hint:empty { display: none; }
+.dock-ghost { position: fixed; z-index: 55; pointer-events: none; transform: translate(-50%, -50%); }
+.dock-ghost .dock-tile { box-shadow: var(--el-2); }
+/* phone width and reduced motion: in the shell's own @media blocks below */
+
 /* ── WINDOWS ─────────────────────────────────────────────────────────────── */
 .win { position: absolute; display: flex; flex-direction: column; overflow: hidden;
   background: var(--surface-2); border: 1px solid var(--hair); border-radius: 12px;
@@ -142,6 +224,8 @@ body.resizing, body.resizing * { user-select: none !important; }
 /* the label inside a taskbar chip — "looking up", "in scene", "off the record" */
 .tb-chip-k { font: 600 9.5px/1 var(--font-ui); letter-spacing: .1em; text-transform: uppercase; }
 .tb-scene { display: inline-flex; align-items: center; gap: 4px; }
+/* her voice's reason (2026-10-29): the words show where a scene's do, the whole sentence is the title */
+.tb-voice { display: inline-flex; align-items: center; }
 /* THE CLOCK IS IN THE ROW NOW. It was position:absolute outside it, and the 88px lane
    reserved for it (2026-09-23) was a workaround this redesign retires. */
 .taskbar .clock { position: static; display: flex; align-items: baseline; gap: 8px;
@@ -260,12 +344,19 @@ body.resizing, body.resizing * { user-select: none !important; }
      Windows start at z 11 (windowManager.js), above both. */
   .dsk-layer { z-index: 6; pointer-events: none; }
   .dsk-icon { pointer-events: auto; }
+  .dsk-fold-panel { pointer-events: auto; }    /* folders still work at phone width */
   /* PHONE WIDTH: A WINDOW IS THE DESKTOP (final review, Q4). Windows opened at their
      registry width and ran off the right edge (Chat at 375px: x 132–692); here each
      one fills the desktop, as a maximised window does, and has nothing to resize. */
   .win { left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important;
     border-radius: 0; }
   .win > .grip { display: none; }
+  /* THE DOCK, ICONS ONLY: no magnify, no tooltip (there is no hover to ask for one) */
+  .dock { gap: 8px; padding: 6px 8px; }
+  .dock-item:hover .dock-tile, .dock-item:hover + .dock-item .dock-tile,
+  .dock-item:has(+ .dock-item:hover) .dock-tile, .dock-item:hover + .dock-item + .dock-item .dock-tile,
+  .dock-item:has(+ .dock-item + .dock-item:hover) .dock-tile { transform: none; }
+  .dock-tip { display: none; }
 }
 /* phone width: a live look and a scene keep their chips (the dot says it; the title names
    it) and lose their words, so a window button still fits beside Shut down */
@@ -278,4 +369,23 @@ body.resizing, body.resizing * { user-select: none !important; }
   .win.win-in, .win.win-min-out, .win.win-restore { animation: none; }
   .her-light { transition: none; }
   .her-light.warm, .presence .note, .taskbar .clock .face .tick { animation: none; }
+  .dsk-fold-panel { animation: none; }
+  .dock, .dock-tile { transition: none; }
+}
+
+/* ── THE MODEL STRIP (2026-10-29, mockup B's lights) — one light per model job, ONE button.
+   Green loaded, cyan pulsing loading, grey off, amber missing/error (room/ModelStrip.jsx). */
+.mst { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 8px;
+  border: 1px solid var(--hair-strong); border-radius: var(--r-pill); background: transparent; }
+.mst:hover { background: var(--hover-tint); }
+.mst:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mst-light { width: 7px; height: 7px; border-radius: 50%; background: var(--lt-idle); }
+.mst-loaded { background: var(--ok); box-shadow: 0 0 6px rgba(var(--ok-rgb), .7); }
+.mst-loading { background: var(--accent); animation: mst-pulse 1.2s ease-in-out infinite; }
+.mst-missing, .mst-error, .mst-light.mst-degraded { background: var(--warn); box-shadow: none; }
+@keyframes mst-pulse { 50% { opacity: .3; } }
+/* the bar sheds glances, never controls: at phone width the strip goes, Shut down stays */
+@media (max-width: 480px) { .tb-right .mst { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .mst-loading { animation: none; }
 }

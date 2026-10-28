@@ -17,6 +17,10 @@ Callers never learn which ran. When the server bin lands, `SP_TTS_URL` is set an
 nothing else in the tree changes — that is the whole reason this file exists
 rather than a subprocess call at the call site.
 
+(2026-10-29) That seam now fronts THREE engines — xai (remote), lfm3 and voxtral (local,
+the server/CLI pair above) — and callers DO learn which one spoke: meta["backend"] and
+meta["fell_back_from"], because a silent fallback is how Grok went quiet on him unnoticed.
+
 MEASURED ON THIS BOX (2026-07-31, RTX 2060, Q4 GGUF, 3 Euler steps, wgpu
 discrete): a 4.3 s utterance cost 63 s cold, 45 s, then 28 s as the shader cache
 warmed — RTF 12.9x -> 9.0x -> 6.1x. The published figure is RTF 0.97 on
@@ -66,6 +70,65 @@ CACHE_MAX = int(os.environ.get("SP_TTS_CACHE_MAX", "512"))
 # One synthesis at a time. Two concurrent voxtral processes contend for the same
 # GPU the daemon is using, and the second one is not faster for having started.
 _LOCK = threading.Lock()
+
+# WHICH ENGINE HOLDS IT (2026-10-29, the Models window): set inside the lock for each engine
+# attempt and cleared in a finally before the next one, so "one voice at a time" can say WHICH.
+# A one-slot list, written only under _LOCK; readers take whatever is there (a str swap is atomic).
+_SPEAKING: list[str] = [""]
+
+
+# ── WHICH VOICES OFF THE RECORD SKIPS, AND WHY — ONE SPELLING (2026-10-29) ──────────────
+# tts.synthesize (the X-TTS-Fallback entry) and the Models window's voice row (models_status)
+# both read these, so the room's chip, the row and the voice can never disagree.
+#   xai      leaves the machine (net.voice)
+#   voxtral  leaves a trace: its CLI can only write its audio to a file (a temp wav), and its
+#            resident tts-server prints the first 48 characters of every sentence to its log
+#            (voxtral-mini-realtime-rs, src/bin/tts-server.rs). Arming condition: tts-server
+#            stops logging the text — then its server leg can run off the record.
+# Off the record, lfm3 is the one voice that speaks.
+_VOXTRAL_TRACE = "its server logs the sentence, its CLI writes a temp wav"
+OFF_RECORD_SKIPS = {
+    "xai": "would send each sentence to a third party",
+    "voxtral": "leaves a trace (%s)" % _VOXTRAL_TRACE,
+}
+OFF_RECORD_VOICE = "lfm3"
+
+
+def off_record_fell(engine: str) -> str:
+    """The X-TTS-Fallback / meta["fell_back_from"] entry for a voice skipped off the record:
+    "xai: off the record", "voxtral: off the record (its server logs ...)"."""
+    return "%s: off the record" % engine + (" (%s)" % _VOXTRAL_TRACE if engine == "voxtral" else "")
+
+
+def off_record_reason(method: str, local: str = OFF_RECORD_VOICE) -> str:
+    """The Models row's why for a voice skipped off the record (operator, 2026-10-29: "switch
+    to local for OTR" — she no longer goes quiet; her local voice speaks instead)."""
+    return ("off the record — speaking locally (%s): her voice is %s, which %s, so her local "
+            "voice speaks until the switch is off." % (local, method, OFF_RECORD_SKIPS.get(method, "is held")))
+
+
+def only_off_record_falls(fell: str) -> bool:
+    """True when every entry of a fell_back_from is a voice SKIPPED off the record — the
+    designed path, not a failure (the Models Test passes on it)."""
+    parts = [p.strip() for p in str(fell or "").split("; ") if p.strip()]
+    return bool(parts) and all(p == off_record_fell(p.split(":", 1)[0]) for p in parts)
+
+
+# ── WHAT OFF THE RECORD KEEPS OF A FAILURE: ITS TYPE, NOTHING ELSE (2026-10-29) ─────────
+# An engine's error can quote its input back — whole, truncated, or JSON-escaped — and a
+# matcher for "her sentence in this message" misses at least one of those. So off the record
+# a failure reaches the log, the room, the header and the raised error as its exception TYPE
+# only ("lfm3: LFM3Error"). On the record the reason is kept verbatim (it is what tells him
+# why Grok went quiet).
+
+
+class _HeldError(Exception):
+    """A swallowed engine error off the record: its message is the original TYPE name only."""
+
+
+def speaking_engine() -> str:
+    """The engine synthesising right now (xai | lfm3 | voxtral), "" when the voice is idle."""
+    return _SPEAKING[0]
 
 
 class TTSError(RuntimeError):
@@ -177,21 +240,65 @@ def _tune(key, env_key, env_default):
     return os.environ.get(env_key, env_default)
 
 
+# THE VOICE METHODS (2026-10-29, LFM3): xai is the remote one; lfm3 and voxtral are
+# both on this machine. `local` is no longer an engine — it is "whichever local voice the
+# profile chose" ([tts].local -> SP_TTS_LOCAL), so a stored or env `local` keeps working.
+METHODS = ("xai", "lfm3", "voxtral")
+_LOCALS = ("lfm3", "voxtral")
+
+
 def live_voice() -> dict:
     """The voice chain's LIVE resolution — what would actually speak right now.
     One reader for synthesize() and the status route, so the panel's chips and
     the next sentence can never disagree."""
     enabled = _tune("voice.enabled", "SP_TTS_ENABLED", "1") in (True, "1", 1)
-    method = str(_tune("voice.method", "SP_TTS_METHOD", "")).strip() or "local"
+    local_default = (os.environ.get("SP_TTS_LOCAL", "") or "lfm3").strip().lower()
+    if local_default not in _LOCALS:
+        local_default = "lfm3"
+    method = str(_tune("voice.method", "SP_TTS_METHOD", "")).strip().lower() or "local"
+    if method not in METHODS:            # `local`, or a spelling no engine answers to
+        method = local_default
     xai_voice = str(_tune("voice.xai_voice", "SP_TTS_XAI_VOICE", "ara"))
+    lfm3_voice = str(_tune("voice.lfm3_voice", "SP_LFM3_VOICE", "female") or "female")
     try:
         speed = float(_tune("voice.speed", "SP_TTS_SPEED", "1.0"))
     except (TypeError, ValueError):
         speed = 1.0
-    return {"enabled": enabled, "method": method, "xai_voice": xai_voice,
+    return {"enabled": enabled, "method": method, "local_default": local_default,
+            "xai_voice": xai_voice, "lfm3_voice": lfm3_voice,
             "speed": max(0.5, min(1.5, speed)),
             "local_gguf": os.path.basename(VOX_GGUF or ""),      # the Voice section names its model (E)
-            "speaking_as": ("xai:" + xai_voice) if method == "xai" else VOICE}
+            "speaking_as": _engine_voice(method, {"xai_voice": xai_voice, "lfm3_voice": lfm3_voice}, None)}
+
+
+def _engine_voice(engine: str, lv: dict, voice: str | None) -> str:
+    """The cache-key spelling of WHO speaks: `xai:<id>`, `lfm3:<female|male>`, or voxtral's
+    own voice name. A caller's voice applies to the engine its prefix names; an unprefixed
+    one is a voxtral voice (the /v1/speak contract before LFM3)."""
+    v = voice or ""
+    if engine == "xai":
+        return v if v.startswith("xai:") else "xai:" + lv["xai_voice"]
+    if engine == "lfm3":
+        return v if v.startswith("lfm3:") else "lfm3:" + lv["lfm3_voice"]
+    return v if (v and ":" not in v) else VOICE
+
+
+def _backend_of(voice: str) -> str:
+    return voice.split(":", 1)[0] if voice.startswith(("xai:", "lfm3:")) else "voxtral"
+
+
+def _speak_with(engine: str, text: str, voice: str, steps: int, speed: float) -> bytes:
+    """One engine, one utterance. Raises with the engine's own reason; never returns b""."""
+    if engine == "xai":
+        from harness.skills import xai as _xai
+        wav = _xai.tts(text, voice_id=voice.split(":", 1)[1], fmt="wav", speed=speed)
+        if not wav:
+            raise TTSError(_xai.tts_last_error() or "no audio came back")
+        return wav
+    if engine == "lfm3":
+        from harness.voice import lfm3 as _lfm3
+        return _lfm3.speak(text, voice=voice.split(":", 1)[1])
+    return _via_server(text, voice, steps) if TTS_URL else _via_cli(text, voice, steps)
 
 
 def synthesize(text: str, voice: str | None = None, steps: int | None = None,
@@ -226,69 +333,115 @@ def synthesize(text: str, voice: str | None = None, steps: int | None = None,
     #
     # A LOCAL VOICE IS NOT A LEAK and is not held: the audio is synthesised on this
     # machine and played. Silencing her would be the mode disabling the room, which
-    # is the failure the whole design is written against. A REMOTE voice is held, and
-    # it RAISES rather than returning silence — the room shows the reason, so "she has
-    # gone quiet" can never be mistaken for "she had nothing to say".
+    # is the failure the whole design is written against. A REMOTE voice is held. Until
+    # 2026-10-29 it RAISED (the room showed the reason); since then it is skipped and the
+    # local voice speaks instead — see below. If nothing local can speak it still raises,
+    # with every reason, so "she has gone quiet" is never "she had nothing to say".
     from harness.control import anon as _anon
-    if _method != "local" and _anon.holds("net.voice"):
-        raise TTSError(
-            "off the record — her voice is %s, which would send this sentence to a "
-            "third party. Switch voice.method to local to hear her while the switch "
-            "is on." % _method)
+    # (2026-10-29) lfm3 joined voxtral as a LOCAL voice: only xai leaves the machine, so
+    # only xai is held — and the fallback chain below never reaches xai, so a held remote
+    # voice cannot be smuggled out through a local one failing.
+    # (2026-10-29, operator: "switch to local for OTR, but ensure obviously nothing is logged
+    # or kept anywhere") HELD NO LONGER MEANS SILENT. The remote voice is skipped — counted
+    # once on net.voice, here, before anything else can run — and the sentence is spoken by
+    # the local default instead, the room told why ("xai: off the record"). From here on the
+    # chosen method IS the local one: cache key, tags and chain all follow it.
+    fell: list[str] = []
+    if _method == "xai" and _anon.holds("net.voice"):
+        fell.append(off_record_fell(_method))
+        _method = OFF_RECORD_VOICE          # the one voice that leaves no trace (voxtral is held)
+    otr = _anon.on()
     # THE TTS EDGE (2026-08-21, the expressive-voice framework): her [laugh] / <soft>
     # tags pass to the xAI voice verbatim and are stripped for the local chain, which
     # would read the brackets aloud. Unknown tag-shapes never reach any voice. Done
     # BEFORE the cache key so a tagged and an untagged line are different utterances.
     from harness.voice.expressive import for_tts as _for_tts
+    raw = text
     text = _for_tts(text, _method)
     if not text:
         raise TTSError("nothing to say once the tags are removed")
-    voice = voice or VOICE
-    # The cache key must carry WHICH voice would speak: under method=xai the audible
-    # voice is Ara (or the knob), not the voxtral voice name — one key for both
-    # would serve her old voice from cache after the switch, or the new one after
-    # a rollback. The "xai:" prefix keys them apart for free.
-    if _method == "xai" and not (voice or "").startswith("xai:"):
-        voice = "xai:" + lv["xai_voice"]
+    # The cache key must carry WHICH voice would speak: `xai:ara`, `lfm3:female` and
+    # voxtral's `casual_female` are three different recordings of the same words — one
+    # key for two of them would serve her old voice from cache after a switch.
+    # _engine_voice() spells each one apart.
+    voice = _engine_voice(_method, lv, voice)
     steps = STEPS if steps is None else steps
     k = _key(text, voice, steps)
     path = _cache_path(k)
 
     if use_cache and os.path.isfile(path):
         with open(path, "rb") as f:
-            return f.read(), {"cached": True, "key": k, "seconds": 0.0, "voice": voice}
+            return f.read(), {"cached": True, "key": k, "seconds": 0.0, "voice": voice,
+                              "backend": _backend_of(voice), "fell_back_from": "; ".join(fell)}
 
+    # ── THE CHAIN, AND IT SAYS WHO SPOKE (2026-10-29) ─────────────────────────────────
+    # Chosen method -> the profile's local default -> voxtral. Grok went silent on him
+    # with nothing in the room saying why; now every engine that fails leaves its reason
+    # ("xai: http 402: ..."), meta names the engine that actually spoke, and /v1/speak
+    # hands both to the room. Each fallback re-strips the tags from the RAW text for
+    # its own engine — a local voice handed xai's tagged line would read "[laugh]" aloud.
+    chain = []
+    # off the record lfm3 is always in the chain — it is the one voice that leaves no trace,
+    # so a voxtral local default (held) must not leave her silent while lfm3 could speak
+    for e in (_method, lv["local_default"]) + ((OFF_RECORD_VOICE,) if otr else ()) + ("voxtral",):
+        if e not in chain:
+            chain.append(e)
     t0 = time.perf_counter()
-    backend = "server" if TTS_URL else "cli"
+    # ONE VOICE AT A TIME (operator, 2026-10-29): every engine — xai, lfm3, voxtral —
+    # synthesises inside this one lock. It is about ordering, not just GPU contention.
     with _LOCK:
         # re-check: another thread may have synthesised the same line while we waited
         if use_cache and os.path.isfile(path):
             with open(path, "rb") as f:
-                return f.read(), {"cached": True, "key": k, "seconds": 0.0, "voice": voice}
+                return f.read(), {"cached": True, "key": k, "seconds": 0.0, "voice": voice,
+                                  "backend": _backend_of(voice), "fell_back_from": "; ".join(fell)}
         # ── THE API VOICE COMES FIRST WHEN ARMED (2026-08-21, operator's call) ──────
-        # SP_TTS_METHOD=xai: POST api.x.ai/v1/tts, voice "ara" by default. MEASURED on
-        # the first probe: 1.1 s for a sentence, real 24 kHz WAV, ZERO VRAM — against
-        # voxtral's 21-28 s warm and the 2026-07-31 CUDA fault a resident voice cost.
-        # It goes through the same cache and the same one-at-a-time lock (the lock is
-        # now about ordering, not GPU contention). Fail-through, never fail-dead: an
-        # empty reply (key gone, API down, network) falls to the local chain exactly
-        # as if the method had never been set — she never loses her voice to an
-        # outage, it just gets slower.
-        wav = b""
-        if _method == "xai":
+        # MEASURED on the first probe: 1.1 s for a sentence, real 24 kHz WAV, ZERO VRAM.
+        # Fail-through, never fail-dead: a dark Grok falls to the local chain — she never
+        # loses her voice to an outage, it just changes, and now the room is told.
+        backend = ""
+        for eng in chain:
+            etext = text if eng == _method else _for_tts(raw, eng)
+            evoice = voice if eng == _method else _engine_voice(eng, lv, None)
+            if not etext:
+                fell.append("%s: nothing to say once the tags are removed" % eng)
+                continue
+            if eng != _method:
+                k = _key(etext, evoice, steps)
+                path = _cache_path(k)
+                if use_cache and os.path.isfile(path):
+                    with open(path, "rb") as f:
+                        wav = f.read()
+                    return wav, {"cached": True, "key": k, "seconds": 0.0, "voice": evoice,
+                                 "backend": eng, "fell_back_from": "; ".join(fell)}
+            # VOXTRAL LEAVES A TRACE, SO OFF THE RECORD IT IS HELD (2026-10-29 audit). Its
+            # CLI can only write to a file (`--output x.wav`, a temp wav on disk), and its
+            # resident server prints the first 48 characters of every sentence to its own
+            # log (voxtral-mini-realtime-rs, src/bin/tts-server.rs). Neither can be told not
+            # to from here. Arming condition: tts-server stops logging the text — then the
+            # server leg can run off the record (docs/ANON-MODE.md).
+            if otr and eng == "voxtral":
+                fell.append(off_record_fell(eng))
+                continue
+            _SPEAKING[0] = eng
             try:
-                from harness.skills import xai as _xai
-                wav = _xai.tts(text, voice_id=voice.split(":", 1)[1] if ":" in voice else "",
-                               fmt="wav", speed=lv["speed"])
-                if wav:
-                    backend = "xai"
-            except Exception as _swx:
-                _swallowed(_swlog, "synthesize", _swx, lane="voice")
-                wav = b""
-        if not wav:
-            # the local chain never sees the "xai:" spelling — it has its own voices
-            lvoice = VOICE if voice.startswith("xai:") else voice
-            wav = _via_server(text, lvoice, steps) if TTS_URL else _via_cli(text, lvoice, steps)
+                wav = _speak_with(eng, etext, evoice, steps, speed=lv["speed"])
+            except Exception as e:
+                if otr:
+                    # an engine may quote her sentence back in its error: off the record a
+                    # swallowed error is logged, and handed to the room, without it
+                    _swallowed(_swlog, "synthesize:" + eng, _HeldError(type(e).__name__), lane="voice")
+                    fell.append("%s: %s" % (eng, type(e).__name__))
+                else:
+                    _swallowed(_swlog, "synthesize:" + eng, e, lane="voice")
+                    fell.append("%s: %s" % (eng, str(e) or type(e).__name__))
+                continue
+            finally:
+                _SPEAKING[0] = ""
+            backend, voice = eng, evoice
+            break
+        if not backend:
+            raise TTSError("no voice could speak — " + "; ".join(fell))
     dt = time.perf_counter() - t0
 
     # A CACHED WAV IS A RECORDING. Keyed by a hash of the text, but the FILE is her
@@ -296,6 +449,8 @@ def synthesize(text: str, voice: str | None = None, steps: int | None = None,
     # is trimmed by size, not by age). Held; she still speaks, the bytes go to the
     # room and nowhere else. A cache READ is left alone: a hit means she has said
     # this before, on the record, so there is nothing new to protect.
+    # The write lands under the key of the engine that SPOKE, so a fallback's audio is
+    # never served later as if the chosen voice had made it.
     if use_cache and not _anon.holds("voice.cache"):
         os.makedirs(CACHE_DIR, exist_ok=True)
         tmp = path + ".part"
@@ -304,7 +459,7 @@ def synthesize(text: str, voice: str | None = None, steps: int | None = None,
         replace_atomic(tmp, path)          # atomic: a reader never sees a partial wav
         _trim_cache()
     return wav, {"cached": False, "key": k, "seconds": round(dt, 2), "voice": voice,
-                 "backend": backend}
+                 "backend": backend, "fell_back_from": "; ".join(fell)}
 
 
 def _via_server(text: str, voice: str, steps: int) -> bytes:

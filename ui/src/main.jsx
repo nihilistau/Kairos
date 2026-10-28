@@ -2,7 +2,7 @@ import React, { useSyncExternalStore, useRef, useEffect, useLayoutEffect } from 
 import { createRoot } from 'react-dom/client'
 import * as wm from './windowManager.js'
 import { APPS, byId, DOCK_HIDDEN_DEFAULT } from './appRegistry.jsx'
-import * as dockPrefs from './dockPrefs.js'
+import * as deskVisibility from './deskVisibility.js'
 import { usePoll } from './apps/panel.jsx'
 import * as api from './api.js'
 import Renderer from './room/Renderer.jsx'
@@ -11,12 +11,14 @@ import TopBar from './room/TopBar.jsx'
 import Portrait from './room/Portrait.jsx'
 import Down from './room/Down.jsx'
 import DeskIcons from './room/DeskIcons.jsx'
+import Dock from './room/Dock.jsx'
 import { Icon } from './kit/icons.jsx'
 import { useMood } from './room/useMood.js'
 import { applyMood } from './room/moodTheme.js'
 import { flightTarget } from './room/flight.js'
 import Anon, { AnonChip } from './room/Anon.jsx'
-import { LookingChip, SceneChip } from './room/TaskChips.jsx'
+import { LookingChip, SceneChip, VoiceChip } from './room/TaskChips.jsx'
+import ModelStrip from './room/ModelStrip.jsx'
 import { useState } from 'react'
 import './kit/fonts.js'
 import './kit/tokens.css'
@@ -241,8 +243,8 @@ function Room() {
   const focusedId = windows.filter(w => !w.minimized && !w.minimizing)
     .reduce((top, w) => (!top || w.z > top.z ? w : top), null)?.appId
   const open = new Set(windows.filter(w => !w.minimized).map(w => w.appId))
-  useSyncExternalStore(dockPrefs.subscribe, dockPrefs.getVersion)
-  const dockHidden = dockPrefs.hiddenSet(DOCK_HIDDEN_DEFAULT)
+  useSyncExternalStore(deskVisibility.subscribe, deskVisibility.getVersion)
+  const dockHidden = deskVisibility.hiddenSet(DOCK_HIDDEN_DEFAULT)
   // One beat for the whole room. 5 s is slow enough to cost nothing and fast
   // enough that the clock never looks stopped.
   const beat = usePoll(api.pulse, 5000)
@@ -305,7 +307,7 @@ function Room() {
       <Renderer kind="2d" pulse={shown} />
       <TopBar pulse={shown} mood={m} />
 
-      {/* THE DOCK IS GONE (2026-09-23, his ask): "move the room icons from a side bar
+      {/* THE LEFT DOCK IS GONE (2026-09-23, his ask; a bottom dock came back 2026-10-29, below): "move the room icons from a side bar
           on the left so that they are actual free desktop like icons". The apps are
           loose on the desktop now (DeskIcons). What lived in that rail and is NOT an
           app moved to the taskbar rather than becoming an icon — Off the record and
@@ -320,6 +322,11 @@ function Room() {
         <Portrait mood={m.word} thinking={m.thinking} />
         {windows.map(w => <Win key={w.appId} w={w} focused={w.appId === focusedId} />)}
       </main>
+      {/* THE DOCK CAME BACK (2026-10-29), bottom centre this time, as his approved mockup has
+          it. Outside <main> on purpose: .desktop is a stacking context holding every window,
+          so nothing mounted in it could stay above a window that has been focused a hundred
+          times. Here its z sits between the desktop and the taskbar (shell.css). */}
+      <Dock />
 
       <footer className="taskbar">
         <div className="tb-left">
@@ -358,62 +365,41 @@ function Room() {
               every restart by design, and he did not know — every reply read as noir bar
               fiction and it was indistinguishable from her personality having changed.
               Persisting the scene is right; resuming it silently is not. */}
+          {/* EVERY MODEL JOB AS A LIGHT (2026-10-29): green loaded, cyan loading, grey off,
+              amber missing. One click opens the Models window. */}
+          <ModelStrip />
           <AnonChip anon={anon} />
+          {/* her voice says why it is quiet (2026-10-29) */}
+          <VoiceChip />
           <SceneChip />
           <LookingChip pulse={pulse}
                        onOpen={() => { const a = byId('research'); if (a) wm.open('research', a) }} />
           <Anon anon={anon} refresh={beat.refresh} />
-
           <div className="sd-wrap">
-
             {!armed ? (
-
               <button className="sd-btn" title="Stop her, or the whole stack"
-
                       onClick={() => setArmed(true)}>
-
                 <Icon name="power" size={14} /><span>Shut down</span>
-
               </button>
-
             ) : (
-
               <div className="sd-confirm">
-
                 <button className="sd-opt" title="stop her; the room stays up"
-
                         onClick={() => { api.shutdown('her', true); setDownMode('her'); setArmed(false) }}>
-
                   her only
-
                 </button>
-
                 <button className="sd-opt" title="stop everything, including this room"
-
                         onClick={() => { api.shutdown('all', true); setDownMode('all'); setArmed(false) }}>
-
                   everything
-
                 </button>
-
                 <button className="sd-opt sd-kill"
-
                         title="stop now — discards a reply in flight and any message she has not shown you"
-
                         onClick={() => { api.shutdown('kill', false); setDownMode('all'); setArmed(false) }}>
-
                   kill
-
                 </button>
-
                 <button className="sd-opt sd-cancel" onClick={() => setArmed(false)}>cancel</button>
-
               </div>
-
             )}
-
           </div>
-
           <Clock pulse={pulse} />
         </div>
       </footer>

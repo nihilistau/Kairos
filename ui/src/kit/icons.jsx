@@ -56,6 +56,9 @@ export const GLYPHS = {
   presence: ['M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z', 'M17 6h.01'],
   librarians: ['M5 4.5h3.5v15H5zM10 4.5h3.5v15H10zM15.3 5.3l3.4-.9 3.3 14.4-3.4.9z',
                'M5 8h3.5M10 8h3.5'],
+  // a chip with pins, and its die as the detail (2026-10-29, the Models window)
+  models: ['M7 5.5h10a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 17V7A1.5 1.5 0 0 1 7 5.5zM9.5 3v2.5M14.5 3v2.5M9.5 18.5V21M14.5 18.5V21M3 9.5h2.5M3 14.5h2.5M18.5 9.5H21M18.5 14.5H21',
+           'M9.5 9.5h5v5h-5z'],
   // the shell's own marks
   brand: ['M12 3l9 9-9 9-9-9z', 'M12 8.5l3.5 3.5-3.5 3.5-3.5-3.5z'],
   anon: ['M12 4.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 1 0 0-7zM5 19.5a7 7 0 0 1 14 0'],
@@ -68,6 +71,11 @@ export const GLYPHS = {
            'M17.4 8.7l-7.6 7.6a1.4 1.4 0 0 1-2-2l6.9-6.9'],
   speaker: ['M4.5 9.5h3l4.5-4v13l-4.5-4h-3z', 'M15 9.5a3.5 3.5 0 0 1 0 5M17.5 7a7 7 0 0 1 0 10'],
   speakerOff: ['M4.5 9.5h3l4.5-4v13l-4.5-4h-3z', 'M15.5 9.5l5 5M20.5 9.5l-5 5'],
+  // his ears (2026-10-29): a capsule mic; open, its pickup arc is the detail; closed, a slash.
+  mic: ['M12 3.5a2.5 2.5 0 0 1 2.5 2.5v5a2.5 2.5 0 0 1-5 0V6A2.5 2.5 0 0 1 12 3.5zM12 16.5v3.5M9 20h6',
+        'M6.5 11a5.5 5.5 0 0 0 11 0'],
+  micOff: ['M12 3.5a2.5 2.5 0 0 1 2.5 2.5v5a2.5 2.5 0 0 1-5 0V6A2.5 2.5 0 0 1 12 3.5zM12 16.5v3.5M9 20h6',
+           'M5 4l14 16'],
 }
 
 export function Icon({ name, size = 20, className = '' }) {

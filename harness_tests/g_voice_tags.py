@@ -103,8 +103,12 @@ print("\n6. THE ROOM SPEAKS — the player exists and is wired")
 sp = os.path.join(ROOT, "ui", "src", "room", "speech.js")
 check("ui/src/room/speech.js exists", os.path.exists(sp))
 chat = open(os.path.join(ROOT, "ui", "src", "Chat.jsx"), encoding="utf-8").read()
+# (2026-10-29) through room/reply.js, which forwards to speech.feed/flush until his voice cuts
+# the reply (behaviour: G-ROOM-KIT's barge-in legs)
+_rp = open(os.path.join(ROOT, "ui", "src", "room", "reply.js"), encoding="utf-8").read()
 check("Chat feeds the speaker as sentences close, and flushes the tail",
-      "speech.feed(" in chat and "speech.flush(" in chat)
+      "reply.feed(r, spokenText, spoken.current)" in chat and "reply.flush(r, spokenText, spoken.current)" in chat
+      and "speech.feed(text, cursor)" in _rp and "speech.flush(text, cursor)" in _rp)
 check("...hands it forSpeech text (marks out, voice tags in)", "forSpeech(last.content)" in chat)
 check("...and her unprompted lines speak too", "speech.say(forSpeech(m.text))" in chat)
 check("a new turn of his hushes her", "speech.stop()" in chat)

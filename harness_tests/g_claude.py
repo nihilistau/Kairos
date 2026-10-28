@@ -350,7 +350,10 @@ def _extra(path, name):
 
 
 _src_x = _extra(os.path.join(ROOT, "pyproject.toml"), "claude")
-_exp_x = _extra(os.path.join(ROOT, "kairos-export", "pyproject.toml"), "claude")
+# INSIDE THE EXPORT there is no kairos-export/ — the export's own pyproject.toml IS the
+# overlay, so the root file is the one being checked (2026-10-29, the first cut that ran it).
+_ovl = os.path.join(ROOT, "kairos-export", "pyproject.toml")
+_exp_x = _extra(_ovl, "claude") if os.path.isfile(_ovl) else _src_x
 check("both pyprojects declare the same `claude` extra", _src_x is not None and _src_x == _exp_x,
       (_src_x, _exp_x))
 check("the extra pins the verified floor anthropic>=1.15", _src_x == ["anthropic>=1.15"], _src_x)

@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.8.76 — Off the record she speaks locally; your voice stops her reply (2026-10-29)
+
+* Off the record with a remote voice (Grok) chosen, she now speaks with her local voice (LFM3-Audio) instead of going quiet; nothing goes to the remote voice, and nothing of the sentence is cached or logged (an engine error that quotes it is redacted; voxtral, which writes a temp file or logs the text, is held off the record). The Models voice row reads "off the record — speaking locally".
+* Opening the mic (push-to-talk, or always-listening hearing you speak) stops her current reply: her voice and the generation stop, the partial reply is marked "interrupted — you started talking", the rest of it is never spoken, and your line is sent at once. A stopped reply is now marked "stopped".
+
+## 0.8.75 — Docs and screenshots (2026-10-29)
+
+* The README shows the desktop folders and the dock, the Models window with its taskbar strip, and the Voice window (Grok / LFM3-Audio / voxtral, push-to-talk ears), with three new screenshots.
+* The Apps window's undo note now says Music and Games show on the desktop unless your saved icon list hides them (it said "unless you hid them yourself", which was not true for every saved list).
+
+## 0.8.74 — Dock and folders: review fixes (2026-10-29)
+
+* The dock no longer sits over a maximised window after a mouse click on it (only keyboard focus calls it back); a drag whose mouse release was lost no longer completes on the next click; Escape another control handled no longer closes a folder panel.
+* The Apps window's "in the dock" is now a "remove from dock" button, and its undo note says Music and Games now show on the desktop.
+
+## 0.8.73 — Desktop folders and the dock (2026-10-29)
+
+* **Five folders on the desktop**: Her, Together, Look it up, Home and System; double-click opens a panel of its apps; drag apps in and out.
+* **A dock, bottom centre**: six apps to start, one click opens (or brings back) an app, a dot under open ones, magnify and a mood-colour glow under the pointer; drag apps on, off and along it (1 to 8). It slides away while a window is maximised and comes back at the bottom edge.
+* **The Apps window** adds to the dock, and offers once to undo the folders: "undo — put my icons back" restores the old icon positions exactly.
+
+## 0.8.72 — Desktop folders groundwork (2026-10-29)
+
+* **Music and Games show on a fresh browser**: they no longer start hidden (they are going into a Together folder). A saved hide still wins.
+* **Groundwork**: every app has a folder and the dock has a default fill, with a one-time upgrade and its undo; folders and the dock render in the next steps.
+
+## 0.8.71 — LFM3 final review: one voice, and the doors stay on this machine (2026-10-29)
+
+* **One voice at a time, and not over him**: the Models voice Test plays through her one queue (the always-listening mic no longer hears it as his turn); push-to-talk holds her streaming reply until he sends; a hush no longer reads as a playback failure.
+* **What he says is never lost**: a line said while she answers is appended to the box and sent when she finishes.
+* **His audio never leaves the machine**: an LFM3 door URL naming another host is refused with the reason, never followed.
+* **Honest rows**: a failed prewarm is an error, a voice Test that fell back fails, a degraded model is not "ready"; profiles without LFM3 default their local voice to voxtral.
+
+## 0.8.70 — LFM3 on the CPU: she can hear, and speak without Grok (2026-10-29)
+
+* **Ears**: a mic in Chat (push-to-talk) transcribed by LFM3-Audio on this machine; optional always-listening, off by default. His audio stays in memory.
+* **Voice**: `voice.method` is `xai | lfm3 | voxtral`, every fallback keeps its reason, and the room is told who spoke and why Grok did not.
+* **The silent-Grok root cause**: the room's player stayed stuck after any hush, so she was silent for the rest of the session. Fixed, and autoplay-blocked is now said out loud.
+* **A Models window and a taskbar strip** of model lights, with a Test per job.
+* **LFM3-1.7B** is an option for the librarian (LFM2.5-1.2B stays the default). All LFM3 models run on the CPU (llama.cpp b11963).
+
 ## 0.8.69 — Launch fixes (2026-10-27)
 
 * **The Launch window works without its optional install**: Settings, Voice, Search and restart never need `tomlkit`; the Launch routes answer 503 with the install line. Restarts are written to the change log, setup names that would share a file are refused, and loading a setup changes only the values it sets — the model path keeps its separators and quoting.

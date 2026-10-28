@@ -25,13 +25,20 @@ and the default face.*
 
 ## What is in the room
 
-The room is a desktop in the browser: loose app icons you arrange, windows you move, resize,
-maximise, minimise and restore, a taskbar along the bottom (a button per window, off the
-record, Shut down, the clock) and a top bar that says how she is (her mood and voice), how her
-day is going (when you last spoke, whether her day has closed) and how the machine is (the
-profile, uptime, the stack light with its bounce / restart actions, the next backup). Every
-window is listed with the route it reads and whose it is in
-[`docs/PANELS.md`](docs/PANELS.md); the room itself is [`ui/README.md`](ui/README.md).
+The room is a desktop in the browser: five folders of apps (Her, Together, Look it up, Home,
+System) that open as a frosted panel, a dock of favourites at the bottom, windows you move,
+resize, maximise, minimise and restore, a taskbar along the bottom (a button per window, a strip
+of model lights, off the record, Shut down, the clock) and a top bar that says how she is (her
+mood and voice), how her day is going (when you last spoke, whether her day has closed) and how
+the machine is (the profile, uptime, the stack light with its bounce / restart actions, the
+next backup). Drag an app out of a folder to make it a loose icon, onto another folder to move
+it, or onto the dock to keep a copy there (one to eight; it starts with Chat, Voice, Music,
+Search, Memory and Models). One click on the dock opens or brings back an app, and the dock
+slides away while a window is maximised. The layout is kept per browser. Every window is listed
+with the route it reads and whose it is in [`docs/PANELS.md`](docs/PANELS.md); the room itself
+is [`ui/README.md`](ui/README.md).
+
+![The desktop with Chat minimised: the five folders down the left, the Her folder open as a panel of its six apps, the portrait, and the dock at the bottom with Search magnified under the pointer](docs/screenshots/room-folders-dock.webp)
 
 **She has her own time.** When the room goes quiet, the idle clock (`harness/kairos/`) gives
 her reasons to act: continue a thread, check in, remind, think on her own, and the presence
@@ -68,11 +75,28 @@ in [`docs/OFF-BY-DEFAULT.md`](docs/OFF-BY-DEFAULT.md).
 
 ![The Research window with research rows marked hers and a box to run one, beside the Settings window showing Voice, Web search, Research and Wardrobe knobs with live, restart to change and changed chips](docs/screenshots/room-research-settings.webp)
 
+**She can hear you, and you can see what she is running.** Point the profile's `[lfm3]` table
+at an LFM3-Audio GGUF and its mmproj and a llama.cpp build (b11960 or newer), and `serve.py`
+runs it on the CPU as her ears and a local voice ([`docs/SETUP.md`](docs/SETUP.md) §6). The mic
+beside send in Chat is push-to-talk (click, speak, click again), and what you said is transcribed
+on your machine and sent exactly as a typed line. The recording stays in memory and is never
+written down. Always-listening is an option and ships off. It works only in a browser on the same
+machine. Her voice is switchable live between xAI Ara (with a key), LFM3-Audio and the older
+voxtral chain. A voice that fails falls back and says so, and a taskbar chip names why she went
+quiet. The **Models** window lists every model job: her mind, the librarian, the memory index,
+her ears, her voice and her eyes. Each row shows the model behind it and a `loaded` / `loading` /
+`off` / `missing` / `error` pill with the reason, plus a **Test**. A job you have not set up says
+`off` or names the missing file rather than failing quietly.
+
+![The Models window with its six rows (her mind, librarian, memory index, her ears, her voice, eyes), each with a status pill and a Test button, and the strip of model lights in the taskbar](docs/screenshots/room-models.webp)
+
+![Models beside the Voice window: the provider picker (xai, lfm3, voxtral), the LFM3 and xAI voice pickers, pace, and the ears mode (push or always) with the pause that ends a line](docs/screenshots/room-voice.webp)
+
 **And the rest:**
 
 | | |
 |---|---|
-| **a voice** | xAI Ara with expressive tags when a key is present, a local chain otherwise; the room speaks her replies (`harness/voice/`). |
+| **a voice and ears** | xAI Ara with expressive tags when a key is present, or LFM3-Audio on the CPU, switchable live; the room speaks her replies and, with LFM3-Audio set up, you can talk back through the push-to-talk mic (`harness/voice/`). |
 | **eyes** | an hourly ambient look behind a quiet guard (off until you arm it), and sight through whatever the served model can receive (`harness/senses/`). |
 | **hands** | an MCP server for her tools and a bridge for yours ([`docs/MCP.md`](docs/MCP.md)); Home Assistant, on request, limited to an allowlist you write ([`docs/HOME-ASSISTANT.md`](docs/HOME-ASSISTANT.md)). |
 | **off the record** | one switch in the taskbar: she stays entirely herself and nothing about the evening is written down, held by a gate that diffs the whole sandbox ([`docs/ANON-MODE.md`](docs/ANON-MODE.md)). |

@@ -196,6 +196,44 @@ from the wardrobe panel's *make it now*.
   `autostart = false` on purpose: a resident synth took ~2 GB and faulted a prefill once.
 - off — she types. Everything else still works.
 
+`voice.method` is `xai | lfm3 | voxtral`. A voice that fails falls to the local default
+(`[tts].local`; `lfm3` when `[lfm3].enabled`, else `voxtral`), then voxtral, and every failure
+keeps its reason: the room's taskbar chip says who spoke and why Grok did not.
+
+### LFM3 on the CPU — her ears and a local voice
+
+LFM3-Audio is her ears (push-to-talk mic in Chat, `POST /v1/listen`) and an offline voice.
+It runs as a **CPU-only** `llama-server` (`-ngl 0`, on purpose: the 2026-07-31 GPU voice
+fault). `serve.py` starts it, and an optional LFM3-1.7B chat door, when `[lfm3].enabled`.
+
+- **llama.cpp**: the official ggml-org release, **b11960 or newer**, unzipped anywhere. Set
+  `llama_dir` to the folder that holds `llama-server`.
+- **Model files** (yours; Kairos does not fetch them): an LFM3-Audio GGUF and its mmproj
+  (`LFM3-Audio-2B-Q8_0.gguf` + `mmproj-LFM3-Audio-2B-F16.gguf` are the defaults; Q5_K_M and
+  BF16 alternatives exist), and optionally an LFM3-1.7B GGUF for the librarian. A missing file
+  is named in the boot line and in the Models window; nothing else breaks.
+- **The `[lfm3]` table** in your profile (the paths are placeholders):
+
+```toml
+[lfm3]
+enabled      = true            # DISARM: false
+llama_dir    = "<path to llama.cpp b11960+>"
+audio_gguf   = "<models>/LFM3-Audio-2B-Q8_0.gguf"
+audio_mmproj = "<models>/mmproj-LFM3-Audio-2B-F16.gguf"
+chat_gguf    = "<models>/LFM3-1.7B-Q6_K.gguf"   # optional: the librarian option
+audio_url    = "http://127.0.0.1:8813"
+chat_url     = "http://127.0.0.1:8814"
+threads      = 8
+voice        = "female"
+lang         = "en"
+```
+
+- The doors are **not children of the stack**: a restart adopts a server already answering
+  `/health`. Logs: `var/lfm3-audio.log`, `var/lfm3-chat.log`.
+- Ears: `ears.mode` is `push` (default) or `always` (off; OFF-BY-DEFAULT §21). The mic works
+  only in the room open on this machine. The audio is never written to disk.
+- The Models window (desktop) shows each model job's state and has a Test per row.
+
 For **talking to her**, `[engine].asr_url` takes any `/v1/audio/transcriptions` endpoint.
 [`mistralai/Voxtral-Mini-4B-Realtime-2602`](https://hf.co/mistralai/Voxtral-Mini-4B-Realtime-2602)
 is the streaming one worth having — batch ASR makes a conversation feel like submitting a

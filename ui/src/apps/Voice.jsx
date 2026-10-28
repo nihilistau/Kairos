@@ -32,7 +32,8 @@ export default function Voice() {
             {String(lv.speaking_as).replace(/^xai:/, '')}
           </Chip>
         ) : null}
-        {lv.method === 'local' && st.available === false ? <Chip tone="err">local chain dark</Chip> : null}
+        {/* `available` is voxtral's chain (2026-10-29: lfm3's state lives in the Models window) */}
+        {lv.method === 'voxtral' && st.available === false ? <Chip tone="err">voxtral chain dark</Chip> : null}
         {typeof st.cached === 'number' ? <Chip title="synthesized sentences on disk">{st.cached} cached</Chip> : null}
       </div>
       <KnobGroups only={['Voice']} extras={{ Voice: 'voice-test' }} />

@@ -42,6 +42,12 @@ the moment these three flipped.
 |---|---|---|
 | `SP_CONSULT` (`[consult].enabled`) | Her `consult` tool: one self-contained question to Claude (`harness/skills/consult.py`), answer back with research's provenance line, a receipt in `var/consult/` per call, refused at call time off the record, in a roleplay scene, in an intimate presence mode, and in her own time when `consult.own_time` is off. Arming condition, met 2026-10-21: a Claude key on file (`var/secrets/claude.txt`) and the operator's say-so; without the key the tool is absent. Gate: `harness_tests/g_consult.py`. | What she actually sends: the receipts carry the question, and it must stand alone (no names, no private detail). The cost: uncapped by design, so watch `usage` in the receipts. A fact from an answer reappearing as "you told me". |
 
+**Armed 2026-10-29, operator's call, live profile `companion` (off in code and in `sp`):**
+
+| Knob | What it does now | Watch for |
+|---|---|---|
+| `[lfm3].enabled` | `serve.py` starts two CPU-only llama-server doors (`-ngl 0`): LFM3-Audio on :8813 (her ears and the `lfm3` voice) and LFM3-1.7B chat on :8814 (an option for `aux.chat_model`, not the default). Receipt `docs/bench/2026-10-29-lfm3-spike.md`; gates G-LFM3-DOORS, G-LFM3. **Disarm: `enabled = false`** (or remove the table); a missing gguf is named in the boot line and the doors stay down. | The doors are not children of the stack, so a stack stop leaves them running by design; a second llama-server on :8813/:8814 is a stale one. CPU contention with the model's host threads during a spoken reply. |
+
 **Armed 2026-10-20, operator's call, live profile `companion` (recorded 2026-10-20, off in `sp`):**
 
 | Knob | What it does now | Watch for |
@@ -133,6 +139,16 @@ responsible for exactly one thing, which is whether she describes the outcome tr
 ---
 
 ## The ledger
+
+### 21. `ears.mode = always` — the room listens without a click *(recorded 2026-10-29)*
+
+| | |
+|---|---|
+| **Code** | `ui/src/room/ears.js` (`setAlways`, the energy VAD in `take()`, the `gated()` mic gate), `ui/src/Chat.jsx` (registers the line handler; the mic closes when Chat closes), `harness/server/app.py` `_listen_op` (`POST /v1/listen`), knobs `ears.mode` / `ears.silence_ms` in `harness/tuning/registry.py` |
+| **Default** | `push` — the mic opens only on his click in Chat and sends on the next one |
+| **Why off** | An always-open mic is a standing recording surface in his room: it is his to open, not a default. The VAD is a plain energy threshold, unmeasured against his room's noise, his speakers' bleed (her own voice is ignored while she plays and for 300 ms after, but echo cancellation is the browser's), or a TV; a false line is sent to her as if he had said it — and since 2026-10-29 his speech onset CUTS her current reply (`ui/src/room/reply.js`), so a false onset (a TV, a door) also stops what she was saying. |
+| **What would arm it** | He turns it on in the Models window's ears row (or Settings → Voice → Ears). Nothing else arms it. Worth watching once he does: lines he did not say landing in Chat, and her replies cut with no one speaking (raise `ears.silence_ms` or go back to push). |
+| **Gate** | `python harness_tests/g_ears.py` |
 
 ### 20. the phone app's second model — OBLITERATED E4B as B in the blind A/B *(recorded 2026-10-26, parked by the operator)*
 

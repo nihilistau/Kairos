@@ -182,6 +182,42 @@ _ = AN.say("she said something out loud here")
 check("logs: her words are redacted, not silenced — the turn is still provable",
       "held back" in _ and "she said" not in _, _)
 
+# HIS VOICE (2026-10-29): /v1/listen hears him under the switch — transcription is local and
+# the TURN that follows goes through the typed path, which is what holds — and it writes
+# nothing, which the census below sees. The door is stubbed at its owner; the model files
+# live outside the sandbox so only a write by the route could reach the diff.
+import tempfile as _tf_ls  # noqa: E402
+import wave as _wv_ls  # noqa: E402
+from harness.voice import lfm3 as _LF  # noqa: E402
+_ls_dir = _tf_ls.mkdtemp(prefix="g_anon_ears_")
+for _n_ls in ("a.gguf", "m.gguf"):
+    open(os.path.join(_ls_dir, _n_ls), "wb").write(b"x")
+_ls_env = {k: os.environ.get(k) for k in ("SP_LFM3", "SP_LFM3_AUDIO_GGUF", "SP_LFM3_AUDIO_MMPROJ")}
+os.environ.update(SP_LFM3="1", SP_LFM3_AUDIO_GGUF=os.path.join(_ls_dir, "a.gguf"),
+                  SP_LFM3_AUDIO_MMPROJ=os.path.join(_ls_dir, "m.gguf"))
+_ls_seam = (_LF._GET, _LF._POST)
+_LF._GET = lambda url, timeout=5: 200
+_LF._POST = lambda url, body, timeout=120: json.dumps(
+    {"choices": [{"message": {"content": "something private, said aloud"}}]}).encode()
+_ls_buf = io.BytesIO()
+with _wv_ls.open(_ls_buf, "wb") as _w_ls:
+    _w_ls.setnchannels(1); _w_ls.setsampwidth(2); _w_ls.setframerate(16000)
+    _w_ls.writeframes(b"\x01\x00" * 1600)
+_ls_raw = _ls_buf.getvalue()
+_ls_held = dict(AN._HELD)
+try:
+    _ls_code, _ls_res = A._listen_op(len(_ls_raw), io.BytesIO(_ls_raw).read)
+finally:
+    _LF._GET, _LF._POST = _ls_seam
+    for _k_ls, _v_ls in _ls_env.items():
+        if _v_ls is None:
+            os.environ.pop(_k_ls, None)
+        else:
+            os.environ[_k_ls] = _v_ls
+check("ears: /v1/listen still hears him off the record, and holds no door of its own",
+      _ls_code == 200 and _ls_res.get("text") == "something private, said aloud"
+      and dict(AN._HELD) == _ls_held, (_ls_code, _ls_res, _ls_held, dict(AN._HELD)))
+
 after = tree()
 check("AND THE DISK IS UNCHANGED — the only witness that counts",
       after == before, {"new": sorted(set(after) - set(before)),
@@ -242,26 +278,39 @@ try:
     from harness.tuning import registry as _tune_v      # noqa: E402
     _voice_was = _tune_v.get("voice.enabled")
     _tune_v.set_many({"voice.enabled": True})
+    # (2026-10-29, operator: "switch to local for OTR, but ensure obviously nothing is logged
+    # or kept anywhere") the remote voice is SKIPPED, not silenced: the local default speaks.
+    # Driven to completion now — the local voice is stubbed at its OWNER (lfm3.speak, which
+    # tts imports at call time), and the cache directory points inside the sandbox, so the
+    # held write is witnessed by the directory itself rather than by a grep.
+    from harness.voice import lfm3 as _LF2           # noqa: E402
+    _sp0, _cd0 = _LF2.speak, _T.CACHE_DIR
+    _spoke = []
+    _LF2.speak = lambda text, voice="", lang="": (_spoke.append(text), b"RIFF\x00\x00\x00\x00WAVE")[1]
+    _T.CACHE_DIR = os.path.join(SB, "tts-cache-anon")
+    os.makedirs(_T.CACHE_DIR, exist_ok=True)
+    _vh0 = dict(AN._HELD)
     try:
-        _T.synthesize("something private")
-        check("voice: a REMOTE voice is held", False, "it synthesised anyway")
+        _w, _meta = _T.synthesize("something private", use_cache=True)
     except _T.TTSError as _e:
-        check("voice: a REMOTE voice is held", "off the record" in str(_e), str(_e)[:90])
+        _w, _meta = b"", {"err": str(_e)}
     finally:
+        _LF2.speak = _sp0
         _tune_v.set_many({"voice.enabled": bool(_voice_was)})
+    _vh1 = dict(AN._HELD)
+    _cached = os.listdir(_T.CACHE_DIR)
+    _T.CACHE_DIR = _cd0
+    check("voice: a REMOTE voice is skipped and her LOCAL voice speaks instead",
+          _meta.get("backend") == "lfm3" and _spoke == ["something private"]
+          and _meta.get("fell_back_from") == "xai: off the record", _meta)
+    check("...net.voice counted once, voice.cache held once, and no wav landed in the cache",
+          _vh1.get("net.voice", 0) - _vh0.get("net.voice", 0) == 1
+          and _vh1.get("voice.cache", 0) - _vh0.get("voice.cache", 0) == 1 and _cached == [],
+          (_vh0, _vh1, _cached))
     check("NOTHING REACHED THE WIRE - the tripwire never fired", not _sent, _sent)
-    # THE CACHED WAV. This one cannot be driven to completion in an OFFLINE gate: the
-    # remote guard above raises before the cache is reached, and the local branch needs a
-    # voxtral backend no gate has. So the behavioural half is stated as the limit it is,
-    # and what IS asserted is that the write site consults the door - not that a comment
-    # near it mentions one. `use_cache and not holds(...)` is the whole guard; a grep for
-    # the door NAME alone would pass on a file that only talks about it.
     _tsrc = io.open(os.path.join(ROOT, "harness", "voice", "tts.py"), encoding="utf-8").read()
-    check("voice: the cache WRITE is gated on the door, not merely near it",
-          'if use_cache and not _anon.holds("voice.cache")' in _tsrc)
     check("...and a cache READ is deliberately left alone - a hit means she said it "
           "before, on the record", "if use_cache and os.path.isfile(path):" in _tsrc)
-    AN.holds("voice.cache")     # register it, so section 7's door table stays closed
 finally:
     _u.urlopen = _real_urlopen
 check("...and every egress door is declared, like every other door",

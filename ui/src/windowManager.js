@@ -35,6 +35,12 @@ export function open(appId, opts = {}) {
   })
   emit()
 }
+/* Does this app have a window — minimised included? (The dock's dot.) */
+export const isOpen = (appId) => windows.some(w => w.appId === appId)
+/* Is a maximised window SHOWING? A maximised window that is minimised covers nothing, so the
+ * dock (which slides away for a maximised one) comes back for it. */
+export const anyMaximized = () => windows.some(w => w.max && !w.minimized)
+
 export const close = (id) => { stopTimer(id); windows = windows.filter(w => w.appId !== id); emit() }
 export function focus(id) {
   const w = windows.find(x => x.appId === id)

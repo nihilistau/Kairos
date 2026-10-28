@@ -86,12 +86,33 @@ was posted to `api.x.ai` in full.
 
 | door | what it holds | where |
 |---|---|---|
-| `net.voice` | a sentence sent to a **remote** voice. A LOCAL voice still speaks — silencing her would be the mode disabling the room. It **raises** rather than returning silence, so "she went quiet" is never mistaken for "she had nothing to say" | `voice/tts.py::synthesize` |
-| `voice.cache` | the wav on disk. Keyed by a text hash, but the file *is* her voice saying the private thing, and the cache is trimmed by size, not age. A cache **read** is deliberately left alone: a hit means she said it before, on the record | `voice/tts.py::synthesize` |
+| `net.voice` | a sentence sent to a **remote** voice. **Skipped, not silenced** (2026-10-29, his call: *"switch to local for OTR, but ensure obviously nothing is logged or kept anywhere"*): with `voice.method = xai` and the switch on, no request goes to `api.x.ai` — the hold is counted once per sentence — and her **local** voice speaks it instead. `X-TTS-Fallback` says `xai: off the record`, and the Models voice row reads *off the record — speaking locally (lfm3)*, lit by the local door. Before 2026-10-29 it raised and she went quiet | `voice/tts.py::synthesize` |
+| `voice.cache` | the wav on disk — for the local voice too, including a fallback's key. Keyed by a text hash, but the file *is* her voice saying the private thing, and the cache is trimmed by size, not age. A cache **read** is deliberately left alone: a hit means she said it before, on the record | `voice/tts.py::synthesize` |
 | `net.search` | the query. A search string is the most legible summary of a private conversation there is, and it goes to a third party in plain text | `skills/search.py::search_web` |
 | `net.research` | the question and the context it carries. It has its **own** client, so guarding `skills/xai.py` would have covered images and video and left this open | `skills/research.py::research`, `::_xai_post` (his box, 2026-10-21) |
 | `net.consult` | the question she (or his Research-app box) would send to Claude. Held before the key or the client is looked at; `skills/claude.py::ask` holds every Claude door again at the transport | `skills/consult.py::shut_reason` (2026-10-21) |
 | `net.provider` | the one door out of `skills/xai.py` — images, video, uploads, and the remote voice all reach `api.x.ai` through `_post`, so one guard covers every one of them including the ones added next year | `skills/xai.py::_post`, `::upload_image` |
+
+### What her local voice keeps off the record: nothing (2026-10-29)
+
+Speaking locally is only worth it if the local path keeps nothing either. Audited end to end, and gated (G-LFM3, G-ANON, G-LFM3-DOORS):
+
+| where | what it could have kept | what it does off the record |
+|---|---|---|
+| the TTS cache (`var/voice/tts`) | her voice saying the sentence | write held (`voice.cache`), whichever engine spoke |
+| `tts.py`'s swallowed engine errors (a log line), `X-TTS-Fallback`, the raised error the room shows | an engine quoting her sentence back in its error — whole, truncated or JSON-escaped | **reduced to the exception type** (`lfm3: LFM3Error`): no message text at all, so no echo of any shape survives (review round 1; it first matched 16-character runs, which a short or escaped echo slips past). On the record the reason is kept verbatim |
+| the LFM3-Audio door's own log (`var/lfm3-audio.log`) | the request text | none at the info threshold (timings and token counts only, read off the live log); `serve.py` pins `--log-verbosity 3` so the environment cannot raise it |
+| the LFM3-Audio door's RAM | her sentences and his recordings in llama-server's host prompt cache (`--cache-ram`, 8 GiB by default) | `serve.py` starts the audio door with `--cache-ram 0 --no-cache-prompt`. **Known limit:** the slot's own KV of the last request stays in that process's RAM until the slot is reused or the door restarts — memory, never disk. These flags and the verbosity pin take effect the next time the audio door starts (a running door is adopted, not restarted) |
+| `lfm3.py`, `/v1/speak` | — | write nothing and log no text (the gateway's request log is silenced) |
+| **voxtral** | its CLI can only write to a file (a temp wav), and its resident `tts-server` prints the first 48 characters of every sentence to its log | **skipped** off the record, whether it is the chosen voice or the local default: the chain records `voxtral: off the record (its server logs the sentence, its CLI writes a temp wav)` and lfm3 speaks; if lfm3 cannot, she is quiet and the room says why, and the Models row is `off`. The one spelling of what is skipped and why is `tts.OFF_RECORD_SKIPS`. **Arming condition:** `tts-server` stops logging the text (voxtral-mini-realtime-rs, `src/bin/tts-server.rs`) — then its server leg can run off the record |
+| the room's player (`ui/src/room/speech.js`) | — | object URLs revoked after play, no storage API |
+
+### His voice cuts her reply — off the record or not (2026-10-29)
+
+Opening the mic stops her current reply (`ui/src/room/reply.js`): her voice stops, the generation is aborted like the stop button, and nothing more of it is spoken. Two things worth knowing:
+
+* **In always-listening mode the cut lands between her sentences.** The mic is gated while her voice is playing (and for 300 ms after), so the room does not hear her through the speakers and answer itself; his speech onset can only be heard — and so can only cut her — in the gaps.
+* **A denied mic permission still stops her reply.** Push-to-talk cuts her the moment he clicks, before the browser's permission answer arrives; if the mic is then blocked, the reply stays stopped and the room says why.
 
 **The gate drives these against a tripwire**, not a grep: `urllib.request.urlopen` is
 replaced with a function that records the attempt and fails the gate. A guard that let the

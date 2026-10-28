@@ -34,7 +34,9 @@ export function VoiceChip() {
   if (!lv) return null
   return lv.enabled === false
     ? <Glance state="off" title="voice.enabled is off">muted</Glance>
-    : <Glance state="on" title="provider · voice">{lv.method}{lv.method === 'xai' ? ' · ' + lv.xai_voice : (lv.local_gguf ? ' · ' + lv.local_gguf : '')}</Glance>
+    : <Glance state="on" title="provider · voice">{lv.method}{lv.method === 'xai' ? ' · ' + lv.xai_voice
+      : lv.method === 'lfm3' ? ' · ' + lv.lfm3_voice
+      : (lv.local_gguf ? ' · ' + lv.local_gguf : '')}</Glance>
 }
 
 export function SearchChip() {

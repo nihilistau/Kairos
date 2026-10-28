@@ -13,7 +13,7 @@
   "",
   "`role` is what the model does in this stack; `note` is the honest reason to pick it."
  ],
- "updated": "2026-08-23",
+ "updated": "2026-10-29",
  "engine": {
   "role": "her — the model that answers /v1/chat/completions",
   "note": "A 26B mixture-of-experts with ~4B active: the quality of a mid-size dense model at the speed and VRAM of a small one, which is what makes a companion that thinks in real time possible on one consumer GPU. Anything OpenAI-compatible works; this is what the decode knobs in profiles/companion.toml were tuned on.",
@@ -75,6 +75,18 @@
     "format": "gguf",
     "knob": "[aux].colbert_url",
     "note": "late-interaction rerank. OFF by default and measured before it is armed — see docs/SEMANTICS.md for the experiment that a plain cosine rank won."
+   },
+   {
+    "id": "LFM3-Audio-2B (Liquid AI) - LFM3-Audio-2B-Q8_0.gguf + mmproj-LFM3-Audio-2B-F16.gguf",
+    "format": "gguf (local files, not fetched by Kairos)",
+    "knob": "[lfm3].audio_gguf / audio_mmproj",
+    "note": "her ears AND her local voice, on the CPU, one resident llama-server (llama.cpp b11963 or newer) on :8813. ASR at temperature 0 (16 kHz mono in), speech out at 24 kHz. voice.method = lfm3 selects it; ears.mode push|always. Never beside the 26B on the GPU: -ngl 0 is spelled out. Measured in docs/bench/2026-10-29-lfm3-spike.md."
+   },
+   {
+    "id": "LFM3-1.7B (Liquid AI) - LFM3-1.7B-Uncensored-AD-Q6_K.gguf",
+    "format": "gguf (local file, not fetched by Kairos)",
+    "knob": "[lfm3].chat_gguf, then [aux].chat_model = lfm3-1.7b-uncensored",
+    "note": "an OPTION for the librarian, on its own CPU door (:8814); liquidai/lfm2.5-1.2b-instruct stays the default. Suggested sampling: temperature 0.1, top_k 50, repetition_penalty 1.1."
    }
   ]
  },

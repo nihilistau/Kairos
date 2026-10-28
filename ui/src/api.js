@@ -190,6 +190,11 @@ export const anonSet         = (on) => post('/v1/anon', { on: !!on })
 /* THE LIBRARIANS (2026-08-22): the aux doors, the index, the pickers. */
 export const aux             = () => get('/v1/aux')
 export const auxRebuild      = () => post('/v1/aux/rebuild', {})
+/* THE MODELS WINDOW (2026-10-29): every model job in one shape, and a small real test per
+ * job. The status route also feeds the taskbar strip; the test answers who spoke — and, for the
+ * voice only, carries the wav it tested (`audio_b64`) so the click can play it. */
+export const modelsStatus    = () => get('/v1/models/status')
+export const modelsTest      = (job) => post('/v1/models/test', { job })
 export const roleplayWrite = (b) => post('/v1/roleplay', b)
 
 /* THE BOARD. One call returns every match and its public state — the answer to a

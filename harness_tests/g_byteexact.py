@@ -133,6 +133,16 @@ print("\n5. every lane goes through this one door")
 import inspect  # noqa: E402
 import re  # noqa: E402
 
+# NOT HER LANE (2026-10-29, controller ruling): this leg's subject is HER DAEMON's request body —
+# the byteexact resolution only means anything on the way to sp-daemon. A module that posts to a
+# SIDECAR's door (a separate llama-server with its own sampling) is out of scope, and is named
+# here with its reason rather than slipping past by shape. sidecar/client.py escapes only by shape
+# (it builds "messages" without the `: [` literal), not by being listed. Everything else stays strict.
+NOT_HER_LANE = {
+    # the LFM3-Audio sidecar (:8813): ASR at temp 0 on /v1/chat/completions, not her daemon
+    os.path.join("harness", "voice", "lfm3.py"),
+}
+
 offenders = []
 for base, _dirs, files in os.walk(os.path.join(ROOT, "harness")):
     for fn in files:
@@ -143,7 +153,8 @@ for base, _dirs, files in os.walk(os.path.join(ROOT, "harness")):
             src = f.read()
         # a lane that posts to /v1/chat must not hand-build the body dict
         if "/v1/chat" in src and re.search(r'"messages"\s*:\s*\[', src) \
-                and "to_sp_chat" not in src and "inference_config" not in fn:
+                and "to_sp_chat" not in src and "inference_config" not in fn \
+                and os.path.relpath(p, ROOT) not in NOT_HER_LANE:
             offenders.append(os.path.relpath(p, ROOT))
 check("no module hand-builds a /v1/chat body outside to_sp_chat", not offenders, offenders)
 check("to_sp_chat is the builder", "byteexact" in inspect.getsource(InferenceConfig.to_sp_chat))

@@ -143,7 +143,8 @@ print("1. every app declares a CSS prefix, and no two share one")
 reg = io.open(os.path.join(UI, "appRegistry.jsx"), encoding="utf-8").read()
 apps = re.findall(r"id: '(\w+)'.*?Component: (\w+), css: '([\w-]+)'", reg)
 declared = {a[0]: a[2] for a in apps}
-ids = re.findall(r"\{ id: '(\w+)'", reg)
+# FOLDERS (desktop folders, 2026-10-29) is also a list of `{ id: ...` rows, and is not apps.
+ids = re.findall(r"\{ id: '(\w+)'", reg.split("export const FOLDERS", 1)[0])
 check("every app in APPS has a css prefix", sorted(declared) == sorted(ids),
       "missing: %s" % sorted(set(ids) - set(declared)))
 dupe = [p for p, n in collections.Counter(declared.values()).items() if n > 1]
@@ -261,6 +262,34 @@ stale_ui = sorted(a for a in UI_RULE_ALLOWED
                   or a[1] not in " ".join(re.sub(r"/\*.*?\*/", "", io.open(
                       os.path.join(UI, a[0]), encoding="utf-8").read(), flags=re.S).split()))
 check("no stale allowance — every listed ui- selector still exists", not stale_ui, stale_ui)
+
+print("\n4d. the shell's own prefix families: no app takes one, and each has its one file")
+# The shell (main.jsx, Chat.jsx, room/*.jsx) is ONE owner, so §3 cannot see two shell files
+# fighting over a family. A family the shell coins is registered here with the file that
+# draws it: no app may declare or use it, and no other shell file may draw it.
+# `dsk-` is the desktop (DeskIcons + Folder, 2026-09-23/10-29); `dock-` the dock (2026-10-29).
+SHELL_FAMILIES = {
+    "dsk": {"room/DeskIcons.jsx", "room/Folder.jsx"},
+    "dock": {"room/Dock.jsx"},
+}
+_taken = sorted(set(declared.values()) & set(SHELL_FAMILIES))
+check("no app declares a shell family as its prefix", not _taken, _taken)
+_app_uses = sorted((o, c) for o, cs in owners.items() if o != "shell"
+                   for c in cs if "-" in c and c.split("-", 1)[0] in SHELL_FAMILIES)
+check("no app or kit file draws a shell family's class", not _app_uses, _app_uses)
+_strays, _drawn = [], {f: set() for f in SHELL_FAMILIES}
+for p in [os.path.join(UI, "main.jsx"), os.path.join(UI, "Chat.jsx")] + \
+         sorted(glob.glob(os.path.join(UI, "room", "*.jsx"))):
+    rel = os.path.relpath(p, UI).replace(os.sep, "/")
+    for c in classes_in(io.open(p, encoding="utf-8").read()):
+        fam = c.split("-", 1)[0] if "-" in c else None
+        if fam in SHELL_FAMILIES:
+            _drawn[fam].add(rel)
+            if rel not in SHELL_FAMILIES[fam]:
+                _strays.append((rel, c))
+check("each shell family is drawn only by its own files", not _strays, _strays)
+_unused = sorted(f for f, files in _drawn.items() if not files)
+check("every registered shell family is drawn (none is a stale row)", not _unused, _unused)
 
 print("\n5. the grandfather table is a ratchet, not a permission slip")
 check("it has not grown", len(GRANDFATHERED) <= GRANDFATHERED_MAX,

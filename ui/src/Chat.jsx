@@ -3,6 +3,8 @@ import * as api from './api.js'
 import { extractTags, moodOf, traitHue, forSpeech } from './room/tags.js'
 import { When } from './room/When.jsx'
 import * as speech from './room/speech.js'
+import * as ears from './room/ears.js'
+import * as reply from './room/reply.js'
 import * as roomMood from './room/roomMood.js'
 import { isProbe } from './room/probe.js'
 import { Chip, Button, TextArea } from './kit/parts.jsx'
@@ -195,7 +197,33 @@ export function Speaker({ voice }) {
   )
 }
 
+/* HIS EARS IN THE ROOM (2026-10-29): the mic beside send. Push-to-talk: a click opens it
+   (and cuts her reply — room/reply.js), the next click sends what he said. Always-listening (ears.mode): pressed
+   while the mic is open; a click closes it for this tab. Off this machine it is disabled and
+   says why — his voice would leave the machine. */
+export function Mic({ ear, here, onClick }) {
+  const on = ear.recording || (ear.mode === 'always' && ear.listening)
+  const title = !here ? ears.NOT_HERE
+    : ear.hearing ? 'hearing you…'
+    : ear.recording ? 'listening — click to send'
+    : ear.mode === 'always' ? (ear.listening ? 'listening — click to stop listening' : 'click to listen')
+    : 'talk to her — click, speak, click again'
+  return (
+    <Button className={'chat-tool chat-mic' + (on ? ' chat-mic-on' : '')} icon={on ? 'mic' : 'micOff'}
+            aria-label="talk to her" aria-pressed={on} disabled={!here || ear.hearing} title={title}
+            onClick={onClick} />
+  )
+}
+
 /* send is the window's one primary; while she is generating it is stop, in danger */
+/* WHAT HE SAID, JOINED TO WHAT HE TYPED (final review, 2026-10-29). A spoken line used to
+   REPLACE the box: his half-typed draft was lost. Now each spoken line is appended to what he
+   typed, and the box is sent — at once, cutting her reply if she is still answering. */
+export function heardLine(draft, said) {
+  const d = String(draft || '').trim(), s = String(said || '').trim()
+  return d && s ? d + ' ' + s : (d || s)
+}
+
 export function SendStop({ busy, onSend, onStop }) {
   return busy
     ? <Button variant="danger" className="chat-send" onClick={onStop}>stop</Button>
@@ -234,6 +262,39 @@ export default function Chat() {
   const oids = useRef(new Set())
   const [voice, setVoice] = useState(speech.state())
   useEffect(() => speech.onChange(setVoice), [])
+  const [ear, setEar] = useState(ears.state())
+  const here = ears.allowed()
+  useEffect(() => ears.onChange(setEar), [])
+  /* WHAT HE SAID IS A LINE HE TYPED. It fills the box and goes through send(), so off the
+     record, history and the busy guard are the typed path's. HE INTERRUPTS; HE DOES NOT WAIT
+     (2026-10-29, operator: "yes stop her reply when you speak"). Opening the mic already cut
+     her reply (room/reply.js); a line that arrives while her stream is still closing cuts it
+     again (a no-op if it is cut) and is sent the moment the abort lands — the effect below,
+     on `busy` — not when she would have finished. */
+  const textNow = useRef('')
+  textNow.current = text
+  const heardWaiting = useRef(false)
+  function heard(said) {
+    if (!said) return
+    const line = heardLine(textNow.current, said)
+    textNow.current = line
+    setText(line)
+    if (busy || abort.current) { reply.interrupt(); heardWaiting.current = true; return }
+    send(line)
+  }
+  useEffect(() => {
+    if (busy || !heardWaiting.current) return
+    heardWaiting.current = false
+    send(textNow.current)
+  }, [busy])
+  const heardNow = useRef(heard)
+  heardNow.current = heard          // always-mode's handler is registered once; this keeps it current
+  useEffect(() => {
+    if (PROBE) return   // a probe tab never opens his mic
+    const off = ears.onUtterance(said => heardNow.current(said))
+    ears.sync()
+    return () => { off(); ears.release() }
+  }, [])
 
   const scroll = () => requestAnimationFrame(() =>
     endRef.current && endRef.current.scrollIntoView({ block: 'end' }))
@@ -278,8 +339,8 @@ export default function Chat() {
     return () => { alive = false }
   }, [])
 
-  async function send() {
-    const t = text.trim()
+  async function send(said) {
+    const t = (typeof said === 'string' ? said : text).trim()
     if ((!t && !img) || busy) return
     sentHistory.current.push(t); histIdx.current = -1; draft.current = ''
     /* OFF THE RECORD LEAVES HER HEAD ON EXIT (2026-08-25, his report: "she
@@ -310,9 +371,13 @@ export default function Chat() {
     if (onMood) onMood(null, true)   // she is thinking
     const attached = img; setImg(null); if (fileRef.current) fileRef.current.value = ''
 
-    abort.current = new AbortController()
+    const ac = new AbortController()
+    abort.current = ac
     // A NEW TURN OF HIS INTERRUPTS HER OUT LOUD, the way it does on the screen.
     speech.stop(); spoken.current = 0
+    // THIS REPLY, CUTTABLE BY HIS VOICE (room/reply.js): his mic aborts it through the same
+    // controller the stop button pulls, and once cut nothing more of it is spoken.
+    const r = reply.begin(() => ac.abort())
     let spokenText = ''
     try {
       for await (const ev of api.chat(history, { image_b64: attached, signal: abort.current.signal })) {
@@ -330,7 +395,7 @@ export default function Chat() {
             // with her marks stripped and her voice tags kept. The cursor is over the
             // speech text, not the raw, so a mark removed mid-stream cannot shift it.
             spokenText = forSpeech(last.content)
-            spoken.current = speech.feed(spokenText, spoken.current)
+            spoken.current = reply.feed(r, spokenText, spoken.current)
           }
           // ONE PERSONA CHIP PER TURN, ALWAYS (2026-08-22). The gateway emits her state at the
           // top of a turn AND the verified shift after it: rendering both wore two chips, one
@@ -377,7 +442,16 @@ export default function Chat() {
         scroll()
       }
     } catch (e) {
-      if (e.name !== 'AbortError') {
+      if (e.name === 'AbortError') {
+        // STOPPED, AND IT SAYS SO (2026-10-29): the partial reply stays as she wrote it, with a
+        // chip saying why it ends there — his voice cut it, or the stop button did.
+        setTurns(h => {
+          const prev = h[h.length - 1]
+          const last = { ...prev, events: [...(prev.events || []),
+                                           { notice: r.cut ? 'interrupted — you started talking' : 'stopped' }] }
+          return [...h.slice(0, -1), last]
+        })
+      } else {
         // a NEW object (the StrictMode double-append lesson, which this branch alone
         // had kept — audit R3) and a CHIP, not content (audit B11, same as ev.error)
         setTurns(h => {
@@ -391,7 +465,9 @@ export default function Chat() {
       setBusy(false); abort.current = null
       if (onMood) onMood(null, false)   // she has finished: the ONLY place thinking ends
       // the tail — whatever closed the reply without a sentence end behind it
-      if (spokenText) spoken.current = speech.flush(spokenText, spoken.current)
+      // (a reply his voice cut speaks no tail: reply.flush is a no-op once it is cut)
+      if (spokenText) spoken.current = reply.flush(r, spokenText, spoken.current)
+      reply.end(r)
       // WHICH CONFIGURATION SPOKE: one status read AFTER thinking has ended and the tail
       // is flushed, never awaited: a slow or hung fetch must not hold either. The chip wears
       // the setup and cfg the gateway is running now; a failed read leaves it off.
@@ -524,11 +600,17 @@ export default function Chat() {
         <Attached img={img} onRemove={() => { setImg(null); if (fileRef.current) fileRef.current.value = '' }} />
       ) : null}
 
+      {ear.error ? <div className="chat-ears-err" role="status">{ear.error}</div> : null}
       <div className="composer">
         <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={attach} />
         <Button className="chat-tool" icon="attach" aria-label="attach an image" title="attach an image"
                 onClick={() => fileRef.current && fileRef.current.click()} />
         <Speaker voice={voice} />
+        <Mic ear={ear} here={here} onClick={async () => {
+          if (ear.recording) heard(await ears.stopAndSend())
+          else if (ear.mode === 'always') ears.setAlways(!ear.listening)
+          else ears.start()
+        }} />
         <TextArea className="chat-text" value={text} placeholder="talk to her"
                   onChange={e => { setText(e.target.value); histIdx.current = -1 }}
                   onKeyDown={e => {

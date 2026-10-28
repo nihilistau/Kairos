@@ -197,6 +197,76 @@ def launch_aux_embed(c, env):
     print(f"[kairos serve] aux embed: starting on {url} (CPU)")
     return {"state": "starting"}
 
+def _lfm3_door(c, env, which, argv_tail, port_key, default_url, log_name):
+    """Shared body of the two LFM3 doors: off / adopt / name-the-missing / Popen on CPU.
+    Same shape as launch_aux_embed and NOT the stack's child for the same reason: CPU
+    only, stateless between requests, so a restart leaves it resident."""
+    l3 = c.get("lfm3", {})
+    if not l3.get("enabled", False):
+        return {"state": "off"}
+    url = l3.get(port_key, default_url)
+    if wait_http(url + "/health", 1):
+        print(f"[kairos serve] lfm3 {which}: adopted at {url}")
+        return {"state": "adopted", "url": url}
+    exe = os.path.join(os.path.expandvars(l3.get("llama_dir", "")), "llama-server.exe")
+    if os.name != "nt" and not os.path.isfile(exe):
+        exe = os.path.join(os.path.expandvars(l3.get("llama_dir", "")), "llama-server")
+    need = [("llama-server", exe)] + [(k, os.path.expandvars(l3.get(k, ""))) for k in argv_tail["files"]]
+    for label, path in need:
+        if not path or not os.path.isfile(path):
+            print(f"[kairos serve] lfm3 {which}: {label} missing ({path or 'not set in [lfm3]'}) — dark")
+            return {"state": "missing", "why": f"{label}: {path}"}
+    port = url.rsplit(":", 1)[-1].rstrip("/")
+    argv = [exe, "-m", need[1][1], *argv_tail["pre"],
+            "--host", "127.0.0.1", "--port", port,
+            "--threads", str(l3.get("threads", 8)),
+            # CPU on purpose, spelled out: a GPU-capable llama_dir swapped in later must
+            # not quietly land beside the model (the 2026-07-31 tts-server fault).
+            "-ngl", "0",
+            # NOTHING SHE SAYS IN THIS LOG (2026-10-29, off the record speaks through this
+            # door). Info (3) logs timings and token counts, never request text — read off
+            # var/lfm3-audio.log. Above it llama-server logs request bodies, and
+            # LLAMA_ARG_LOG_VERBOSITY could raise it from the env; the command line wins.
+            "--log-verbosity", "3", *argv_tail["post"]]
+    log = open(os.path.join(VAR, log_name), "a", encoding="utf-8")
+    log.write("\n-- boot %s --\n" % time.strftime("%Y-%m-%dT%H:%M:%S"))
+    log.flush()
+    p = subprocess.Popen(argv, stdout=log, stderr=subprocess.STDOUT, creationflags=NO_WINDOW)
+    try:
+        os.makedirs(os.path.join(VAR, "aux"), exist_ok=True)
+        with open(os.path.join(VAR, "aux", log_name.replace(".log", ".pid")), "w") as f:
+            f.write(str(p.pid))
+    except Exception:
+        pass
+    print(f"[kairos serve] lfm3 {which}: starting on {url} (CPU)")
+    return {"state": "starting", "url": url}
+
+
+def launch_lfm3_audio(c, env):
+    """Her ears AND voice (2026-10-29): ONE resident llama-server on the LFM3-Audio GGUF
+    + --mmproj. ASR is POST /v1/chat/completions with input_audio, speech is POST /tts
+    (docs/bench/2026-10-29-lfm3-spike.md, 'Serving shape'). Always a server: the CLI
+    pays a 3-24 s model load per call. Non-fatal on every path."""
+    return _lfm3_door(c, env, "audio",
+                      {"files": ["audio_gguf", "audio_mmproj"],
+                       "pre": ["--mmproj", os.path.expandvars(c.get("lfm3", {}).get("audio_mmproj", ""))],
+                       # NO HOST PROMPT CACHE (2026-10-29, off the record speaks here): llama-server
+                       # keeps finished prompts in a RAM cache (--cache-ram, 8 GiB by default) for
+                       # reuse. Her sentences and his recordings have no reason to outlive their
+                       # request there. (The slot's own KV of the last request remains until the
+                       # slot is reused or the door restarts — docs/ANON-MODE.md, a known limit.)
+                       "post": ["--cache-ram", "0", "--no-cache-prompt"]},
+                      "audio_url", "http://127.0.0.1:8813", "lfm3-audio.log")
+
+
+def launch_lfm3_chat(c, env):
+    """The optional LFM3-1.7B chat door (the librarian's alternative; lfm2.5-1.2b stays
+    the default). Liquid's suggested sampling rides as server defaults."""
+    return _lfm3_door(c, env, "chat",
+                      {"files": ["chat_gguf"], "pre": [],
+                       "post": ["--temp", "0.1", "--top-k", "50", "--repeat-penalty", "1.1"]},
+                      "chat_url", "http://127.0.0.1:8814", "lfm3-chat.log")
+
 
 def report_tts(info, env):
     """Say what the voice is doing, once, in one line. `/health` on that server
@@ -1032,6 +1102,18 @@ def build_env(c: dict) -> dict:
         "SP_AUX_RERANK": b(aux.get("rerank", False)),
         "SP_AUX_COLBERT_URL": aux.get("colbert_url", "http://127.0.0.1:8812"),
         "SP_AUX_CONSOLIDATE": b(aux.get("consolidate", False)),
+        # ── LFM3 ON THE CPU (2026-10-29): her ears + voice and the optional 1.7B chat door.
+        # Profile [lfm3]; overrides ride tune.chosen()/tune_or_env, these are boot defaults.
+        "SP_LFM3": b(c.get("lfm3", {}).get("enabled", False)),
+        "SP_LFM3_DIR": os.path.expandvars(c.get("lfm3", {}).get("llama_dir", "")),
+        "SP_LFM3_AUDIO_GGUF": os.path.expandvars(c.get("lfm3", {}).get("audio_gguf", "")),
+        "SP_LFM3_AUDIO_MMPROJ": os.path.expandvars(c.get("lfm3", {}).get("audio_mmproj", "")),
+        "SP_LFM3_CHAT_GGUF": os.path.expandvars(c.get("lfm3", {}).get("chat_gguf", "")),
+        "SP_LFM3_AUDIO_URL": c.get("lfm3", {}).get("audio_url", "http://127.0.0.1:8813"),
+        "SP_LFM3_CHAT_URL": c.get("lfm3", {}).get("chat_url", "http://127.0.0.1:8814"),
+        "SP_LFM3_THREADS": str(c.get("lfm3", {}).get("threads", 8)),
+        "SP_LFM3_VOICE": c.get("lfm3", {}).get("voice", "female"),
+        "SP_LFM3_LANG": c.get("lfm3", {}).get("lang", "en"),
         # ── SIX KNOBS THAT LIVE CODE READS AND THIS DOOR STRIPPED (2026-07-30) ────────
         # Each of these is read by a live path and was absent from this table, so
         # `e = {k: v for k, v in os.environ.items() if not k.startswith("SP_")}` above
@@ -1227,6 +1309,12 @@ def build_env(c: dict) -> dict:
         # empty = the module's default (https://api.anthropic.com); the one base-url override.
         "SP_CLAUDE_BASE_URL": (c.get("claude", {}).get("base_url") or ""),
         "SP_TTS_METHOD": (c.get("tts", {}).get("method") or ""),
+        # (2026-10-29) which LOCAL voice `local` means, and where a failed method lands
+        # first: lfm3 (Task 1's measured default) or voxtral. Read by tts.live_voice().
+        # ...defaulting to lfm3 only where [lfm3] is enabled (final review): sp and companion
+        # have no LFM3 door, and paid a dead hop and a log line on every sentence before voxtral.
+        "SP_TTS_LOCAL": (c.get("tts", {}).get("local")
+                         or ("lfm3" if c.get("lfm3", {}).get("enabled", False) else "voxtral")),
         "SP_TTS_XAI_VOICE": (c.get("tts", {}).get("xai_voice") or "ara"),
         "SP_TTS_SPEED": str(c.get("tts", {}).get("speed", 1.0)),   # her pace (knob voice.speed)
         "SP_XAI_IMAGE_MODEL": (c.get("xai", {}).get("image_model") or "grok-imagine-image-2.0"),
@@ -2009,6 +2097,8 @@ def main() -> int:
     # its own, and /v1/speak/status says which way it went.
     _tts = launch_tts(c, env)
     launch_aux_embed(c, env)
+    launch_lfm3_audio(c, env)
+    launch_lfm3_chat(c, env)
     gw_log = open(os.path.join(VAR, "gateway.log"), "a")   # append: see above
     subprocess.Popen(
         [sys.executable, "-m", "harness.server.app",
