@@ -1,404 +1,251 @@
-# Kairos — a local AI companion framework that owns its memory
+# Kairos
 
-Kairos is the engine-agnostic companion framework distilled from a private working
-repository: a Python harness that owns **durable, auditable memory**, unprompted speech,
-personality, presence, a wardrobe and a voice — and a React room you talk to her in — running
-against **any OpenAI-compatible chat endpoint** (LM Studio, llama.cpp's `llama-server`, vLLM, a
-cloud) on one consumer GPU. She remembers the person she talks to, speaks when she has a
-reason to, spends time on her own while you are away, and has a face, a wardrobe and a voice.
+**An AI companion that runs on your own computer and actually remembers you.**
 
-**The one rule over everything: nothing she knows is ever deleted.** Facts are tombstoned,
-never dropped; every row says who said it, what it came from, and when; an inference may never
-retire an observation; every verdict is a ruling of a committed finite table, not prose.
+Kairos gives a local language model a memory, a personality, a face and a voice, and a place to
+talk to her: a little desktop that opens in your browser. She remembers what you tell her, can show
+you where each memory came from, keeps herself busy while you're away, and only speaks first when
+she has a reason to. Everything she knows stays on your disk.
 
-![The room: a column of desktop app icons, the Chat window with a reply, the portrait on the right, and the top bar with the mood pill, the day's facts, the profile chip, uptime, the stack light and the next backup](docs/screenshots/room-chat.webp)
+It works with any model server that speaks the OpenAI chat API (LM Studio, llama.cpp, vLLM, or a
+cloud provider), and it's built to run well on a single consumer graphics card.
 
-*The screenshots on this page are the room of the reference install, the long-running
-companion Kairos was extracted from. A fresh clone draws the same room with an empty memory
-and the default face.*
+![The room: desktop app icons down the left, the Chat window with a reply, her portrait on the right, and the top bar showing her mood, the day, uptime and the next backup](docs/screenshots/room-chat.webp)
+
+*Screenshots are from a long-running install. A fresh copy looks the same, with an empty memory and
+the default face.*
+
+## What she does
+
+- **Remembers you, and shows her working.** Facts about you and about herself go into a memory you
+  can browse. Nothing is ever deleted: when something changes, the old version is kept, marked as
+  retired. Anything she worked out on her own (rather than being told) has a **why** button that
+  shows what it was based on.
+- **Has her own time.** When you go quiet she can read, search the web, write in her journal or
+  pick up an earlier thread. The *Her own time* window shows what she got up to. Every night she
+  writes a journal entry, and once a week a short chapter about how she's been changing.
+- **Speaks first, but sparingly.** She can check in, follow up on something she promised, or keep
+  you company overnight. The default is silence: every reason to speak has limits, and an idea she
+  decides against still counts against them.
+- **Has a face and a wardrobe.** A set of portraits, outfits and short animations that follow her
+  mood as she talks. One outfit ships with the project; with an xAI key she can grow more from a
+  reference image you choose.
+- **Can talk and listen.** She speaks her replies out loud. With a local speech model you can talk
+  back using a push-to-talk mic. Your speech is transcribed on your machine and never saved.
+- **Looks things up.** Web search works out of the box (DuckDuckGo, free), with optional slower
+  "homework" research that she files where you can read it.
+- **Goes off the record.** One switch in the taskbar and nothing from the evening is written down.
+- **Can use tools.** She can connect to MCP tools, and to Home Assistant if you allow it, limited to
+  a list of devices you write yourself.
+
+![The Memory window listing live and retired facts, beside the Wardrobe window with mood chips and recently arrived looks](docs/screenshots/room-memory-wardrobe.webp)
+
+## Getting started
+
+**You'll need:**
+
+- **Windows.** It's the tested platform. Linux and macOS should work but haven't been tried end to end.
+- **Python 3.11 or newer.**
+- **A model server.** [LM Studio](https://lmstudio.ai) is the easiest. Load
+  [`gemma-4-26B-A4B-it-qat-q4_0`](https://hf.co/google/gemma-4-26B-A4B-it-qat-q4_0-gguf), the model
+  everything was tuned on. It runs on a 12 GB graphics card.
+
+**Then:**
+
+1. Download it and install:
+
+   ```bash
+   git clone https://github.com/nihilistau/Kairos && cd Kairos
+   pip install -e ".[http]"
+   ```
+
+2. Give her a personality to start from. This copy is yours to edit, and git ignores it:
+
+   ```bash
+   cp -r persona-template persona
+   ```
+
+   Her default name is Kairos. Change it, and anything else about her, in `persona/00-identity.md`.
+
+3. Tell her who you are. In `profiles/companion.toml`, fill in `name` (and `pronouns` if you like)
+   under `[user]`. Left blank, she calls you "the user".
+
+4. Start your model server. LM Studio listens on port 1234 by default, which is what the profile
+   expects. If yours is somewhere else, change `base_url` under `[engine]` in the same file.
+
+5. Start her:
+
+   ```bash
+   python serve.py companion
+   ```
+
+6. Open **http://127.0.0.1:8810/room/** and say hello.
+
+To stop her, click **Shut down** in the taskbar, or run `python serve.py --stop`.
+
+**If something doesn't work,** open the **Setup** window in the room. It checks each step and tells
+you which one you're stuck on. [`docs/SETUP.md`](docs/SETUP.md) has the full walkthrough: other
+servers, keys, models, every setting, and a table of common problems.
+
+## Optional extras
+
+Everything above runs fully offline. These are add-ons, and all of them ship turned off.
+
+- **An xAI API key** turns on four things at once: her expressive voice (Ara), new outfits and
+  animations, live web search and the research tier. Save the key in `var/secrets/Xapi.txt`. Keys
+  are always files, never typed into config, and `var/` is never committed. Get a key at
+  <https://console.x.ai/>.
+- **Local voice and ears.** Point the `[lfm3]` section of the profile at an LFM3-Audio model and a
+  recent llama.cpp build (b11960 or newer), and she can hear you and speak without any cloud
+  service. See [`docs/SETUP.md`](docs/SETUP.md) §6.
+- **CPU helper models.** Small models that file and index her memory on the CPU:
+  [`LFM2.5-1.2B-Instruct`](https://hf.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF) and
+  [`LFM2.5-Embedding-350M`](https://hf.co/LiquidAI/LFM2.5-Embedding-350M-GGUF).
+- **Smartwatch awareness.** A tiny Wear OS app you build yourself lets her notice things like a
+  climbing heart rate. She states readings plainly, says "seems" about guesses, says nothing when
+  the data is stale, and never offers a diagnosis. Read [`docs/TELEMETRY.md`](docs/TELEMETRY.md)
+  first, including the part about network access.
+- **A faster engine.** [`kairos-engine`](https://github.com/nihilistau/kairos-engine) is a custom
+  Rust + CUDA backend built for this model on a 12 GB card. You don't need it; reach for it only
+  when your normal server is the bottleneck.
+
+The **Models** window shows every model she uses, whether each is loaded, and a Test button. Anything
+you haven't set up says so instead of failing quietly.
+
+![The Models window with a status pill and Test button for each of her six model jobs](docs/screenshots/room-models.webp)
+
+## Will it run on my machine?
+
+The reference machine is a single **RTX 2060 with 12 GB**. Gemma 4 26B-A4B is a mixture-of-experts
+model: only about 4B of its 26B parameters work on each token. That's why it can hold a real-time
+conversation on a mid-range card, where a dense model of the same size would crawl.
+
+With LM Studio or llama.cpp, speed is up to that server. With the optional custom engine on that
+card, she generates about **35 tokens a second** and reads a 4,000-token prompt in about **6
+seconds**. The full measurement history is in the
+[`kairos-engine`](https://github.com/nihilistau/kairos-engine) README.
+
+Whatever you run on, expect the first reply after a cold start to take a while as the model reads
+her persona. Later replies are much faster.
+
+Smaller models work, but she'll be noticeably less herself. Her mood and outfit cues and her tool
+use take real instruction-following ability.
+
+## A tour of the room
+
+The room works like a small desktop. Apps live in five folders (Her, Together, Look it up, Home,
+System). Windows can be moved, resized and minimised. A dock holds your favourites, and a top bar
+shows her mood and the state of the machine. Drag apps between folders, onto the desktop, or onto
+the dock. The layout is remembered per browser. [`docs/PANELS.md`](docs/PANELS.md) lists every
+window and what it shows.
+
+![The desktop with the Her folder open and the dock along the bottom](docs/screenshots/room-folders-dock.webp)
+
+![The Her own time window showing her notes and a look she asked for](docs/screenshots/room-her-own-time.webp)
+
+![The Research window beside Settings, where each option says whether it applies live or after a restart](docs/screenshots/room-research-settings.webp)
+
+![The Voice window with the voice provider and listening options](docs/screenshots/room-voice.webp)
+
+---
+
+## Under the hood
+
+The rest of this page is for people who want to know how it works or contribute to it.
 
 ```
  the room (browser)  --->  gateway :8810 (Python, harness/server/)  --->  any /v1/chat/completions server
-        ^                         |  memory . spine . kairos . wardrobe . voice . senses        (LM Studio . llama-server . vLLM . cloud)
-        |                         '-->  optional: the xAI API (voice, images/motion, live search) . CPU sidecars
+        ^                         |  memory . idle loop . wardrobe . voice . senses        (LM Studio . llama-server . vLLM . cloud)
+        |                         '-->  optional: xAI API (voice, images, live search) . CPU sidecars
 ```
 
-## What is in the room
+### Memory
 
-The room is a desktop in the browser: five folders of apps (Her, Together, Look it up, Home,
-System) that open as a frosted panel, a dock of favourites at the bottom, windows you move,
-resize, maximise, minimise and restore, a taskbar along the bottom (a button per window, a strip
-of model lights, off the record, Shut down, the clock) and a top bar that says how she is (her
-mood and voice), how her day is going (when you last spoke, whether her day has closed) and how
-the machine is (the profile, uptime, the stack light with its bounce / restart actions, the
-next backup). Drag an app out of a folder to make it a loose icon, onto another folder to move
-it, or onto the dock to keep a copy there (one to eight; it starts with Chat, Voice, Music,
-Search, Memory and Models). One click on the dock opens or brings back an app, and the dock
-slides away while a window is maximised. The layout is kept per browser. Every window is listed
-with the route it reads and whose it is in [`docs/PANELS.md`](docs/PANELS.md); the room itself
-is [`ui/README.md`](ui/README.md).
+Memory is an append-only ledger of facts in two lanes, what she knows about you and what she knows
+about herself, plus a separate durable transcript. Every row records who said it, where it came
+from, when, and whether it was **observed** (you told her) or **inferred** (she concluded it).
 
-![The desktop with Chat minimised: the five folders down the left, the Her folder open as a panel of its six apps, the portrait, and the dock at the bottom with Search magnified under the pointer](docs/screenshots/room-folders-dock.webp)
+- Changed or forgotten facts are retired, never removed. `provenance` can still answer about them.
+- An inference can never retire an observation. This is enforced by a committed verdict table,
+  not by convention.
+- A conclusion whose supporting facts have all been retired is retired with them.
+- The nightly and weekly consolidation passes write derived material (journal, distilled facts,
+  self-summary, weekly chapter) tagged with what it was derived from. They never edit what you
+  said, and they can't read each other's output, so conclusions can't quietly pile up on earlier
+  conclusions.
 
-**She has her own time.** When the room goes quiet, the idle clock (`harness/kairos/`) gives
-her reasons to act: continue a thread, check in, remind, think on her own, and the presence
-modes that keep you company while you sleep. Every impulse is metered, judged, and dropped by
-default. What she did while you were away is in the *Her own time* window — journal lines,
-notes, what she wore, what she asked for — and it is read-only by construction: there is no
-write route behind it.
+Details: [`docs/MEMORY-AND-RECALL.md`](docs/MEMORY-AND-RECALL.md). Before adding anything to her
+context, read [`docs/LANES.md`](docs/LANES.md), which covers the six ways information reaches her
+and which ones have been measured wrong before.
 
-![The Her own time window open over Chat, listing her own-time notes and a look she asked for, with the taskbar below showing window buttons, the looked-up chip, the Anonymous switch and Shut down](docs/screenshots/room-her-own-time.webp)
+### Speaking first
 
-**She remembers, and can say why.** One append-only fact registry with two lanes — what she
-knows about you and what she knows about herself. A changed fact is tombstoned forward with
-its provenance, never dropped, so the Memory window shows the retired rows beside the live
-ones, and a row she *concluded* carries a **why** button: what it was drawn from, and whether
-each support is still live. Every night she writes her journal and a short paragraph on who
-she has been becoming; weekly, a chapter. Neither consolidator may read a distillate, so what
-she concludes cannot quietly rest on what she concluded before. The rules:
-[`docs/MEMORY-AND-RECALL.md`](docs/MEMORY-AND-RECALL.md).
+`harness/kairos/` is an idle loop that checks, on every tick, whether she has a named reason to
+speak: *continue* (she was cut off), *check-in* (it's been quiet), *remind* (she promised), *solo*
+(her own time), *muse* (something she concluded), or one of the overnight presence modes. Every
+limit is checked before the model is asked: cooldown, hourly cap, chain length, minimum idle time,
+and never talking over a question she's waiting on you to answer. An attempt uses up its slot even
+if she decides not to speak. Before that rule existed, a vetoed turn could be re-proposed seconds
+later, which burned eleven minutes of GPU per cycle.
 
-**She has a face and clothes.** A catalog of looks, gestures and moments — stills and motion
-loops, generated through the xAI API when a key is present — chosen by her or by you, with a
-chip saying which. Her marks (`[MOOD:]`, `[VOICE:]`, `[TRAIT:]`, `[WEAR:]`, `[SHOW:]`) move
-real state mid-sentence: the mood pill, her voice, the portrait.
+### How it compares
 
-![The Memory window with its live / his / hers / core / retired counts, a filter, an add box and a re-file control on each row, beside the Wardrobe window with mood chips, what she has on and the looks that just arrived](docs/screenshots/room-memory-wardrobe.webp)
-
-**She looks things up, and does homework.** Web search answers in the turn (DuckDuckGo by
-default, free; xAI live search, Brave, Tavily or SearxNG if you choose); the optional research
-tier is a real, slower model call whose receipts land in the Research window — hers you can
-read and cannot edit, and there is a box to set her one yourself. Every knob is in the
-Settings window, each saying whether it is live or needs a restart, and whether you have
-overridden it from the room; everything that ships off has its arming condition written down
-in [`docs/OFF-BY-DEFAULT.md`](docs/OFF-BY-DEFAULT.md).
-
-![The Research window with research rows marked hers and a box to run one, beside the Settings window showing Voice, Web search, Research and Wardrobe knobs with live, restart to change and changed chips](docs/screenshots/room-research-settings.webp)
-
-**She can hear you, and you can see what she is running.** Point the profile's `[lfm3]` table
-at an LFM3-Audio GGUF and its mmproj and a llama.cpp build (b11960 or newer), and `serve.py`
-runs it on the CPU as her ears and a local voice ([`docs/SETUP.md`](docs/SETUP.md) §6). The mic
-beside send in Chat is push-to-talk (click, speak, click again), and what you said is transcribed
-on your machine and sent exactly as a typed line. The recording stays in memory and is never
-written down. Always-listening is an option and ships off. It works only in a browser on the same
-machine. Her voice is switchable live between xAI Ara (with a key), LFM3-Audio and the older
-voxtral chain. A voice that fails falls back and says so, and a taskbar chip names why she went
-quiet. The **Models** window lists every model job: her mind, the librarian, the memory index,
-her ears, her voice and her eyes. Each row shows the model behind it and a `loaded` / `loading` /
-`off` / `missing` / `error` pill with the reason, plus a **Test**. A job you have not set up says
-`off` or names the missing file rather than failing quietly.
-
-![The Models window with its six rows (her mind, librarian, memory index, her ears, her voice, eyes), each with a status pill and a Test button, and the strip of model lights in the taskbar](docs/screenshots/room-models.webp)
-
-![Models beside the Voice window: the provider picker (xai, lfm3, voxtral), the LFM3 and xAI voice pickers, pace, and the ears mode (push or always) with the pause that ends a line](docs/screenshots/room-voice.webp)
-
-**And the rest:**
-
-| | |
-|---|---|
-| **a voice and ears** | xAI Ara with expressive tags when a key is present, or LFM3-Audio on the CPU, switchable live; the room speaks her replies and, with LFM3-Audio set up, you can talk back through the push-to-talk mic (`harness/voice/`). |
-| **eyes** | an hourly ambient look behind a quiet guard (off until you arm it), and sight through whatever the served model can receive (`harness/senses/`). |
-| **hands** | an MCP server for her tools and a bridge for yours ([`docs/MCP.md`](docs/MCP.md)); Home Assistant, on request, limited to an allowlist you write ([`docs/HOME-ASSISTANT.md`](docs/HOME-ASSISTANT.md)). |
-| **off the record** | one switch in the taskbar: she stays entirely herself and nothing about the evening is written down, held by a gate that diffs the whole sandbox ([`docs/ANON-MODE.md`](docs/ANON-MODE.md)). |
-| **a design system** | the room is drawn from one kit (`ui/src/kit/`) — tokens, parts, one icon family — rendered and checked under node by G-ROOM-KIT and G-ROOM-TOKENS. |
-
-## Quick start
-
-> **Windows is the tested platform.** `serve.py` has had one platform seam since 0.8.14 — it
-> spawns and stops its processes on Linux and macOS too, held by `G-BACKEND-SEAM`, and CI runs
-> the offline suite on Linux — but the launcher has not been exercised end to end on real
-> Linux hardware; [`docs/BACKENDS.md`](docs/BACKENDS.md) says so plainly.
-
-```bash
-pip install -e ".[http]"                      # zero hard deps on the core path; httpx for the client
-cp -r persona-template persona                # her identity — yours to edit, gitignored
-# start an OpenAI-compatible server: LM Studio (default :1234) or llama-server (:8080)
-# (LM Studio with 'require authentication' on: put its API token in var/secrets/engine.token — a file, never committed)
-python serve.py companion                     # boots the gateway; the engine is yours
-```
-
-Open http://127.0.0.1:8810/room/ and talk to her. `profiles/companion.toml` is the one door:
-`[engine] base_url / model / dialect / api_key_file` point at your server; everything else is a
-knob in the Settings window (live) or the profile (restart). **The profile is positional and
-not optional** — a mistyped name fails loudly instead of quietly serving the wrong config.
-Stop her from Shut down in the taskbar, or `python serve.py --stop`.
-
-**If anything above is not obvious, open [`docs/SETUP.md`](docs/SETUP.md)** — the endpoint, every
-key file and where it goes, the model cards, what each setting actually affects, and a symptom
-table. The room has a live version of it: the **Setup** window reports which step you are on
-rather than which steps exist.
-
-### Keys, in one paragraph
-
-Every key in this system is a **file**, never a value in a config file and never a value in git
-(`var/` is gitignored in its entirety). Your inference endpoint's token, if it needs one, goes in
-`var/secrets/engine.token`. The optional **xAI API key** goes in `var/secrets/Xapi.txt` and turns
-on four things at once — her voice (Ara, with expressive tags), her face and wardrobe
-(still → motion, grown from your own reference), live web search, and the research tier. Get one
-at <https://console.x.ai/>. **Nothing else needs it**: memory, personality, unprompted speech,
-the room and every gate run offline against any endpoint.
-
-### Which models
-
-`config/models.json` is the committed list with cards, and the Setup window reads that same file
-so the two cannot drift. In short: **[`google/gemma-4-26B-A4B-it-qat-q4_0-gguf`](https://hf.co/google/gemma-4-26B-A4B-it-qat-q4_0-gguf)**
-for her — a 26B mixture-of-experts with ~4B active, which is the whole reason a companion can
-think in real time on one consumer card, and what every decode knob in the profile was tuned
-against. **[`LiquidAI/LFM2.5-1.2B-Instruct-GGUF`](https://hf.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF)**
-and **[`LFM2.5-Embedding-350M-GGUF`](https://hf.co/LiquidAI/LFM2.5-Embedding-350M-GGUF)** for the
-CPU librarians (off by default). **[`Voxtral-Mini-4B-Realtime-2602`](https://hf.co/mistralai/Voxtral-Mini-4B-Realtime-2602)**
-if you want to talk to her out loud.
-
-### Will it run on my card?
-
-The reference machine is **one RTX 2060, 12 GB** — deliberately, because the interesting
-question is not whether a companion runs on an H100. Gemma-4-26B-A4B is a mixture of 128
-experts with top-8 routing, so **~4B parameters are active per token** out of 26B, and about
-10.6 GB streams from host memory onto the card. A *dense* 31B on the same hardware would
-cross 8–9 GB of PCIe every token for a 3–5 tok/s ceiling; the sparsity is the whole reason
-this is a conversation and not a batch job.
-
-Measured on that card, with the optional Rust + CUDA engine. The first two columns are before and
-after the work that made it liveable — **the memory-tiering work, 2026-09-08 to 09-10**, which is
-about where the weights live and how often a token has to cross PCIe. The third is the same rows
-as they stood on **2026-09-29**, after the kernel work of 09-11/12 and the hybrid MoE decode
-of 09-28/29. The fourth is **2026-10-20**, after split-K decode attention, the prefill copy overlap,
-tensor-core prefill attention and an eight-wide dequant:
-
-| | before (09-08) | after tiering (09-10) | 2026-09-29 | **2026-10-20** |
-|---|---|---|---|---|
-| prefill (expert-major) | 230 ms/tok | 8 ms/tok | ~3.3–4.1 ms/tok (304 tok/s at 3,720 tok on 09-12; the 3,932–4,128-tok bench prompts of 09-29 at 14–17 s) | **~1.4 ms/tok: 4,204 tokens in 5.95 s (~707 tok/s); 9,027 in 13.6 s** |
-| decode (resident hot-expert cache) | ~6 tok/s | 23.8 tok/s | 31.5 tok/s at depth ~4k (5.5 GB cache, decayed-frequency eviction); 19–27 live at a ~9k prefix | **35.5 tok/s** at depth ~4.2k (6.0 GB cache, 4 CPU threads, split-K attention) |
-| cold prefill, live gateway | 209 s | 25.5 s | not re-measured | **15.1 s** for the 9,055-token persona prefix (55 s the same morning) |
-| warm prefill | 25.5 s | ~1.0 s | not re-measured | not re-measured |
-| prewarm, 2,922 tok | 689 s | 29 s | not re-measured | not re-measured |
-
-The one worth reading is the cache row: **33.4% of experts resident buys ~4×**, because MoE
-routing is skewed — capacity share is not hit rate.
-
-**That is not the same table as the engine's, and the two should not be added together.**
-[`kairos-engine`](https://github.com/nihilistau/kairos-engine)'s README carries a *later* and
-*separate* experiment — the CUDA **kernel** work of 2026-09-11/12, where coalescing the
-attention kernels and moving the weight GEMM onto fp16 tensor cores took a 3,750-token prefill
-from 36.6 s to ~13.3 s and decode from 16.6 to 21.1 tok/s. Different prompt, different date,
-different knobs; the decode figures differ between the two files for that reason and not
-because one of them is wrong.
-
-That pinned workload has **now been measured** (2026-09-12): one prompt, one sitting, every
-kernel armed, with `llama.cpp -ncmoe 8` on the same row. The engine's combined kernel win is
-**2.12×**, not the ~2.7× that stitching two traces implied — and prefill is now **1.16× faster**
-than `llama.cpp`, with decode **2.37× slower**, which is where the whole remaining gap now is.
-The table is in the engine README. It is still a different experiment from the tiering one
-above, and still not to be added to it.
-
-**Decode has since closed most of that gap (2026-09-28/29).** A profile over a real
-conversation showed the limiter was the host thread issuing the work, not the bus: ~2,750
-kernel launches per token on WDDM and a router sync per layer. The same pinned bench (depth
-~3.9k) went **17.5 -> 31.7 tok/s**, so `llama.cpp -ncmoe 8` is now **1.21x** faster at decode
-rather than 2.37x. Every step kept the greedy output byte-identical:
-- a 6 GB expert cache (was 4);
-- one grouped launch for a layer's resident experts;
-- the experts not resident at routing computed on the CPU, bit-exact against the GPU kernel down to its `tanhf`, while they are admitted to the cache in the background;
-- per-layer CUDA graphs.
-
-In her live sessions that is **~19-27 tok/s at a ~9k prefix, up from 12.5-16.5**. A
-decayed-frequency expert eviction (replacing LRU after a replay of the real routing trace)
-added +6-11% on top, depending on cache size.
-
-**2026-10-20.** Decode on the same bench is **35.5 tok/s**, at parity with `llama.cpp -ncmoe 14`'s 34.4 on
-this card, and prefill moved most: a 4,204-token prompt went from 16.4 s to 5.95 s, and a 9k one
-from 40.7 s to 13.6 s. Two of the steps change greedy text at near-tie words (split-K decode attention,
-and fp16-operand prefill attention); each has a parity mode and its receipt. The rest are byte- or
-bit-identical. The engine README's newest section has the table, and its `CHANGELOG.md` the list.
-
-**Those are sp-daemon numbers, not a promise about your setup.** Kairos is engine-agnostic
-and most people will point it at LM Studio, `llama-server` or vLLM, where throughput is that
-server's business and not this framework's. What carries over is the shape of the problem:
-pick a sparse model, expect the first turn after a cold start to cost real seconds of
-prefill, and expect a dense model of the same total size to be much worse. The harness is
-built around those facts — the warm gate, the prefill budget and the unprompted loop's
-metering all exist because of them.
-
-### She comes with a face
-
-`assets/avatar-default/` ships one outfit across all seven of the faces her `[MOOD:]` marks reach,
-six gestures, and the reference they were grown from; the gateway lays them into `var/room/avatar/`
-the first time it sees that set. It fills gaps only and runs once — it cannot overwrite a wardrobe
-and cannot hand back something you deleted. The drawn SVG stays underneath as the floor and is
-never removed. Replace `_reference.png` and `character.txt` **together** and everything the
-generator makes from then on is yours ([`docs/AVATAR-PIPELINE.md`](docs/AVATAR-PIPELINE.md)).
-
-## How she is present, and how she consolidates
-
-Two things here are easy to miss from a feature list, and they are the architecture rather
-than the decoration.
-
-**She runs on a clock, not only on your turn.** `harness/kairos/` is an idle loop that asks,
-on every beat, whether there is a REASON to speak — and the reasons are named, not a
-temperature: *continue* (she was cut off mid-thought), *check-in* (the room has been quiet),
-*remind* (she promised), *solo* (her own time: reading, searching, writing in her journal),
-*muse* (a conclusion she has drawn), and the *presence modes* — narration, company, lucid
-dream — for the hours you are asleep. The policy is SILENT by default and every bound is
-checked before the model is consulted: a cooldown, an hourly cap, a chain limit, an idle
-floor, and a rule that she never speaks over a question she asked you. **An attempt spends
-the clock whether or not she speaks**, so a turn that is generated and then vetoed cannot be
-re-proposed four seconds later — that loop cost eleven minutes of GPU per cycle before it was
-metered, and the gate that holds it now drives every drop door.
-
-**She consolidates without overwriting.** At the day boundary a pass reads the day's
-transcript and writes her journal, distils durable facts, curates her traits from evidence,
-refreshes the standing block she reads every turn, and — once a week — rolls the week into one
-paragraph. Everything it produces is a *derived artefact*: it carries `derived_from`, the days
-and kinds it rests on, and the status `inferred`. **It never edits testimony.** A conclusion
-whose supports are all retired is retired with it (a conclusion should not outlive its
-evidence); an inference may never retire an observation, and the verdict table enforces that
-rather than a convention. The tombstoned base rows stay exactly where they were, answerable
-by `provenance`.
-
-The two connect: what the night writes is folded into her prefix at the same boundary, so she
-wakes up having taken in what she became — for a long time the write half worked and the read
-half did not, which is the kind of thing a suite of green tests will not tell you.
-
-## Her body-awareness — optional, and off unless you build it
-
-A companion that can *notice* — "his heart, last few readings: 70, 78, 92 — climbing" — and
-say something a person in the room would say. It ships as a framework plus a Wear OS agent
-you build yourself; nothing is running until you do.
-
-```
-  watch agent (APK)  --HTTP-->  POST /v1/telemetry/ingest
-                                     |
-                                ingest.record()      <- one door: privacy gate, one clock, shape
-                                     |
-                                store (one JSONL per day)
-                                     |
-                     +---------------+----------------+
-                     |                                |
-               body.read() / present()         GET /v1/telemetry/{now,history}
-                     |                                |
-              her prefix + reasons               the Body window
-```
-
-**Build the agent** (no gradle needed — it stays on the platform SDK on purpose, so
-`aapt2 → javac → d8 → apksigner` is the whole toolchain, about 16 KB):
-
-```bash
-cd harness/telemetry/watch-agent
-python build.py --install --arm        # --arm grants the sensors and starts it
-```
-
-`--arm` is a separate word deliberately: installing an app that reads your heart is one
-decision, turning it on is another. Set `TELEMETRY_ENDPOINT` to your harness — the default
-in the source is an example and will not resolve on your network.
-
-**What it does and does not do.** It reduces motion to one number per window rather than
-posting 100 Hz of raw accelerometer; it batches on the heart-rate sensor's own 600-event
-FIFO rather than posting per beat; and it puts failed batches back at the *front* of the
-queue, so an outage leaves a gap in the link and not in your history.
-
-**What she is allowed to do with it** is the part worth reading before you turn it on:
-
-- a **measurement** is `observed` — she may state it plainly;
-- a **reading** ("he is asleep") is `inferred` — it says *seems*, and your own word
-  outranks it the moment you speak;
-- **silence is an answer** — no watch, stale data, or off the wrist and she is told
-  *nothing*, because "you seem calm" from readings taken at lunch is worse than nothing;
-- she gets the **last few readings**, not an average, and only when they *move* — a flat
-  tail costs context to say nothing;
-- **never a diagnosis.** Nothing computes a medical claim and her prompt forbids one in as
-  many words. It is a wrist sensor, not a doctor.
-
-Your privacy mode holds it: `telemetry.sample` is a door in `anon.DOORS`, and readings taken
-off the record are **held, not queued** — a queue is the same leak with a delay on it.
-
-Two knobs, both on once data arrives: `telemetry.turn_note` (she is handed it per turn) and
-`telemetry.reasons` (she may speak first about it). Full detail, including the three tiers
-and what the hardware will and will not give you: [`docs/TELEMETRY.md`](docs/TELEMETRY.md).
-
-> **Reaching the gateway.** It binds `127.0.0.1` and **loopback is its security model** — the
-> origin check defends against a browser, not against a script. A watch is not on that
-> machine, so either tunnel (`adb reverse tcp:8810 tcp:8810` for the companion profile's port)
-> or widen `[serve].bind` and scope it with a firewall rule. That second one is a real decision
-> about who can reach her; `python tools/lan_bind.py --status` tells you whether your scoping
-> is actually in place.
-
-## Where this sits, and what it is not
-
-There is a lot of good software next to this one and most of it is solving a different
-problem. The honest way to place Kairos is by the decisions it makes differently, not by a
-feature count — so this compares **stances**, and says what each stance costs.
-
-| | a chat front-end<br>(LM Studio, Open WebUI, SillyTavern) | an agent/memory framework<br>(LangChain, Letta/MemGPT, mem0) | **Kairos** |
+| | chat front-ends<br>(LM Studio, Open WebUI, SillyTavern) | agent/memory frameworks<br>(LangChain, Letta, mem0) | **Kairos** |
 |---|---|---|---|
-| **what memory IS** | the conversation, plus what you paste | retrieved context — usually a vector store, often summarised forward | an **append-only ledger of facts**, each with speaker, source, time and status; the transcript is a separate durable record |
-| **forgetting** | delete a chat, it is gone | eviction, summarisation, re-embedding; the original is usually not kept | **tombstoned, never dropped.** `forget` retires a row and `provenance` still answers about it |
-| **who said it** | roles in a transcript | usually flattened at ingest | a first-class column, and an **inference may never retire an observation** — enforced by a committed verdict table, not a convention |
-| **speaking first** | never; you send, it replies | on a schedule or a trigger you write | a **named-reason idle loop** — continue, check-in, remind, solo, muse, presence modes — SILENT by default, every bound checked before the model is consulted |
-| **identity** | a system prompt you edit | a prompt plus tools | persona, traits curated **from evidence**, wardrobe and mood marks she emits and that actually move state |
-| **what proves it** | manual testing | unit tests | ~160 offline gates, each a named claim with a receipt, most with a mutant proving the check is load-bearing |
+| **memory** | the chat, plus what you paste | retrieved context, often summarised forward | a ledger of facts with speaker, source, time and status |
+| **forgetting** | delete it and it's gone | evicted or re-summarised | retired, never deleted |
+| **speaking first** | never | on a schedule you write | named reasons, silent by default |
+| **personality** | a system prompt | a prompt plus tools | persona plus traits curated from evidence, with mood and outfit cues that change real state |
+| **testing** | manual | unit tests | ~160 offline gates, each a named claim with a receipt |
 
-**What it is not.** Not a model server — bring your own endpoint. Not a RAG framework for
-your documents; the memory here is about a *person*, and pointing it at a corpus is not what
-any of it was tuned for. Not multi-user: one companion, one person, loopback by default. Not
-a product — it is a working system with its reasoning written down, and the reasoning is
-most of the value.
+**What it isn't:** a model server (bring your own), a document-search (RAG) tool (her memory is
+about a person, not a corpus), or multi-user (one companion, one person, local-only by default).
+The trade-offs: an append-only ledger grows and needs occasional cleanup, a companion who speaks
+first sometimes picks the wrong moment, and a test suite this thorough makes changes slower.
 
-**The cost of these stances, stated plainly.** An append-only ledger grows and needs
-hygiene passes. A companion that speaks first can speak when you would rather it did not,
-which is why every bound is a knob and the default is silence. And a gate culture this dense
-is slow to change — that is the trade, and it is deliberate.
+### What the custom engine adds
 
-## What works, and what the custom engine adds
+Everything above works on any endpoint. The optional sp-daemon backend also provides the raw
+stop-vs-continue signal behind her *continue* impulse, byte-exact decoding, audio and vision input
+frames, engine-side memory embeddings, and the prefix warm gate. Without it those features degrade,
+and the degradation is documented in [`docs/BACKENDS.md`](docs/BACKENDS.md) and
+[`docs/OFF-BY-DEFAULT.md`](docs/OFF-BY-DEFAULT.md).
 
-Everything here runs engine-agnostically: memory with tombstones and verdicts, the recall seam,
-unprompted speech (remind / solo / muse / check-in), personality marks, the wardrobe and catalog,
-the voice (xAI Ara with expressive tags, or a local chain), the ambient eye's quiet guard, the
-room and all its windows, the gate culture (`harness_tests/`).
+### Security note
 
-The optional **sp-daemon** backend adds what a generic endpoint cannot give: the raw
-stop-vs-continue margin that drives her *continue* and *expand* impulses, byte-exact
-decoding, residual vision/audio frames (sight and voice-in), engine-side episode minting and
-L5 embeddings, the prefix warm gate. Without it those degrade with a stated loss — see
-`docs/BACKENDS.md` and `docs/OFF-BY-DEFAULT.md` §12.
+The gateway binds to `127.0.0.1`, and being reachable only from your own machine is its security
+model. If you open it to your network (for the watch, say), scope it with a firewall rule;
+`python tools/lan_bind.py --status` checks that the scoping is actually in place.
 
-That engine is public too: **[`kairos-engine`](https://github.com/nihilistau/kairos-engine)**
-— the Rust + CUDA daemon these numbers were measured on, with the MoE expert cache, the
-expert-major prefill and the KV ring. It is a separate repo because it is a separate
-decision: Kairos is complete without it, and you should only reach for it once a generic
-endpoint is the thing in your way.
+### Contributing and testing
 
-```bash
-git clone --recurse-submodules https://github.com/nihilistau/kairos-engine engine
-```
-
-## Read next
-
-| | |
-|---|---|
-| how to set it up: endpoint, keys, models, settings | [`docs/SETUP.md`](docs/SETUP.md) |
-| the two-minute map | [`START-HERE.md`](START-HERE.md) |
-| the rules, the bug class this project keeps paying for, the traps | [`AGENTS.md`](AGENTS.md) |
-| the documents and which is authoritative | [`docs/README.md`](docs/README.md) |
-| what proves it still works | [`gates/GATE-INDEX.md`](gates/GATE-INDEX.md) |
-| what is deliberately off, and what would turn it on | [`docs/OFF-BY-DEFAULT.md`](docs/OFF-BY-DEFAULT.md) |
-| the room: windows, the kit, how to rebuild it | [`ui/README.md`](ui/README.md) |
-| every window, what it reads, and whose it is | [`docs/PANELS.md`](docs/PANELS.md) |
-| the six ways a fact reaches her, and which one yours belongs in | [`docs/LANES.md`](docs/LANES.md) |
-| what changed, by version | [`CHANGELOG.md`](CHANGELOG.md) |
-| the optional Rust + CUDA engine, and what it adds | [`kairos-engine`](https://github.com/nihilistau/kairos-engine) |
-
-Read [`docs/LANES.md`](docs/LANES.md) before adding anything to her context: two of the six
-lanes have already been measured wrong, and the receipts are in there.
-
-## Before you say you are done
+Run these before calling a change done. They're offline:
 
 ```bash
 python harness_tests/g_claim.py && python harness_tests/g_durability.py && python harness_tests/g_memory_lifecycle.py && python harness_tests/g_backend_seam.py && python harness_tests/g_docs_true.py
 ```
 
-Those five are OFFLINE; the whole offline suite is `python tools/sweep.py` (no GPU). The LIVE
-gates read `SP_GATEWAY_URL` / `SP_BOOT_GATEWAY` (default `http://127.0.0.1:8800`; the companion
-profile serves `:8810`, so set it) — `g_kairos_boot.py` is the acceptance run, and
-`gates/KAIROS-BOOT-<date>.md` holds the receipts.
+The whole offline suite is `python tools/sweep.py`, and it needs no GPU. Live gates read
+`SP_GATEWAY_URL` / `SP_BOOT_GATEWAY`; the companion profile serves on `:8810`, so set that.
+`g_kairos_boot.py` is the acceptance run.
 
-Kairos is exported from the source repo (see `KAIROS-SOURCE.txt`, `CONTRIBUTING.md`). MIT.
+Kairos is exported from a private working repo (see `KAIROS-SOURCE.txt` and
+[`CONTRIBUTING.md`](CONTRIBUTING.md)).
+
+### Further reading
+
+| | |
+|---|---|
+| a two-minute map of the code | [`START-HERE.md`](START-HERE.md) |
+| full setup: endpoints, keys, models, settings | [`docs/SETUP.md`](docs/SETUP.md) |
+| rules and known traps, for people and coding agents | [`AGENTS.md`](AGENTS.md) |
+| index of all documentation | [`docs/README.md`](docs/README.md) |
+| every test gate and what it proves | [`gates/GATE-INDEX.md`](gates/GATE-INDEX.md) |
+| what ships off, and how to turn it on | [`docs/OFF-BY-DEFAULT.md`](docs/OFF-BY-DEFAULT.md) |
+| the room's code and design kit | [`ui/README.md`](ui/README.md) |
+| her face and how new looks are made | [`docs/AVATAR-PIPELINE.md`](docs/AVATAR-PIPELINE.md) |
+| tools, MCP and Home Assistant | [`docs/MCP.md`](docs/MCP.md), [`docs/HOME-ASSISTANT.md`](docs/HOME-ASSISTANT.md) |
+| off-the-record mode | [`docs/ANON-MODE.md`](docs/ANON-MODE.md) |
+| what changed, by version | [`CHANGELOG.md`](CHANGELOG.md) |
+
+MIT licensed.
