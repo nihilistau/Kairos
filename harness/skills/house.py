@@ -22,6 +22,7 @@ from typing import Any, Dict, Optional
 
 import logging
 from harness.loud import swallowed as _swallowed
+from harness.user import say as _say
 _swlog = logging.getLogger(__name__)
 
 
@@ -56,7 +57,7 @@ def what_i_can_reach() -> Dict[str, Any]:
     names = _h.reachable()
     return {"ok": True, "things": names,
             "why": ("" if names else
-                    "nothing yet — the house side is off, or he has not listed anything")}
+                    _say("nothing yet — the house side is off, or {he} {has} not listed anything"))}
 
 
 def house_tools() -> list:

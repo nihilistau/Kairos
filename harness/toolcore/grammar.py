@@ -58,6 +58,7 @@ from typing import Any, Optional
 
 import logging
 from harness.loud import swallowed as _swallowed
+from harness.user import say as _say
 _swlog = logging.getLogger(__name__)
 
 
@@ -205,8 +206,8 @@ class ToolGrammar:
         calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)]
         if not calls:
             return ParseError("the block contains no call at all", at=code[:60],
-                              fixable_hint="A tool_code block must be exactly one call, "
-                                           "like recall(query=\"his name\").")
+                              fixable_hint=_say("A tool_code block must be exactly one call, "
+                                                "like recall(query=\"{his} name\")."))
 
         # ONE CALL PER FENCE, ENFORCED BY THE GRAMMAR, NOT TRUNCATED AFTER THE FACT.
         # She once emitted add_note + edit_note + remove_note in a single fence and executed

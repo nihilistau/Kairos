@@ -114,7 +114,8 @@ def omit(name: str, reason: str) -> None:
 # `[project.optional-dependencies]` block rather than a parse. It only ever needs
 # distribution NAMES, which is the one part of a requirement string that is easy.
 _IMPORT_NAME = {"pyyaml": "yaml", "sentence-transformers": "sentence_transformers",
-                "pillow": "PIL", "protobuf": "google.protobuf"}
+                "pillow": "PIL", "protobuf": "google.protobuf",
+                "audioop-lts": "audioop"}     # the 3.13+ backport of a removed stdlib module
 
 
 def optional_dists(root: str = "") -> set:
@@ -238,6 +239,7 @@ _STORE_ENV = (
     # so a gate that reaches a launch route unredirected would edit her real companion.toml.
     "SP_LAUNCH_PROFILES_DIR",   # profiles/ - the toml the Launch window edits in place
     "SP_LAUNCH_VAR",            # var/ root for launched.json, launch-setups/, settings-changes.jsonl
+    "SP_GRAPH_DIR",             # the memory graph's generations (derived, but a gate must not write HERS)
 )
 
 
@@ -295,6 +297,14 @@ def sandbox(name: str = "gate", persona: str = "") -> str:
     os.environ["SP_LAUNCH_PROFILES_DIR"] = os.path.join(sb, "profiles")
     os.makedirs(os.environ["SP_LAUNCH_PROFILES_DIR"], exist_ok=True)
     os.environ["SP_LAUNCH_VAR"] = os.path.join(sb, "launch-var")
+    os.environ["SP_GRAPH_DIR"] = os.path.join(sb, "graph")
+    # THE FIXTURES ARE ABOUT A NAMED USER (2026-11-19). Since harness/user.py, the user's
+    # name and pronouns come from the profile, and unset is "the user", they/them — so a
+    # fixture fact like "Sam is terrified of open water" is no longer anchored to anyone,
+    # and every gate asserting his prose would read "their". The fixtures all describe one
+    # named "he", so the sandbox says so. G-USER-NAME clears these to grade the unset case.
+    os.environ["SP_USER_NAME"] = "Sam"
+    os.environ["SP_USER_PRONOUNS"] = "he/him/his"
     os.environ["SP_PERSONA_FILE"] = os.path.join(sb, "persona.md")
     with open(os.environ["SP_PERSONA_FILE"], "w", encoding="utf-8") as f:
         f.write(persona or "She is dry and warm.\n\n## Personality state\nmood: neutral\n")

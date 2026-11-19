@@ -19,6 +19,7 @@ import time
 from typing import Any, Optional
 
 from harness.loud import swallowed as _swallowed
+from harness.user import say as _say
 
 logger = logging.getLogger(__name__)
 
@@ -294,13 +295,13 @@ def my_research(n: int = 12) -> str:
         # HIS lookups are in the shared ledger too (the room's manual boxes). She
         # may read and use them — but they are his searches, not her activity, and
         # the marker keeps her from narrating his clicks as things she did.
-        his = " — his search, not yours" if (r.get("by") == "him") else ""
+        his = _say(" — {his} search, not yours") if (r.get("by") == "him") else ""
         lines.append("- [%s %s%s] %s\n  %s" % (kind, ok, his, title,
                                                summ or "(no text came back)"))
-    return ("(these are your notes — things you actually looked up, not memories "
-            "and not things he told you. Rows marked 'his search' are things HE "
-            "looked up in the room; you may use them, but they are not your doing)"
-            "\n\n" + "\n".join(lines))
+    return (_say("(these are your notes — things you actually looked up, not memories "
+                 "and not things {he} told you. Rows marked '{his} search' are things {HE} "
+                 "looked up in the room; you may use them, but they are not your doing)"
+                 "\n\n") + "\n".join(lines))
 
 
 def looking_tools():

@@ -303,4 +303,71 @@ check("§10 BACKENDS.md says which half is portable",
       "launcher" in _bk.lower() and ("posix" in _bk.lower() or "linux" in _bk.lower()),
       "docs/BACKENDS.md must name what runs off Windows and what does not")
 
+print("\n11. A PROXY THAT REFUSES PYTHON'S DEFAULT USER-AGENT (RunPod, 2026-11-06)")
+# Her 31B copy runs against llama-server behind RunPod's proxy, which sits behind Cloudflare
+# and answers 403 to urllib's default "Python-urllib/3.x" before the request reaches the
+# model. Two doors talk to an openai engine — the backend client and the launcher's probe —
+# so BOTH are driven against a fake that bites exactly that way (AGENTS.md §0: a rule held on
+# one of two paths is held on neither). Carried back from her copy 2026-11-08.
+import urllib.request as _ur11  # noqa: E402
+import urllib.error as _ue11  # noqa: E402
+
+UA11 = []
+
+
+class CF(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    def _gate(self):
+        ua = self.headers.get("User-Agent") or ""
+        UA11.append(ua)
+        if not ua or ua.startswith("Python-urllib"):
+            self.send_error(403); return False
+        return True
+
+    def do_GET(self):
+        if self._gate():
+            _send_json(self, {"data": [{"id": "fake-1"}]})
+
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        self.rfile.read(n)
+        if self._gate():
+            _send_json(self, {"choices": [{"message": {"role": "assistant", "content": "ok"},
+                                           "finish_reason": "stop"}]})
+
+
+cf = ThreadingHTTPServer(("127.0.0.1", 0), CF)
+threading.Thread(target=cf.serve_forever, daemon=True).start()
+_cf_base = "http://127.0.0.1:%d" % cf.server_address[1]
+# THE FAKE BITES: a bare urllib request — what both doors sent before — is refused.
+try:
+    _ur11.urlopen(_cf_base + "/v1/models", timeout=3).read(); _bit = False
+except _ue11.HTTPError as ex:
+    _bit = ex.code == 403
+check("§11 the fake refuses urllib's default User-Agent (the mutant: the old request)", _bit)
+os.environ["SP_ENGINE_KIND"] = "openai"   # leg 8 left it on sp
+os.environ["SP_ENGINE_BASE_URL"] = _cf_base
+C._CLIENT = None
+_cl11 = C.get_client()
+check("§11 the backend client gets through (health)", _cl11.health() is True, UA11[-1:])
+check("§11 ...and a one-shot gets through",
+      (_cl11.oneshot([{"role": "user", "content": "hi"}], max_tokens=8) or "").strip() == "ok",
+      UA11[-1:])
+_spec11 = _ilu.spec_from_file_location("serve_door11", os.path.join(ROOT, "serve.py"))
+_serve11 = _ilu.module_from_spec(_spec11)
+_spec11.loader.exec_module(_serve11)
+check("§11 the launcher's /v1/models probe gets through", _serve11._probe_models(_cf_base, "") is True,
+      UA11[-1:])
+cf.shutdown()
+# THE THOUGHT CHANNEL. llama-server returns reasoning as `reasoning_content` and streams only
+# the answer, so no `<channel|>` ever arrives; a stream assumed to START in thought put her
+# whole first reply on the thought lane, unspoken. Read, not driven: the condition lives inside
+# the gateway's streaming closure. The assertion is that the open state names the engine kind.
+_app11 = _srcmod.pkg("harness", "server")   # the server package as text (G-SRC-TRAP: never app.py as a file)
+_th11 = _app11[_app11.index('_th = {"open":'):][:220]
+check("§11 the thought channel does not start open on the openai engine",
+      'SP_ENGINE_KIND' in _th11 and '"openai"' in _th11, _th11[:120])
+
 finish("G-BACKEND-SEAM")

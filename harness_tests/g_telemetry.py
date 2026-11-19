@@ -36,6 +36,10 @@ from _gate import check, finish, sandbox, utf8_stdout  # noqa: E402
 
 utf8_stdout()
 SB = sandbox("g_telemetry")            # FIRST — redirects SP_TELEMETRY_DIR
+# Pins the operator's profile: legs below assert her body sentences as he reads them
+# ("off his wrist", "diagnose him"); the naming itself is G-USER-NAME's subject.
+os.environ["SP_USER_NAME"] = "Sam"
+os.environ["SP_USER_PRONOUNS"] = "he"
 os.environ["SP_ENGINE_KIND"] = "openai"
 os.environ.setdefault("SP_DAEMON_URL", "http://127.0.0.1:9")
 

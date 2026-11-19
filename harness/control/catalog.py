@@ -45,6 +45,7 @@ from typing import Any, Dict, List, Optional
 
 from harness.control import avatar as AV
 from harness.control import wardrobe as WD
+from harness.user import say as _say
 from harness.loud import swallowed as _swallowed
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ _IMAGE = (".png", ".jpg", ".jpeg", ".webp")
 ACT = {
     "clothing": 'wear("…") or [WEAR:…] — a way you are',
     "gesture": 'express("…") or gesture("…") — a thing you do, on your face',
-    "moment": 'show_him("…") or [SHOW:…] — a thing you put on his screen',
+    "moment": _say('show_him("…") or [SHOW:…] — a thing you put on {his} screen'),
 }
 
 
@@ -358,6 +359,6 @@ def for_her(limit: int = 14) -> str:
         if on is not None:
             wearing = " — on you now: %s" % (on.get("title") or on.get("label") or on["id"]).strip()
         out.append("  %s (%d) — %s%s" % (cat.upper(), len(items), ACT[cat], wearing))
-    out.append('Not sure you own something? search_wardrobe("lace") answers in one line — '
-               'ask it before you tell him you have not got it.')
+    out.append(_say('Not sure you own something? search_wardrobe("lace") answers in one line — '
+                    'ask it before you tell {him} you have not got it.'))
     return "\n".join(out)

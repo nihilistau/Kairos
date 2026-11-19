@@ -26,6 +26,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 
 from harness.skills import notes as N
+from harness.user import called as _called
 from harness.skills.duetime import parse_due
 
 
@@ -50,7 +51,7 @@ def _fmt(n: dict) -> str:
     bits = [f"[{n['id']}]", f"({n.get('category', 'note')})", n.get("title", "")]
     if n.get("due_at"):
         bits.append("— due " + n["due_at"][:16].replace("T", " ") + ("  ✓done" if n.get("done") else ""))
-    bits.append("· by " + ("you" if n.get("speaker") == "self" else "Sam"))
+    bits.append("· by " + ("you" if n.get("speaker") == "self" else _called()))
     return " ".join(b for b in bits if b)
 
 

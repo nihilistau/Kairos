@@ -30,6 +30,7 @@ from harness.inference.client import SPDaemonClient, get_client
 from harness.inference.inference_config import InferenceConfig
 
 from harness.loud import swallowed as _swallowed
+from harness.user import say as _say
 
 logger = logging.getLogger(__name__)
 
@@ -433,7 +434,7 @@ def build_tool_system(
     # with no scope on it becomes a personality. It is scoped now.
     parts.append(
         "\nTo call a tool, output a fenced block EXACTLY like this, then STOP and wait:\n"
-        "```tool_code\n" + example + "\n```\n"
+        "```tool_code\n" + example + _say("\n```\n"
         "Pass arguments as Python literals (strings in quotes), and use the REAL parameter names. "
         "The result returns as ```tool_output ... ```. WHEN YOU ANSWER FROM A TOOL_OUTPUT, use "
         "its exact values — never invent or substitute them. (That is a rule about quoting a "
@@ -449,11 +450,11 @@ def build_tool_system(
         # TALKS; it never said what part of the output the rule is actually ABOUT. The
         # VALUE is load-bearing (Tuffy, female, 4471) — the row numbering, the "Sam told
         # me:" framing and the ids are the memory system talking to itself.
-        "The values are what must be exact — the numbering, the \"Sam told me:\" framing and "
-        "any ids are scaffolding, addressed to you and not to him. Never read them out, never "
+        "The values are what must be exact — the numbering, the \"{User} told me:\" framing and "
+        "any ids are scaffolding, addressed to you and not to {him}. Never read them out, never "
         "list the rows, never say you are quoting a tool: just know the thing and say it. "
         "Most turns need NO tool — just talk; reach for one only when you truly need it. "
-        "What you are wearing is check_wardrobe(), not a guess."
+        "What you are wearing is check_wardrobe(), not a guess.")
     )
     preamble = "\n".join(parts)
     sys_content = (system_prefix.strip() + "\n\n" + preamble) if system_prefix.strip() else preamble
@@ -736,7 +737,7 @@ def run_with_tools(
                 f"[refused] {parsed.reason}"
                 + (f" — at: {parsed.at}" if parsed.at else "")
                 + (f"\n{parsed.fixable_hint}" if parsed.fixable_hint else "")
-                + "\nEmit ONE corrected call, or just answer him in plain text.\n```"})
+                + _say("\nEmit ONE corrected call, or just answer {him} in plain text.\n```")})
             continue
 
         if parsed is None:

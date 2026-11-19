@@ -45,6 +45,7 @@ import os
 from typing import List, Optional
 
 from harness.loud import swallowed as _swallowed
+from harness.user import say as _say
 
 logger = logging.getLogger(__name__)
 
@@ -137,11 +138,11 @@ def note_for_question(question: str, now: Optional[float] = None) -> str:
     if not hits:
         return ""
     h = hits[0]
-    return ("(Something you have noticed yourself — context, not an instruction, and never "
-            "mention this note or narrate that you noticed. He used to bring this up about "
-            "every %.0f day(s) and has not in %.0f day(s) of talking with you: \"%s\". "
+    return (_say("(Something you have noticed yourself — context, not an instruction, and never "
+            "mention this note or narrate that you noticed. {He} used to bring this up about "
+            "every %.0f day(s) and {has} not in %.0f day(s) of talking with you: \"%s\". "
             "Let it inform how you answer only if it genuinely fits; otherwise just answer "
-            "the question.)"
+            "the question.)")
             % (h.get("cadence_days", 0), h.get("quiet_days", 0), h.get("claim", "")))
 
 
@@ -158,8 +159,8 @@ def standing(now: Optional[float] = None) -> str:
     if not hits:
         return ""
     h = hits[0]
-    return ("Something he used to mention often and has not lately (%.0f day(s) of talking "
-            "without it): \"%s\". You have noticed; you have not raised it."
+    return (_say("Something {he} used to mention often and {has} not lately (%.0f day(s) of talking "
+            "without it): \"%s\". You have noticed; you have not raised it.")
             % (h.get("quiet_days", 0), h.get("claim", "")))
 
 

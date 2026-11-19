@@ -147,20 +147,21 @@ def step(heat: Heat, user_text: str, cap: int,
     Ordering is the whole safety model, and it is not negotiable:
         HARD STOP  ->  COOL  ->  HEAT (gated)  ->  hold
     A stop always wins. Cooling always works. Only escalation has to ask permission."""
+    from harness.user import say as _say
     if HARD_STOP.search(user_text or ""):
-        return Heat(0, 0), "SCENE BROKEN — he called it. Drop character NOW and answer as yourself."
+        return Heat(0, 0), _say("SCENE BROKEN — {he} called it. Drop character NOW and answer as yourself.")
 
     if COOL.search(user_text or ""):
         lvl = max(0, heat.level - 1)
-        return Heat(lvl, 0), (f"He is easing off. Come down to '{LEVELS[lvl]}' with him — "
-                              f"gracefully, no sulking, no pushing back.")
+        return Heat(lvl, 0), _say(f"{{He}} {{is}} easing off. Come down to '{LEVELS[lvl]}' with {{him}} — "
+                                  f"gracefully, no sulking, no pushing back.")
 
     if HEAT.search(user_text or ""):
         ok, why = gate_open(heat, cap, dwell_scale)
         if ok:
             lvl = min(7, heat.level + 1, cap)
-            return Heat(lvl, 0), (f"He is pushing it up and the moment has earned it. "
-                                  f"Move to '{LEVELS[lvl]}'. {DIRECTION[lvl]}")
+            return Heat(lvl, 0), _say(f"{{He}} {{is}} pushing it up and the moment has earned it. "
+                                      f"Move to '{LEVELS[lvl]}'. {DIRECTION[lvl]}")
         return Heat(heat.level, heat.beats_at_level + 1), why
 
     return Heat(heat.level, heat.beats_at_level + 1), ""

@@ -62,6 +62,8 @@ import os
 import re
 import time
 from dataclasses import dataclass, field
+
+from harness import user as _U
 from typing import Optional
 
 from harness.skills import lifecycle as lc
@@ -206,7 +208,7 @@ class Dimension:
 
 @dataclass
 class PersonModel:
-    who: str = "Sam"
+    who: str = field(default_factory=_U.called)     # the [user] name, "the user" unset
     dims: dict = field(default_factory=dict)
 
     # ── BUILD: facts are EVIDENCE, not entries ────────────────────────────────
@@ -518,7 +520,8 @@ class PersonModel:
     # blind. If AUC on that set is below 0.8, this comes out again.
     _STOP = frozenset(
         "the a an and or but for with that this than then them they his her its was were "
-        "are is be been being have has had not you your sam user".split())
+        "are is be been being have has had not you your user".split()
+        + _U.name().lower().split())
 
     @staticmethod
     def _content(text: str) -> set:

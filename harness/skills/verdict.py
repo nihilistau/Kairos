@@ -36,6 +36,7 @@ import os
 import threading
 
 from harness.loud import swallowed as _swallowed
+from harness.user import say as _say
 
 _logger = logging.getLogger(__name__)
 
@@ -127,15 +128,15 @@ FRAMING = [
     ("inferred", "*", "I've come to think: {t}"),
     ("confirmed", "*", "We settled that: {t}"),
     ("*", "self", "About myself: {t}"),
-    ("*", "*", "Sam told me: {t}"),
+    ("*", "*", "{User} told me: {t}"),   # {User}: harness/user.py, filled in framing_for
 ]
 
 
 def framing_for(status: str, speaker: str) -> str:
     for st, sp, tpl in FRAMING:
         if st in ("*", status) and sp in ("*", speaker):
-            return tpl
-    return "Sam told me: {t}"      # unreachable; the last row is total
+            return _say(tpl)
+    return _say("{User} told me: {t}")      # unreachable; the last row is total
 
 
 # supersede permission: may `incoming` retire `held`? THE asymmetry (find_superseded's

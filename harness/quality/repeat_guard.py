@@ -39,6 +39,8 @@ from __future__ import annotations
 import re
 from typing import Callable, Optional
 
+from harness.user import say as _say
+
 _WORD = re.compile(r"[a-z0-9']+")
 
 
@@ -67,9 +69,9 @@ def is_self_repeat(reply: str, previous_reply: str, *, threshold: float = 0.85) 
     return similarity(r, p) >= threshold
 
 
-REROLL_NUDGE = (
+REROLL_NUDGE = _say(
     "(You have just repeated your previous message almost word for word. Do not do that. "
-    "Respond to what he ACTUALLY said this time — react to it, disagree, ask, or move the "
+    "Respond to what {he} ACTUALLY said this time — react to it, disagree, ask, or move the "
     "conversation on. Say something you have not already said.)"
 )
 

@@ -147,7 +147,7 @@ from harness.skills.memory.store import (                      # noqa: E402,F401
     # and not `_CACHE`: `semindex` already owns that name and `g_self_model` patches it,
     # so a second `_CACHE` in the package makes §5's owner-vs-alias check ambiguous
     # about which module a mutant was aimed at.
-    registry_stamp, invalidate_cache, _PARSE_CACHE, _PARSE_LOCK)
+    registry_stamp, invalidate_cache, cache_epoch, _CACHE_EPOCH, _PARSE_CACHE, _PARSE_LOCK)
 from harness.skills.memory.mint import (                       # noqa: E402,F401
     _MINT_Q, _MINT_LOCK, _mint_is_async, _CAPTURE_REFUSED, capture_status,
     eps_root, _mint_now, _mint_drain, _mint_later, mint_backlog, mint_drain_blocking,

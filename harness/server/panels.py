@@ -344,10 +344,26 @@ def _setup_json() -> Dict[str, Any]:
     try:
         from harness.personality import persona_layers as _PL
         pdir = _PL.persona_dir()
-        out["persona"] = {"dir": os.path.relpath(pdir, _ROOT_DIR).replace("\\", "/"),
+        try:
+            _pd = os.path.relpath(pdir, _ROOT_DIR)
+        except ValueError:                    # another drive on Windows: relpath raises
+            _pd = pdir
+        out["persona"] = {"dir": _pd.replace("\\", "/"),
                           "present": os.path.isdir(pdir),
                           "fragments": len([f for f in os.listdir(pdir)
                                             if f.endswith(".md")]) if os.path.isdir(pdir) else 0}
+        # WHAT SHE ACTUALLY GOT (2026-11-19). `fragments` above counts files on disk; a fresh
+        # clone with no persona.md reported 14 of them while her prefix composed none. These
+        # come from the last load_agent_system() call — `file` is None before the first one.
+        from harness.agent import PERSONA_SOURCE as _src
+        out["persona"].update(persona_file=_src.get("file"),
+                              composed=_src.get("fragments", 0),
+                              fallback=_src.get("fallback"))
+        if out["persona"]["fragments"] and _src.get("file") is not None \
+                and not _src.get("fragments"):
+            out["persona"]["warning"] = ("fragments on disk but none composed into her prefix"
+                                         + (" (generic fallback system)" if _src.get("fallback")
+                                            else ""))
     except Exception as exc:
         out["persona"] = {"present": False, "error": str(exc)[:160]}
     try:

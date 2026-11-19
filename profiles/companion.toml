@@ -13,6 +13,12 @@
 # relative var/ paths. The engine-only sections ([kv], the daemon keys under [memory]) are
 # present because the one door reads one schema for every profile; their values are inert.
 
+[user]
+# Who the companion is talking to. Unset = "the user", they/them. pronouns takes
+# "he/him/his", "she/her/her", "they/them/their", or your own three forms.
+name = ""
+pronouns = ""
+
 [engine]
 kind = "openai"                       # "sp" (the Rust sp-daemon) | "openai"
 base_url = "http://127.0.0.1:1234"    # LM Studio default; llama-server is :8080
@@ -99,3 +105,10 @@ key_file = "var/secrets/Xapi.txt"
 
 [aux]
 enabled = false
+
+[graph]
+# The memory graph (harness/skills/graph): a DERIVED view over the fact registry and day
+# transcripts. Every switch is OFF; each one's arming condition is in docs/OFF-BY-DEFAULT.md.
+build     = false        # SP_GRAPH_BUILD    — rebuild the graph in the background when it is stale
+annotate  = false        # SP_GRAPH_ANNOTATE — recalled facts carry their graph id and neighbours
+follow    = false        # SP_GRAPH_FOLLOW   — the recall_node tool follows an edge

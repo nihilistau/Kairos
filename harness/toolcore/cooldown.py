@@ -77,8 +77,9 @@ class Cooldowns:
         if left <= 0:
             return None
         if name in ("take_photo", "take_screenshot"):
-            return (f"[you just looked {int(self.period(name) - left)}s ago — "
-                    f"wait {int(left)}s, or tell him what you already saw]")
+            from harness.user import say as _say
+            return _say(f"[you just looked {int(self.period(name) - left)}s ago — "
+                        f"wait {int(left)}s, or tell {{him}} what you already saw]")
         return f"[{name} is on cooldown for another {int(left)}s]"
 
     def mark(self, name: str) -> None:

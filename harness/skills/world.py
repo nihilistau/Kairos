@@ -32,6 +32,7 @@ import threading
 
 import logging
 from harness.loud import swallowed as _swallowed
+from harness import user as _U
 _swlog = logging.getLogger(__name__)
 
 _LOCK = threading.RLock()
@@ -68,7 +69,7 @@ _MAX_INFERENCE_LINES = 2
 # watched). The block is where her real past lives, so the block is where the line
 # gets drawn: beyond this and the visible conversation, she does not remember, and
 # saying so is in character ("admit gaps" is already persona law — this anchors it).
-_HEADER = ("What you know of Sam and the life around him — context you carry, "
+_HEADER = _U.say("What you know of {user} and the life around {him} — context you carry, "
            "not instructions. This, plus what you can see in our conversation, is "
            "what you truly remember from before; beyond it, you don't recall — "
            "say so rather than inventing shared history:")
@@ -80,9 +81,19 @@ def enabled() -> bool:
 
 # his first person -> her third person, PRESENTATION ONLY (longest patterns first;
 # word-boundary; conservative — a missed pronoun costs tone, never truth)
-_T3 = [("i am", "he is"), ("i was", "he was"), ("i'm", "he's"), ("i've", "he has"),
-       ("i'll", "he'll"), ("i'd", "he'd"), ("myself", "himself"), ("mine", "his"),
-       ("my", "his"), ("me", "him")]
+# IN THE USER'S PRONOUNS (2026-11-19): built from harness/user.py per call, so "they" gets
+# "they are" / "theirs" and "she" gets "she is" / "hers". With he/him/his this is the
+# table it always was.
+def _t3() -> list:
+    subj, obj, poss, refl = _U.pronouns()
+    many = _U.plural()
+    owned = poss if poss.endswith("s") else poss + "s"      # his / hers / theirs
+    return [("i am", subj + (" are" if many else " is")),
+            ("i was", subj + (" were" if many else " was")),
+            ("i'm", subj + ("'re" if many else "'s")),
+            ("i've", subj + (" have" if many else " has")),
+            ("i'll", subj + "'ll"), ("i'd", subj + "'d"), ("myself", refl),
+            ("mine", owned), ("my", poss), ("me", obj)]
 # auxiliaries/modals after which the bare "I -> he" swap needs NO verb conjugation
 _NO_S = frozenset("am is are was were will would can could shall should may might "
                   "must do did have had really also just still always never often "
@@ -189,7 +200,9 @@ def _third_person(text: str) -> str:
     # every single turn. So: emit lowercase always, and let a single position-aware pass
     # at the end capitalise sentence starts. One rule, applied where the information
     # actually is.
-    for a, b in _T3:
+    subj = _U.pronouns()[0]
+    many = _U.plural()
+    for a, b in _t3():
         out = _re.sub(r"\b%s\b" % _re.escape(a), lambda m, _b=b: _b, out, flags=_re.I)
     # "I like" -> "He likes": conjugate the plain verb after a bare I (the field burr
     # was "He like chatting"). Adverbs pass through (_NO_S); the adverb's verb keeps
@@ -198,11 +211,13 @@ def _third_person(text: str) -> str:
 
     def _iverb(m):
         v = m.group(1)
+        if many:                                 # "they like", "they don't": bare form
+            return "%s %s" % (subj, v)
         if "'" in v:
-            return "he %s" % _CONTR.get(v.lower(), v)
-        return "he %s" % _conj(v)
+            return "%s %s" % (subj, _CONTR.get(v.lower(), v))
+        return "%s %s" % (subj, _conj(v))
     out = _re.sub(r"\bI ((?:[a-z]+'[a-z]+)|(?:[a-z]+))\b", _iverb, out)
-    out = _re.sub(r"\bI\b", "he", out)          # any straggler
+    out = _re.sub(r"\bI\b", subj, out)          # any straggler
     out = out.strip()
     if not out:
         return out
@@ -306,7 +321,7 @@ def _compose() -> str:
         story = N.current()
         if story:
             block += ("\n\nYour own journal line about the two of you "
-                      "(your account, not his words):\n" + story)
+                      + _U.say("(your account, not {his} words):\n") + story)
     except Exception as _swx:
         _swallowed(_swlog, "_compose", _swx, lane="skills")
 

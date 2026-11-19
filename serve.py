@@ -374,12 +374,26 @@ def guard_live_turn(force: bool, c=None) -> None:
         "   warmed idle stack, so its warnings got ignored and a turn got killed.)" % why)
 
 
+GRAPH_RULE_NAMES = frozenset({"explicit", "sequence", "day", "minted_from", "activity"})
+
+
 def build_env(c: dict) -> dict:
     """The ONE explicit profile→env mapping. Anything not mapped here does not exist."""
     paths, kv, mem = c["paths"], c["kv"], c["memory"]
     agent, dec, veto = c["agent"], c["decode"], c.get("veto", {})
     sem = c.get("sem", {})
+    graph = c.get("graph", {})
     aux = c.get("aux", {})
+    # A string where a list belongs ("explicit,day") would be joined letter by letter below.
+    if "rules" in graph and not (isinstance(graph["rules"], list) and all(isinstance(r, str) for r in graph["rules"])):
+        raise SystemExit(f"profile invalid: [graph].rules must be a list of rule names (got {graph['rules']!r})")
+    # A typo'd name would otherwise survive to the build, where rules.apply raises KeyError inside
+    # a background thread and the graph quietly never builds. Literal, not imported from
+    # harness.skills.graph.rules (which pulls in the memory package); G-GRAPH-OFF holds it equal
+    # to RULES.keys().
+    _bad = [r for r in graph.get("rules", []) if r not in GRAPH_RULE_NAMES]
+    if _bad:
+        raise SystemExit(f"profile invalid: [graph].rules names unknown rule(s) {_bad!r} (known: {sorted(GRAPH_RULE_NAMES)})")
     if mem.get("recall_authority") != "L5":
         raise SystemExit(f"profile invalid: recall_authority must be 'L5' (got {mem.get('recall_authority')!r})")
     # G-VERBATIM lint (2026-07-12): no_repeat_ngram>=2 BANS re-emitting any N-token
@@ -831,6 +845,18 @@ def build_env(c: dict) -> dict:
         # counters + witness lines; they never alter results. Gate: G-SEM-LAW.
         "SP_SEM_LAW": b(sem.get("law", False)),
         "SP_SEM_LAW_LOG": str(sem.get("law_log", "")).replace("/", "\\"),
+        # THE MEMORY GRAPH (harness/skills/graph; docs/OFF-BY-DEFAULT.md). A switch the profile
+        # does not name is exported empty, which the empty-SP_* strip below deletes: absent stays
+        # absent, and the graph's own defaults (all off) apply. Gate: G-GRAPH-OFF.
+        "SP_GRAPH_BUILD": b(graph["build"]) if "build" in graph else "",
+        "SP_GRAPH_ANNOTATE": b(graph["annotate"]) if "annotate" in graph else "",
+        "SP_GRAPH_ANNOTATE_N": str(graph["annotate_neighbours"]) if "annotate_neighbours" in graph else "",
+        "SP_GRAPH_FOLLOW": b(graph["follow"]) if "follow" in graph else "",
+        "SP_GRAPH_FOLLOW_CAP": str(graph["follow_cap"]) if "follow_cap" in graph else "",
+        "SP_GRAPH_REBUILD_MIN_S": str(graph["rebuild_min_s"]) if "rebuild_min_s" in graph else "",
+        "SP_GRAPH_KEEP": str(graph["keep"]) if "keep" in graph else "",
+        "SP_GRAPH_RULES": ",".join(graph.get("rules", []) or []),
+        "SP_GRAPH_DIR": str(graph.get("dir", "") or "").replace("/", "\\"),
         # Phase B2 cutover: the table RULES at the seam (silence-direction only; unmapped
         # cells kept and counted). Receipt behind arming it: G-SEM-VERDICT corpus byte-
         # equality with empty slots + the 29/0/0 live shadow. Gate: G-SEM-VERDICT.
@@ -1297,6 +1323,10 @@ def build_env(c: dict) -> dict:
         "SP_CONSULT_MODEL": (c.get("consult", {}).get("model") or "claude-opus-5-5"),
         "SP_CONSULT_EFFORT": (c.get("consult", {}).get("effort") or "high"),
         "SP_CONSULT_RECEIPTS": os.path.join(VAR, "consult"),
+        # ── WHO SHE IS TALKING TO (2026-11-19). harness/user.py fills every prompt-visible
+        # mention of the user from these; unset = "the user", they/them.
+        "SP_USER_NAME": str(c.get("user", {}).get("name") or ""),
+        "SP_USER_PRONOUNS": str(c.get("user", {}).get("pronouns") or ""),
         # ── THE xAI API (2026-08-21, operator: "use the API instead of the cli").
         # ONE key, as a FILE under var/secrets/ (this repo is public): research,
         # her voice (Ara), and the image/video generator all read it through
@@ -1588,7 +1618,8 @@ def _probe_models(base: str, key_file: str) -> bool:
     endpoint with auth on (LM Studio 0.3.2x) answers 401 to a bare probe and the banner
     said 'NOT answering yet' while the gateway was already talking to it (2026-08-21)."""
     try:
-        req = urllib.request.Request(base + "/v1/models")
+        req = urllib.request.Request(base + "/v1/models",
+                                     headers={"User-Agent": "kairos-harness/1.0"})  # Cloudflare 403s Python-urllib (RunPod proxy); G-BACKEND-SEAM §11
         if key_file and os.path.exists(key_file):
             with open(key_file, encoding="utf-8") as f:
                 k = f.read().strip()

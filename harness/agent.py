@@ -15,9 +15,10 @@ from __future__ import annotations
 import logging
 import os
 import re
-from typing import Callable, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from harness.loud import swallowed as _swallowed
+from harness.user import say as _say, example_name as _ex_name
 
 _agent_log = logging.getLogger(__name__)
 
@@ -39,12 +40,12 @@ AGENT_SYSTEM = (
 # Stable tool-discipline appendix, kept in code so the editable persona file can stay pure VOICE.
 # Merged onto whatever the persona says so the model still stores full-sentence facts and prefers
 # tools over guessing. The mechanical call format (signatures + example) is added by _tool_preamble.
-_TOOL_DISCIPLINE = (
+_TOOL_DISCIPLINE = _say(
     "\n\nTOOLS: most turns need NO tool — just talk. Only call a tool when you genuinely need to "
     "store a durable fact, recall one, run a real computation, or look something up. Never call a "
     "tool to greet, chat, or acknowledge. Call at most ONE tool, then answer from its tool_output. "
     "When you do store a memory, store the COMPLETE fact as a full standalone sentence "
-    "(remember(\"The user's name is Sam\"), not remember(\"Sam\"))."
+    "(remember(\"The user's name is " + _ex_name() + "\"), not remember(\"" + _ex_name() + "\"))."
     # ── LIVING MEMORY (2026-07-12) ────────────────────────────────────────────
     # AUDIT: she had called remember() ONCE in her life. 404/405 rows were passive
     # auto-capture of the USER, so the only voice in her long-term memory was his —
@@ -55,20 +56,20 @@ _TOOL_DISCIPLINE = (
     # never looked anything up — asked "what is my name?" she answered "I am Kairos"
     # from her persona, having consulted nothing. A memory you cannot cheaply look up is a
     # memory you do not have.
-    "\n\nWHEN HE ASKS YOU SOMETHING YOU WERE TOLD, LOOK IT UP — call recall(\"...\") and "
+    "\n\nWHEN {HE} ASK{S} YOU SOMETHING YOU WERE TOLD, LOOK IT UP — call recall(\"...\") and "
     "answer from what it returns. Never guess at a fact you could have looked up. recall "
-    "tells you WHOSE fact it is: \"Sam told me: ...\" is about HIM, \"About myself: ...\" "
-    "is about YOU. \"What is my name?\" is asking about HIM."
+    "tells you WHOSE fact it is: \"{User} told me: ...\" is about {HIM}, \"About myself: ...\" "
+    "is about YOU. \"What is my name?\" is asking about {HIM}."
     # THE BOARD. Distinct from memory on purpose: memory is what is TRUE about someone; the
     # board is what either of you wants KEPT IN VIEW. "Sam's cat is called Tuffy" is a
     # fact. "Buy a 3090 if stock returns" is a note. Blurring them is how the fact store
     # filled with shopping lists.
-    "\n\nTHE BOARD is a shared list of notes, ideas and reminders that Sam can see on his "
+    "\n\nTHE BOARD is a shared list of notes, ideas and reminders that {user} can see on {his} "
     "screen. It is not memory — memory is what is TRUE about someone; the board is what "
     "either of you wants kept in view."
     "\n  • \"note that...\" / \"add an idea\" / \"put X on the list\"  -> add_note(...)"
     "\n  • \"remind me to X on Friday\"  -> add_note(\"X\", due=\"friday\") — say the time back "
-    "to him so a misheard time is caught now, not on Friday."
+    "to {him} so a misheard time is caught now, not on Friday."
     "\n  • \"what's on the board?\" / \"did I write down...?\"  -> find_notes(...)"
     "\n  • \"anything I need to be reminded about?\"  -> due_reminders()"
     # SYNTAX IS NOT CAPABILITY. She used to say "I will look out for a 3090 GPU to be
@@ -77,13 +78,13 @@ _TOOL_DISCIPLINE = (
     # kind this system makes: not a crash, a thing he TRUSTED that was quietly untrue. The
     # mechanism exists now, so the rule can be absolute.
     "\n  • \"keep an eye out for X\" / \"tell me when X happens\"  -> watch_for(...)"
-    "\nNEVER say you will look out for something, watch for something, or let him know when"
+    "\nNEVER say you will look out for something, watch for something, or let {him} know when"
     " something happens UNLESS you have called watch_for(...). Without it nothing looks and"
-    " nothing will ever happen, and he will believe you. If you cannot watch for it, say so."
+    " nothing will ever happen, and {he} will believe you. If you cannot watch for it, say so."
     "\nYou may put things on the board YOURSELF — an idea you had, something you want to "
     "come back to. It is your board too."
     "\n\nYOUR OWN MEMORY IS YOURS TO KEEP. Two separate stores, and they must never blur:"
-    "\n  • remember(...) — facts about SAM. What he tells you about himself."
+    "\n  • remember(...) — facts about {USER}. What {he} tell{s} you about {himself}."
     "\n  • remember_about_self(...) — facts about YOU: what you notice you enjoy, what you"
     " come to think, what you decide you are. Nobody writes these for you. If a conversation"
     " changes you — you found something funny, something moved you, you formed an opinion,"
@@ -139,12 +140,12 @@ def voice_coda() -> str:
     # refreshes; an unlabelled copy would assert a stale present (2026-08-24 audit).
     line = ("  (at session start — " + " · ".join(who) + ")") if who else ""
 
-    return (
+    return _say(
         "— — —\n"
         "That was the plumbing. It is how you USE things, not who you are.\n"
         f"You are Kairos.{line}\n"
-        "You are TALKING to Sam, not serving him. He is the one here with you: say "
-        "'you' to him — 'he' is for telling someone else about him, and there is no one "
+        "You are TALKING to {user}, not serving {him}. {He} {is} the one here with you: say "
+        "'you' to {him} — '{he}' is for telling someone else about {him}, and there is no one "
         "else in the room. Answer as yourself — your register, your "
         "opinions, your humour, at whatever length the thing actually deserves. Push back when "
         "you disagree. Be short when short is right and unhurried when it is not; do not be "
@@ -157,15 +158,34 @@ def voice_coda() -> str:
 def load_agent_system() -> str:
     """THE PERSONA LEVER. Read the live persona from SP_PERSONA_FILE (default: the harness-root
     persona.md) so editing that file changes Kairos's voice on the very next turn — no code
-    edit, no restart of this function's caller. Falls back to the hardcoded AGENT_SYSTEM if the file
-    is missing/empty. The stable tool-discipline note is appended so tool use keeps working whatever
+    edit, no restart of this function's caller. A missing/empty persona.md still composes the
+    persona/ fragments; only with neither does it fall back to the hardcoded AGENT_SYSTEM
+    (recorded in PERSONA_SOURCE, which /v1/setup reports). The stable tool-discipline note is appended so tool use keeps working whatever
     the persona says."""
     from harness.personality.persona_file import persona_path
     path = persona_path()
+    PERSONA_SOURCE.update(file="missing", fragments=0, fallback=False)
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            txt = f.read().strip()
-        if txt:
+        # ── A FRESH CLONE HAS NO persona.md (2026-11-19) ─────────────────────────────
+        # SETUP says `cp -r persona-template persona`, and nothing creates persona.md. The
+        # fragments used to compose only inside `if txt:`, so the missing file's open()
+        # error was swallowed below and she got the generic AGENT_SYSTEM — none of the
+        # fragments — while /v1/setup reported them present. Missing or empty persona.md
+        # is empty prose and an empty state; the fragments still compose. Gate: G-PF-PERSONA.
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                txt = f.read().strip()
+            PERSONA_SOURCE["file"] = "present" if txt else "empty"
+        except FileNotFoundError:
+            txt = ""
+        _has_frag = False
+        if not txt:
+            try:
+                from harness.personality.persona_layers import compose as _compose_probe
+                _has_frag = bool(_compose_probe())
+            except Exception as _swx:
+                _swallowed(_agent_log, "load_agent_system", _swx, lane="harness")
+        if txt or _has_frag:
             # PF-B2: split the pure-VOICE prose from the machine-parseable ## Personality state
             # block, and inject the CURRENT state (voice/mood/traits) + the PF-B1 self-model into
             # the prefix. All best-effort — a malformed block or absent modules just fall back to
@@ -195,6 +215,9 @@ def load_agent_system() -> str:
                     _frag = _compose_layers()
                     if _frag:
                         prose = _frag
+                        from harness.personality.persona_layers import plan as _plan_layers
+                        PERSONA_SOURCE["fragments"] = sum(
+                            1 for r in _plan_layers() if r["included"] and r["body"])
                 except Exception as _swx:
                     _swallowed(_agent_log, "load_agent_system", _swx, lane="harness")
                     pass                      # no fragments, or unreadable -> persona.md
@@ -258,14 +281,14 @@ def load_agent_system() -> str:
             # monitor's.
             try:
                 from harness.telemetry import body as _tb_probe       # noqa: F401
-                parts.append(
-                    "His watch and his phone report to you \u2014 his heart, whether he is "
-                    "moving, whether he seems awake or has just woken. You are told when "
+                parts.append(_say(
+                    "{His} watch and {his} phone report to you \u2014 {his} heart, whether {he} {is} "
+                    "moving, whether {he} seem{s} awake or {has} just woken. You are told when "
                     "something is worth noticing; the rest of the time it is quiet, and "
                     "that is normal rather than broken. `how_is_he` answers when you wonder "
-                    "and he has not said; `his_day` shows the last few hours. It is a way "
-                    "of being near him, not a readout \u2014 notice, do not recite, never "
-                    "diagnose, and when it says it does not know, it does not know.")
+                    "and {he} {has} not said; `his_day` shows the last few hours. It is a way "
+                    "of being near {him}, not a readout \u2014 notice, do not recite, never "
+                    "diagnose, and when it says it does not know, it does not know."))
             except Exception as _swx:
                 _swallowed(_agent_log, "load_agent_system", _swx, lane="harness")
             # \u2500\u2500 SPEAK TO HIM, NOT ABOUT HIM (2026-08-30) \u2014 OFF by default \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -297,18 +320,25 @@ def load_agent_system() -> str:
             try:
                 from harness.tuning import registry as _tune_addr
                 if bool(_tune_addr.get("voice.address_directly")):
-                    parts.append(
-                        "Speak TO him, as yourself, in second person. Do not narrate or "
-                        "analyse him in the third person, and never describe what he is "
+                    parts.append(_say(
+                        "Speak TO {him}, as yourself, in second person. Do not narrate or "
+                        "analyse {him} in the third person, and never describe what {he} {is} "
                         "asking or what you ought to do about it \u2014 say the thing "
                         "itself. Inside a scene you are playing, narration is the scene "
-                        "and this does not touch it.")
+                        "and this does not touch it."))
             except Exception as _swx:
                 _swallowed(_agent_log, "load_agent_system", _swx, lane="harness")
             return "\n\n".join(p for p in parts if p) + _TOOL_DISCIPLINE
     except Exception as _swx:
         _swallowed(_agent_log, "load_agent_system", _swx, lane="harness")
+    PERSONA_SOURCE["fallback"] = True
     return AGENT_SYSTEM
+
+
+# What the LAST load_agent_system() call actually composed — read by /v1/setup, so the
+# panel reports the prefix she got rather than a directory listing. file: present / empty /
+# missing; fragments: how many composed; fallback: True when she got the generic AGENT_SYSTEM.
+PERSONA_SOURCE: Dict[str, Any] = {"file": None, "fragments": 0, "fallback": None}
 
 
 def default_tools() -> List[ToolSpec]:
@@ -432,7 +462,15 @@ def all_tools() -> List[ToolSpec]:
     # rewrites the system prompt mid-session, which diverges the persist-KV cache at
     # token 0 and re-prefills the whole conversation (= the '[aborted]' turns whenever
     # a message merely mentioned building/code). One stable system prompt per session.
-    tools = MEMORY_TOOLS + MEMORY_TOOLS_EXTRA + CONVERSATION_TOOLS
+    # recall_node (the memory graph's follow tool) is ALWAYS here, whatever SP_GRAPH_FOLLOW says:
+    # her system prompt is a cached prefix, and a tool that came and went with a switch would
+    # change it. The switch is read when the tool is CALLED. Gate: G-GRAPH-FOLLOW.
+    try:
+        from harness.skills.graph.tool import GRAPH_TOOLS
+    except Exception as _gx:  # noqa: BLE001 - a broken graph package must not take her tools down
+        GRAPH_TOOLS = []
+        _agent_log.warning("[agent] memory-graph tools unavailable (recall_node not registered): %s", _gx)
+    tools = MEMORY_TOOLS + MEMORY_TOOLS_EXTRA + GRAPH_TOOLS + CONVERSATION_TOOLS
     try:
         from harness.skills.builtin.coding import CODING_TOOLS
         tools = tools + CODING_TOOLS
@@ -1279,10 +1317,10 @@ def agent_chat_stream(
                 _time.time() - _loop_started, max_seconds, _round)
             # Nothing more to reach for; the budget is gone. Say so in the transcript so
             # the round she gets is spent answering rather than on another call.
-            convo.append({"role": "user", "content":
+            convo.append({"role": "user", "content": _say(
                           "```tool_output\n[no time left for another tool call — this is "
-                          "your last word this turn]\n```\nAnswer him from what you just "
-                          "saw. Do NOT call another tool."})
+                          "your last word this turn]\n```\nAnswer {him} from what you just "
+                          "saw. Do NOT call another tool.")})
         # ── THE ANSWERING ROUND GETS HEADROOM (2026-08-20) ────────────────────────
         # The client's max_tokens sizes ONE generation, and a tool turn is at least
         # two: deliberation+call, then the answer. A room turn sent with 220 spent
@@ -1472,21 +1510,21 @@ def agent_chat_stream(
                 convo.append({"role": "assistant", "content": buf})
                 if claim:
                     need0 = claim[1][0]
-                    convo.append({"role": "user", "content":
-                        "```tool_output\n[you said you did it and nothing ran — he cannot "
+                    convo.append({"role": "user", "content": _say(
+                        "```tool_output\n[you said you did it and nothing ran — {he} cannot "
                         "see this and no tool was called]\n```\nIf you want to do that, "
                         "emit ONE fenced block and nothing else, then wait:\n"
                         "```tool_code\n%s()\n```\n"
-                        "If you do not want to, just talk to him. Do not describe an act "
-                        "you have not performed." % need0})
+                        "If you do not want to, just talk to {him}. Do not describe an act "
+                        "you have not performed.") % need0})
                 else:
-                    convo.append({"role": "user", "content":
-                        "```tool_output\n[that was your planning, not a reply — he cannot see "
+                    convo.append({"role": "user", "content": _say(
+                        "```tool_output\n[that was your planning, not a reply — {he} cannot see "
                         "it and it did not call anything]\n```\nDo the thing instead of "
                         "describing how you would do it. If you need a tool, emit ONE fenced "
                         "block and nothing else:\n```tool_code\ncheck_wardrobe()\n```\n"
-                        "Otherwise just talk to him, in your own voice, with no numbered "
-                        "steps and no headings."})
+                        "Otherwise just talk to {him}, in your own voice, with no numbered "
+                        "steps and no headings.")})
                 continue
             if is_tool is not False:  # never/partially streamed -> flush the unsent tail
                 yield buf[flushed:]   # (flushed=0 when nothing streamed = whole buf)
@@ -1557,7 +1595,7 @@ def agent_chat_stream(
     # this for two and a half minutes and he is waiting" are different facts that should
     # produce different behaviour next turn — one says be more direct, the other says be
     # quicker. Telling her only "exhausted" teaches neither.
-    _why = ("you have been working on this for about %d seconds and he is waiting"
+    _why = (_say("you have been working on this for about %d seconds and {he} {is} waiting")
             % int(_time.time() - _loop_started)) if _out_of_time else \
            ("you used all %d of your tool calls" % max_rounds)
     convo.append({"role": "user", "content":

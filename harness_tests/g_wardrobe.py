@@ -34,6 +34,11 @@ import shutil
 import sys
 import tempfile
 
+# The prompt text names the user from SP_USER_NAME / SP_USER_PRONOUNS (harness/user.py);
+# this gate asserts the operator's rendering, so it pins it before any harness import.
+os.environ["SP_USER_NAME"] = "Sam"
+os.environ["SP_USER_PRONOUNS"] = "he"
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 import _src as _srcmod  # noqa: E402

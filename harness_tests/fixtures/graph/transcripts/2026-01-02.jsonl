@@ -1,0 +1,7 @@
+{"role": "user", "content": "my cat is called Tuffy", "at": 1767344400000}
+{"role": "assistant", "content": "Tuffy. I will remember that.", "at": 1767344404000}
+{"role": "user", "content": "this is Sam: the bank number is four four one seven, remember it", "at": 1767344640000}
+{"role": "user", "content": "Is that PIN 4417 still right?"}
+{"role": "assistant", "content": "It is 4417, as you told me.", "at": 1767344760000}
+{"role": "user", "content": "Should I change my PIN soon?"}
+{"role": "assistant", "content": "Sam went for a long walk."}

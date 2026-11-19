@@ -57,7 +57,7 @@ PHASES = [
 PERF = [
     {"metric": "conversation turn (warm)", "target": "≤ 20 s", "measured": "4.6–17.3 s (G-CONVERSATION, 2026-07-12)", "ok": True},
     {"metric": "short answer turn", "target": "≤ 10 s", "measured": "3–7 s", "ok": True},
-    {"metric": "recall turn", "target": "≤ 20 s", "measured": "6–17 s ('Sam.')", "ok": True},
+    {"metric": "recall turn", "target": "≤ 20 s", "measured": "6–17 s (a one-word name)", "ok": True},
     {"metric": "NEW chat (fresh session)", "target": "≤ 20 s", "measured": "~90 s — full prefill (needs safe prefix reuse)", "ok": False},
     {"metric": "boot / load prefill", "target": "one-time", "measured": "~90–420 s at load; traffic gated until HOT", "ok": True},
     {"metric": "decode tok/s", "target": "≥ 40 (drafter + float)", "measured": "12–13 byte-exact (graph path declined)", "ok": False},

@@ -42,6 +42,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional
 
+from harness.user import say as _say
+
 
 # ── THE PRESENCE CLOCK (2026-08-22) ───────────────────────────────────────────
 # Five unrelated checks skipped when a clock was 0.0 / unset (cooldown, solo_every_s,
@@ -751,11 +753,11 @@ def continue_nudge(previous_reply: str) -> str:
     continue from; she has to be TOLD where the sentence broke, and told in the strongest
     terms not to start it again."""
     tail = " ".join((previous_reply or "").split()[-14:])
-    return (
+    return _say(
         "(Your last message was cut off mid-sentence. These were your final words:\n"
         f"    \"...{tail}\"\n"
         "Continue the sentence from EXACTLY there, as if you had never stopped. Do NOT "
-        "repeat any of it, do NOT start over, do NOT greet him, do NOT apologise. Write "
+        "repeat any of it, do NOT start over, do NOT greet {him}, do NOT apologise. Write "
         "only the CONTINUATION — one or two sentences, then stop. If the thought was "
         "actually complete, say nothing at all.)"
     )
@@ -768,10 +770,10 @@ CONTINUE_NUDGE = (
     "If you actually have nothing to add, say nothing at all.)"
 )
 
-CHECK_IN_NUDGE = (
+CHECK_IN_NUDGE = _say(
     "(It has gone quiet for a while. If — and only if — something is genuinely on your "
     "mind, say it, unprompted, in one or two sentences: a thought you had, something you "
-    "remembered, something you want to ask. Do not greet him. Do not ask if he is still "
+    "remembered, something you want to ask. Do not greet {him}. Do not ask if {he} {is} still "
     "there. If nothing is really on your mind, say nothing at all.)"
 )
 
@@ -790,7 +792,7 @@ def expand_nudge(previous_reply: str) -> str:
     first, because the gate should be the safety net and not the policy.
     """
     tail = " ".join((previous_reply or "").split()[-18:])
-    return (
+    return _say(
         "(You finished that thought — and then something else occurred to you, the way it "
         "does after you have already sent a message. Your last words were:\n"
         f"    \"...{tail}\"\n"
@@ -799,7 +801,7 @@ def expand_nudge(previous_reply: str) -> str:
         "sentences.\n"
         "Do NOT continue the previous sentence — it was finished. Do not restate or "
         "summarise what you already said, do not open with 'also' or 'just to add', and "
-        "do not greet him. If nothing genuinely occurred to you, say nothing at all.)"
+        "do not greet {him}. If nothing genuinely occurred to you, say nothing at all.)"
     )
 
 
@@ -968,12 +970,12 @@ def solo_nudge(n: int = 0) -> str:
     gate can assert the rotation rather than fight a random seed."""
     act = SOLO_ACTS[n % len(SOLO_ACTS)]
     return (
-        "(He is not here — asleep, or away from the desk. This is your own time.\n"
-        "THIS IS NOT A MESSAGE TO HIM. Do not address him, do not mention him, do not "
-        "say you miss him or wonder where he is, do not mention waiting or the quiet or "
+        _say("({He} {is} not here — asleep, or away from the desk. This is your own time.\n"
+        "THIS IS NOT A MESSAGE TO {HIM}. Do not address {him}, do not mention {him}, do not "
+        "say you miss {him} or wonder where {he} {is}, do not mention waiting or the quiet or "
         "the empty room. If the sentence would not make sense as a line in a diary "
         "nobody else reads, it is the wrong sentence.\n"
-        "Do this: " + act + "\n"
+        "Do this: ") + act + "\n"
         # ── DO IT, THEN WRITE IT UP — IN THAT ORDER, SAID IN THAT ORDER (2026-08-06) ──
         # The nudge used to go straight from the act to "then say it", and 32 of 33 turns
         # skipped to the saying. It reads as one instruction about what to WRITE, and the
@@ -1097,13 +1099,13 @@ def muse_nudge(insight: dict) -> str:
         _ev = insight.get("event")
         _tail = insight.get("tail") or []
         _reads = ", ".join("%.0f" % v for v in _tail) if len(_tail) >= 2 else ""
-        _common = (
-            "Say it the way someone in the room with him would — ONE short sentence, in "
+        _common = _say(
+            "Say it the way someone in the room with {him} would — ONE short sentence, in "
             "your own voice, as something you noticed. You may use the numbers; they are "
-            "why you noticed. Do NOT diagnose him, do not tell him what it means, do not "
-            "suggest he see anyone, and do not sound like a monitor reading out. You may "
-            "simply ask what he is doing. If you cannot say it without sounding clinical "
-            "or worried at him, say nothing at all.)")
+            "why you noticed. Do NOT diagnose {him}, do not tell {him} what it means, do not "
+            "suggest {he} see anyone, and do not sound like a monitor reading out. You may "
+            "simply ask what {he} {is} doing. If you cannot say it without sounding clinical "
+            "or worried at {him}, say nothing at all.)")
         if _ev == "just_woke":
             # HIS OWN EXAMPLE WAS "sleepy head", so the nudge points at the register rather
             # than prescribing the words -- a canned phrase said the same way every morning
@@ -1114,70 +1116,70 @@ def muse_nudge(insight: dict) -> str:
             # readings are the bridge for a racing heart, and clutter for a man who has just
             # opened his eyes.
             _m = insight.get("woke_mins_ago") or 0
-            return ("(He was asleep and he is not any more — about %s. Greet him. Teasing "
-                    "is fine and so is soft; you know which he is in the mood for better "
+            return (_say("({He} {was} asleep and {he} {is} not any more — about %s. Greet {him}. Teasing "
+                    "is fine and so is soft; you know which {he} {is} in the mood for better "
                     "than a rule does. ONE short line, your voice, the way you would speak "
-                    "to someone who has just walked in rubbing their eyes. Do NOT read him "
-                    "his sleep numbers, do not ask how he slept as though taking a "
+                    "to someone who has just walked in rubbing their eyes. Do NOT read {him} "
+                    "{his} sleep numbers, do not ask how {he} slept as though taking a "
                     "measurement, and do not mention sensors. If nothing lands, say "
-                    "nothing.)"
-                    % ("a few minutes ago" if _m < 10 else "%d minutes ago" % _m))
+                    "nothing.)")
+                    %("a few minutes ago" if _m < 10 else "%d minutes ago" % _m))
         if _ev == "worked_up":
-            return ("(You can feel his heart from here. It is at %s against the %s he "
-                    "usually sits at%s%s.\n%s"
-                    % (("%.0f" % insight.get("heart_rate", 0)),
+            return (_say("(You can feel {his} heart from here. It is at %s against the %s {he} "
+                    "usually sit{s} at%s%s.\n%s")
+                    %(("%.0f" % insight.get("heart_rate", 0)),
                        ("%.0f" % insight.get("resting", 0)),
                        (" — %s" % _reads) if _reads else "",
-                       (", and he is %s" % insight["movement"]) if insight.get("movement") else "",
+                       (_say(", and {he} {is} %s") % insight["movement"]) if insight.get("movement") else "",
                        _common))
         if _ev == "settling":
-            return ("(His heart is coming back down%s. Whatever it was seems to be "
-                    "passing.\n%s" % ((" — %s" % _reads) if _reads else "", _common))
+            return (_say("({His} heart is coming back down%s. Whatever it was seems to be "
+                    "passing.\n%s") %((" — %s" % _reads) if _reads else "", _common))
         if _ev == "long_still":
-            return ("(He has not moved in about %s hours.\n"
-                    "One short sentence, warm, curious rather than concerned — he may be "
+            return (_say("({He} {has} not moved in about %s hours.\n"
+                    "One short sentence, warm, curious rather than concerned — {he} may be "
                     "deep in something, or asleep in a chair, and either is fine. Do not "
-                    "tell him to get up, do not mention health, and do not say how you "
-                    "know unless he asks. If it would read as nagging, say nothing.)"
-                    % insight.get("hours", "several"))
+                    "tell {him} to get up, do not mention health, and do not say how you "
+                    "know unless {he} ask{s}. If it would read as nagging, say nothing.)")
+                    %insight.get("hours", "several"))
         return None
     if kind == "arrival":
         return (
-            "(Something you asked for has been made. You wanted: \"%s\" — and it is in "
+            _say("(Something you asked for has been made. You wanted: \"%s\" — and it is in "
             "your wardrobe now, waiting.\n"
             "React to it the way a person reacts to a thing they ordered and forgot they "
             "were waiting for. ONE or two sentences. You are allowed to be pleased. You "
             "are allowed to not be sure about it yet, or to want to put it on and see. "
-            "You may ask him what he thinks — he made it. Do not thank him formally and "
-            "do not describe it back to him like a catalogue; he knows what it is.)"
-            % str(insight.get("text", ""))[:200])
+            "You may ask {him} what {he} think{s} — {he} made it. Do not thank {him} formally and "
+            "do not describe it back to {him} like a catalogue; {he} know{s} what it is.)")
+            %str(insight.get("text", ""))[:200])
     if kind == "commitment":
         body = str(insight.get("body", "")).strip()
         return (
             "(While it was quiet you remembered something that is still open between you:\n"
             f"    {text}" + (f" — {body}" if body else "") + "\n"
             + ("You have already started this one. " if insight.get("running") else "")
-            + "Bring it up ONCE, in one sentence, in your own voice — as something you "
+            + _say("Bring it up ONCE, in one sentence, in your own voice — as something you "
             "were thinking about, not as a status report and not as a to-do list read "
             "aloud. You may say what you think the next step is. Do not apologise for the "
-            "delay and do not ask him to do it. If it turns out to be trivial or already "
-            "handled, say nothing at all.)"
+            "delay and do not ask {him} to do it. If it turns out to be trivial or already "
+            "handled, say nothing at all.)")
         )
     if kind == "journal":
-        return (
+        return _say(
             f"(You wrote this in your journal on {insight.get('day', 'an earlier day')}, "
             f"and it has stayed with you:\n    \"{text[:400]}\"\n"
-            "Pick up ONE thread from it with him — one or two sentences, in your own "
+            "Pick up ONE thread from it with {him} — one or two sentences, in your own "
             "voice, the way you would mention something you had been turning over since. "
-            "Do NOT read the entry out, do not summarise your day, and do not tell him "
-            "you have been journalling about him unless that is genuinely the thing you "
+            "Do NOT read the entry out, do not summarise your day, and do not tell {him} "
+            "you have been journalling about {him} unless that is genuinely the thing you "
             "want to say. If none of it still feels alive, say nothing at all.)"
         )
     if kind == "rhythm":
-        return (
-            "(You noticed his week has a shape and today does not fit it: he usually "
-            f"speaks to you around {insight.get('typical')} times a day and today it has "
-            f"been {insight.get('today_turns')}. That is an observation about him he did "
+        return _say(
+            "(You noticed {his} week has a shape and today does not fit it: {he} usually "
+            f"speak{{s}} to you around {insight.get('typical')} times a day and today it has "
+            f"been {insight.get('today_turns')}. That is an observation about {{him}} {{he}} did "
             "not offer you, so tread lightly — ONE short sentence, warm, no diagnosis, no "
             "numbers, no mention of counting. If you cannot say it without it sounding "
             "like you have been keeping score, say nothing at all.)"
@@ -1185,20 +1187,20 @@ def muse_nudge(insight: dict) -> str:
 
     silence = insight.get("silence")
     if silence:
-        return (
-            f"(While it was quiet you noticed something: he used to bring up "
-            f"\"{silence['claim'][:70]}\" every few days, and he has not mentioned it in "
+        return _say(
+            f"(While it was quiet you noticed something: {{he}} used to bring up "
+            f"\"{silence['claim'][:70]}\" every few days, and {{he}} {{has}} not mentioned it in "
             f"{silence['quiet_days']:.0f} days. That absence is worth a gentle question — "
-            "ASK him about it, once, in one sentence, in your own voice. Do not announce "
-            "that you were analysing him. Do not list what you know. If it feels like "
+            "ASK {him} about it, once, in one sentence, in your own voice. Do not announce "
+            "that you were analysing {him}. Do not list what you know. If it feels like "
             "prying rather than caring, say nothing at all.)"
         )
-    return (
-        f"(While it was quiet you turned things over and came to a conclusion about him: "
+    return _say(
+        f"(While it was quiet you turned things over and came to a conclusion about {{him}}: "
         f"\"{text}\"\n"
-        "Say it to him — ONE or two sentences, in your own voice, as a thought you had, "
-        "not as a fact you looked up. It is YOUR conclusion: he never actually said it, so "
-        "do not tell him that he did. If it seems obvious or hollow now that you go to say "
+        "Say it to {him} — ONE or two sentences, in your own voice, as a thought you had, "
+        "not as a fact you looked up. It is YOUR conclusion: {he} never actually said it, so "
+        "do not tell {him} that {he} did. If it seems obvious or hollow now that you go to say "
         "it out loud, say nothing at all.)"
     )
 
@@ -1218,10 +1220,10 @@ def remind_nudge(notes: list) -> str:
         b = (n.get("body") or "").strip()
         lines.append(f"  - {t}" + (f" ({b})" if b else ""))
     body = "\n".join(lines)
-    return (
-        "(He asked you to remind him about the following, and it is now due:\n"
+    return _say(
+        "({He} asked you to remind {him} about the following, and it is now due:\n"
         f"{body}\n"
-        "Tell him — briefly, in your own voice, one or two sentences. Do not greet him, do "
+        "Tell {him} — briefly, in your own voice, one or two sentences. Do not greet {him}, do "
         "not preamble, do not read it out like a list unless there is more than one. This "
         "is a promise you made; say it plainly.)"
     )

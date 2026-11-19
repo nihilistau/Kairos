@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kairos-companion"
-version = "0.8.76"   # keep in step with CHANGELOG.md — it read 0.1.0 through
+version = "0.8.81"   # keep in step with CHANGELOG.md — it read 0.1.0 through
                     # two releases (fixed 2026-08-25), then sat at 0.8.4 through
                     # 0.8.5 (fixed 2026-08-29): this comment is the tripwire
                     # and it is not working. FOURTH occurrence 2026-09-15: five
@@ -37,7 +37,13 @@ keywords = ["companion", "agent", "memory", "local-first", "llm", "openai-compat
 
 # The harness runs with ZERO third-party deps (stdlib HTTP server + urllib, hashing embedder,
 # jsonl stores). Optional extras unlock the nicer paths.
-dependencies = []
+# AND ONE BACKPORT OF THE STDLIB ITSELF (2026-11-19). harness/voice/lfm3.py imports
+# `audioop`, which Python 3.13 removed. On 3.13+ the whole tree failed to import there
+# (G-IMPORTS, G-LFM3, G-EARS, G-ANON, G-MODELS-WINDOW red with ModuleNotFoundError) while
+# this file claimed >=3.11. `audioop-lts` is the drop-in: same module name, no code
+# change, and the marker means nothing is installed below 3.13. The marker is written
+# with single quotes because the gates read these names with a "..." regex.
+dependencies = ["audioop-lts; python_version >= '3.13'"]
 
 [project.optional-dependencies]
 http = ["httpx>=0.27"]          # the sp-daemon transport (only with [engine] kind = "sp")

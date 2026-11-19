@@ -243,11 +243,11 @@ def extract_facts(messages: List[dict], client=None) -> List[str]:
     # "The user ..." — 24 of the 25 such rows in the live store carried src=consolidator,
     # this pass. A memory of a person is written in that person's name; "the user" is a
     # role, and a companion who files her person under a role is keeping records, not
-    # knowing someone. The name comes from PersonModel.who — the one authority the export
-    # already rewrites for the blank slate, so a fresh clone's companion writes its own
-    # operator's name and never his.
-    from harness.model.person import PersonModel as _PM
-    _who = _PM.who or "the user"
+    # knowing someone. The name comes from the profile's [user] name (harness/user.py,
+    # 2026-11-19; it was PersonModel.who, a literal the export rewrote to a fixed name), so
+    # a fresh clone's companion writes its own operator's name, or "the user" when unset.
+    from harness.user import called as _called
+    _who = _called()
     # "still be true next week" — the store had "Sam needs to pee", "Sam's eyes are
     # wide" filed as durable FACTS (class fact, year-long half-life) by this pass. A
     # moment is not a memory; the admission door catches some of these, but the cheapest

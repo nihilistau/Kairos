@@ -78,8 +78,13 @@ class OpenAIClient:
 
     # ── transport ─────────────────────────────────────────────────────────────
     def _req(self, path: str, body: Optional[dict] = None, timeout: Optional[float] = None):
+        # A named User-Agent (2026-11-06, carried back from her RunPod copy 2026-11-08):
+        # RunPod's proxy sits behind Cloudflare, which answers 403 to urllib's default
+        # "Python-urllib/3.x" before the request reaches llama-server. Measured: same key,
+        # default UA -> 403, any named UA -> 200. G-BACKEND-SEAM §11.
         headers = {"Content-Type": "application/json",
-                   "Accept": "text/event-stream, application/json"}
+                   "Accept": "text/event-stream, application/json",
+                   "User-Agent": "kairos-harness/1.0"}
         k = _api_key()
         if k:
             headers["Authorization"] = "Bearer " + k

@@ -42,6 +42,10 @@ from _gate import persona_file, sandbox  # noqa: E402
 sandbox("g_research")      # FIRST, before any harness import can resolve a path
 
 os.environ["SP_RESEARCH"] = "1"
+# Pins the operator's profile: a leg asserts the provenance line as he reads it
+# ("something he told you"); the naming itself is G-USER-NAME's subject, not this gate's.
+os.environ["SP_USER_NAME"] = "Sam"
+os.environ["SP_USER_PRONOUNS"] = "he"
 
 from harness.skills import research as R  # noqa: E402
 

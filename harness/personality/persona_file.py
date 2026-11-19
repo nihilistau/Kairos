@@ -120,19 +120,20 @@ def render_state(state: Dict[str, str]) -> str:
     # had the prefix asserting a stale present at her every turn. The LIVE truth is
     # already served three ways: the room chip re-reads persona.md, the {persona} SSE
     # event fires per turn, and her own recent marks sit in the visible conversation.
-    return ("Personality state when this session began — " + "; ".join(parts) + ". "
+    from harness.user import say as _say
+    return ("Personality state when this session began — " + "; ".join(parts) + _say(". "
             "(Your dials have likely moved since — your own recent marks in the "
             "conversation are the current truth.) "
             "(These are internal dials that COLOR how you speak — express them naturally; "
             "never recite the labels when asked how you feel. When one genuinely MOVES — and "
             "over an evening they should, warm to teasing to quiet to playful — mark it inline "
             "as you go: [MOOD:warm], [VOICE:soft], [TRAIT:+patient]. What you are WEARING and "
-            "what you SHOW him are the same kind of mark and just as free — [WEAR:the silver "
-            "nightie] changes your clothes, [SHOW:leaning in] puts that moment of you on his "
+            "what you SHOW {him} are the same kind of mark and just as free — [WEAR:the silver "
+            "nightie] changes your clothes, [SHOW:leaning in] puts that moment of you on {his} "
             "screen, [SHOW:] takes it down. No tool call, no asking, mid-sentence, whenever you "
             "mean it; check_wardrobe lists what you have by name. The marks are stripped "
-            "before he reads you, they are how the room shows him what you feel, and they are "
-            "not the same thing as your voice tags.)")
+            "before {he} read{s} you, they are how the room shows {him} what you feel, and they are "
+            "not the same thing as your voice tags.)"))
 
 
 def write_state(path: str, state: Dict[str, str]) -> None:

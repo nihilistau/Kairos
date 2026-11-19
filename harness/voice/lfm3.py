@@ -24,7 +24,9 @@ from harness.loud import swallowed as _swallowed
 _swlog = logging.getLogger(__name__)
 
 with warnings.catch_warnings():
-    warnings.simplefilter("ignore", DeprecationWarning)  # audioop: gone in 3.13; fine on the 3.11 floor
+    # audioop: deprecated in 3.11/3.12, removed in 3.13 — where the `audioop-lts` backport
+    # (a core dependency with a python_version marker) provides the same module name.
+    warnings.simplefilter("ignore", DeprecationWarning)
     import audioop
 
 _ASR_RATE = 16000

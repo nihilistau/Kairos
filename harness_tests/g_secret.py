@@ -35,6 +35,9 @@ whole file: every class the decider branches on MUST be producible by the writer
     python harness_tests/g_secret.py        (offline: no GPU, no daemon)
 """
 import os
+# The fixtures are about a named user (harness/user.py reads these; unset = "the user").
+os.environ["SP_USER_NAME"] = "Sam"
+os.environ["SP_USER_PRONOUNS"] = "he/him/his"
 import sys
 import tempfile
 

@@ -1,0 +1,8 @@
+{"role": "user", "content": "Morning, synthetic fixture speaking.", "at": 1767261600000}
+{"role": "assistant", "content": "Good morning. The fixture hears you.", "at": 1767261605000, "oid": "o-fx-answer-1"}
+{"role": "user", "content": "An untimed question about lamps."}
+{"role": "assistant", "content": "An untimed answer about lamps."}
+{"role": "user", "content": "malformed line, no closing brace"
+{"role": "user", "content": "Injected synthetic turn.", "at": 1767265200000, "synthetic": true}
+{"role": "user", "content": "Repeat after me.", "at": 1767268800000}
+{"role": "user", "content": "Repeat after me.", "at": 1767268800000}

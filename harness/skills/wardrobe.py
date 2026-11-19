@@ -24,6 +24,7 @@ from __future__ import annotations
 import logging
 
 from harness.loud import swallowed as _swallowed
+from harness.user import say as _say
 
 logger = logging.getLogger(__name__)
 
@@ -96,9 +97,9 @@ def wear(what: str) -> str:
             try:
                 r = WD.request(what, made_in=(WD.current().get("outfit") or WD.DEFAULT_OUTFIT), by="her",
                                subject="clothes")   # she said wear; the clothes ARE it
-                filed = (" You have already asked for that one — it is still on his list."
+                filed = (_say(" You have already asked for that one — it is still on {his} list.")
                          if r.get("dup") else
-                         " I have put it on his list, so he can make it for you.")
+                         _say(" I have put it on {his} list, so {he} can make it for you."))
             except Exception as _swx:
                 _swallowed(logger, "wear", _swx, lane="skills")
             # A NEAR MISS BEATS A LIST OF DRAWERS (2026-08-28). The refusal handed her
@@ -140,7 +141,7 @@ def show_him(which: str = "") -> str:
             # BY THE NAME SHE WOULD SAY, not the filename. This listed `c["id"]` — the
             # raw stem, "see-thru-black-bra-panties-bedroom-laydown-hands-2-28ss" — and
             # then asked her to name one. `label` is what she is shown everywhere else.
-            return "Yours to show him:\n" + "\n".join("  %s" % (c.get("label") or c["id"])
+            return _say("Yours to show {him}:\n") +"\n".join("  %s" % (c.get("label") or c["id"])
                                                       for c in have)
         # ── ONE MATCHER (2026-08-04) ──────────────────────────────────────────────
         # This grew its OWN scorer over clip ids and tags, while the `[SHOW:]` mark went
@@ -157,7 +158,7 @@ def show_him(which: str = "") -> str:
             if hit is None:
                 return "No moment of yours matches %r. Call show_him() to see them." % which
         WD.choose(clip=hit["id"], by="her")
-        return "It is on his screen now: %s." % (hit.get("label") or hit["id"])
+        return _say("It is on {his} screen now: %s.") % (hit.get("label") or hit["id"])
     except Exception as exc:
         return "[could not show it: %s]" % exc
 
@@ -230,9 +231,9 @@ def ask_for(look: str, like: str = "") -> str:
                      "making": "the picture is done — it starts moving at the end of the "
                                "day, and that is when it hangs in your wardrobe",
                      "delayed": "it is held up (%s), still queued, and will be tried again"
-                                % (st.get("delay_reason") or "something on his side"),
+                                % (st.get("delay_reason") or _say("something on {his} side")),
                      "refused": "that one is not going to be made"}.get(
-                st.get("stage"), "it is on his list")
+                st.get("stage"), _say("it is on {his} list"))
             return ("You already asked for that one — %s. Right now %s."
                     % (r["want"], where))
         # ── IT ARRIVES WHEN IT MOVES — AND IT MOVES IN MINUTES NOW (2026-08-24) ─────
@@ -252,7 +253,7 @@ def ask_for(look: str, like: str = "") -> str:
                "where it has got to." % (
                    WD.TIER_WORDS[r["made_in"]]["wearing"],
                    "The picture and its motion are both being made now — a few "
-                   "minutes." if started else "It is on his list."))
+                   "minutes." if started else _say("It is on {his} list.")))
         # AND WHAT SHE ALREADY OWNS THAT IS CLOSE. Four of her six looks were the same
         # garment in different light, each asked for as if from nothing. Naming the near
         # ones does not block her — she may well want the same dress by moonlight AND by
@@ -311,7 +312,7 @@ def my_looks() -> str:
                         "making": "picture done — it starts moving at the end of the day, "
                                   "and that is when it hangs in your wardrobe",
                         "delayed": "held up (%s) — still queued, it will be tried again"
-                                   % (w.get("delay_reason") or "something on his side"),
+                                   % (w.get("delay_reason") or _say("something on {his} side")),
                         "refused": "this one will not be made"}.get(w.get("stage"), "")
                 out.append("  %-8s %-60s (%s)" % (w["id"], w.get("want", "")[:60], note))
         return "\n".join(out)
@@ -332,7 +333,7 @@ def he_liked(what_he_said: str, about: str = "") -> str:
         st = WD.current()
         target = (about or "").strip() or st.get("look") or st.get("clip") or st.get("outfit") or WD.DEFAULT_OUTFIT
         WD.praise(target, what_he_said.strip(), by="him")
-        return "Kept. He said that about %s, and you will have it next time you go to choose." % target
+        return _say("Kept. {He} said that about %s, and you will have it next time you go to choose.") % target
     except Exception as exc:
         return "[could not keep it: %s]" % exc
 
@@ -348,13 +349,13 @@ def my_favourites() -> str:
         _r, ceiling = _ceiling()
         favs = WD.favourites()
         if not favs:
-            return ("Nothing has become a favourite yet — you have not worn anything "
-                    "often enough, and he has not said anything about a particular look.")
+            return _say("Nothing has become a favourite yet — you have not worn anything "
+                        "often enough, and {he} {has} not said anything about a particular look.")
         out = []
         for f in favs:
             line = "  %-46s worn %d" % (f["label"][:46], f["worn"])
             if f["praise"]:
-                line += " · he said: %s" % "; ".join(p["said"][:60] for p in f["praise"][-2:])
+                line += _say(" · {he} said: %s") % "; ".join(p["said"][:60] for p in f["praise"][-2:])
             out.append(line)
         return "What you keep coming back to:" + chr(10) + chr(10).join(out)
     except Exception as exc:

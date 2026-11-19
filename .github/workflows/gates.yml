@@ -42,7 +42,10 @@ jobs:
         # which is 3.11+, so the launcher could not start on the floor it advertised).
         # 3.12 is what people actually have. Testing the floor is the point: it is the
         # version a claim can be wrong about without anybody noticing.
-        python: ["3.11", "3.12"]
+        # 3.13 (2026-11-19): the first version without the stdlib `audioop` that
+        # voice/lfm3.py imports. It was green on the two above and five gates red there,
+        # with no job that could have seen it.
+        python: ["3.11", "3.12", "3.13"]
         # ── TWO INSTALLS, BECAUSE THERE ARE TWO CLAIMS (2026-09-11) ──────────────────
         # This job installed `.[http]` and then asserted that EVERY module imports —
         # a stronger claim than the packaging makes, so it could only ever be red, and

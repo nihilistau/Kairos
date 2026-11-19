@@ -31,6 +31,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from harness.store_io import replace_atomic
+from harness import user as _U
 from harness.games import chess as CH
 from harness.games import holdem as HE
 from harness.games import words as WD
@@ -149,7 +150,7 @@ def new(kind: str, mid: str, seed: str = "") -> dict:
         # so a third chair is a config change rather than a rewrite — but two is the
         # form worth playing first, and the one where the blind rules are inverted.
         m["stacks"] = [200, 200]
-        m["names"] = ["sam", "kairos"]
+        m["names"] = [(_U.name() or "you").lower(), "kairos"]
         m["button"] = 0
         m["hand_no"] = 0
         m["hand"] = HE.new_hand(m["names"], m["stacks"], m["button"],

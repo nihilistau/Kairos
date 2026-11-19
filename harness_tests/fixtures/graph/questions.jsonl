@@ -1,0 +1,4 @@
+{"q": "what is my cat called", "gold": ["ep_live_1767261600001"], "hops": 0}
+{"q": "my cat is called Tuffy", "gold": ["ep_live_1767261600001", "t:2026-01-02:1"], "hops": 1}
+{"q": "what is the weather on Mars", "gold": ["ep_live_1767261600001"], "hops": 0}
+{"q": "what is the PIN", "gold": ["ep_live_1767261600006"], "hops": 0}

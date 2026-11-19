@@ -35,6 +35,12 @@ from typing import Iterable, Optional
 
 import logging
 from harness.loud import swallowed as _swallowed
+from harness import user as _U
+
+# THE USER'S NAME IN THE DETECTORS (2026-11-19). These patterns used to list the operator's
+# name beside "he" and "the user"; it is the configured [user] name now, absent when unset.
+_NAME_ALT = ("|" + _U.name_pattern()) if _U.name_pattern() else ""
+_NAME_POSS_ALT = (_NAME_ALT + _NAME_ALT + "'s") if _NAME_ALT else ""
 _swlog = logging.getLogger(__name__)
 
 USER_PREFIX = "The user said: "
@@ -65,7 +71,8 @@ _STOP = frozenset("""a an the is are was were am be been being of in on at to fo
     and or but not no so very really quite too my your his her their its our i you he she it they
     we me him them us that this those these there here what which who whom whose how when where
     why do does did done has have had can could will would shall should may might must
-    sam user kairos person thing things stuff""".split())
+    user kairos person thing things stuff""".split()
+    + _U.name().lower().split())          # the [user] name, as the operator's name was
 
 
 def topic_of(fact: str) -> frozenset:
@@ -215,7 +222,7 @@ def infer_speaker(fact: str, author: str) -> str:
 # bug VISIBLE by acting on it. "like this", "more like", "sounds like", "such as" are
 # comparisons. A preference needs the verb to have a PERSON DOING IT.
 _PREF_VERB = re.compile(
-    r"\b(?:i|we|he|she|sam|the user)\s+(?:really\s+|genuinely\s+|absolutely\s+|"
+    r"\b(?:i|we|he|she" + _NAME_ALT + r"|the user)\s+(?:really\s+|genuinely\s+|absolutely\s+|"
     r"don'?t\s+|do\s+not\s+)*"
     r"(?:like|love|hate|enjoy|prefer|adore|can'?t stand)\b", re.I)
 _PREF_NOUN = re.compile(r"\b(favou?rite|lucky number|preference)\b", re.I)
@@ -576,7 +583,7 @@ def find_superseded(new_fact: str, speaker: str, rows: Iterable[dict],
 # the tool loop. My rule was right in spirit and too tight in fact: "the user" IS a person.
 _PERSONAL_REF = re.compile(
     r"\b(i|i'm|i've|im|my|me|mine|myself|you|you're|your|yours|we|our|us|"
-    r"user|user's|operator|sam|kairos|kairos|she|he|her|his|him|they|their)\b",
+    r"user|user's|operator" + _NAME_ALT + r"|kairos|kairos|she|he|her|his|him|they|their)\b",
     re.I)
 
 # ...but an INSTRUCTION to her is not a fact about anyone. The transcript showed the
@@ -663,7 +670,7 @@ _ANAPHORIC_SUBJ = re.compile(
 # one it's more like "Hey Kairos"' read as knowledge: it contains a name. Being named in
 # a sentence is not being what the sentence is about.
 _ANCHOR = re.compile(
-    r"\b(i|i'm|i've|im|my|mine|myself|we|our|ours|us|sam|sam's|"
+    r"\b(i|i'm|i've|im|my|mine|myself|we|our|ours|us" + _NAME_POSS_ALT + r"|"
     r"the user|user's|the operator)\b", re.I)
 
 # Discourse markers are STRIPPED, not rejected: "oh i always run my pc's 24/7" is a
@@ -743,8 +750,8 @@ def is_memorable(fact: str) -> tuple[bool, str]:
 
     # meta/instruction first — these are about the SYSTEM, not about a person
     if _INSTRUCTION.match(t) or _META.search(t):
-        return False, ("that is an instruction or a note about how the system works, not a "
-                       "fact about a person. Store what you have LEARNED about Sam, or "
+        return False, _U.say("that is an instruction or a note about how the system works, not a "
+                       "fact about a person. Store what you have LEARNED about {user}, or "
                        "something true about yourself.")
 
     core = _DISCOURSE_LEAD.sub("", t).strip()   # strip the hat, keep the fact
@@ -770,8 +777,8 @@ def is_memorable(fact: str) -> tuple[bool, str]:
         return False, "that is a question, not a fact."
 
     if _ADDRESSEE_SUBJ.match(core):
-        return False, ("that is about ME, not about Sam — a fact for his store has to be "
-                       "about HIM. If it is true of you, use remember_about_self.")
+        return False, _U.say("that is about ME, not about {user} — a fact for {his} store has to be "
+                       "about {HIM}. If it is true of you, use remember_about_self.")
 
     if _ANAPHORIC_SUBJ.match(core):
         return False, ("that points back at something said earlier ('it', 'that', 'the "
@@ -797,8 +804,8 @@ def is_memorable(fact: str) -> tuple[bool, str]:
     # ANCHORED, not merely mentioning. See _ANCHOR: being named in a sentence is not being
     # what the sentence is about.
     if not _ANCHOR.search(claim):
-        return False, ("that is a sentence, not a memory — it is not ABOUT anyone. "
-                       "Store facts about Sam, or about yourself.")
+        return False, _U.say("that is a sentence, not a memory — it is not ABOUT anyone. "
+                       "Store facts about {user}, or about yourself.")
 
     return True, ""
 
@@ -892,9 +899,9 @@ def admit_to_user_store(fact: str, self_values: Iterable[str]) -> tuple[bool, st
     read live from the persona), not the one that happened to break first."""
     v = asserted_identity(fact)
     if v and v in {n.strip().lower() for n in self_values if n and n.strip()}:
-        return False, (f"'{v}' is true of YOU, not of him — it belongs in your own memory. "
+        return False, _U.say(f"'{v}' is true of YOU, not of {{him}} — it belongs in your own memory. "
                        "Call remember_about_self(...) for facts about yourself. "
-                       "(Refused: writing this to Sam's store would overwrite who HE is.)")
+                       "(Refused: writing this to {user}'s store would overwrite who {HE} {IS}.)")
     return True, ""
 
 

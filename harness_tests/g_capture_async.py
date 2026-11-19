@@ -40,6 +40,9 @@ Not "the queue works". Two things that matter:
 """
 import io
 import os
+# The fixtures are about a named user (harness/user.py reads these; unset = "the user").
+os.environ["SP_USER_NAME"] = "Sam"
+os.environ["SP_USER_PRONOUNS"] = "he/him/his"
 import socket
 import sys
 import tempfile

@@ -25,6 +25,7 @@ from harness.skills import verdict as V
 
 import logging
 from harness.loud import swallowed as _swallowed
+from harness import user as _U
 _swlog = logging.getLogger(__name__)
 
 
@@ -537,12 +538,12 @@ def insight() -> dict[str, Any]:
     if not picture:
         return {"insights": 0, "why": "nothing known about him yet"}
 
-    prompt = (
+    prompt = _U.say(
         f"{picture}\n\n"
-        "Those are the things Sam has actually SAID. Read them as a whole and tell me "
-        "what you have come to BELIEVE about him that he has never said out loud — the "
+        "Those are the things {user} {has} actually SAID. Read them as a whole and tell me "
+        "what you have come to BELIEVE about {him} that {he} {has} never said out loud — the "
         "kind of thing a friend notices.\n"
-        "Give AT MOST 2, each a single plain sentence starting with 'Sam '. No preamble, "
+        "Give AT MOST 2, each a single plain sentence starting with '{User} '. No preamble, "
         "no bullets, no hedging. If the evidence does not support a real conclusion, say "
         "exactly: NOTHING YET."
     )
@@ -572,7 +573,8 @@ def insight() -> dict[str, Any]:
     try:
         for line in text.splitlines():
             line = line.strip().lstrip("-*0123456789. ").strip()
-            if not line.lower().startswith("sam") or len(line.split()) < 4:
+            # the prompt asks for lines starting with the user's name ('the user' unset)
+            if not line.lower().startswith(_U.called().lower()) or len(line.split()) < 4:
                 continue
             # Straight through remember(), so it meets EVERY door this store has: the
             # durability gate, the identity firewall, dedupe-into-reinforcement. An

@@ -60,6 +60,7 @@ from harness.skills.delegate import repo_root
 
 import logging
 from harness.loud import swallowed as _swallowed
+from harness.user import say as _say
 _swlog = logging.getLogger(__name__)
 
 ARMED = os.environ.get("SP_RESEARCH", "0") == "1"
@@ -95,7 +96,7 @@ class Answer:
         is a choice she makes knowingly rather than a fact she has to reconstruct."""
         if not self.ok:
             return f"[research failed: {self.text}]"
-        head = f"({self.provenance} — this is not your memory and not something he told you)"
+        head = f"({self.provenance} — {_say('this is not your memory and not something {he} told you')})"
         return f"{head}\n\n{self.text}"
 
 

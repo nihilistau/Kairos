@@ -65,6 +65,7 @@ from harness.observability import get_logger
 
 logger = get_logger(__name__)
 from harness.loud import swallowed as _swallowed
+from harness import user as _usr
 # ── THE GATEWAY'S LIVE STATE LIVES IN ONE MODULE (2026-09-01, Stage 1 of the split) ──
 # Nine column-0 mutables were scattered through this file, read and written from request
 # threads, worker threads and tickers. They are in `state.py` now; the underscored names
@@ -1458,7 +1459,7 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
                 if _msgs[_i].get("role") == "user":
                     _txt = _msgs[_i].get("content", "")
                     _msgs[_i] = {**_msgs[_i], "content":
-                                 f"(He attached an image. You looked at it and saw: {_seen})\n\n{_txt}"}
+                                 f"{_usr.say('({He} attached an image. You looked at it and saw: ')}{_seen})\n\n{_txt}"}
                     break
             body = {**body, "messages": _msgs}
             # DISPLAY SLICE ONLY — she already has the full _seen injected above.
@@ -1831,9 +1832,9 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
                 # her; this is an observation she is being handed.
                 msgs.insert(len(msgs) - 1, {
                     "role": "system", "_tel": 1,
-                    "content": "(From his watch, right now: %s. You noticed; you did not "
+                    "content": _usr.say("(From {his} watch, right now: %s. You noticed; you did not "
                                "measure. Use it only if it is worth a word — never "
-                               "diagnose him, and never recite it back.)" % _said})
+                               "diagnose {him}, and never recite it back.)") % _said})
                 if typed:
                     yield ("data: " + json.dumps({"body": _said}) + "\n\n").encode()
     except Exception as exc:
@@ -1944,7 +1945,14 @@ def _native_chat_sse_body(body: Dict[str, Any], _st: Dict[str, Any]) -> Iterator
     #     tidy abstraction would be the worst possible trade.
     _TH_CLOSE = "<channel|>"
     import os as _os_th
-    _th = {"open": _os_th.environ.get("SP_THINKING") == "1", "buf": ""}
+    # ON THE OPENAI BACKEND THE CHANNEL IS NEVER OPEN HERE (2026-11-06, carried back from her
+    # RunPod copy 2026-11-08). The sp prompt ends inside `<|channel>thought`, so the stream
+    # starts in thought and waits for `<channel|>`. llama-server / vLLM parse the thought out
+    # into `reasoning_content` (openai.py sends it to the thinking lane) and stream ONLY the
+    # answer as content — no close marker ever comes, and assuming an open channel put her
+    # whole reply on the thought lane, unspoken. G-BACKEND-SEAM §11.
+    _th = {"open": (_os_th.environ.get("SP_THINKING") == "1"
+                    and _os_th.environ.get("SP_ENGINE_KIND", "sp") != "openai"), "buf": ""}
 
     # ── ONE SEAM FOR "THIS IS SPEECH" ───────────────────────────────────────────────
     # A residual channel surface is never speech. Un-banning `<channel|>` so she can END
@@ -3052,10 +3060,10 @@ def _run_stdlib(host: str, port: int) -> None:
                     from harness.agent import agent_chat_stream
                     from harness.inference import InferenceConfig as _IC
                     h = list(last) + [{"role": "system", "content":
-                                       "(He is shutting you down for now — not gone, just "
+                                       _usr.say("({He} {is} shutting you down for now — not gone, just "
                                        "off. Say one short goodnight in your own voice. "
-                                       "Do not ask him anything; there is no time for an "
-                                       "answer.)"}]
+                                       "Do not ask {him} anything; there is no time for an "
+                                       "answer.)")}]
                     c = _IC(max_tokens=80, **_UNPROMPTED_SAMPLING)
                     text = strip_control_surfaces("".join(agent_chat_stream(h, config=c)))
                     if text.strip():

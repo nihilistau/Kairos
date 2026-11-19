@@ -83,6 +83,8 @@ built out of the tree's own usage rather than a list kept in the gate:
 | MEM-OKF knowledge stores | `memory-okf/` (LUT.md tier-0, `sum/` tier-1, `full/` tier-2, content-addressed), plus `memory-okf-self/`, `memory-okf-personality/`, `memory-okf-telemetry/` | Markdown + frontmatter, content-addressed by `sha256(body)[:16]` or C2 signature | `tools/okf_mem.py` |
 | Quarantine | `var/memory/quarantine.jsonl` | JSONL | `harness/maintenance/ops.py` (cleanup, see below) |
 | SEM semantic index (S0) | `var/memory/semindex.jsonl` (path from `SP_SEM_INDEX`; armed by `SP_SEM_MINT`, both mapped in `serve.py`) | JSONL sidecar, DERIVED: one embedding row per fact, keyed `(addr, ts)` with addr = MEM-OKF `addr_of(text)`; append-only, tombstone-blind, model-tagged (`hash256-v1` / `l5-512-v1`). Cannot write the registry. See [`SEMANTICS.md`](SEMANTICS.md). | `harness/skills/semindex.py` |
+| Memory graph (generations) | `var/memory/graph/` (beside the registry; `SP_GRAPH_DIR` overrides): `gen-<stamp>-<hex>/{nodes.jsonl, edges.jsonl, summary.json}` plus a one-line `CURRENT` pointer | JSONL, DERIVED, rebuilt whole and published by an atomic pointer swap; `keep` (default 3, floor 2) generations stay, `rebuild_min_s` (default 600) floors rebuilds. Never read as truth: it keeps retired facts and secrets on purpose, and everything she is shown goes through `graph.view` | `harness/skills/graph/` (`python -m harness.skills.graph` builds one). Built only with `[graph].build` on, or by hand. Measured 2026-11-03 on a copy of the live store: 7,252 nodes in 0.4-1.0 s |
+| App activity | `var/memory/activity/<app>/<YYYY-MM-DD>.jsonl` (beside the registry; `<app>` is lowercase letters, digits, `_`, `-`, at most 32) | JSONL, append-only, WRITTEN BY THE APPS (Primer first), one directory per app. A row is `{at (epoch ms, optional), event (<= 40 chars), title (<= 200), ref (optional), private (optional)}`. A `private` row is never read by anything: it is the app's off-the-record lever. Not a fact store: nothing here enters the registry, and an event is what he did, not a claim he made | `harness/model/activity.py` (`record()` for Python callers, `all_rows()` the one reader). Its only consumer is the memory graph (`app_event` nodes, the `activity` rule, labelled `(in <app>, <event>)` by `graph.view` under the turn secret test). G-GRAPH-ACTIVITY |
 
 `var/` is gitignored: all of the above is runtime state, not source. The live registry on
 this checkout has 86 rows: `fact` 58, `preference` 12, `identity` 8, `relationship` 5,
@@ -470,6 +472,7 @@ decline unreachable; the guard must fire, not evaporate.
   stay off by default).
 - **`forget()`** (`memory::forget`) — writes tombstones (`lifecycle=1` + `forgotten_at` +
   `superseded_by="forget"`). See TRAP 6: this function hard-deleted the row for months.
+- **The memory graph: `annotate` and `recall_node`** (`harness/skills/graph/`, 2026-11-03, both OFF; arming conditions in `docs/OFF-BY-DEFAULT.md` row 22). Two doors onto one DERIVED graph, and neither opens a store of its own. `annotate` (`[graph].annotate`) is called by `recall_decider` for each recalled fact and appends the fact's node id and up to `annotate_neighbours` (default 2) one-line neighbours; `recall_node` (`[graph].follow`) is a tool that takes an id and shows that node and its links, one hop per call, `follow_cap` (default 3) successful follows per question. **Both reuse the doors above and add none:** liveness and testimony come from `memory.live_rows(testimony=True)`, the words come from `world.present_for_her`, and the question comes from `memory.current_question()`. A retired or unknown id answers "nothing live under that id". **The graph NEVER serves private-secret text**: a live private-secret fact, and any turn that carries one (the `minted_from` source, 60% or more of its salient tokens, or any key token: one with a digit or a registry document frequency of 2 or less), renders `SECRET_WITHHELD_NOTE` whatever the query; `recall()` stays the only door that serves a secret. Known residual: a secret's value spelled out in words, in a turn `minted_from` does not reach, is not caught. A graph failure is counted (`graph.dropped()`) and the turn proceeds without annotation. `recall_node` is registered unconditionally in the extra tier because its gist line is in her cached prefix (shipping it costs one cold bounce; flipping `follow` after that changes nothing in the prefix, and off it answers "following is off"). Measured 2026-11-03 on a copy of the live store: `minted_from` links only 67 of 2,339 facts (about 1,500 are her own output, and turns before 2026-08-24 carry no timestamp, so they get `sequence` and `day` edges only); 391 `explicit` edges dropped because a `superseded_by` target is not in the registry; replay on 3 hand-written questions, baseline 0/3 and graph 1/3, 446 to 639 characters injected. Gates: G-GRAPH-LIVE-ONLY, G-GRAPH-OFF, G-GRAPH-FOLLOW.
 - **Engine-side recall** (`recall.rs` L5 selection, gated by `ep.lifecycle != 0` at
   `routes.rs:2773`) — authoritative only for **daemon-direct chat when the gateway is down**.
   the live profile: `authority = 'spine'` under `[agent]` means the harness owns
@@ -739,13 +742,21 @@ for the specific instance, is what actually closes this.
 
 | Gate | File | Needs GPU / live stack? |
 |---|---|---|
-| G-CLAIM (38/38) | `harness_tests/g_claim.py` | No — discard port `127.0.0.1:9` |
+| G-CLAIM (45/45) | `harness_tests/g_claim.py` | No — discard port `127.0.0.1:9` |
 | G-SALIENCE | `harness_tests/g_salience.py` | No — discard port |
 | G-REAL-HER | `harness_tests/g_real_her.py` | No — discard port; temp registry |
 | G-DURABILITY | `harness_tests/g_durability.py` | No — pure logic, no daemon call |
 | G-MEMORY-LIFECYCLE | `harness_tests/g_memory_lifecycle.py` | No |
 | G-RECALL-EVIDENCE | `harness_tests/g_recall_evidence.py` | No — discard port; sandboxed stores |
 | G-MEMORY-STORY | `harness_tests/g_memory_story.py` | No — discard port; sandboxed stores |
+| G-GRAPH-IDS | `harness_tests/g_graph_ids.py` | No — sandboxed stores |
+| G-GRAPH-RULES | `harness_tests/g_graph_rules.py` | No — sandboxed stores |
+| G-GRAPH-DERIVED | `harness_tests/g_graph_derived.py` | No — sandboxed stores |
+| G-GRAPH-LIVE-ONLY | `harness_tests/g_graph_live_only.py` | No — sandboxed stores |
+| G-GRAPH-OFF | `harness_tests/g_graph_off.py` | No — sandboxed stores |
+| G-GRAPH-FOLLOW | `harness_tests/g_graph_follow.py` | No — sandboxed stores |
+| G-GRAPH-REPLAY | `harness_tests/g_graph_replay.py` | No — sandboxed stores |
+| G-GRAPH-ACTIVITY | `harness_tests/g_graph_activity.py` | No — sandboxed stores |
 | G-SILENCE | `harness_tests/g_silence.py` | No — discard port |
 | G-CLOCK | `harness_tests/g_clock.py` | No — discard port |
 | G-REFLECT | `harness_tests/g_reflect.py` | No — discard port |
@@ -802,6 +813,15 @@ daemon's memory code in `routes.rs`/`recall.rs`:
     routes, the elder seat, the deterministic explore roll.
 13. `python harness_tests/g_memory_story.py` — the story cycle: block shares, the
     distillate exemption, core, the fold's laws.
+
+If your change touches `harness/skills/graph/`, `tools/graph_replay.py`, the `[graph]` table in `serve.py`, the
+graph hook in `harness/control/spine.py::recall_decider`, `recall_node` in `harness/agent.py`, or
+`transcript.all_rows`, also run the seven graph gates: `python harness_tests/g_graph_ids.py`,
+`g_graph_rules.py`, `g_graph_derived.py`, `g_graph_live_only.py` (no secret text, however the node is
+reached), `g_graph_off.py` (the `facts` payload is byte-identical with the switches off) and
+`g_graph_follow.py`, then `g_graph_replay.py` (the replay never writes the store it is pointed at).
+A graph change that touches what a node renders is a change to what she may be shown, so run
+`g_graph_live_only.py` even when the change looks cosmetic.
 
 If your change touches `growth` / `SP_B4_NIGHTSHIFT` / `store_verb` / `SP_MEM_STORE` in any
 profile, run `python harness_tests/g_onewriter.py` — it walks every `profiles/*.toml` and

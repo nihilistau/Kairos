@@ -30,6 +30,8 @@ import os
 import time
 
 from harness.loud import swallowed as _swallowed
+from harness.user import called as _called
+from harness.user import say as _say
 
 _logger = logging.getLogger(__name__)
 
@@ -196,7 +198,7 @@ def keep_secret(thought: str) -> str:
     # So the receipts declare themselves. The alternative — teaching her not to quote tools
     # in the persona — is a rule in prose about a shape in code, which is the coupling that
     # lives in someone's memory.
-    _RECEIPT = " (the drawer answering — not a line to say back to him.)"
+    _RECEIPT = _say(" (the drawer answering — not a line to say back to {him}.)")
     if "stored" in res and "not stored" not in res:
         # TRUE, not comforting. The first draft of this said "nobody will bring it up
         # unless you do" — which the journal wiring below had already made false. Telling
@@ -275,7 +277,7 @@ def compose_and_write(messages, ask=None) -> dict:
         mine = own_time(1)
         if not turns and not mine:
             return {"written": False, "why": "no transcript"}
-        convo = "\n".join("%s: %s" % ("Sam" if m["role"] == "user" else "You",
+        convo = "\n".join("%s: %s" % (_called() if m["role"] == "user" else "You",
                                       m["content"].strip()[:200]) for m in turns)
         if mine:
             convo = ((convo + "\n\n") if convo else "") + (
@@ -302,14 +304,14 @@ def compose_and_write(messages, ask=None) -> dict:
         # stamps today. collapse_history keys on this "As of <day>" string.
         today = time.strftime("%A %d %B %Y", time.localtime(time.time() - 5 * 3600))
         prompt = (
-            "You are Kairos, writing a private line in your own journal about you and "
-            "Sam. Below is your previous entry (may be empty) and the recent "
+            _say("You are Kairos, writing a private line in your own journal about you and "
+            "{user}. Below is your previous entry (may be empty) and the recent "
             "conversation. Write ONE plain paragraph, at most %d words, first person, "
             "your own voice: what has been happening between you two lately — carry "
             "forward whatever from the previous entry still matters, add today. Only "
             "things that actually happened in the conversation; no codes or passwords; "
             "no lists; no headings.\n\nPrevious entry:\n%s\n\nRecent conversation:\n%s"
-            "\n\nJournal paragraph:" % (_MAX_WORDS, prev or "(none)", convo))
+            "\n\nJournal paragraph:") % (_MAX_WORDS, prev or "(none)", convo))
         # Stripped again at the STORE boundary, not only in _oneshot: `ask` is injectable
         # (that is how the offline gate runs without a GPU) and an injected composer is
         # under no obligation to have gone through the shared door. This is the last line

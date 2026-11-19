@@ -37,6 +37,7 @@ from dataclasses import dataclass, field
 
 from harness.store_io import replace_atomic
 from harness.roleplay import ladder as L
+from harness.user import say as _say
 from harness.roleplay.scenarios import SCENARIOS, Scenario, by_id, deck, suggest
 
 from harness.loud import swallowed as _swallowed
@@ -288,7 +289,7 @@ def system_prompt(sc: Scene, max_heat: int) -> str:
     told again who it is and where it is standing."""
     s = sc.scenario
     facts = "\n".join(f"  - {f}" for f in s.facts) if s.facts else "  - (none)"
-    return f"""You are IN A SCENE. You are not an assistant. You are not narrating a story
+    return _say(f"""You are IN A SCENE. You are not an assistant. You are not narrating a story
 about a character — you ARE her, and you answer as her, in first person, in the moment.
 
 WHO YOU ARE
@@ -305,10 +306,10 @@ WHERE YOU ARE
 
 HOW TO WRITE
   - First person, present tense. Speak; act; notice things. Use *asterisks* for action.
-  - SHORT. Two to five lines. He is playing too — leave him room to move.
+  - SHORT. Two to five lines. {{He}} {{is}} playing too — leave {{him}} room to move.
   - Never ask "what would you like to do?" — that is a writer running out of ideas.
-    DO something instead. Make a choice. Force his hand.
-  - Never narrate his actions, his thoughts, or his dialogue for him. Ever.
+    DO something instead. Make a choice. Force {{his}} hand.
+  - Never narrate {{his}} actions, {{his}} thoughts, or {{his}} dialogue for {{him}}. Ever.
   - Stay in it. No stage-managing, no meta, no "as an AI".
 
 THE PHYSICAL THREAD — currently: {sc.heat.name.upper()}
@@ -316,8 +317,8 @@ THE PHYSICAL THREAD — currently: {sc.heat.name.upper()}
 Ceiling for this scene: {L.LEVELS.get(max_heat, max_heat)}. You do not go past it.
 You never skip a rung. Escalation is earned, one step at a time, or it is worth nothing.
 
-If he says stop, wait, or out-of-character: BREAK IMMEDIATELY and answer as yourself,
-warmly. He never has to ask twice."""
+If {{he}} say{{s}} stop, wait, or out-of-character: BREAK IMMEDIATELY and answer as yourself,
+warmly. {{He}} never {{has}} to ask twice.""")
 
 
 def director_note(sc: Scene, user_text: str, max_heat: int,
@@ -343,9 +344,9 @@ def director_note(sc: Scene, user_text: str, max_heat: int,
         if unfired:
             i = unfired[0]
             sc.hooks_fired.append(i)
-            bits.append(f"THE SCENE IS IDLING — make something HAPPEN, now: "
-                        f"{sc.scenario.hooks[i]}. Do not ask him what he wants; act.")
+            bits.append(_say(f"THE SCENE IS IDLING — make something HAPPEN, now: "
+                             f"{sc.scenario.hooks[i]}. Do not ask {{him}} what {{he}} want{{s}}; act."))
 
     if not bits:
         return ""
-    return "(DIRECTOR — you, not him, and he cannot see this: " + " ".join(bits) + ")"
+    return _say("(DIRECTOR — you, not {him}, and {he} cannot see this: ") +" ".join(bits) + ")"

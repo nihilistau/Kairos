@@ -35,6 +35,7 @@ from typing import Callable, Dict, List, Optional
 import numpy as np
 
 from harness.store_io import replace_atomic
+from harness.user import say as _say
 from harness.sidecar import client
 
 import logging
@@ -196,7 +197,7 @@ def query_prefix() -> str:
     from harness.tuning import registry as _tr
     return str(_tr.tune_or_env(
         "aux.query_prefix", "SP_AUX_QUERY_PREFIX",
-        "Recall for Kairos: find the moment in her past conversations with Sam that tthe operator's asks about — ") or "")
+        _say("Recall for Kairos: find the moment in her past conversations with {user} that tthe operator's asks about — ")) or "")
 
 
 def doc_prefix() -> str:

@@ -29,6 +29,9 @@ Every assertion below is on the REAL code path (spine.recall_decider), never on 
 by hand. A gate that calls the guarded function directly proves only that the guard compiles.
 """
 import os
+# The fixtures are about a named user (harness/user.py reads these; unset = "the user").
+os.environ["SP_USER_NAME"] = "Sam"
+os.environ["SP_USER_PRONOUNS"] = "he/him/his"
 import sys
 import tempfile
 

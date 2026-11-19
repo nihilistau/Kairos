@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.8.81 — She is yours from the first turn: your persona, your name, Python 3.13 (2026-11-19)
+
+* A fresh install now gets its persona. Following the setup steps (`cp -r persona-template persona`) never creates `persona.md`, and without it the `persona/` fragments were silently skipped, so the companion answered with a generic tool-agent prompt. The fragments now compose whether or not `persona.md` exists.
+* `/v1/setup` reports what actually reached the companion's prompt: `persona_file` (present / empty / missing), `composed` (how many fragments), `fallback`, and a `warning` when fragments exist but none were used.
+* Tell the companion who you are. A new `[user]` section in the profile takes `name` and `pronouns` (`"he/him/his"`, `"she/her/her"`, `"they/them/their"`, or your own three forms). Left empty, as shipped, it says "the user" and they/them. It used to call everyone "Sam" and "he".
+* Python 3.13 works. The voice module imports `audioop`, which 3.13 removed; the `audioop-lts` backport is now installed automatically on 3.13 and later (nothing changes below that). CI runs on 3.13 too.
+
+## 0.8.80 — Other apps can tell her what you were doing (2026-11-08)
+
+* Apps can append what you did to `var/memory/activity/<app>/<day>.jsonl` (one JSON line per event: `at`, `event`, `title`, optional `ref` and `private`). `harness/model/activity.py` is the contract, a `record()` helper and the one reader. A `private` row is never read by anything.
+* The memory graph turns each event into an `app_event` node and links it with a fifth rule, `activity`: the next event in the same app that day, the turn it happened during (within 10 minutes), and the first turn of its day. The graph is still off by default; nothing reaches her unless `[graph]` switches are on.
+* An event reaches her labelled as an app event ("(in primer, open_page) Kookaburra"), never as something you said, and a title carrying a secret is withheld exactly as a turn would be.
+
+## 0.8.79 — An OpenAI-compatible engine behind Cloudflare (RunPod) works (2026-11-08)
+
+* Requests to an `openai` engine, and the launcher's startup probe, now send a named User-Agent (`kairos-harness/1.0`). RunPod's proxy runs through Cloudflare, which refuses Python's default with a 403 before the request reaches the model.
+* On the `openai` engine with thinking on, her reply is no longer put on the thought lane. llama-server and vLLM return reasoning separately (`reasoning_content`) and never send the close marker the gateway was waiting for, so a stream assumed to start inside a thought never left it.
+
+## 0.8.78 — The graph's profile checks tightened (2026-11-03)
+
+* `[graph].rules` in a profile is refused at load when it names a rule that does not exist, as well as when it is not a list.
+* A turn the graph is shown that he never typed reads "(from a turn he never typed)".
+* `graph.store.load("")` returns nothing instead of reading the current directory.
+* A failure while importing the `recall_node` tool, of any kind, now leaves her without that tool instead of stopping her starting.
+* `docs/OFF-BY-DEFAULT.md` row 22 now lists the preconditions for arming each graph switch.
+
+## 0.8.77 — The memory graph, built and measured, off (2026-11-03)
+
+* A derived graph over her fact registry and day transcripts (`harness/skills/graph/`): facts and turns as nodes, four versioned edge rules (`explicit`, `sequence`, `day`, `minted_from`), published as whole generations under `var/memory/graph/`. It never writes the registry, the transcripts or the speech log.
+* Three switches in `[graph]`, all off: `build` (rebuild in the background), `annotate` (recalled facts carry a graph id and a couple of neighbours) and `follow` (the `recall_node` tool follows a link). The arming condition for each is in `docs/OFF-BY-DEFAULT.md`.
+* The graph never serves private-secret text: a live secret, and any turn that carries one, reads as the same withheld note whatever the question. `recall()` stays the only door that serves a secret. Known residual: a secret's value spelled out in words, in a turn the fact was not minted from, is not caught.
+* `recall_node` is registered whatever the switches say, so shipping it costs one cold bounce; with `follow` off it answers "following is off".
+* `tools/graph_replay.py` replays a question set offline against a copy of a store and reports hits and characters injected, baseline against graph.
+* Measured 2026-11-03 on a copy of a live store (not a benefit claim): a build takes 0.4-1.0 s for 7,252 nodes; `minted_from` links only 67 of 2,339 facts; replay on three hand-written questions read baseline 0/3, graph 1/3, 446 to 639 characters injected.
+
 ## 0.8.76 — Off the record she speaks locally; your voice stops her reply (2026-10-29)
 
 * Off the record with a remote voice (Grok) chosen, she now speaks with her local voice (LFM3-Audio) instead of going quiet; nothing goes to the remote voice, and nothing of the sentence is cached or logged (an engine error that quotes it is redacted; voxtral, which writes a temp file or logs the text, is held off the record). The Models voice row reads "off the record — speaking locally".

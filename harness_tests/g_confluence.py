@@ -43,6 +43,9 @@ So this gate holds the claims that ARE true, and they are sharper than the one I
 from __future__ import annotations
 
 import os
+# The fixtures are about a named user (harness/user.py reads these; unset = "the user").
+os.environ["SP_USER_NAME"] = "Sam"
+os.environ["SP_USER_PRONOUNS"] = "he/him/his"
 import random
 import re
 import sys

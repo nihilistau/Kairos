@@ -39,6 +39,10 @@ import _src as _srcmod  # noqa: E402
 
 from _gate import sandbox   # noqa: E402
 sandbox("g_room_veto")
+# Pins the operator's profile: the legs below assert her body sentence as he reads it
+# ("his heart"), and the naming itself is G-USER-NAME's subject, not this gate's.
+os.environ["SP_USER_NAME"] = "Sam"
+os.environ["SP_USER_PRONOUNS"] = "he"
 
 os.environ["SP_DAEMON_URL"] = "http://127.0.0.1:9"
 os.environ["SP_ENGINE_KIND"] = "openai"

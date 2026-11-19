@@ -124,6 +124,17 @@ _PARSE_LOCK = threading.Lock()          # the memo ONLY. Never taken while _REG_
                                         # never the reverse.
 
 
+_CACHE_EPOCH = [0]                      # bumped under _PARSE_LOCK by every invalidate_cache()
+
+
+def cache_epoch() -> int:
+    """How many times the registry memo has been invalidated. A reader that keeps its OWN cache
+    over registry content (graph.view) puts this in its key, so an in-process write, which
+    `registry_stamp` can miss inside one mtime tick at equal size, still drops it. Not a lock
+    and not a count of writes: only 'has it changed since I looked'."""
+    return _CACHE_EPOCH[0]
+
+
 def invalidate_cache() -> None:
     """Drop the memo. `_save_all` calls this, so an in-process write never depends on
     mtime granularity to be seen — the stamp is the fallback for an edit made by
@@ -131,6 +142,7 @@ def invalidate_cache() -> None:
     with _PARSE_LOCK:
         _PARSE_CACHE["key"] = None
         _PARSE_CACHE["rows"] = None
+        _CACHE_EPOCH[0] += 1
 
 
 def _load(path: str = "") -> List[dict]:

@@ -140,6 +140,27 @@ responsible for exactly one thing, which is whether she describes the outcome tr
 
 ## The ledger
 
+### 22. `[graph]` — the memory graph: `SP_GRAPH_BUILD`, `SP_GRAPH_ANNOTATE`, `SP_GRAPH_FOLLOW` *(recorded 2026-11-03)*
+
+**STATUS: all three OFF** (`[graph]` in `profiles/companion.toml` writes `build`, `annotate` and `follow`, each `false`; a profile with no `[graph]` table leaves them absent, which is also off). With all three off, `recall_decider`'s `facts` payload is byte-identical to a tree without the graph, and the turn executes no graph code.
+
+**What it is.** A DERIVED view over her fact registry and the day transcripts (`harness/skills/graph/`): one node per fact and per turn, edges from four versioned rules (`explicit`, `sequence`, `day`, `minted_from`), published as generations under `var/memory/graph/`. It never writes `registry.jsonl`, `transcripts/*.jsonl` or `speech.jsonl`. It reaches her only through `graph.view`, which goes through `memory.live_rows(testimony=True)`: retired facts do not surface. **It never serves private-secret text**: a live private-secret fact, and any turn that carries one (it is the `minted_from` source, holds 60% or more of the fact's salient tokens, or holds a key token: a token with a digit or a registry document frequency of 2 or less), renders `SECRET_WITHHELD_NOTE` whatever the query. `recall()` stays the only door that serves a secret. **Known residual:** a secret's value spelled out in words, in a turn `minted_from` does not reach, is not caught. Gate: `python harness_tests/g_graph_live_only.py`.
+
+The other `[graph]` keys are tuning, not switches, and are profile-only: `annotate_neighbours` (default 2), `follow_cap` (default 3 follows per question), `rules` (a list of rule names; a non-list, or a name that is not a rule, is refused at profile load), `dir`, `rebuild_min_s` (default 600), `keep` (default 3, floor 2).
+
+**`recall_node` is registered whatever the switches say** (extra tier). Its gist line is in her cached prefix, so shipping it costs ONE cold bounce, and flipping `follow` later changes nothing in the prefix: with it off the tool answers "following is off". Gate: `python harness_tests/g_graph_follow.py`.
+
+**Why off.** EVIDENCE BASE. Measured 2026-11-03 on a copy of the live store, not on her: a build takes 0.4-1.0 s for 7,252 nodes. `minted_from` links only 67 of 2,339 facts (about 1,500 are her own output, and turns before 2026-08-24 carry no timestamp, so they get `sequence` and `day` edges only). 391 `explicit` edges were dropped because a `superseded_by` target is missing from the registry. The replay on three hand-written questions read baseline 0/3, graph 1/3, and 446 to 639 characters injected (+43%). That is three questions, not a result, and the cost is over the +30% bar below.
+
+| | |
+|---|---|
+| **Code** | `harness/skills/graph/` (`nodes.py`, `rules.py`, `store.py`, `view.py`, `annotate.py`, `tool.py`, `config.py`, `__init__.py`), the hook in `harness/control/spine.py`, `tools/graph_replay.py`, the `[graph]` table mapped in `serve.py::build_env` |
+| **Default** | all off; `rules = ["explicit", "sequence", "day", "minted_from"]` |
+| **What would arm it: `build`** (`SP_GRAPH_BUILD`) | The operator wants the graph for analysis or visualization. It costs disk only, bounded by `keep` and `rebuild_min_s`. Watch the size of `var/memory/graph/` and the generation count; it should sit at `keep`. **Preconditions before arming:** (1) graph failures (`graph.dropped()` and exceptions in the rebuild thread) are surfaced in a log or memory status, not only counted, because a counter nobody reads is how a dead rebuild goes unnoticed; (2) `store.write_generation` fsyncs the generation files before the CURRENT swap, because without it a power loss can publish a generation whose files are empty. |
+| **What would arm it: `annotate`** (`SP_GRAPH_ANNOTATE`) | A replay receipt (`python tools/graph_replay.py`) on a question set of at least 20 questions showing graph_hit above baseline_hit at no more than +30% characters injected. Today's receipt is 3 questions at +43%. Annotation also changes what her recall note says, so it is a voice change, not only a recall one. |
+| **What would arm it: `follow`** (`SP_GRAPH_FOLLOW`) | The same receipt, plus one live session reviewed for what she follows (read `calls=N` in `gateway.log`, round 0 tool then round 1 speech). **Preconditions before arming:** (1) the follow cap is keyed per turn (a per-turn ContextVar or token), not by question text in a process global, because two turns with the same question text share one budget and a repeated question is refused; (2) a ruling on turns carrying a RETIRED or forgotten secret, because the secret set is built from live rows only, so such a turn is served today. |
+| **Gate** | `python harness_tests/g_graph_off.py` (and the other `g_graph_*` gates, listed in `docs/MEMORY-AND-RECALL.md`) |
+
 ### 21. `ears.mode = always` — the room listens without a click *(recorded 2026-10-29)*
 
 | | |

@@ -163,10 +163,12 @@ from harness.kairos.impulse import SOLO_NUDGE  # noqa: E402
 # Case-insensitive: the wording moved when the nudge was rewritten around the
 # rotation, and a leg that pins prose verbatim fails on an edit rather than on a
 # regression.
+# In the configured user's pronouns since 2026-11-19 (harness/user.py; unset = them).
+from harness.user import say as _say_u  # noqa: E402
 check("the solo nudge forbids addressing him",
-      "do not address him" in SOLO_NUDGE.lower())
+      _say_u("do not address {him}") in SOLO_NUDGE.lower())
 check("...and forbids narrating the waiting",
-      "waiting" in SOLO_NUDGE.lower() and "miss him" in SOLO_NUDGE.lower())
+      "waiting" in SOLO_NUDGE.lower() and _say_u("miss {him}") in SOLO_NUDGE.lower())
 check("...and lets her decline to do anything at all",
       "say nothing at all" in SOLO_NUDGE,
       "a turn she is forced to fill is a turn she will fill with performance")

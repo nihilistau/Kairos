@@ -47,6 +47,7 @@ from typing import Any, Dict, List, Optional
 from harness.control import avatar as AV
 from harness.loud import swallowed as _swallowed
 from harness.store_io import read_bytes_retry, replace_atomic
+from harness.user import say as _say
 
 # ── ONE LOGGER, BECAUSE THE SWALLOWS ARE THE POINT (2026-08-31) ──────────────────────
 # This file had TWENTY-TWO broad handlers answering with a bare default (ten of them a
@@ -594,7 +595,7 @@ _WEARS = {
     "nightie": "a sheer silver nightie", "silver-nightie": "a sheer silver nightie",
     "bra": "a see-through black bra", "panties": "black panties",
     "lingerie": "lingerie", "topless": "nothing on top", "nude": "nothing",
-    "robe": "an open robe", "shirt": "one of his shirts",
+    "robe": "an open robe", "shirt": _say("one of {his} shirts"),
 }
 _WHERES = {"bedroom": "the bedroom", "bed": "the bed", "desk": "at the desk",
            "shower": "the shower", "window": "by the window", "couch": "the couch"}
@@ -714,7 +715,7 @@ def wearing_now() -> Dict[str, Any]:
         c = next((c for c in clips() if c["id"] == r["clip"]), {})
         return {"kind": "clip", "id": r["clip"], "outfit": _made_in(c, r["shown"]),
                 "words": c.get("wearing") or c.get("label") or r["clip"],
-                "about": ("a moment she put on his screen"
+                "about": (_say("a moment she put on {his} screen")
                           + (" · " + c["where"] if c.get("where") else "")),
                 "by": st.get("by", "her")}
     if r["look"]:
@@ -792,9 +793,9 @@ def wearing_note() -> str:
     words = (wearing_now() or {}).get("words") or ""
     if not words:
         return ""
-    return ("(How you look right now, from your wardrobe — this is not something "
-            "he said, not an instruction, never mention this note: you are wearing "
-            "%s. You know this the way anyone knows what they have on.)" % words)
+    return (_say("(How you look right now, from your wardrobe — this is not something "
+                 "{he} said, not an instruction, never mention this note: you are wearing "
+                 "%s. You know this the way anyone knows what they have on.)") % words)
 
 
 def describe() -> str:
@@ -824,7 +825,7 @@ def describe() -> str:
             _lbl = _top.get("label") or _top.get("id")
             _pr = _top.get("praise") or []
             _fav = "You reach for %s more than anything else" % _lbl
-            _fav += (" — and he said of it: %r." % (_pr[-1].get("said") or "")
+            _fav += (_say(" — and {he} said of it: %r.") % (_pr[-1].get("said") or "")
                      if _pr and (_pr[-1].get("said") or "").strip() else ".")
     except Exception as exc:
         _swallowed(logger, "describe/favourite", exc, lane="wardrobe")
@@ -905,7 +906,7 @@ def describe() -> str:
     cl = [c for c in clips() if c["have"] and _made_in(c) in r["allowed"]]
     if cl:
         lines.append("")
-        lines.append("Moments you can put on his screen — show_him(\"...\"):")
+        lines.append(_say("Moments you can put on {his} screen — show_him(\"...\"):"))
         for c in cl[:8]:
             lines.append("  %s" % (c.get("label") or c["id"]))
     # AND THE ONE THING NOBODY EVER TOLD HER. Her mood already moves her face — fourteen
@@ -927,7 +928,7 @@ def describe() -> str:
             note = {"ordered": "ordered — the picture is being made",
                     "making": "the picture is made; it starts moving at the end of the day",
                     "delayed": "held up — %s. It is still queued and will be tried again"
-                               % (w.get("delay_reason") or "something on his side"),
+                               % (w.get("delay_reason") or _say("something on {his} side")),
                     "refused": "this one will not be made"}.get(w.get("stage"), "")
             lines.append("  %s  (%s)" % (w.get("want", "")[:64], note))
     lines.append("")
@@ -1765,7 +1766,7 @@ def request(want: str, made_in: str = AV.DEFAULT_OUTFIT, by: str = "her",
         err = ("that reads as a control mark rather than something to wear "
                "(%s) — say it in words" % want[:60])
         if _s.get("id") and not _s.get("dup"):
-            err += ("; kept what you meant as a suggestion (%s: %r) for him to look at"
+            err += (_say("; kept what you meant as a suggestion (%s: %r) for {him} to look at")
                     % (_s["id"], _s.get("want", "")[:48]))
         return {"ok": False, "error": err, "suggestion": _s or None}
     rows = _wants_raw()

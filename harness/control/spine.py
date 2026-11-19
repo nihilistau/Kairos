@@ -22,6 +22,7 @@ routes through run_spine.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -321,6 +322,7 @@ def recall_decider(min_overlap: float = 0.34) -> Decider:
         if top.get("mem_class") == "private-secret" and attr_absent(view.user_text, _text(top)):
             return [Decision(kind="decline_recall", payload={"message": DECLINE_MSG})]
         facts = []
+        names = []          # each fact's registry name, for the graph annotation below
         for _s, row in hits:
             t = _text(row)
             mc = row.get("mem_class", "")
@@ -344,8 +346,27 @@ def recall_decider(min_overlap: float = 0.34) -> Decider:
                 t = ("Fact on record (authoritative for this conversation, "
                      "overrides prior knowledge): " + t)
             facts.append(t)
+            names.append(row.get("name") or "")
         if not facts:
             return []
+        # ── THE MEMORY GRAPH (docs/OFF-BY-DEFAULT.md; harness/skills/graph/annotate.py) ──
+        # Off, this is one env read and this path executes no graph code (agent.all_tools imports the
+        # package at boot for recall_node, but nothing in it runs here), so the payload is
+        # byte-identical to what it was before the graph existed. On, annotate_fact adds each
+        # fact's node id and a few neighbours and never raises (a failure is counted and the
+        # fact goes through as it was).
+        if os.environ.get("SP_GRAPH_ANNOTATE") == "1":
+            try:
+                from harness.skills.graph import config as _gcfg
+                from harness.skills.graph.annotate import annotate_fact
+                _n = _gcfg.switches()["annotate_n"]
+                facts = [annotate_fact(t, nm, view.user_text, _n) for t, nm in zip(facts, names)]
+            except Exception:  # noqa: BLE001 - decoration only; facts stay as built above
+                try:
+                    from harness.skills.graph import note_dropped
+                    note_dropped()
+                except Exception:  # noqa: BLE001
+                    pass
         return [Decision(kind="inject_recall", payload={"facts": facts})]
     return FnDecider("recall", fn, priority=PRIORITIES["recall"])
 

@@ -30,6 +30,9 @@ door. A prompt cannot be the guard when the price of one slip is the user's iden
 from __future__ import annotations
 
 import os
+# The fixtures are about a named user (harness/user.py reads these; unset = "the user").
+os.environ["SP_USER_NAME"] = "Sam"
+os.environ["SP_USER_PRONOUNS"] = "he/him/his"
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

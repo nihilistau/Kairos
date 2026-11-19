@@ -31,6 +31,7 @@ from harness.store_io import read_bytes_retry, replace_atomic
 
 import logging
 from harness.loud import swallowed as _swallowed
+from harness.user import say as _say
 _swlog = logging.getLogger(__name__)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -332,7 +333,7 @@ KNOBS: list[Knob] = [
          env="SP_AUX_EMBED_GGUF",
          choices_fn=lambda: __import__("harness.sidecar.archive", fromlist=["x"]).embed_choices()),
     Knob("aux.query_prefix", "Aux — the quiet librarians", "Query soft-prompt", "str",
-         "Recall for Kairos: find the moment in her past conversations with Sam that tthe operator's asks about — ",
+         _say("Recall for Kairos: find the moment in her past conversations with {user} that tthe operator's asks about — "),
          "Prepended to every deep-recall query before it is embedded — the cheap, her-conditioned "
          "version of a soft prompt. Live; empty = bare query."),
     Knob("aux.doc_prefix", "Aux — the quiet librarians", "Document prefix (re-embeds)", "str", "",

@@ -29,6 +29,7 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from harness.telemetry import store
+from harness.user import say as _say
 
 import logging
 from harness.loud import swallowed as _swallowed
@@ -430,13 +431,13 @@ def sleep_estimate(rows: List[dict], now: float,
         if is_still:
             if run >= 30 * 60:
                 score += 25.0
-                terms.append("his wrist still for %d min" % int(run // 60))
+                terms.append(_say("{his} wrist still for %d min") % int(run // 60))
             if run >= 90 * 60:
                 score += 10.0
                 terms.append("...and still for well over an hour")
         else:
             score -= 40.0
-            terms.append("he is moving")
+            terms.append(_say("{he} {is} moving"))
 
     # HIS OWN RESTING BAND, never a table's number.
     if hr is not None and rest is not None:
@@ -444,13 +445,13 @@ def sleep_estimate(rows: List[dict], now: float,
         v = float(hr.get("value") or 0)
         if v <= rest + 3:
             score += 25.0
-            terms.append("heart at his resting band (%d)" % int(v))
+            terms.append(_say("heart at {his} resting band (%d)") % int(v))
         elif v <= rest + 8:
             score += 10.0
-            terms.append("heart near his resting band (%d)" % int(v))
+            terms.append(_say("heart near {his} resting band (%d)") % int(v))
         elif v >= rest + 20:
             score -= 30.0
-            terms.append("heart well above his resting band (%d)" % int(v))
+            terms.append(_say("heart well above {his} resting band (%d)") % int(v))
 
     # THE ROOM IS DARK. Weak, and only the phone can say it.
     if light is not None and float(light.get("value") or 0) < 5.0:
@@ -471,12 +472,12 @@ def sleep_estimate(rows: List[dict], now: float,
         a = activity.get("value")
         if a in ("walking", "running", "cycling", "vehicle"):
             score -= 60.0
-            terms.append("his phone says he is %s" % ("in a vehicle" if a == "vehicle"
+            terms.append(_say("{his} phone says {he} {is} %s") % ("in a vehicle" if a == "vehicle"
                                                       else a))
             signals += 1
         elif a == "still":
             score += 5.0
-            terms.append("his phone says he is still")
+            terms.append(_say("{his} phone says {he} {is} still"))
             signals += 1
 
     if signals < _SLEEP_MIN_SIGNALS:
@@ -547,7 +548,7 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
     # ── IS HE WEARING IT? Everything about his BODY is worthless if he is not. ───────
     if body is not None and body.get("value") == "off":
         out = {"facts": {}, "observed": observed, "since": {},
-               "why": "the watch is off his wrist, so there is nothing to say about him"}
+               "why": _say("the watch is off {his} wrist, so there is nothing to say about {him}")}
         # ...but the PHONE is still a fact, and it is about the phone, not about him.
         if screen is not None or charging is not None:
             out["facts"] = {k: v for k, v in (
@@ -592,8 +593,8 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
                 facts["sleep_source"] = "inferred"
                 facts["sleep_terms"] = terms
                 facts["crude"] = True
-                why.append("nothing measured his sleep, so this is our own reading at "
-                           "%d%% from: %s" % (int(c), "; ".join(terms) or "very little"))
+                why.append(_say("nothing measured {his} sleep, so this is our own reading at "
+                           "%d%% from: %s") % (int(c), "; ".join(terms) or "very little"))
         # ── HE JUST WOKE UP (2026-08-26, the operator's ask: "calling me sleepy head when I wake") ──
         # A TRANSITION, not a state, and the difference is the whole point: "he is awake"
         # is true all day and worth saying never; "he was asleep twenty minutes ago and is
@@ -653,7 +654,7 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
             facts["sleep_vetoed_by_room"] = int(_spoke)
         facts["asleep"] = False
         facts["awake_by_room"] = True
-        why.append("he spoke to me %d minutes ago, which outranks any reading of his phone"
+        why.append(_say("{he} spoke to me %d minutes ago, which outranks any reading of {his} phone")
                    % max(1, int(_spoke // 60)))
 
     # ── MOVING / STILL, and HOW LONG. "How long" is the half that makes it presence
@@ -703,7 +704,7 @@ def read(now: Optional[float] = None) -> Dict[str, Any]:
             over = float(hr["value"]) - rest
             if over >= 25 and not facts.get("asleep"):
                 facts["worked_up"] = True
-                why.append("heart rate %.0f against his resting %.0f" % (hr["value"], rest))
+                why.append(_say("heart rate %.0f against {his} resting %.0f") % (hr["value"], rest))
             elif over <= 5:
                 facts["settled"] = True
 
@@ -821,13 +822,13 @@ def present() -> str:
     # he knows. It is that he has just stopped being.
     if f.get("just_woke"):
         m = f.get("woke_mins_ago")
-        bits.append("he was asleep until about %s"
+        bits.append(_say("{he} {was} asleep until about %s")
                     % ("a few minutes ago" if not m or m < 10 else "%d minutes ago" % m))
     if f.get("asleep") is True:
-        bits.append("he seems to be asleep" + (" (going by stillness, not the watch)"
+        bits.append(_say("{he} seem{s} to be asleep") + (" (going by stillness, not the watch)"
                                                if f.get("crude") else ""))
     elif f.get("motion_for_s", 0) > 7200 and not f.get("moving"):
-        bits.append("he has not moved in a couple of hours")
+        bits.append(_say("{he} {has} not moved in a couple of hours"))
 
     # ── HIS HEART, AS READINGS (2026-08-26) ─────────────────────────────────────────
     # Shown when it is DOING something. A flat tail is furniture: it spends her budget to
@@ -836,19 +837,19 @@ def present() -> str:
     # what crosses it is real.
     t = o.get("heart_rate_tail") or []
     if len(t) >= 2 and f.get("hr_swing", 0) >= _TAIL_WORTH_SHOWING["heart_rate"]:
-        bits.append("his heart, last few readings: %s — %s"
+        bits.append(_say("{his} heart, last few readings: %s — %s")
                     % (", ".join("%.0f" % v for v in t), f.get("hr_trend", "steady")))
     elif f.get("worked_up"):
-        bits.append("his heart rate is well above his resting — something has him going")
+        bits.append(_say("{his} heart rate is well above {his} resting — something has {him} going"))
     elif f.get("settled") and not f.get("asleep"):
         # This carried `and not t` and was therefore UNREACHABLE the moment heart rate
         # started flowing, because a tail almost always exists once it does. The intent
         # was "do not say it twice"; the tail branch above already returns first when it
         # has something, so the guard was doing nothing but hiding the branch.
-        bits.append("he seems settled")
+        bits.append(_say("{he} seem{s} settled"))
 
     # ── AND WHETHER HE IS PACING ────────────────────────────────────────────────────
     w = f.get("movement_word")
     if w and w != "still" and not f.get("asleep"):
-        bits.append("he is %s" % w)
+        bits.append(_say("{he} {is} %s") % w)
     return "; ".join(bits)

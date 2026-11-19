@@ -93,6 +93,9 @@ FACTS: Dict[str, ToolFacts] = {
     "remember":            ToolFacts("memory", "write", note="facts about HIM"),
     "remember_about_self": ToolFacts("memory", "write", note="facts about HER — a separate store, never blended"),
     "recall":              ToolFacts("memory", "read"),
+    # `recall_node` is registered unconditionally (its gist is in her cached prefix); the [graph].follow
+    # switch is read at CALL time and off it answers "following is off". Read-only: it opens a node by id.
+    "recall_node":         ToolFacts("memory", "read", note="one hop along the memory graph; off unless [graph].follow"),
     # ARMS WAS EMPTY AND THE TOOL IS ARMED (2026-09-11). `deep_recall` joins the surface
     # only when SP_AUX is on — G-TOOL-MANIFEST's own header has said so since 2026-08-21 —
     # but its row did not record the knob, so it was the one armed tool the manifest could

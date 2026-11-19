@@ -29,6 +29,11 @@ import sys
 import tempfile
 import time
 
+# The prompt text names the user from SP_USER_NAME / SP_USER_PRONOUNS (harness/user.py);
+# this gate asserts the operator's rendering, so it pins it before any harness import.
+os.environ["SP_USER_NAME"] = "Sam"
+os.environ["SP_USER_PRONOUNS"] = "he"
+
 # A cp1252 console must not be able to crash the gate mid-report — a gate that dies
 # printing its own "ok" line reads as RED for reasons that have nothing to do with
 # what it guards (bit on 2026-08-19: exit 1 from a UnicodeEncodeError in check()).

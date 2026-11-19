@@ -101,6 +101,43 @@ def his_turns(registry: str = "", days: int = DEFAULT_DAYS) -> Optional[list]:
     return out
 
 
+def all_rows(registry: str = "", days: Optional[int] = None) -> Optional[list]:
+    """[(day, line_index, row)] for EVERY parseable row, oldest day first, in file order.
+
+    The memory graph's door. Unlike `his_turns` it keeps untimed and synthetic rows (a graph
+    node can be a turn nobody can place in time), and `line_index` counts every physical line
+    — blank and malformed included — so the `t:<day>:<index>` turn ID never shifts when a
+    bad line is skipped. None (not []) when the directory cannot be read, as in `his_turns`.
+    """
+    d = _dir(registry)
+    if not d or not os.path.isdir(d):
+        return None
+    try:
+        names = sorted(n for n in os.listdir(d) if n.endswith(".jsonl"))
+    except OSError:
+        return None
+    if days is not None:
+        names = names[-days:] if days > 0 else []
+    out = []
+    for n in names:
+        day = n[:-len(".jsonl")]
+        try:
+            with open(os.path.join(d, n), encoding="utf-8", errors="replace") as f:
+                for idx, line in enumerate(f):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        row = json.loads(line)
+                    except ValueError:
+                        continue
+                    if isinstance(row, dict):
+                        out.append((day, idx, row))
+        except OSError:
+            return None
+    return out
+
+
 def spoken_since(turns: list) -> list:
     """Suffix-unions of `turns` (newest first): index i = every word used at or after i."""
     acc, run = [], set()

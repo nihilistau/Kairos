@@ -122,8 +122,47 @@ def main() -> int:
     survives_broken = "particular someone made of math" in s5 or "voice: dry, warm" in s5
     print(f"unreadable fragment -> persona lever survives={survives_broken}")
 
+    # ── A FRESH CLONE HAS NO persona.md (2026-11-19) ─────────────────────────────
+    # SETUP says `cp -r persona-template persona` and nothing ever creates persona.md.
+    # The fragments used to be composed only INSIDE `if txt:`, so a missing file
+    # swallowed the open() error and served the generic AGENT_SYSTEM — 7,914 chars, none
+    # of the 14 fragments — while /v1/setup said `fragments: 14`. A missing or empty
+    # persona.md is empty prose plus an empty state, and the fragments still compose.
+    from harness import agent as _agent
+    for f in LAYERS.glob("*.md"):
+        f.unlink()
+    (LAYERS / "00-a.md").write_text(FRAG_A, encoding="utf-8")
+    (LAYERS / "10-b.md").write_text(FRAG_B, encoding="utf-8")
+    PERSONA.unlink()
+    s6 = load()
+    src6 = dict(_agent.PERSONA_SOURCE)
+    missing_ok = ("assembled here from separate pieces" in s6 and s6 != _agent.AGENT_SYSTEM
+                  and src6.get("file") == "missing" and src6.get("fragments") == 2
+                  and not src6.get("fallback"))
+    # /v1/setup reports what COMPOSED, not just what is on disk
+    from harness.server import panels as _panels
+    sp6 = _panels._setup_json().get("persona") or {}
+    setup_ok = (sp6.get("composed") == 2 and sp6.get("persona_file") == "missing"
+                and sp6.get("fallback") is False and "warning" not in sp6)
+    _agent.PERSONA_SOURCE.update(file="missing", fragments=0, fallback=True)  # the old bug's state
+    sp_bad = _panels._setup_json().get("persona") or {}
+    setup_ok = setup_ok and "none composed" in (sp_bad.get("warning") or "")
+    print(f"/v1/setup persona reports composition={setup_ok} ({sp6}) bug-state warning={sp_bad.get('warning')!r}")
+    PERSONA.write_text("", encoding="utf-8")
+    s7 = load()
+    empty_ok = ("assembled here from separate pieces" in s7
+                and _agent.PERSONA_SOURCE.get("file") == "empty")
+    # and with neither, the fallback is still the generic system — and it SAYS so
+    PERSONA.unlink()
+    for f in LAYERS.glob("*.md"):
+        f.unlink()
+    s8 = load()
+    neither_ok = s8 == _agent.AGENT_SYSTEM and _agent.PERSONA_SOURCE.get("fallback") is True
+    print(f"no persona.md -> fragments composed={missing_ok} (source={src6}); "
+          f"empty persona.md -> composed={empty_ok}; neither -> AGENT_SYSTEM+fallback={neither_ok}")
+
     ok = (prose_ok and state_ok and header_stripped and selfmodel_ok and edit_ok and graceful
-          and layers_ok and survives_broken)
+          and layers_ok and survives_broken and missing_ok and setup_ok and empty_ok and neither_ok)
     print(f"RESULT pf-persona: {'PASS' if ok else 'FAIL'} "
           f"(state parsed+injected + self-model + live-edit + graceful fallback "
           f"+ fragments-replace-prose-only + broken fragment survivable)")

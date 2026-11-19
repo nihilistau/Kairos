@@ -26,6 +26,7 @@ from typing import Any, Dict, List
 
 import logging
 from harness.loud import swallowed as _swallowed
+from harness.user import say as _say
 _swlog = logging.getLogger(__name__)
 
 
@@ -59,7 +60,7 @@ def how_is_he() -> Dict[str, Any]:
     try:
         r = _b.read()
     except Exception as exc:                       # never raises at her
-        return {"ok": False, "why": "could not read his body just now (%s)"
+        return {"ok": False, "why": _say("could not read {his} body just now (%s)")
                                     % type(exc).__name__}
 
     facts = r.get("facts") or {}
@@ -75,29 +76,29 @@ def how_is_he() -> Dict[str, Any]:
     # THE SENTENCE FIRST, because a dict of numbers is not an answer to "how is he".
     bits: List[str] = []
     if not obs and not facts:
-        bits.append("nothing is reporting — the watch is off him and the phone is quiet")
+        bits.append(_say("nothing is reporting — the watch is off {him} and the phone is quiet"))
     else:
         hr = obs.get("heart_rate")
         tail = obs.get("heart_rate_tail")
         if tail and len(tail) >= 2:
-            bits.append("his heart, last few readings: %s"
+            bits.append(_say("{his} heart, last few readings: %s")
                         % ", ".join(str(int(v)) for v in tail))
         elif hr:
-            bits.append("his heart is %d" % int(hr))
+            bits.append(_say("{his} heart is %d") % int(hr))
         rest = None
         try:
             rest = _b.resting()
         except Exception as _swx:
             _swallowed(_swlog, "how_is_he", _swx, lane="skills")
         if rest is None:
-            bits.append("his resting rate is not learned yet, so I have nothing to "
-                        "compare a number against")
+            bits.append(_say("{his} resting rate is not learned yet, so I have nothing to "
+                        "compare a number against"))
         if facts.get("movement_word"):
-            bits.append("he is %s" % facts["movement_word"])
+            bits.append(_say("{he} {is} %s") % facts["movement_word"])
         conf = facts.get("sleep_confidence")
         if conf is not None:
             src = facts.get("sleep_source")
-            where = ("his watch measured it" if src == "watch"
+            where = (_say("{his} watch measured it") if src == "watch"
                      else "a sleep classifier says so" if src == "classifier"
                      else "that is my own reading, not a measurement")
             if facts.get("sleep_vetoed_by_room"):
@@ -121,17 +122,17 @@ def how_is_he() -> Dict[str, Any]:
                 # reason about it. This is only about what she is TOLD.
                 pass
             elif facts.get("asleep") is True:
-                bits.append("he seems to be asleep — %d%%, and %s" % (int(conf), where))
+                bits.append(_say("{he} seem{s} to be asleep — %d%%, and %s") % (int(conf), where))
             elif facts.get("asleep") is False:
-                bits.append("he is awake — sleep confidence only %d%%" % int(conf))
+                bits.append(_say("{he} {is} awake — sleep confidence only %d%%") % int(conf))
             else:
-                bits.append("whether he is asleep is genuinely unclear — %d%%, which is "
-                            "between the two answers" % int(conf))
+                bits.append(_say("whether {he} {is} asleep is genuinely unclear — %d%%, which is "
+                            "between the two answers") % int(conf))
         if facts.get("awake_by_wrist"):
-            bits.append("he just looked at his watch")
+            bits.append(_say("{he} just looked at {his} watch"))
         elif facts.get("awake_by_screen"):
-            bits.append("his phone screen is on")
-    out["in_a_sentence"] = "; ".join(bits) if bits else "I cannot tell you anything about him right now"
+            bits.append(_say("{his} phone screen is on"))
+    out["in_a_sentence"] = "; ".join(bits) if bits else _say("I cannot tell you anything about {him} right now")
     return out
 
 
@@ -154,7 +155,7 @@ def his_day(hours: float = 8.0) -> Dict[str, Any]:
         now = _t.time()
         rows = _s.read_since(float(hours) * 3600, now)
     except Exception as exc:
-        return {"ok": False, "why": "could not read his history (%s)" % type(exc).__name__}
+        return {"ok": False, "why": _say("could not read {his} history (%s)") % type(exc).__name__}
 
     newest: Dict[str, dict] = {}
     counts: Dict[str, int] = {}
@@ -187,11 +188,11 @@ def his_day(hours: float = 8.0) -> Dict[str, Any]:
         "last_reading": last_seen,
         "watch_on_his_wrist": on_wrist,
         "in_a_sentence": (
-            "nothing at all in the last %g hours — he has not been wearing it"
+            _say("nothing at all in the last %g hours — {he} {has} not been wearing it")
             % float(hours) if not rows else
             "%d readings in the last %g hours; the watch is %s"
             % (len(rows), float(hours),
-               "on him" if on_wrist else "off him" if on_wrist is False else "not saying")),
+               _say("on {him}") if on_wrist else _say("off {him}") if on_wrist is False else "not saying")),
     }
 
 

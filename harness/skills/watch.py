@@ -47,6 +47,28 @@ from harness.loud import swallowed as _swallowed
 logger = logging.getLogger(__name__)
 
 
+
+# The judge's question, in the user's name and pronouns (harness/user.py). Filled BEFORE the
+# search evidence goes in, so braces in a web page can never be read as a token.
+_JUDGE_TEMPLATE = (
+    "{User} asked you to watch for this:\n  <<Q>>\n\n"
+    "Here is what a web search just returned:\n<<E>>\n\n"
+    "Has the thing {he} {is} waiting for ACTUALLY HAPPENED, according to these results?\n"
+    "Almost always the answer is NO — a page merely EXISTING about a product is not the "
+    "same as the thing {he} asked for being true. Do not stretch.\n"
+    "Answer in exactly this shape:\n"
+    "  NO: <one short reason>\n"
+    "or, only if a specific line above proves it:\n"
+    "  YES: <quote the exact line that proves it>"
+)
+
+
+def _judge_prompt(question: str, evidence: str) -> str:
+    from harness.user import say
+    head, rest = say(_JUDGE_TEMPLATE).split("<<Q>>", 1)
+    mid, tail = rest.split("<<E>>", 1)
+    return head + str(question) + mid + str(evidence) + tail
+
 def due_checks(now: Optional[float] = None, every_hours: float = 6.0) -> list:
     """Watches that have not been looked at recently enough. Cheap; no network."""
     now = now or time.time()
@@ -177,17 +199,7 @@ def _judge_sidecar(question: str, evidence: str):
         return _judge(question, evidence)
     if not _aux.available():
         return _judge(question, evidence)
-    prompt = (
-        f"Sam asked you to watch for this:\n  {question}\n\n"
-        f"Here is what a web search just returned:\n{evidence}\n\n"
-        "Has the thing he is waiting for ACTUALLY HAPPENED, according to these results?\n"
-        "Almost always the answer is NO — a page merely EXISTING about a product is not the "
-        "same as the thing he asked for being true. Do not stretch.\n"
-        "Answer in exactly this shape:\n"
-        "  NO: <one short reason>\n"
-        "or, only if a specific line above proves it:\n"
-        "  YES: <quote the exact line that proves it>"
-    )
+    prompt = _judge_prompt(question, evidence)
     txt = _aux.chat([{"role": "user", "content": prompt}], max_tokens=90).strip()
     if not txt:
         return _judge(question, evidence)
@@ -211,17 +223,7 @@ def _judge(question: str, evidence: str):
     from harness.inference import InferenceConfig
     from harness.inference.client import get_client
 
-    prompt = (
-        f"Sam asked you to watch for this:\n  {question}\n\n"
-        f"Here is what a web search just returned:\n{evidence}\n\n"
-        "Has the thing he is waiting for ACTUALLY HAPPENED, according to these results?\n"
-        "Almost always the answer is NO — a page merely EXISTING about a product is not the "
-        "same as the thing he asked for being true. Do not stretch.\n"
-        "Answer in exactly this shape:\n"
-        "  NO: <one short reason>\n"
-        "or, only if a specific line above proves it:\n"
-        "  YES: <quote the exact line that proves it>"
-    )
+    prompt = _judge_prompt(question, evidence)
     # ONE-SHOT. She answers this once and the session is thrown away — there is nothing here to
     # continue. Through chat() this landed in THE RESIDENT KV SLOT, the one holding his
     # conversation: ~1450 tokens of PER-TOKEN prefill (78 SECONDS, to produce one YES/NO token),
