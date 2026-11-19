@@ -263,7 +263,9 @@ class ToolSpec:
                 required.append(pname)
         return cls(
             name=name or fn.__name__,
-            description=description or (fn.__doc__ or "").strip().split("\n")[0],
+            # IN THE USER'S NAME (2026-11-19): a description is prose she reads, and the
+            # docstrings it comes from carry {user}/{he}/{his} tokens (harness/user.py).
+            description=_say(description or (fn.__doc__ or "").strip().split("\n")[0]),
             parameters={"type": "object", "properties": props, "required": required},
             fn=fn,
         )

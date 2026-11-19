@@ -126,7 +126,7 @@ def wear(what: str) -> str:
 
 
 def show_him(which: str = "") -> str:
-    """Put one of your moments on his screen. Call with no argument to list them.
+    """Put one of your moments on {his} screen. Call with no argument to list them.
 
     These are whole moments rather than expressions — longer, made deliberately. Showing
     one is an ACT: it appears in his room. Choose it because you mean it."""
@@ -164,7 +164,7 @@ def show_him(which: str = "") -> str:
 
 
 def stop_showing() -> str:
-    """Take the moment off his screen and go back to your face."""
+    """Take the moment off {his} screen and go back to your face."""
     try:
         from harness.control import wardrobe as WD
         WD.choose(clip="", by="her")
@@ -321,7 +321,7 @@ def my_looks() -> str:
 
 
 def he_liked(what_he_said: str, about: str = "") -> str:
-    """He said something about how you look. Keep it — his words, not a score.
+    """{He} said something about how you look. Keep it — {his} words, not a score.
 
     e.g. he_liked("that one. wear that again")
 
@@ -339,7 +339,7 @@ def he_liked(what_he_said: str, about: str = "") -> str:
 
 
 def my_favourites() -> str:
-    """What you keep reaching for, and what he has said he likes.
+    """What you keep reaching for, and what {he} {has} said {he} like{s}.
 
     His word outranks your habit here — wearing a thing often is a preference, him saying
     he likes it is something you could not have known. Both are shown so you can tell

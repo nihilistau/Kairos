@@ -28,7 +28,7 @@ _swlog = logging.getLogger(__name__)
 
 def set_light(what: str, on: Optional[bool] = None, colour: str = "",
               brightness: Optional[int] = None) -> Dict[str, Any]:
-    """Turn one of his lights on or off, or set its colour or brightness.
+    """Turn one of {his} lights on or off, or set its colour or brightness.
 
     `what` is what he calls it — "the lamp", "the bedroom light". `colour` is a name
     ("red", "warm"); `brightness` is 1-100. Setting either turns the light on unless he
@@ -42,13 +42,13 @@ def set_light(what: str, on: Optional[bool] = None, colour: str = "",
 
 
 def set_fan(what: str, on: bool) -> Dict[str, Any]:
-    """Turn one of his fans on or off. `what` is what he calls it."""
+    """Turn one of {his} fans on or off. `what` is what {he} call{s} it."""
     from harness.homeassistant import hands as _h
     return _h.act(what, on=on)
 
 
 def what_i_can_reach() -> Dict[str, Any]:
-    """The things in his house she is allowed to touch, by the names he uses.
+    """The things in {his} house she is allowed to touch, by the names {he} use{s}.
 
     Call it when he asks what she can do, or when a name did not resolve. It is a short
     list on purpose — he chose every row.

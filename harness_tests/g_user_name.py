@@ -130,19 +130,50 @@ check("watch judge: neutral, and braces in his question untouched",
       jp.startswith("The user asked you") and "they are waiting" in jp and "a {he} question" in jp,
       jp[:160])
 
+print("\n2b. the tool descriptions she reads are neutral too")
+# A description is the docstring's first line (ToolSpec.from_callable, skill.py) or, for
+# consult, the whole docstring; both run through user.say(). Graded on what the BUILDERS
+# produce, not on the source, because that is the text that reaches her.
+import inspect as _inspect                         # noqa: E402
+from harness.toolcore.tools import ToolSpec as _TS  # noqa: E402
+_descs = {}
+for _t in list(A.default_tools()) + list(A.all_tools()):
+    _descs[_t.name] = _t.description
+from harness.skills import house as _house, consult as _consult  # noqa: E402
+from harness.kairos import presence as _presence                 # noqa: E402
+for _f in (_house.set_light, _house.set_fan, _house.what_i_can_reach,
+           _presence.enter_mode, _presence.leave_mode):
+    _descs[_f.__name__] = _TS.from_callable(_f).description
+_descs["consult"] = _TS.from_callable(
+    _consult.consult, description=_inspect.cleandoc(_consult.consult.__doc__ or "")).description
+_HE_RX = re.compile(r"\b(?:he|him|his|himself|%s)\b|\{(?:user|he|him|his|is|has|s)\}" % "|".join(NAMES), re.I)
+_bad = sorted("%s: %s" % (k, v[:60]) for k, v in _descs.items() if _HE_RX.search(v or ""))
+check("no tool description says he/him/his or a name (%d described)" % len(_descs), not _bad,
+      "; ".join(_bad[:5]))
+check("...and the converted ones read as they",
+      _descs.get("how_is_he", "").startswith("What their body is doing right now")
+      and "whether they seem awake" in _descs.get("how_is_he", "")
+      and _descs.get("add_note", "").endswith("shared board that the user can see."),
+      (_descs.get("how_is_he"), _descs.get("add_note")))
+
 print("\n3. his profile renders exactly what the literals said")
 probe = (
     "import os,sys; sys.path.insert(0, %r); os.environ['SP_DAEMON_URL']='http://127.0.0.1:9';"
     "from harness import agent as A; from harness.skills import verdict as V;"
     "from harness.skills import world as W;"
     "print(A.voice_coda()); print('\\x1e'); print(A._TOOL_DISCIPLINE); print('\\x1e');"
-    "print(V.framing_for('observed','user')); print('\\x1e'); print(W._third_person('I like tea and I am tired.'))"
+    "print(V.framing_for('observed','user')); print('\\x1e'); print(W._third_person('I like tea and I am tired.'));"
+    "from harness.skills import body as B; from harness.toolcore.tools import ToolSpec as T;"
+    "print('\\x1e'); print(T.from_callable(B.how_is_he).description)"
 ) % ROOT
 env = dict(os.environ, SP_USER_NAME=OPERATOR, SP_USER_PRONOUNS="he/him/his", PYTHONIOENCODING="utf-8")
 out = subprocess.run([sys.executable, "-c", probe], env=env, capture_output=True, text=True,
                      encoding="utf-8").stdout.split("\x1e")
-if len(out) == 4:
-    k_coda, k_disc, k_frame, k_t3 = [s.strip("\n") for s in out]
+if len(out) == 5:
+    k_coda, k_disc, k_frame, k_t3, k_tool = [s.strip("\n") for s in out]
+    check("a tool description: the old docstring line, byte for byte",
+          k_tool == "What his body is doing right now — heart, movement, whether he seems awake.",
+          k_tool)
     check("coda: the old sentence, byte for byte",
           ("You are TALKING to %s, not serving him. He is the one here with you: say "
            "'you' to him — 'he' is for telling someone else about him, and there is no one "

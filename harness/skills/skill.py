@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import threading
 import time
+
+from harness.user import say as _user_say
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
 
@@ -108,7 +110,8 @@ def skill(
             func=fn,
             name=name or fn.__name__,
             pack=pack,
-            description=description or (fn.__doc__ or "").strip().split("\n")[0],
+            # the docstring's {user}/{he} tokens filled, as ToolSpec.from_callable does
+            description=_user_say(description or (fn.__doc__ or "").strip().split("\n")[0]),
             tags=list(tags or []),
             category=(category or "").lower(),
             cooldown_secs=cooldown,

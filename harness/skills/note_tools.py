@@ -56,7 +56,7 @@ def _fmt(n: dict) -> str:
 
 
 def add_note(title: str, body: str = "", category: str = "note", due: str = "") -> str:
-    """Pin a note, idea, task or REMINDER to the shared board that Sam can see.
+    """Pin a note, idea, task or REMINDER to the shared board that {user} can see.
 
     title     one short line — what it is (required)
     body      the detail, if there is any (optional)
@@ -79,7 +79,7 @@ def add_note(title: str, body: str = "", category: str = "note", due: str = "") 
 
 
 def watch_for(title: str, look_for: str) -> str:
-    """KEEP AN EYE OUT for something in the world, and tell him when it happens.
+    """KEEP AN EYE OUT for something in the world, and tell {him} when it happens.
 
     title      what he is waiting for, e.g. "RTX 3090 back in stock"
     look_for   what to SEARCH for, as a search query: "RTX 3090 in stock under $1500"
@@ -112,7 +112,7 @@ def find_notes(query: str = "") -> str:
 
 
 def due_reminders() -> str:
-    """What Sam should be reminded about RIGHT NOW. Use this when he asks "is there
+    """What {user} should be reminded about RIGHT NOW. Use this when {he} ask{s} "is there
     anything I need to be reminded about?" and answer from what it returns."""
     rows = N.due(include_raised=True)
     if not rows:

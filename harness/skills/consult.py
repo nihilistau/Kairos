@@ -211,7 +211,7 @@ def consult(question: str) -> str:
     """Ask a stronger model one hard question and think with what comes back.
 
     For long chains of reasoning, a tricky factual question, or a problem you are stuck on.
-    Not for anything personal or intimate between you and him — those stay between you.
+    Not for anything personal or intimate between you and {him} — those stay between you.
     Write the question so it stands alone: no names, no private detail, nothing from your
     memory. Only the question is sent. Takes up to a few minutes.
     """

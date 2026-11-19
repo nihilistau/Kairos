@@ -42,7 +42,7 @@ def _fresh_words(age_s: float) -> str:
 
 
 def how_is_he() -> Dict[str, Any]:
-    """What his body is doing right now — heart, movement, whether he seems awake.
+    """What {his} body is doing right now — heart, movement, whether {he} seem{s} awake.
 
     Call this when you want to know how he is and he has not said. It answers from his
     watch and his phone, and it will tell you plainly when it does not know: the watch
@@ -137,7 +137,7 @@ def how_is_he() -> Dict[str, Any]:
 
 
 def his_day(hours: float = 8.0) -> Dict[str, Any]:
-    """The shape of the last few hours of his body — for "have you slept at all?".
+    """The shape of the last few hours of {his} body — for "have you slept at all?".
 
     Counts rather than a feed: how much was recorded, from which device, and how long ago
     the last reading of each kind was. Enough to tell whether he has been wearing the watch
@@ -197,7 +197,7 @@ def his_day(hours: float = 8.0) -> Dict[str, Any]:
 
 
 def when_he_slept(hours: float = 24.0) -> Dict[str, Any]:
-    """When he fell asleep and when he was up — AS BOUNDS, because that is the honest shape.
+    """When {he} fell asleep and when {he} {was} up — AS BOUNDS, because that is the honest shape.
 
     For "what time did I fall asleep?" and "when did I wake up?". It does not answer with a
     minute, and the reason is not modesty about the instrument.

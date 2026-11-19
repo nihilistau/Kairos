@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.82 — Tool descriptions use your name and pronouns too (2026-11-19)
+
+* The tool descriptions the companion reads follow `[user]` as well. Fifteen of them still said "he"/"his" or "Sam" (the body, wardrobe, notes, presence and house tools, and consult); with `[user]` unset they now say "the user" and they/them. Tool names are unchanged.
+
 ## 0.8.81 — She is yours from the first turn: your persona, your name, Python 3.13 (2026-11-19)
 
 * A fresh install now gets its persona. Following the setup steps (`cp -r persona-template persona`) never creates `persona.md`, and without it the `persona/` fragments were silently skipped, so the companion answered with a generic tool-agent prompt. The fragments now compose whether or not `persona.md` exists.

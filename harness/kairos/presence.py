@@ -223,7 +223,7 @@ def memory_kind(mode: str, reading: bool = False) -> str:
 
 # ── her tools: enter / leave a mode when he asks (2026-08-22) ─────────────────────────
 def enter_mode(mode: str) -> str:
-    """Enter one of your presence modes when he asks for it — "narration" (you live your
+    """Enter one of your presence modes when {he} ask{s} for it — "narration" (you live your
     evening out loud), "company" (soft presence, a few true words), or "lucid" (a whisper in
     the dark: tenderness, a small story, or reading to him). Your first turn comes right
     after this reply; then one every few minutes while the room is quiet. Use leave_mode
@@ -238,7 +238,7 @@ def enter_mode(mode: str) -> str:
 
 
 def leave_mode() -> str:
-    """Leave the presence mode you are in (narration / company / lucid) — when he asks you to stop."""
+    """Leave the presence mode you are in (narration / company / lucid) — when {he} ask{s} you to stop."""
     from harness.kairos import scheduler as _ks
     _ks.leave_mode()
     return "You have left the mode; you speak only as kairos allows now."
