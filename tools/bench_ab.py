@@ -6,7 +6,7 @@ run BOTH kernels against BOTH kernels off on one prompt in one sitting, which is
 assumes the table means.
 
 Arms:
-    off   attn_tile=0    attn_v2=0  gemm_f16=0     the kernels an adopter gets out of the box
+    off   attn_tile=0    attn_v2=0  gemm_f16=0     the older kernels (pmax capped, see run_arm)
     on    attn_tile=1024 attn_v2=1  gemm_f16=1     what upstream actually runs
 
 The daemon is launched DIRECTLY, not through serve.py, because serve.py maps these from the
@@ -102,6 +102,13 @@ def kill():
 def run_arm(name, nsys_out=None):
     env = dict(serve.build_env(CFG))
     env.update(ARMS[name])
+    # THE FLAT KERNEL CANNOT LAUNCH ABOVE serve.FLAT_ATTN_PMAX_MAX (2026-11-26, G-FLAT-ATTN).
+    # Its decode attention asks for Pmax*4 bytes of shared memory, so at a profile's pmax 20000
+    # every launch fails, the attention output is stale, and the "off" arm times a kernel that
+    # never ran. Cap it for that arm; the prompt (TARGET_TOKENS) fits well under the cap.
+    if env.get("SP_G4_ATTN_TILE") == "0":
+        env["SP_DAEMON_KVDECODE_PMAX"] = str(min(int(env["SP_DAEMON_KVDECODE_PMAX"]),
+                                                 serve.FLAT_ATTN_PMAX_MAX))
     # CreateProcess needs SystemRoot; build_env strips what the profile does not map.
     _sr = os.environ.get("SystemRoot") or os.environ.get("windir")
     if _sr:

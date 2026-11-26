@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.97 — The native engine profile no longer produces garbage by hand (2026-11-27)
+
+* `profiles/sp.toml` used the flat attention kernel, which cannot launch above a context of
+  12,096 tokens. The engine kept going with stale attention and answered with runs of digits.
+  `sp.toml` now uses the tiled kernel (`attn_tile = 1024`), a context long enough for a
+  companion's system prompt (`pmax = 20000`), and `byteexact = false`, which the 26B MoE model
+  needs. It now answers correctly, though slowly: Get set up's profile is the fast one.
+* `serve.py` refuses a native profile that asks for the flat kernel above that size, or with
+  segment graphs (`seg_graph`), and says which setting to change.
+
 ## 0.8.96 — The native engine's profile works out of the box (2026-11-26)
 
 * The profile Get set up writes for the Kairos engine now carries the settings the model is

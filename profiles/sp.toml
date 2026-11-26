@@ -70,7 +70,11 @@ gateway_port = 8810                   # beside hers (8800): two stacks, one box
 persist = false
 persist_b4 = false
 ring_w = 2048
-pmax = 4096
+# 20000, not 4096 (2026-11-26): a companion's system prompt alone is ~7.5k tokens, and 4096
+# answered every turn with `exceeds Pmax`. The engine's AUTOFIT (on unless `autofit = false`)
+# clamps this DOWN to what your card has free; it never raises it. Above 12096 the tiled
+# attention kernel is REQUIRED (attn_tile below) and serve.py refuses the profile without it.
+pmax = 20000
 
 [memory]
 recall_authority = "L5"
@@ -116,6 +120,10 @@ mcp_tools = true
 # the settings panel) per turn. G-PROFILE-KEYS holds this section honest now.)
 no_repeat_ngram = 0
 eot_bias = 0.0                        # moot here (sp-only); kept so the schema matches
+# false: certified-float turns. Absent, the gateway asks for byte-exact, and the engine refuses
+# that on a MoE model (`SP_BYTEEXACT not implemented for the expert branch`) — the Gemma 4
+# your model Get set up ships is one. A DENSE model can serve byte-exact; set true to ask for it.
+byteexact = false
 
 # -- THE ENGINE KERNELS ARE OFF HERE, AND THAT IS WHY THE README'S NUMBERS ARE NOT YOURS YET --
 # (2026-09-12) These three were ABSENT from this profile, not zero. `serve.py` strips every
@@ -125,7 +133,8 @@ eot_bias = 0.0                        # moot here (sp-only); kept so the schema 
 # appear does not exist (AGENTS.md §0); it is named here so it can be found and argued with.
 #
 # They stay 0 because an unproven CUDA kernel should not arrive armed on hardware nobody has
-# run it on. That is a stance, not an accident, so it carries its arming condition:
+# run it on. That is a stance, not an accident, so it carries its arming condition. ONE
+# EXCEPTION, attn_tile, which ships at 1024 (see its line): its 0 was never the safe floor.
 #
 #   ARMING CONDITION. Set the knob to 2 first. Mode 2 runs BOTH paths and serves the OLD one,
 #   printing the numerical difference on your weights — so it costs a slower prefill and can
@@ -134,6 +143,8 @@ eot_bias = 0.0                        # moot here (sp-only); kept so the schema 
 #   because that is a fault on hardware the author does not have.
 #
 # Upstream production runs attn_tile = 1024, attn_v2 = 1, gemm_f16 = 1 every day. The engine
+# README's "Measured" table is those values; with the zeros further down you are measuring the
+# older kernels, and comparing THAT to llama.cpp compares the wrong thing.
 
 # Expert staging on a second CUDA stream, so a cache miss transfers while the previous expert
 # computes. Decode only (n_tok == 1); prefill is expert-major and already stages once.
@@ -152,7 +163,9 @@ moe_pf_lane = 0                       # SP_G4_MOE_PF_LANE — prefill misses evi
 #   moe_cpu: experts not resident at routing computed on the CPU (needs AVX-512 VNNI; the GELU
 #     tables are built from YOUR GPU at start, so parity must be re-run on a different card). +7%.
 #   seg_graph: per-layer CUDA segment graphs for the MoE decode step. No parity mode: arm it and
-#     compare the greedy output hash with it off. +~10% upstream.
+#     compare the greedy output hash with it off. +~10% upstream. NEEDS attn_tile > 0: the flat
+#     ring kernel takes its context length from the host, so a graph replays one token's context
+#     forever (measured: "[laugh] [laugh] [laugh]"), and serve.py refuses that pair.
 #   moe_bisect: ADR-013 per-op syncs at layer 0. A fault-localisation tool; leave it off.
 moe_grouped = 0                       # SP_G4_MOE_GROUPED (2 = parity: old loop served, bitwise compare)
 moe_cpu = 0                           # SP_G4_MOE_CPU     (2 = parity: GPU served, CPU recomputes)
@@ -163,9 +176,15 @@ hf_p1 = 0                             # SP_G4_HF_P1       (host-free layer P1: d
 hf_p2 = 0                             # SP_G4_HF_P2       (host-free layer P2: 0 off, 1 serve, 2 parity; P2.0 = MID GPU timing only)
 seg_graph = false                     # SP_G4_SEG_GRAPH
 moe_bisect = false                    # SP_G4_MOE_BISECT
-# README's "Measured" table is those values; with the zeros below you are measuring the older
-# kernels, and comparing THAT to llama.cpp compares the wrong thing.
-attn_tile = 0                         # SP_G4_ATTN_TILE  — 1024 upstream; 0 is the flat kernel
+# attn_tile = 1024, NOT 0 (2026-11-26). 0 is the flat decode-attention kernel, which asks for
+# pmax*4 bytes of shared memory; CUDA allows 48 KB without an opt-in the engine does not make,
+# so above pmax 12096 EVERY decode step's launch fails (12288 measured failing), the daemon logs it once
+#     [g4-kv] FLOAT ATTN LAUNCH FAILED: cudaErrorInvalidValue (nh=16 bd=512 attn_shm=80000)
+# and serves stale attention: "17 plus 73421 is 42", runs of digits. Measured on the your model,
+# one knob at a time from the tested kit settings: this knob alone at 0 broke it; attn_v2, gemm_f16,
+# dequant_h8, attn_split, attn_prefill_gemm and every MoE knob at 0 each left it coherent.
+# serve.py refuses attn_tile = 0 above pmax 12096 (FLAT_ATTN_PMAX_MAX).
+attn_tile = 1024                      # SP_G4_ATTN_TILE  — the tiled kernel; 0 = flat, only for pmax <= 12096
 attn_v2 = 0                           # SP_G4_ATTN_V2    — 1 upstream; 2 = parity, old served
 attn_prefill_gemm = 0                 # SP_G4_ATTN_PF_GEMM — prefill attention as tensor-core GEMMs (needs attn_tile > 0); 2 = parity
 dequant_h8 = 0                        # SP_G4_DEQ_H8 — eight-wide Q4 -> fp16 dequant, bit-identical; 2 = bitwise parity

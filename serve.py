@@ -375,6 +375,12 @@ def guard_live_turn(force: bool, c=None) -> None:
 
 
 GRAPH_RULE_NAMES = frozenset({"explicit", "sequence", "day", "minted_from", "activity"})
+# The engine's flat decode attention asks for Pmax*4 bytes of dynamic shared memory ON TOP of
+# its static `g_sum`, and CUDA's no-opt-in ceiling is 48 KB for the two together. MEASURED on
+# the 2060: Pmax 12288 (attn_shm=49152, exactly 48 KB) still fails the launch. 12096 is the
+# value the engine's own history ran the flat kernel at (cuda_forward.cu, "WHY pmax IS 12096").
+# build_env refuses attn_tile = 0 above it. G-FLAT-ATTN.
+FLAT_ATTN_PMAX_MAX = 12096
 
 
 # ── THE COMPANION HOME (2026-11-26, design docs/DESIGN-2026-11-26-homes-people-setup.md §1) ──
@@ -566,6 +572,36 @@ def build_env(c: dict) -> dict:
         raise SystemExit(
             f"profile invalid: no_repeat_ngram={dec['no_repeat_ngram']} breaks verbatim copy "
             f"(G-VERBATIM). Set 0, or export SP_ALLOW_NGRAM_BAN=1 to override deliberately.")
+    # ── THE FLAT ATTENTION KERNEL CANNOT LAUNCH ABOVE PMAX 12096 (2026-11-26) ─────────────
+    # With attn_tile = 0 the engine's decode attention for the global layers is the flat
+    # kernel, which asks for Pmax*4 bytes of dynamic shared memory. CUDA refuses more than
+    # 48 KB (with the kernel's static shared) without an opt-in the engine does not make, on
+    # every card. So above FLAT_ATTN_PMAX_MAX every decode-step launch fails, the daemon logs it ONCE
+    #     [g4-kv] FLOAT ATTN LAUNCH FAILED: cudaErrorInvalidValue (... attn_shm=80000)
+    # and keeps serving from stale attention output: "17 plus 73421 is 42", runs of digits.
+    # Found by flipping sp.toml's knobs one at a time on the model MoE (CHANGELOG 2026-11-26).
+    # The engine cannot refuse this itself (a released binary is what users run), so the door does.
+    #
+    # AND THE FLAT RING KERNEL CANNOT BE GRAPHED. With attn_tile = 0 and ring_w > 0 the SWA
+    # layers take k_attn_decode_ring_T, whose context length and shared size come from the
+    # HOST (s->dpos_host) as launch arguments. seg_graph captures them once and replays that
+    # token's context forever; the segment-graph design assumes every position-dependent kernel
+    # reads the DEVICE dpos, and this one does not. MEASURED: pmax 12096 + attn_tile 0 answered
+    # "17 plus 25 is 42" with seg_graph off and "[laugh] [laugh] [laugh]" with it on.
+    _native = str(c.get("engine", {}).get("kind") or "sp") == "sp"
+    _flat = int(dec.get("attn_tile", 0) or 0) == 0
+    if _native and _flat and int(kv.get("pmax", 0) or 0) > FLAT_ATTN_PMAX_MAX:
+        raise SystemExit(
+            f"profile invalid: [decode] attn_tile = 0 with [kv] pmax = {kv.get('pmax')}. The flat "
+            f"attention kernel needs pmax*4 bytes of shared memory and CUDA allows 48 KB, so above "
+            f"pmax {FLAT_ATTN_PMAX_MAX} it fails to launch and the daemon serves garbage. "
+            f"Set attn_tile = 1024 (the tiled kernel), or pmax <= {FLAT_ATTN_PMAX_MAX}.")
+    if _native and _flat and dec.get("seg_graph", False) and int(kv.get("ring_w", 0) or 0) > 0:
+        raise SystemExit(
+            "profile invalid: [decode] attn_tile = 0 with seg_graph = true (and [kv] ring_w > 0). "
+            "The flat ring attention kernel takes its context length from the host, so a segment "
+            "graph replays one token's context forever and the daemon serves garbage. "
+            "Set attn_tile = 1024 (the tiled kernel), or seg_graph = false.")
 
     # ── ONE MEMORY AUTHORITY, ENFORCED AT THE DOOR INSTEAD OF HOPED FOR IN A COMMENT ──────
     #
@@ -1750,8 +1786,9 @@ def build_env(c: dict) -> dict:
 
     # ── AND SAY WHEN THE MEASURED KERNELS ARE NOT THE ONES SERVING (2026-09-12) ────────
     # The engine README's prefill/decode table is attn_v2=1 / gemm_f16=1 / attn_tile=1024.
-    # The public profile ships them 0 on purpose — an unproven CUDA kernel should not arrive
-    # armed on hardware nobody has run it on — but silence there means someone compares the
+    # The public profile ships attn_v2/gemm_f16 at 0 on purpose — an unproven CUDA kernel should
+    # not arrive armed on hardware nobody has run it on (attn_tile ships 1024 since 2026-11-26:
+    # its 0 cannot launch above FLAT_ATTN_PMAX_MAX) — but silence means someone compares the
     # OLD kernels to llama.cpp and concludes the README is dishonest. Same argument as the
     # passthrough receipt directly above: the door states what actually went through it.
     _off = [n for n, k in (("attn_v2", "SP_G4_ATTN_V2"), ("gemm_f16", "SP_G4_GEMM_F16"),
