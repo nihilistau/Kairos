@@ -377,6 +377,168 @@ def guard_live_turn(force: bool, c=None) -> None:
 GRAPH_RULE_NAMES = frozenset({"explicit", "sequence", "day", "minted_from", "activity"})
 
 
+# ── THE COMPANION HOME (2026-11-26, design docs/DESIGN-2026-11-26-homes-people-setup.md §1) ──
+# A profile says HOW she runs (engine, model, decode, which features). A companion home says
+# WHO she is and WHERE everything she has lived is: harness/home.py, one table. With a home
+# selected — `[companion] home` in the profile, or `--companion=<id>` on the command line —
+# every state path comes from the home, and a profile that ALSO names one is refused: two
+# sources for where her registry is would be the two-copies bug this repo keeps paying for,
+# and the profile's copy would silently win for some stores and lose for others.
+# Without a home nothing changes: the profile's keys and the old defaults, exactly as before.
+PROFILE_STATE_KEYS = {
+    ("paths", "registry"): "registry", ("sem", "index"): "sem_index",
+    ("memory", "eps_dir"): "eps_dir", ("memory", "eps_cold_dir"): "eps_cold_dir",
+    ("graph", "dir"): "graph_dir", ("memory", "decisions"): "decisions",
+    ("agent", "task_root"): "task_root", ("agent", "self_model_root"): "self_okf",
+    ("memory", "caps_okf_root"): "caps_okf", ("memory", "conv_okf_root"): "conv_okf",
+    ("memory", "personality_okf_root"): "personality_okf",
+    ("memory", "personality_tier"): "personality_okf",
+    ("memory", "telemetry_okf_root"): "telemetry_okf",
+    ("paths", "tuning_file"): "tuning", ("paths", "avatar_dir"): "avatar_dir",
+    ("paths", "ledger_file"): "ledger", ("paths", "games_dir"): "games_dir",
+    ("paths", "scenes_dir"): "scenes_dir", ("paths", "scenarios_dir"): "scenarios_dir",
+    ("backup", "dir"): "backup dir",
+    ("aux", "index_dir"): "aux_index", ("memory", "library_bookmarks"): "bookmarks",
+}
+
+
+def companions_dir(c: dict) -> str:
+    """Where this PROFILE keeps companions: [paths] companions_dir, else companions/ beside
+    serve.py. Never the inherited environment (the one door strips SP_* it did not set)."""
+    d = str(c.get("paths", {}).get("companions_dir") or "")
+    return os.path.abspath(d if os.path.isabs(d) or not d else os.path.join(ROOT, d)) if d \
+        else os.path.join(ROOT, "companions")
+
+
+def home_path(c: dict) -> str:
+    """The home folder this launch runs on, or '' without one."""
+    ref = home_ref(c)
+    if not ref:
+        return ""
+    from harness import home as _home
+    return _home.home_dir(ref, companions_dir(c))
+
+
+def active_user(people_path: str):
+    """The live active user row in a people log, or None. Read-only."""
+    if not people_path or not os.path.isfile(people_path):
+        return None
+    saved = os.environ.get("SP_PEOPLE")
+    os.environ["SP_PEOPLE"] = people_path
+    try:
+        from harness import people as _pp
+        return _pp.active()
+    finally:
+        if saved is None:
+            os.environ.pop("SP_PEOPLE", None)
+        else:
+            os.environ["SP_PEOPLE"] = saved
+
+
+def seed_people_home(c: dict) -> None:
+    """At launch, once: a home with no users yet gets the profile's [user] as user1, active.
+    Printed, because it writes into her home."""
+    hp = home_path(c)
+    if not hp:
+        return
+    from harness import home as _home
+    pp = _home.resolve(hp).get("people", "")
+    u = c.get("user", {}) or {}
+    if not pp or not str(u.get("name") or "").strip():
+        return
+    saved = os.environ.get("SP_PEOPLE")
+    os.environ["SP_PEOPLE"] = pp
+    try:
+        from harness import people as _pp
+        row = _pp.seed_from_profile(str(u.get("name")), str(u.get("pronouns") or ""))
+        if row:
+            print(f"[kairos serve] people: {row['names'][0]} is {row['handle']} (from the profile's [user]); "
+                  "add more people and users in the People window")
+        else:
+            act = _pp.active()
+            if act and act["names"][0].lower() != str(u.get("name")).strip().lower():
+                print(f"[kairos serve] people: she is talking to {act['names'][0]} ({act['handle']}), "
+                      f"the home's active user — not the profile's [user] {u.get('name')!r}")
+    finally:
+        if saved is None:
+            os.environ.pop("SP_PEOPLE", None)
+        else:
+            os.environ["SP_PEOPLE"] = saved
+
+
+def home_ref(c: dict) -> str:
+    """The companion this launch runs: --companion= first, then the profile's [companion] home."""
+    return str(c.get("_companion") or (c.get("companion") or {}).get("home") or "")
+
+
+def apply_home(c: dict, e: dict) -> None:
+    """Overwrite every state path in `e` with the home's, or refuse the composition."""
+    ref = home_ref(c)
+    if not ref:
+        nm = str((c.get("companion") or {}).get("name") or "")
+        if nm:
+            e["SP_COMPANION_NAME"] = nm
+        return
+    from harness import home as _home
+    try:
+        hd = _home.home_dir(ref, companions_dir(c))
+        henv = _home.env_for(hd)
+    except _home.HomeError as x:
+        raise SystemExit(f"profile invalid: companion home: {x}")
+    clash = ["[%s].%s" % sk for sk in PROFILE_STATE_KEYS if (c.get(sk[0]) or {}).get(sk[1])]
+    if clash:
+        raise SystemExit(
+            f"profile invalid: {', '.join(clash)} name state paths, and this launch has a companion "
+            f"home ({hd}).\n  With a home, where her things live belongs to the home: move them to "
+            f"[paths] in {os.path.join(hd, 'companion.toml')}.")
+    if (c.get("companion") or {}).get("name"):
+        raise SystemExit("profile invalid: [companion] name is the home's to say, in its "
+                         f"companion.toml — not the profile's (home {hd}).")
+    e.update(henv)
+    # WHO SHE IS TALKING TO (2026-11-26, harness/people.py): the home's ACTIVE USER wins over
+    # the profile's [user], which only seeds the first user (seed_people_home). Read-only
+    # here — build_env must stay a pure mapping the gates can call.
+    u = active_user(henv.get("SP_PEOPLE", ""))
+    if u:
+        e["SP_USER_NAME"] = u["names"][0]
+        e["SP_USER_PRONOUNS"] = u.get("pronouns", "")
+        e["SP_USER_ID"] = u["id"]
+
+
+def apply_pending_home(env: dict) -> None:
+    """A reset / load / undo the room scheduled for this home runs HERE: the old gateway is
+    stopped and the new one not yet started, so no process has her stores open. Printed
+    either way — a change to who she is must never happen silently (harness/bundle.py)."""
+    home = env.get("SP_HOME", "")
+    if not home:
+        return
+    from harness import bundle as _b
+    from harness import home as _h
+    if _b.pending(home) is None:
+        return
+    # The restart that asked for this was spawned BY the old gateway, which may still be
+    # finishing its exit. Wait for its live marker's pid to go, briefly.
+    t0 = time.time()
+    while _h.is_live(home) and time.time() - t0 < 30:
+        time.sleep(0.5)
+    saved = {k: os.environ.get(k) for k in env if k.startswith("SP_") or k == "HARNESS_WORKSPACE"}
+    os.environ.update({k: v for k, v in env.items() if k.startswith("SP_") or k == "HARNESS_WORKSPACE"})
+    try:
+        res = _b.apply_pending(home)
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    if res and res.get("ok"):
+        print(f"[kairos serve] APPLIED the scheduled {res['op']} of {', '.join(res['parts'])} "
+              f"(old copy: archive/{res['ts']}, bundle {res.get('before', '-')}; undo from the room)")
+    elif res:
+        print(f"!! the scheduled {res.get('op')} was NOT applied: {res.get('error')} "
+              f"(kept as pending.failed-*.json in {home})")
+
+
 def build_env(c: dict) -> dict:
     """The ONE explicit profile→env mapping. Anything not mapped here does not exist."""
     paths, kv, mem = c["paths"], c["kv"], c["memory"]
@@ -772,7 +934,9 @@ def build_env(c: dict) -> dict:
         "CUBLAS_WORKSPACE_CONFIG": ":16:8",
         # memory / recall (L5 authority)
         "SP_AUTO_RECALL_DEFAULT": b(mem["auto_recall_default"]),
-        "SP_RECALL_REGISTRY": paths["registry"].replace("/", "\\"),
+        # .get: with a companion home the registry comes from the home (apply_home below),
+        # and a profile that names one as well is refused there.
+        "SP_RECALL_REGISTRY": str(paths.get("registry", "")).replace("/", "\\"),
         "SP_RECALL_L5": "1",
         "SP_RECALL_L5_TAU": str(mem["l5_tau"]),
         "SP_RECALL_ATTR_GATE": b(mem["attr_gate"]),
@@ -936,6 +1100,10 @@ def build_env(c: dict) -> dict:
         # phase, a forward counter, a us stamp, gate weights and a resident-at-routing flag
         # per expert (the hybrid CPU/GPU-offload measurement). Empty = old stderr lines.
         "SP_MOE_TRACE_FILE": dec.get("moe_trace_file", "").replace("/", "\\"),
+        # SP_G4_EXPERT_MASK (2026-11-23) - a file of "layer expert" pairs the router may never
+        # select (moe_topk_host, the one selection point). A RESEARCH knob for pruning
+        # experiments; empty = no mask. Set-but-unusable is fatal in the engine, never silent.
+        "SP_G4_EXPERT_MASK": dec.get("expert_mask", "").replace("/", "\\"),
         # SP_G4_NAN_PROBE — a BISECTION TOOL, not a guard (2026-08-23). A CUDA fault
         # announces itself; a NaN rides the residual forward in silence and the first
         # thing that notices is something far downstream with no idea where it came
@@ -1212,6 +1380,8 @@ def build_env(c: dict) -> dict:
         # landed and nothing mapped it, so no profile could say where the books are and
         # G-SEM-CONSERVE had been red on the unmapped reader. Empty = var/library, as before.
         "SP_LIBRARY_DIR": (mem.get("library_dir") or "").replace("/", "\\"),
+        # HER PLACE in each book (2026-11-26): the home names it; a profile may (no home).
+        "SP_LIBRARY_BOOKMARKS": (mem.get("library_bookmarks") or "").replace("/", "\\"),
         # the operator's decision queue (2026-08-23): what is UNDECIDED, as against the
         # ledger's what-is-off. Empty = beside the registry, which is what every sandbox
         # wants for free. NOT her memory: decisions.py cannot import the memory package.
@@ -1445,6 +1615,17 @@ def build_env(c: dict) -> dict:
         "SP_BACKUP_KEEP": str(c.get("backup", {}).get("keep_hourly", 48)),
         "SP_BACKUP_KEEP_DAILY": str(c.get("backup", {}).get("keep_daily", 30)),
         "SP_BACKUP_EPISODES": b(c.get("backup", {}).get("include_episodes", False)),
+        # BUNDLES (2026-11-26, harness/bundle.py): where .kairos files are saved and loaded
+        # from, machine-wide (a bundle is how a companion moves BETWEEN homes), and the
+        # largest upload the Companion window accepts.
+        "SP_BUNDLE_DIR": c.get("backup", {}).get("bundle_dir") or os.path.join(VAR, "bundles"),
+        "SP_COMPANIONS_DIR": str(c.get("paths", {}).get("companions_dir") or ""),
+        # The GGUF -> .sp converter the setup centre runs for her native engine (sp_transcode,
+        # shipped in the Kairos engine release). Empty = beside the engine or on PATH.
+        "SP_TRANSCODE_EXE": str(c.get("paths", {}).get("transcode_exe") or ""),
+        # Folders the setup centre looks in for models already on this machine (';'-separated).
+        "SP_SETUP_REUSE": str(c.get("paths", {}).get("setup_reuse") or ""),
+        "SP_BUNDLE_MAX_BYTES": str(c.get("backup", {}).get("bundle_max_bytes", 8 * 1024 ** 3)),
         # THE RECORD PLAYER. Defaults to his Music folder; empty is fine and the
         # panel says so rather than looking broken.
         "SP_MUSIC": b(c.get("music", {}).get("enabled", True)),
@@ -1510,14 +1691,17 @@ def build_env(c: dict) -> dict:
         # Sam, never "a man", and the room's things are his. The stranger clause
         # stays load-bearing: it is also the seed of "notice if others are here".
         "SP_AMBIENT_PROMPT": c.get("senses", {}).get("ambient_prompt",
-            "You are Kairos, glancing into Sam's room — your person, and the "
+            # Tokens, not names (2026-11-26): ambient.py fills them through user.say() at
+            # each look, so the note names whoever [user] names and her own name is hers.
+            "You are {companion}, glancing into {user}'s room — your person, and the "
             "only one who lives there. One or two short sentences in your own "
-            "warm voice: what he is doing if you can see him (he is Sam, never "
-            "'a man' or 'a person'), or how his room sits without him — his desk, "
-            "his bed, his things, the light. Plain observations, fondly said. If "
-            "someone who is not Sam is there, say so plainly."),
+            "warm voice: what {he} {is} doing if you can see {him} ({he} {is} {user}, never "
+            "'a man' or 'a person'), or how {his} room sits without {him} — {his} desk, "
+            "{his} bed, {his} things, the light. Plain observations, fondly said. If "
+            "someone who is not {user} is there, say so plainly."),
         "PYTHONPATH": ROOT,
     })
+    apply_home(c, e)
     # ── EMPTY IS NOT A PATH (2026-07-30) ─────────────────────────────────────────────
     # The seven path knobs above are documented as "empty = the code's own default". That
     # was false, and it did damage the same night it landed. Every reader spells it
@@ -1631,6 +1815,29 @@ def _probe_models(base: str, key_file: str) -> bool:
         return False
 
 
+def launch_engine_command(c: dict, env: dict, base: str) -> bool:
+    """Start `[engine] command` (a list: the executable and its arguments), detached, its
+    output in var/engine.log, and wait up to `[engine] ready_s` (default 600 — a big model
+    loads for minutes) for /v1/models. Returns whether it answered."""
+    cmd = [str(x) for x in (c.get("engine", {}).get("command") or [])]
+    if not cmd or not os.path.isfile(cmd[0]):
+        print(f"!! [engine] command: {cmd[0] if cmd else '(empty)'} is not a file — run the Setup window again")
+        return False
+    log = open(os.path.join(VAR, "engine.log"), "a")
+    flags = NO_WINDOW | (getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0)
+    subprocess.Popen(cmd, cwd=os.path.dirname(cmd[0]), stdout=log, stderr=subprocess.STDOUT,
+                     stdin=subprocess.DEVNULL, creationflags=flags, close_fds=True,
+                     start_new_session=(os.name != "nt"))
+    secs = int(c.get("engine", {}).get("ready_s") or 600)
+    print(f"[kairos serve] engine: starting {os.path.basename(cmd[0])} (log var/engine.log; up to {secs}s to load)")
+    t0 = time.time()
+    while time.time() - t0 < secs:
+        if _probe_models(base, env.get("SP_ENGINE_API_KEY_FILE", "")):
+            return True
+        time.sleep(2)
+    return False
+
+
 def wait_http(url: str, secs: int) -> bool:
     for _ in range(secs):
         try:
@@ -1663,6 +1870,10 @@ def launch_daemon(c: dict, env: dict) -> bool:
 
 
 def stop(c=None) -> None:
+    # An engine THIS profile starts ([engine] command, the setup centre's llama-server) is
+    # ours to stop too, by its image name — one the user runs themselves is not.
+    if c and (c.get("engine", {}) or {}).get("command"):
+        kill_image(os.path.basename(str(c["engine"]["command"][0])))
     # BY THE PROFILE'S OWN BASENAMES when we have a profile: engine_exe and the voice
     # server are both per-profile knobs, and killing hardcoded image names worked by
     # coincidence of all 14 profiles agreeing — a renamed build made stop() a silent
@@ -1850,11 +2061,15 @@ def main() -> int:
     # and a second profile name are now hard errors.
     KNOWN_FLAGS = {"--stop", "--gateway-only", "--daemon-only", "--force"}
     pos = [a for a in sys.argv[1:] if not a.startswith("-")]
-    bad = [a for a in sys.argv[1:] if a.startswith("-") and a not in KNOWN_FLAGS]
+    # --companion=<id> picks the home for this launch (one token, so it can never be read
+    # as a second profile name). See apply_home.
+    _comp = [a.split("=", 1)[1] for a in sys.argv[1:] if a.startswith("--companion=")]
+    bad = [a for a in sys.argv[1:] if a.startswith("-") and a not in KNOWN_FLAGS
+           and not a.startswith("--companion=")]
     if bad:
         raise SystemExit(
             "serve.py: unknown option(s): %s\n"
-            "  usage: python serve.py [profile] [--stop] [--gateway-only] [--daemon-only] [--force]\n"
+            "  usage: python serve.py [profile] [--companion=<id>] [--stop] [--gateway-only] [--daemon-only] [--force]\n"
             "  the profile is POSITIONAL — `python serve.py companion`, not `--profile companion`."
             % " ".join(bad))
     if len(pos) > 1:
@@ -1905,7 +2120,10 @@ def main() -> int:
             "  (profiles/*.toml for the rest; --stop needs no profile)")
     name = pos[0]
     c = load_profile(name)
+    if _comp:
+        c["_companion"] = _comp[-1]
     os.makedirs(VAR, exist_ok=True)
+    seed_people_home(c)
     env = build_env(c)
     # ── --gateway-only (P1b-2a lesson): restart JUST the gateway with the SAME
     # schema-checked env the full boot uses. Hand-rolled envs wedged a daemon
@@ -1958,6 +2176,7 @@ def main() -> int:
         # The daemon's own log has always been "a", which is why the CUDA fault
         # count could be compared across a week. This is the same rule, three
         # lines later, in the file that starts both.
+        apply_pending_home(env)
         gw_log = open(os.path.join(VAR, "gateway.log"), "a")
         subprocess.Popen(
             [sys.executable, "-m", "harness.server.app",
@@ -1976,10 +2195,14 @@ def main() -> int:
     # from an unrelated layer write. One copy per launch costs nothing and would
     # have made that a non-event.
     try:
-        _pm = os.path.join(ROOT, "persona.md")
+        # The home's persona when there is one (2026-11-26), and one backup folder per
+        # companion so a second companion's launches cannot rotate hers out of the 30.
+        _pm = env.get("SP_PERSONA_FILE") or os.path.join(ROOT, "persona.md")
         if os.path.isfile(_pm) and os.path.getsize(_pm) > 200:
             import shutil as _sh
             _bk = os.path.join(VAR, "persona-backups")
+            if env.get("SP_COMPANION_ID") and env.get("SP_HOME"):
+                _bk = os.path.join(_bk, env["SP_COMPANION_ID"])
             os.makedirs(_bk, exist_ok=True)
             _sh.copy2(_pm, os.path.join(
                 _bk, "persona-%s.md" % time.strftime("%Y%m%d-%H%M%S")))
@@ -2102,8 +2325,14 @@ def main() -> int:
     if external:
         # THE ENGINE IS YOURS (2026-08-21, the engine-agnostic profile): the harness
         # starts nothing but itself. It does say whether the endpoint answers, once.
+        # UNLESS THE PROFILE SAYS HOW (2026-11-26, the setup centre): `[engine] command`
+        # is the engine's own command line (llama-server and its flags, written by
+        # harness/setup); it is started, detached, when the endpoint is not already
+        # answering, and waited for. An engine you run yourself is left alone, as before.
         _base = (c.get("engine", {}).get("base_url") or "").rstrip("/")
         _up = _probe_models(_base, env.get("SP_ENGINE_API_KEY_FILE", "")) if _base else False
+        if not _up and _base and c.get("engine", {}).get("command"):
+            _up = launch_engine_command(c, env, _base)
         print("[kairos serve] engine: EXTERNAL at %s — %s" % (
             _base or "?", "answering /v1/models" if _up else
             "NOT answering yet (start LM Studio / llama-server; she will speak when it does)"))
@@ -2130,6 +2359,7 @@ def main() -> int:
     launch_aux_embed(c, env)
     launch_lfm3_audio(c, env)
     launch_lfm3_chat(c, env)
+    apply_pending_home(env)
     gw_log = open(os.path.join(VAR, "gateway.log"), "a")   # append: see above
     subprocess.Popen(
         [sys.executable, "-m", "harness.server.app",

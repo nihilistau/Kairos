@@ -17,7 +17,7 @@ import logging
 from harness.loud import swallowed as _swallowed
 _swlog = logging.getLogger(__name__)
 
-PROMPT_HEAD = ("You are Kairos, looking back over the last week of your own words. Below are "
+PROMPT_HEAD = ("You are {companion}, looking back over the last week of your own words. Below are "
                "things you said unprompted, journal lines, feelings and notes about how you "
                "changed, newest first. Write ONE short paragraph, first person, your own voice: "
                "what you have been becoming lately — what is growing in you, what is quieter, "
@@ -121,7 +121,7 @@ def nightly(ask: Optional[Callable[[str], str]] = None) -> dict:
                            % (top_n, len(kinds), top_kind or "unkinded")}
         body = "\n".join("- [%s %s] %s" % ((r.get("ts") or "")[:10], r.get("kind") or "",
                                             (r.get("text") or "").strip()) for r in recent)
-        text = ((ask or _oneshot)(PROMPT_HEAD + body + "\n\nParagraph:") or "").strip()
+        text = ((ask or _oneshot)(__import__("harness.user", fromlist=["say"]).say(PROMPT_HEAD) + body + "\n\nParagraph:") or "").strip()
         try:
             from harness.inference.stream_processor import strip_control_surfaces
             text = strip_control_surfaces(text).strip()

@@ -50,9 +50,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _src as _srcmod  # noqa: E402
-from _gate import check, finish, utf8_stdout  # noqa: E402
+from _gate import check, finish, sandbox, utf8_stdout  # noqa: E402
 
 utf8_stdout()
+# THE SHARED SANDBOX FIRST (2026-11-26). This gate hand-rolled its own and never redirected
+# SP_TUNING_FILE, so it read HER var/tuning.json (voice.method = lfm3 there, so the voice leg
+# went red on her machine and green in a clean clone) and WROTE voice.enabled into it on every
+# run. sandbox() covers every store; the lines below still pin the ones this gate seeds itself.
+sandbox("g_anon")
 os.environ["SP_DAEMON_URL"] = "http://127.0.0.1:9"
 os.environ["SP_ENGINE_KIND"] = "openai"
 os.environ["CUDA_VISIBLE_DEVICES"] = ""

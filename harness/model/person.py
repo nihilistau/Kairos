@@ -227,6 +227,8 @@ class PersonModel:
         for r in _mem.all_rows(p):
                 if r.get("lifecycle"):
                     continue                            # a retired fact is not evidence
+                if lc.other_users_secret(r):
+                    continue                            # another user's private fact (ruling 9.1)
                 if (r.get("speaker") or lc.SPEAKER_USER) != speaker:
                     continue                            # HER facts do not model HIM
                 # ── AND HER CONCLUSIONS ARE NOT EVIDENCE EITHER (2026-08-01) ──────────

@@ -53,16 +53,9 @@ def _tier_full() -> str:
     set the env — which is every gate that wants to test the journal without touching hers —
     she wrote to one directory and read from another, and the readers silently returned
     nothing. One law, one implementation; AGENTS.md 0."""
-    tier = os.environ.get("SP_PERSONALITY_TIER")
-    if not tier:
-        try:
-            from harness.personality.self_model import HARNESS_ROOT
-            tier = str(HARNESS_ROOT / "memory-okf-personality")
-        except Exception as _swx:
-            _swallowed(_logger, "_tier_full", _swx, lane="skills")
-            tier = os.path.join(os.path.dirname(os.path.dirname(
-                os.path.dirname(os.path.abspath(__file__)))), "memory-okf-personality")
-    return os.path.join(tier, "full")
+    # harness/home.py since 2026-11-26: the env (SP_PERSONALITY_OKF_ROOT, then
+    # SP_PERSONALITY_TIER), else the repo-root default — never "", so no fallback here.
+    return os.path.join(__import__("harness.home", fromlist=["path"]).path("personality_okf"), "full")
 
 
 def current() -> str:
@@ -304,7 +297,7 @@ def compose_and_write(messages, ask=None) -> dict:
         # stamps today. collapse_history keys on this "As of <day>" string.
         today = time.strftime("%A %d %B %Y", time.localtime(time.time() - 5 * 3600))
         prompt = (
-            _say("You are Kairos, writing a private line in your own journal about you and "
+            _say("You are {companion}, writing a private line in your own journal about you and "
             "{user}. Below is your previous entry (may be empty) and the recent "
             "conversation. Write ONE plain paragraph, at most %d words, first person, "
             "your own voice: what has been happening between you two lately — carry "
@@ -402,7 +395,7 @@ _CHAPTER_KINDS = ("journal", "narration", "spoke_up")
 _CHAPTER_MAX_ROWS = 40
 
 CHAPTER_PROMPT = (
-    "You are Kairos, looking back over the last week. Below are your own journal "
+    "You are {companion}, looking back over the last week. Below are your own journal "
     "paragraphs for those days, things you did on your own time, and lines you said "
     "unprompted — oldest first. Write ONE plain paragraph, at most %d words, first person, "
     "your own voice: what that WEEK was, as a stretch of time — what it turned on, what "
@@ -477,7 +470,7 @@ def weekly_chapter(ask=None) -> dict:
         if mine:
             body = ((body + "\n\n") if body else "") + "On your own time:\n" + "\n".join(
                 "- " + m[:220] for m in reversed(mine[:20]))
-        text = ((ask or _oneshot)(CHAPTER_PROMPT + body + "\n\nThe week:") or "").strip()
+        text = ((ask or _oneshot)(_say(CHAPTER_PROMPT) + body + "\n\nThe week:") or "").strip()
         try:
             from harness.inference.stream_processor import strip_control_surfaces
             text = strip_control_surfaces(text)

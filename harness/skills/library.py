@@ -32,7 +32,11 @@ def _dir() -> str:
 
 
 def _bm_path() -> str:
-    return os.path.join(_dir(), ".bookmarks.json")
+    # HER PLACE in each book is hers (2026-11-26); the shelf itself stays shared. An
+    # SP_LIBRARY_DIR without a home keeps the bookmarks beside the books, as before.
+    if os.environ.get("SP_LIBRARY_DIR") and not os.environ.get("SP_LIBRARY_BOOKMARKS"):
+        return os.path.join(_dir(), ".bookmarks.json")
+    return __import__("harness.home", fromlist=["path"]).path("bookmarks")
 
 
 def _load_bm() -> dict:

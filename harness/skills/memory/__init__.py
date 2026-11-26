@@ -201,7 +201,9 @@ def live_rows(testimony: bool = False) -> List[dict]:
     readers (tools she speaks from): a covered inference does not take the floor. The
     audit lane and maintenance passes want testimony=False: they must see everything
     live, judged or not."""
-    rows = [e for e in _store._load() if not e.get("lifecycle")]
+    from harness.skills import lifecycle as _lcp
+    # Not another user's private fact (ruling 9.1; lifecycle.other_users_secret).
+    rows = [e for e in _store._load() if not e.get("lifecycle") and not _lcp.other_users_secret(e)]
     if testimony:
         from harness.skills import lifecycle as lc
         rows = [e for _s, e in lc.testimony_wins([(0.0, e) for e in rows])]

@@ -310,12 +310,19 @@ _serve8 = open(os.path.join(ROOT, "serve.py"), encoding="utf-8").read()
 ok("SP_AMBIENT_ON_BOOT" in _serve8, "the boot knob is mapped through the one door")
 _pi = _serve8.index('"SP_AMBIENT_PROMPT"')
 _pchunk = _serve8[_pi:_pi + 900]
-ok("Sam" in _pchunk and "never" in _pchunk,
-   "the door's prompt names him — Sam, never 'a man'")
-ok("his desk" in _pchunk and "his bed" in _pchunk,
+# Since 2026-11-26 the names are TOKENS filled by user.say() at each look — the export
+# can no longer ship a companion who glances into someone else's room.
+ok("{user}" in _pchunk and "never" in _pchunk,
+   "the door's prompt names him — {user}, never 'a man'")
+ok("{his} desk" in _pchunk and "{his} bed" in _pchunk,
    "…and his room's things are HIS, not 'a desk'")
-ok("not Sam" in _pchunk,
+ok("not {user}" in _pchunk,
    "…and the stranger clause survives — anyone else is said plainly")
+ok("Sam" not in _pchunk and "Kairos" not in _pchunk,
+   "…and no literal name is left for the export to mis-rewrite")
+ok("say(PROMPT)" in open(os.path.join(ROOT, "harness", "senses", "ambient.py"),
+                         encoding="utf-8").read(),
+   "…and the eye fills the tokens at the look, not at import")
 
 print("\n§ THE LOOK'S CEILING IS A KNOB, AND A CEILING IS NOT A TARGET")
 # 220 tokens — sized for the hourly one-sentence room note — silently cut the

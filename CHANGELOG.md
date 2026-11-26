@@ -1,5 +1,68 @@
 # Changelog
 
+## 0.8.91 — First-time setup in one place (2026-11-26)
+
+* **One place for first-time setup.** `kairos.bat` → **9 – get set up** now also creates your companion (or uses one you have) and asks your name, so she knows who she is talking to from the first turn.
+* **Models you already have are reused.** Point setup at the folders where you keep models. A file already there is used once its checksum matches, instead of downloading it again.
+* **The README's Getting started** now begins with the launcher.
+
+## 0.8.90 — The lobby page; RunPod as a launch choice (2026-11-26)
+
+* `kairos.bat lobby` opens the launcher as a page at http://127.0.0.1:8799/. Pick the companion, who is talking to her and how she runs, then start or stop.
+* **RunPod:** a profile with a `[runpod]` table runs the model on a rented RunPod pod. Your companion's memory and everything else stay on your machine. Starting rents the pod. Stopping runs her end-of-day pass, then terminates the pod so nothing keeps billing. The API keys stay in files under `var/secrets/`.
+
+## 0.8.89 — Get set up: models and engines downloaded and configured for you (2026-11-26)
+
+* **Get set up** (System folder), or `python -m harness.setup` in a terminal, or option 9 in `kairos.bat`:
+  1. It looks at your graphics card and memory, and suggests an engine and a model.
+  2. It downloads them. Downloads resume if interrupted, and every file is checked against its published checksum.
+  3. Before the engine runs, you approve it by its checksum.
+  4. It writes a profile that starts the engine for you.
+* **Models:** Gemma 4 26B-A4B (recommended), Gemma 4 31B, and uncensored builds of each. The uncensored ones come with a warning.
+* **Engines:** llama.cpp (NVIDIA CUDA, Vulkan, CPU, Linux), an engine you already run (LM Studio, Ollama…), or the native Kairos engine once its release is published.
+* **New profile key:** `[engine] command`. A profile can now start its own engine, and `serve.py --stop` stops it again.
+
+## 0.8.88 — A launcher, and switching companions (2026-11-26)
+
+* **`kairos.bat`** (or `./kairos.sh`) opens a small menu: pick the companion, who is talking to her, and how she runs, then start, stop, back up, or open the room. `kairos.bat start --profile=companion --companion=ivy` does the same without the menu.
+* **Switch companion** from the Companion window. On the native engine the model reloads too, which takes a couple of minutes. On an external engine it takes a few seconds.
+
+## 0.8.87 — People, pets and places; more than one user (2026-11-26)
+
+* **People** (Her folder) holds who and what your companion knows: people, pets, places, things. Each has a name and nicknames, who they are to you, and notes. She can suggest someone she hears about, and you confirm it. Nothing is deleted.
+* **More than one user.** Add users in People and switch who she is talking to; switching takes a quick restart. What one person tells her in confidence (passwords, PINs, codes) is never brought up with anyone else.
+* Facts she remembers are linked to the people they are about, and she can remember facts about your pets and friends, not only about you.
+* The guided Character flow now ends with "who you are" and "the people in your life".
+* With a companion home, the active user in People replaces `[user]` in the profile. `[user]` only fills in the first user.
+
+## 0.8.86 — Make your companion a question at a time; her persona as sections; first-run hints (2026-11-26)
+
+* **Character** (Her folder) makes a companion a question at a time: her name, who she is, how she sounds, what she cares about, where she comes from, the two of you, her ways, how she looks, her limits, her voice. Each question has a tip, examples you can click, and a live preview of what she will read about herself. Skip any step but her name, and the starter persona covers it. Finish with a new companion, or rewrite the current one.
+* **Persona** (Her folder) shows who she is as titled sections you can edit, reorder, add to, retire and restore. Nothing is deleted. Changes apply from her next session.
+* **First-run hints:** on a fresh setup the room shows one hint at a time: how to talk to her, memory, the journal, clothing, voice, backups and more. Each goes away once you have tried the thing it is about. Turn them off from the card, or bring them back from the Companion window.
+
+## 0.8.85 — Save, load, reset and undo your companion (2026-11-26)
+
+* A new **Companion** window (System folder). Save her as a `.kairos` bundle — pick personality, history, receipts & logs, face — and download it, or upload one from another machine.
+* **Load & reset:** start fresh (personality, history, or both), or load either from a bundle. You type her name to confirm a reset. The change happens at her next start, and the window offers the ~20-second restart.
+* **Nothing is deleted.** The old contents move to the companion's `archive/` folder and a bundle of them is saved first; **Undo** puts them back.
+* **Create a new companion** (Companion window → Companions, or `python tools/companion.py create <id> --name …`). She starts with the persona template already in her name, the default face and wardrobe, and a voice of her own. By default she uses the local voice on your machine (offline, no key). An xAI voice no other companion uses is kept ready if you switch, or you can pick one.
+* Make a new companion from a bundle without touching the current one. Anything the bundle lacks is filled in the same way.
+* Fixed: restarting from the room kept the profile's companion rather than the one you started with `--companion=`. Held-back messages, the deep-recall index, game screenshots and book bookmarks now belong to each companion.
+* The room's name in the taskbar and the browser tab is the companion's.
+* The same from a terminal: `python tools/companion.py list | export | inspect | new | load | reset | undo`.
+* Needs a companion home (`[companion] home` in the profile, or `--companion=<id>`).
+
+## 0.8.84 — A companion is a folder; she says the name you gave her (2026-11-26)
+
+* A companion can live in its own folder: `companions/<id>/companion.toml` names her (`[companion] id`, `name`) and, optionally, where any of her stores are (`[paths]`). Point a profile at it with `[companion] home = "<id>"`, or pass `--companion=<id>` to `serve.py`. Every store (memory, persona, knobs, journal, wardrobe, receipts) then lives inside that folder, and the hourly backup goes to `var/backups/<id>`. A profile that names a store path as well as a home is refused at startup. Without a home, nothing changes.
+* The companion's own name is no longer fixed. Prompts that said "You are Kairos" now use the name in `companion.toml` (or `[companion] name` in the profile without a home).
+* Fixed: the deep-recall query prefix had a garbled phrase in it, and two windows read the personality journal from the repo folder even when a different store was configured.
+
+## 0.8.83 — A research knob to switch off chosen MoE experts (2026-11-23)
+
+* New `[decode] expert_mask` profile key (`SP_G4_EXPERT_MASK`): a file of `layer expert` pairs the engine's router will never select, for pruning experiments. Empty, as shipped, changes nothing. A mask file that is set but unreadable or malformed stops the engine instead of running unmasked.
+
 ## 0.8.82 — Tool descriptions use your name and pronouns too (2026-11-19)
 
 * The tool descriptions the companion reads follow `[user]` as well. Fifteen of them still said "he"/"his" or "Sam" (the body, wardrobe, notes, presence and house tools, and consult); with `[user]` unset they now say "the user" and they/them. Tool names are unchanged.

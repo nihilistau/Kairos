@@ -77,9 +77,14 @@ if (os.path.exists(os.path.join(ROOT, "KAIROS-SOURCE.txt"))
 else:
     his = serve.load_profile("companion")
     henv = serve.build_env(his)
-    check("a cold root is set on his profile, and mapped as written",
-          bool(his["memory"].get("eps_cold_dir")) and henv.get("SP_EPS_COLD_DIR") == his["memory"]["eps_cold_dir"],
-          henv.get("SP_EPS_COLD_DIR"))
+    # Since 2026-11-26 the cold root is her HOME's (companions/kairos/companion.toml
+    # [paths].eps_cold_dir), not the profile's; "as written" still means byte for byte.
+    from harness import home as _home
+    _hd = serve.home_path(his)
+    _written = (_home.read(_hd).get("paths") or {}).get("eps_cold_dir", "")
+    check("a cold root is set in his home, and mapped as written",
+          bool(_written) and henv.get("SP_EPS_COLD_DIR") == _written,
+          (henv.get("SP_EPS_COLD_DIR"), _written))
     # ARMED BY THE OPERATOR (2026-10-20), after the dry run. Arming is his decision, not the
     # code's, so the gate does not pin a state: it holds that whichever state the profile is
     # in, the off-ledger says the same (an armed tier is recorded as ARMED in §19; an

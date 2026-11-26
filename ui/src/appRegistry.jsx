@@ -30,9 +30,14 @@ import Ledger from './apps/Ledger.jsx'
 import Stage from './apps/Stage.jsx'
 import Games from './apps/Games.jsx'
 import Wardrobe from './apps/Wardrobe.jsx'
+import Persona from './apps/Persona.jsx'
+import Character from './apps/Character.jsx'
+import People from './apps/People.jsx'
 import Settings from './apps/Settings.jsx'
 import Launch from './apps/Launch.jsx'
 import Setup from './apps/Setup.jsx'
+import Companion from './apps/Companion.jsx'
+import Install from './apps/Install.jsx'
 import Agency from './apps/Agency.jsx'
 import Research from './apps/Research.jsx'
 import Search from './apps/Search.jsx'
@@ -91,6 +96,13 @@ export const APPS = [
      a picker where the job can switch live, and a Test. The taskbar strip opens it. */
   { id: 'models', group: 'system', title: 'Models', icon: 'models', w: 640, h: 560, Component: Models, css: 'mdl',
     blurb: 'every model she runs on — what is loaded, what is missing, a picker and a test for each' },
+  /* WHO SHE IS, AS A THING YOU CAN SAVE (2026-11-26): bundles, load, reset, undo, and the
+     companions on this machine (harness/bundle.py, harness/server/companion_routes.py). */
+  { id: 'companion', group: 'system', title: 'Companion', icon: 'companion', w: 640, h: 640, Component: Companion, css: 'cp',
+    blurb: 'save her as a bundle, load or reset her personality and history, undo, and other companions' },
+  /* EVERYTHING SHE NEEDS, FETCHED (2026-11-26, harness/setup/): engine, model, a profile. */
+  { id: 'install', group: 'system', title: 'Get set up', icon: 'install', w: 700, h: 700, Component: Install, css: 'in',
+    blurb: 'pick an engine and a model, download and check them, approve the engine, write her profile' },
   { id: 'setup', group: 'system', title: 'Setup', icon: 'setup', w: 660, h: 640, Component: Setup, css: 'su',
     blurb: 'what is configured and what is not — your endpoint, your keys, her face, the model cards. reads only' },
   { id: 'voice', group: 'system', title: 'Voice', icon: 'voice', w: 560, h: 460, Component: Voice, css: 'vc',
@@ -148,6 +160,16 @@ export const APPS = [
   { id: 'presence', group: 'her', title: 'Presence', icon: 'presence', w: 600, h: 560, Component: Presence, css: 'prs',
     TitleChip: PresenceChip,
     blurb: 'narration, company, lucid dream — her modes of being there out loud, and the shelf she reads from' },
+  /* WHO SHE IS, EDITABLE (2026-11-26, design §7b): her persona as titled sections, and the
+     guided flow that writes them a question at a time (harness/personality/). */
+  { id: 'persona', group: 'her', title: 'Persona', icon: 'persona', w: 640, h: 660, Component: Persona, css: 'ps',
+    blurb: 'who she is, as titled sections — edit, reorder, add, retire; nothing is deleted' },
+  { id: 'character', group: 'her', title: 'Character', icon: 'character', w: 760, h: 680, Component: Character, css: 'ch',
+    blurb: 'make her a question at a time — hints, examples, good practice; a new companion or a rewrite' },
+  /* WHO AND WHAT SHE KNOWS (2026-11-26, harness/people.py): people, pets, places, things,
+     and the users she talks to; her suggestions wait here for a yes. */
+  { id: 'people', group: 'her', title: 'People', icon: 'people', w: 620, h: 640, Component: People, css: 'pp',
+    blurb: 'who and what she knows — people, pets, places — and who she talks to; her suggestions wait for your yes' },
   { id: 'librarians', group: 'lookup', title: 'Librarians', icon: 'librarians', w: 620, h: 560, Component: Librarians, css: 'lib',
     TitleChip: AuxChip,
     blurb: 'the quiet librarians — the small CPU models that embed, retrieve, judge and read for her; never her voice' },

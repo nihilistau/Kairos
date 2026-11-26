@@ -88,8 +88,7 @@ def persist_receipts(root: str = "") -> int:
         return 0
     import json as _json
     import os as _os
-    root = root or _os.environ.get("SP_TELEMETRY_OKF_ROOT") or _os.path.join(
-        _os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))), "memory-okf-telemetry")
+    root = root or __import__("harness.home", fromlist=["path"]).path("telemetry_okf")
     try:
         from harness.telemetry.sink import TelemetrySink
         sink = TelemetrySink(root)

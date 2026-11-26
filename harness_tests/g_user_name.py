@@ -197,4 +197,36 @@ e0 = _serve.build_env(_serve.load_profile("companion"))
 check("the shipped profile leaves the user unnamed", not e0.get("SP_USER_NAME")
       and not e0.get("SP_USER_PRONOUNS"), (e0.get("SP_USER_NAME"), e0.get("SP_USER_PRONOUNS")))
 
+print("\n5. HER name is a token too (2026-11-26)")
+# "You are Kairos" was a literal in thirteen prompt-visible strings; the export's name rule
+# rewrote every one to "Kairos", so a companion named anything else was told otherwise in her
+# own prompts. {companion} is filled from SP_COMPANION_NAME (the home's companion.toml).
+os.environ.pop("SP_COMPANION_NAME", None)
+check("{companion} unset is the one default", U.say("You are {companion}.") ==
+      "You are %s." % U.DEFAULT_COMPANION, U.say("You are {companion}."))
+os.environ["SP_COMPANION_NAME"] = "Ivy"
+check("{companion} follows the env at call time", U.say("You are {companion}.") == "You are Ivy.")
+from harness.kairos import presence as _pr          # noqa: E402
+check("a presence prompt says her configured name (mode_nudge fills it)",
+      "You are Ivy in" in _pr.mode_nudge("narration"), _pr.mode_nudge("narration")[:60])
+os.environ.pop("SP_COMPANION_NAME")
+# Her name where a PROMPT would put it — not the bare word, because in the export the
+# product itself is called Kairos (the scrub renames her default to the product's name).
+COMP_RX = re.compile(r"(?:You are|Recall for|means|Your name is) Kairos\b(?!-Prime)")
+chits = []
+for dp, dn, fn in os.walk(os.path.join(ROOT, "harness")):
+    dn[:] = [d for d in dn if d != "__pycache__"]
+    for f in fn:
+        if not f.endswith(".py"):
+            continue
+        p = os.path.join(dp, f)
+        if os.path.relpath(p, ROOT) == os.path.join("harness", "user.py"):
+            continue                                   # DEFAULT_COMPANION: the one literal
+        src = io.open(p, encoding="utf-8", errors="replace").read()
+        toks = list(tokenize.generate_tokens(io.StringIO(src).readline))
+        for i, t in enumerate(toks):
+            if t.type == tokenize.STRING and COMP_RX.search(t.string) and not _docstring_token(toks, i):
+                chits.append("%s:%d" % (os.path.relpath(p, ROOT), t.start[0]))
+check("no string literal under harness/ names her", not chits, chits[:6])
+
 finish("G-USER-NAME")

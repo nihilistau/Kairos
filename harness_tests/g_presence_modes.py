@@ -176,13 +176,14 @@ p1 = L.next_passage(60)
 check("a passage is plain text, tags stripped, from the start", p1.startswith("One") or p1.startswith("It was a dark"), p1)
 p2 = L.next_passage(60)
 check("the bookmark advanced (a different passage next)", bool(p2) and p2 != p1, p2)
-bm = json.load(open(os.path.join(LIB, ".bookmarks.json"), encoding="utf-8"))
+# the owner's path (2026-11-26): bookmarks are hers and live in her home, not beside the books
+bm = json.load(open(L._bm_path(), encoding="utf-8"))
 check("the bookmark is persisted as a position, never the text", "The Little Book" in bm and isinstance(bm["The Little Book"].get("pos"), int))
 import importlib                                # noqa: E402
 importlib.reload(L)
 check("...and survives a reload (in hand and position)", bool(L.in_hand()) and L.in_hand()["title"] == "The Little Book" and L.in_hand()["pos"] > 0)
 L.put_down()
-check("put down: nothing in hand, the bookmark kept", L.in_hand() is None and json.load(open(os.path.join(LIB, ".bookmarks.json")))["The Little Book"]["pos"] > 0)
+check("put down: nothing in hand, the bookmark kept", L.in_hand() is None and json.load(open(L._bm_path()))["The Little Book"]["pos"] > 0)
 L.pick_up("Tales of the Tide")
 tail = ""
 for _ in range(200):

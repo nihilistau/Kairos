@@ -2590,11 +2590,11 @@ L.dockAdd('journal'); L.moveToFolder('memory', null); un(); L.dockAdd('agency')
 out.ticks = ticks
 """)
 check("the layout-store probe rendered", "_error" not in d, d.get("_error", ""))
-_exp_groups = {"her": ["journal", "agency", "memory", "decisions", "wardrobe", "presence"],
+_exp_groups = {"her": ["journal", "agency", "memory", "decisions", "wardrobe", "presence", "persona", "character", "people"],
                "together": ["music", "games", "story", "stage"],
                "lookup": ["search", "research", "librarians", "files", "board"],
                "home": ["house", "body", "senses", "roomview", "room"],
-               "system": ["settings", "models", "launch", "setup", "voice", "tools", "ledger", "apps"]}
+               "system": ["settings", "models", "launch", "companion", "install", "setup", "voice", "tools", "ledger", "apps"]}
 _got_groups = d.get("groups") or {}
 check("every app has a known group or none",
       d.get("badGroup") == [] and {k: sorted(v) for k, v in _got_groups.items()} == {k: sorted(v) for k, v in _exp_groups.items()}
@@ -2620,7 +2620,7 @@ check("alias: docking keeps folder membership, and so does undocking",
       and d.get("moved") == ["chat", "voice", "journal", "music", "search", "memory", "models"], (d.get("alias"), d.get("moved")))
 check("corrupt storage falls back to defaults",
       d.get("corrupt") == {"dock": ["chat", "voice", "music", "search", "memory", "models"],
-                           "her": ["wardrobe", "memory", "decisions", "agency", "journal", "presence"],  # registry order
+                           "her": ["wardrobe", "memory", "decisions", "agency", "journal", "presence", "persona", "character", "people"],  # registry order
                            "canUndo": False, "folder": "her"}
       and (d.get("wrongShape") or {}).get("dock") == ["chat", "voice", "music", "search", "memory", "models"]
       and (d.get("wrongShape") or {}).get("folder") == "her", (d.get("corrupt"), d.get("wrongShape")))
@@ -2751,7 +2751,7 @@ check("...and an app taken out of its folder is a loose icon again",
       d.get("outLabels") == ["Her", "Together", "Look it up", "Home", "System", "Journal"], d.get("outLabels"))
 _pn = grab(d, "panel")
 check("the open panel is a named group of its apps, the first one in the tab order",
-      'aria-label="Her"' in _pn and _pn.count('class="dsk-fold-item') == 6 and _pn.count('tabindex="0"') == 1
+      'aria-label="Her"' in _pn and _pn.count('class="dsk-fold-item') == 9 and _pn.count('tabindex="0"') == 1  # 6 + Persona, Character, People (2026-11-26)
       and ">Journal<" in _pn and "dsk-fold-panel" in _pn, _pn[:300])
 check("panel closes on Escape and outside click",
       (d.get("afterA"), d.get("afterEsc"), d.get("afterInside"), d.get("afterOutside")) == (0, 1, 1, 2),

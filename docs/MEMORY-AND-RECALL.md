@@ -191,6 +191,23 @@ Other fields:
   field first and only falls back to sniffing `src` for legacy rows written before `status`
   existed. `lifecycle.render()` had the identical near-miss for the same reason — see
   `lifecycle.py:709-713`. **The rule: `src` is a log line, not an enum.**
+- **`said_by`** (since 2026-11-26) — the person id (`harness/people.py`) of the USER who told
+  her, on `speaker=user` rows, when users are configured (`SP_USER_ID`, the home's active
+  user). Stamped in `lifecycle._stamp_people`, called from `stamp()`: the one function both
+  row creators (remember() and the cleanup rescue) pass through. Absent on every row
+  written before people existed.
+- **`about`** (since 2026-11-26) — the ids of the live people, pets and places whose names
+  the fact mentions (`people.mentioned`). Absent when no one is named. A PROPOSED person
+  links nothing until he confirms them.
+- **Private stays with its teller (ruling 9.1).** `lifecycle.other_users_secret(row)`: a
+  `private-secret` row whose `said_by` is another user is ABSENT — not declined — from
+  `live_rows()`, the ranked seam (`search_memories_ranked_rows`), `PersonModel` and the
+  room's Memory panel. A row with no `said_by` is never hidden by this. Known gap: the dedupe
+  matches text alone, so user B repeating user A's exact sentence reinforces A's row.
+- **Aboutness and known people.** `admission`'s anchor rule (`_ANCHOR`: the fact must be
+  about him or her) also accepts a fact whose SUBJECT is a live person she knows ("Tuffy
+  hates the vacuum cleaner", `lifecycle._anchored_on_known`). A name mentioned later in the
+  sentence still does not anchor it. G-PEOPLE.
 
 ## Write paths — there are three, and only one is authoritative
 

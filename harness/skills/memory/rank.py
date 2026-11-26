@@ -30,6 +30,7 @@ Extracted from `memory.py` on 2026-09-02, byte-identical.
 """
 from __future__ import annotations
 
+from harness.skills import lifecycle as _lc_people  # other_users_secret (2026-11-26)
 import logging
 import math
 import os
@@ -142,6 +143,10 @@ def search_memories_ranked_rows(query: str, k: int = 5, min_overlap: float = 0.2
     for e in eps:
         if not include_retired and e.get("lifecycle"):
             continue                      # superseded is superseded — on EVERY path, not just the polite one
+        if _lc_people.other_users_secret(e):
+            # Another user's PRIVATE fact (ruling 9.1). Not declined, absent: the decider's
+            # decline is for HIS secrets; that someone else told her one is itself private.
+            continue
         t = _text(e)
         ov = _overlap(query, t)
         if clause != query:

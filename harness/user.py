@@ -18,6 +18,9 @@ JSON braces for a later .format():
     {is} {was} {has} {does}     verb agreement     is / are, was / were, has / have, does / do
     {s} {es}             third-person -s / -es  "{he} ask{s}" -> he asks / they ask
     {IS} {HAS} {S} {ES}  the same, upper-cased
+    {companion}          HER name — the companion's own (SP_COMPANION_NAME, from the home's
+                         companion.toml or the profile's [companion] name). Unset: "Kairos",
+                         the one literal the export's name rule rewrites to its own default.
 
 Read at call time, not import time, so a gate can set the env and see the result. Module
 constants built at import still take the boot env, which serve.py sets before the gateway
@@ -30,6 +33,11 @@ import re
 from typing import Dict, Tuple
 
 DEFAULT_NAME = "the user"
+# Her name when nothing configures one (2026-11-26). "You are Kairos" was a literal in
+# thirteen prompt-visible strings, so a Kairos user who named their companion anything else
+# still had her told she was called Kairos. ONE literal now, here; G-USER-NAME §9 scans for
+# any other.
+DEFAULT_COMPANION = "Kairos"
 
 _PRONOUNS: Dict[str, Tuple[str, str, str, str]] = {
     "he": ("he", "him", "his", "himself"),
@@ -46,6 +54,17 @@ def name() -> str:
 def called() -> str:
     """What she calls him in prose: the name, or 'the user'."""
     return name() or DEFAULT_NAME
+
+
+def user_id() -> str:
+    """The active user's person id (harness/people.py), or '' — set by serve.py from the
+    home's active user. Facts he tells her are stamped with it (said_by)."""
+    return (os.environ.get("SP_USER_ID") or "").strip()
+
+
+def companion() -> str:
+    """Her own name: SP_COMPANION_NAME, else DEFAULT_COMPANION. Read at call time."""
+    return (os.environ.get("SP_COMPANION_NAME") or "").strip() or DEFAULT_COMPANION
 
 
 def example_name() -> str:
@@ -83,7 +102,7 @@ def name_pattern() -> str:
 
 
 _TOKEN = re.compile(r"\{(user|User|USER|he|He|HE|him|Him|HIM|his|His|HIS|himself|"
-                    r"is|was|has|does|IS|HAS|s|es|S|ES)\}")
+                    r"is|was|has|does|IS|HAS|s|es|S|ES|companion)\}")
 
 
 def _table() -> Dict[str, str]:
@@ -101,6 +120,7 @@ def _table() -> Dict[str, str]:
         "IS": "ARE" if many else "IS", "HAS": "HAVE" if many else "HAS",
         "s": "" if many else "s", "es": "" if many else "es",
         "S": "" if many else "S", "ES": "" if many else "ES",
+        "companion": companion(),
     }
 
 

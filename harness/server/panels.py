@@ -632,7 +632,9 @@ def _memory_json() -> Dict[str, Any]:
     looked live. A browser you cannot act from is a report, not a panel."""
     try:
         from harness.skills.memory import _load, verify_registry
-        rows = [_mem_row_json(e) for e in _load()]
+        from harness.skills import lifecycle as _lcp
+        # The room is any user's: another user's private facts are not shown in it (9.1).
+        rows = [_mem_row_json(e) for e in _load() if not _lcp.other_users_secret(e)]
         rows.sort(key=lambda r: -r["salience"])
         return {"count": len(rows), "facts": rows, "health": verify_registry()}
     except Exception as exc:
@@ -855,9 +857,8 @@ def _narrative_json() -> Dict[str, Any]:
     except Exception as exc:
         out["error"] = str(exc)[:200]
     try:
-        root = os.path.join(os.path.dirname(os.path.dirname(
-            os.path.dirname(os.path.abspath(__file__)))),
-            "memory-okf-personality", "full")
+        # The home's tier (2026-11-26) — the repo-root literal showed every companion hers.
+        root = os.path.join(__import__("harness.home", fromlist=["path"]).path("personality_okf"), "full")
         rows = []
         for fn in os.listdir(root):
             if not fn.endswith(".md"):

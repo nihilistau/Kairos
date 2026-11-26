@@ -24,7 +24,7 @@ MAX_TRAITS = 8
 
 def _tier_root(root=None) -> Path:
     return Path(root) if root else Path(
-        os.environ.get("SP_PERSONALITY_OKF_ROOT") or (HARNESS_ROOT / "memory-okf-personality"))
+        __import__("harness.home", fromlist=["path"]).path("personality_okf"))
 
 
 def _dedup(items: List[str]) -> List[str]:

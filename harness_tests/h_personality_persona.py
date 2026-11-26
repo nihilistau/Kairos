@@ -136,7 +136,7 @@ def main() -> int:
     PERSONA.unlink()
     s6 = load()
     src6 = dict(_agent.PERSONA_SOURCE)
-    missing_ok = ("assembled here from separate pieces" in s6 and s6 != _agent.AGENT_SYSTEM
+    missing_ok = ("assembled here from separate pieces" in s6 and s6 != __import__("harness.user", fromlist=["say"]).say(_agent.AGENT_SYSTEM)
                   and src6.get("file") == "missing" and src6.get("fragments") == 2
                   and not src6.get("fallback"))
     # /v1/setup reports what COMPOSED, not just what is on disk
@@ -157,7 +157,7 @@ def main() -> int:
     for f in LAYERS.glob("*.md"):
         f.unlink()
     s8 = load()
-    neither_ok = s8 == _agent.AGENT_SYSTEM and _agent.PERSONA_SOURCE.get("fallback") is True
+    neither_ok = s8 == __import__("harness.user", fromlist=["say"]).say(_agent.AGENT_SYSTEM) and _agent.PERSONA_SOURCE.get("fallback") is True
     print(f"no persona.md -> fragments composed={missing_ok} (source={src6}); "
           f"empty persona.md -> composed={empty_ok}; neither -> AGENT_SYSTEM+fallback={neither_ok}")
 

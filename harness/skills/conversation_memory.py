@@ -34,8 +34,8 @@ from harness.loud import swallowed as _swallowed
 _swlog = logging.getLogger(__name__)
 
 _HARNESS_ROOT = os.path.abspath(os.path.join(_THIS, "..", ".."))
-CONV_ROOT = os.environ.get("SP_CONV_OKF_ROOT", os.path.join(_HARNESS_ROOT, "memory-okf-conv"))
-CAPS_ROOT = os.environ.get("SP_CAPS_OKF_ROOT", os.path.join(_HARNESS_ROOT, "memory-okf-caps"))
+CONV_ROOT = __import__("harness.home", fromlist=["path"]).path("conv_okf")     # the home's, else <root>/memory-okf-conv
+CAPS_ROOT = __import__("harness.home", fromlist=["path"]).path("caps_okf")     # the home's, else <root>/memory-okf-caps
 
 
 # ──── transcript / model helpers ───────────────────────────────────────────
@@ -297,7 +297,7 @@ def consolidate_conversation(messages: List[dict], client=None) -> dict:
 # ──── CAPABILITIES corpus + init primer ────────────────────────────────────
 CAPABILITIES = [
     ("identity", "What you are",
-     "You are Kairos, an experimental AI running locally on a single RTX 2060 with a real, auditable working memory."),
+     "You are {companion}, an experimental AI running locally with a real, auditable working memory."),
     ("memory-remember", "Store a fact",
      "State a fact and it is captured to long-term memory automatically; or call the remember tool. Facts survive across turns and restarts."),
     ("memory-recall", "Recall facts",
@@ -328,6 +328,7 @@ def seed_capabilities() -> List[str]:
     """Write the capabilities corpus into the MEM-OKF caps store (recallable 'how do I use myself')."""
     addrs = []
     for key, summary, detail in CAPABILITIES:
+        detail = __import__("harness.user", fromlist=["say"]).say(detail)
         body = f"# {summary}\n\n{detail}\n"
         addr = ok.addr_of(body)
         _okf_add(CAPS_ROOT, addr, keys=key, summary=summary, full_body=body, detail=detail, kind="agent")
@@ -348,10 +349,10 @@ def recall_capability(query: str) -> str:
 
 def init_primer() -> str:
     """The on-init priming text: a compact 'how to use yourself' the system loads at start."""
-    lines = ["You are Kairos. You can use yourself as follows:"]
+    lines = ["You are {companion}. You can use yourself as follows:"]
     for _key, summary, detail in CAPABILITIES:
         lines.append(f"- {summary}: {detail}")
-    return "\n".join(lines)
+    return __import__("harness.user", fromlist=["say"]).say("\n".join(lines))
 
 
 # Tools the model can call (alongside harness.skills.memory.MEMORY_TOOLS).

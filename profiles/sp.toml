@@ -180,6 +180,7 @@ prefill_dp4a = false                  # SP_KV_PREFILL_DP4A — measured ~18% SLO
 # it came from. Costs a D2H + sync per layer when armed.
 #   ARMING CONDITION. Arm it, run the failing prompt ONCE, read the layer it names, disarm.
 nan_probe = false                     # SP_G4_NAN_PROBE
+expert_mask = ""                      # SP_G4_EXPERT_MASK (research: file of "layer expert" pairs the router never selects; empty = off)
 
 [tts]
 method = "xai"                        # her voice via the xAI API when a key file is present; local otherwise

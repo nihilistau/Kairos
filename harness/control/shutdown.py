@@ -45,7 +45,9 @@ MODES = ("her", "all", "kill")
 
 
 def undelivered_path() -> str:
-    return os.path.join(_ROOT, "var", "room", "undelivered.jsonl")
+    # The home's (2026-11-26): a literal here meant the NEXT companion started on this
+    # machine replayed her held-back lines as its own.
+    return __import__("harness.home", fromlist=["path"]).path("undelivered")
 
 
 def is_shutting_down() -> bool:

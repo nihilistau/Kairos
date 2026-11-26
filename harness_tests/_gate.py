@@ -240,7 +240,20 @@ _STORE_ENV = (
     "SP_LAUNCH_PROFILES_DIR",   # profiles/ - the toml the Launch window edits in place
     "SP_LAUNCH_VAR",            # var/ root for launched.json, launch-setups/, settings-changes.jsonl
     "SP_GRAPH_DIR",             # the memory graph's generations (derived, but a gate must not write HERS)
+    # THE REST OF THE HOME TABLE (2026-11-26, harness/home.py KEYS). G-HOME §6 holds this
+    # list to that table, so a store added there and forgotten here goes red by name.
+    "SP_TASK_ROOT",             # the task queue (_task_state/)
+    "SP_AMBIENT_LOG",           # the ambient eye's log of his room
+    "SP_GAMES_DIR", "SP_SCENES_DIR", "SP_SCENARIOS_DIR",
+    "HARNESS_WORKSPACE",        # the shared workspace (var/room/files)
+    "SP_BUNDLE_DIR",            # .kairos bundles, and the before-<op> copies a reset writes
+    "SP_UNDELIVERED", "SP_AUX_INDEX_DIR", "SP_LIBRARY_BOOKMARKS",
+    "SP_COMPANIONS_DIR",        # where companion homes are created and listed
+    "SP_HINTS_STATE",           # first-run hints' progress
+    "SP_PEOPLE",                # who she knows, and which of them are users
 )
+# Identity of a live launch's home. A gate that inherits it would back up and name HER.
+_HOME_ENV = ("SP_HOME", "SP_COMPANION_ID", "SP_COMPANION_NAME")
 
 
 # What each root pointed at BEFORE the sandbox replaced it. A gate that wants to grade
@@ -298,6 +311,22 @@ def sandbox(name: str = "gate", persona: str = "") -> str:
     os.makedirs(os.environ["SP_LAUNCH_PROFILES_DIR"], exist_ok=True)
     os.environ["SP_LAUNCH_VAR"] = os.path.join(sb, "launch-var")
     os.environ["SP_GRAPH_DIR"] = os.path.join(sb, "graph")
+    os.environ["SP_TASK_ROOT"] = os.path.join(sb, "tasks")
+    os.environ["SP_AMBIENT_LOG"] = os.path.join(sb, "senses", "ambient.jsonl")
+    os.environ["SP_GAMES_DIR"] = os.path.join(sb, "games")
+    os.environ["SP_SCENES_DIR"] = os.path.join(sb, "scenes")
+    os.environ["SP_SCENARIOS_DIR"] = os.path.join(sb, "scenarios")
+    os.environ["HARNESS_WORKSPACE"] = os.path.join(sb, "files")
+    os.environ["SP_BUNDLE_DIR"] = os.path.join(sb, "bundles")
+    os.environ["SP_UNDELIVERED"] = os.path.join(sb, "undelivered.jsonl")
+    os.environ["SP_AUX_INDEX_DIR"] = os.path.join(sb, "aux-index")
+    os.environ["SP_LIBRARY_BOOKMARKS"] = os.path.join(sb, "bookmarks.json")
+    os.environ["SP_COMPANIONS_DIR"] = os.path.join(sb, "companions")
+    os.environ["SP_HINTS_STATE"] = os.path.join(sb, "hints.json")
+    os.environ["SP_PEOPLE"] = os.path.join(sb, "memory", "people.jsonl")
+    for _v in _HOME_ENV:
+        _REPLACED.setdefault(_v, os.environ.get(_v))
+        os.environ.pop(_v, None)
     # THE FIXTURES ARE ABOUT A NAMED USER (2026-11-19). Since harness/user.py, the user's
     # name and pronouns come from the profile, and unset is "the user", they/them — so a
     # fixture fact like "Sam is terrified of open water" is no longer anchored to anyone,

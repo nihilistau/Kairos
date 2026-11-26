@@ -116,6 +116,73 @@ _last: Dict = {}
 _lock = threading.Lock()
 
 
+# ── THE HOME'S SOURCES (2026-11-26) ───────────────────────────────────────────────────
+# With a companion home (SP_HOME), the source set is the home's stores, resolved through
+# harness/home.py — the SAME table serve.py used to tell the gateway where they are. Until
+# today SOURCES above was the only list, resolved against the repo root, so a registry the
+# profile had moved somewhere else was simply not backed up, and a second companion would
+# have been backed up as her. Same set as SOURCES, by store: the registry's whole folder
+# (speech, transcripts, notes, journal, graph live beside it), the persona, the OKF tiers,
+# the knobs, the sense log, research, the workspace, the ledger, the task queue — plus the
+# home's companion.toml and its [backup] extra. Not the face or the episodes, as before.
+HOME_SOURCES: List[Tuple[str, bool]] = [
+    ("persona_file", False), ("persona_dir", True), ("tuning", False),
+    ("registry", True), ("sem_index", False), ("graph_dir", True), ("decisions", False),
+    ("ambient_log", True), ("research", True), ("workspace", True), ("ledger", False),
+    ("task_root", True), ("self_okf", True), ("personality_okf", True),
+    ("conv_okf", True), ("telemetry_okf", True),
+]
+
+
+def _sources() -> List[Tuple[str, bool]]:
+    """(absolute path, recursive?) — the home's stores, or SOURCES under _ROOT."""
+    home = os.environ.get("SP_HOME", "")
+    if not home:
+        return [(os.path.join(_ROOT, rel), rec) for rel, rec in SOURCES]
+    from harness import home as _home
+    out: List[Tuple[str, bool]] = [(os.path.join(home, _home.MANIFEST), False)]
+    for key, rec in HOME_SOURCES:
+        p = _home.path(key)
+        if not p:
+            continue
+        if key in ("registry", "ambient_log"):      # the FOLDER: everything beside it
+            p = os.path.dirname(p)
+        out.append((os.path.normpath(p), rec))
+    out += [(p, True) for p in _home.backup_extra(home)]
+    # A store inside a folder already taken whole would be archived twice.
+    trees = [os.path.normcase(p) + os.sep for p, r in out if r]
+    seen, keep = set(), []
+    for p, r in out:
+        k = os.path.normcase(p)
+        if k in seen or any(k.startswith(t) for t in trees if t != k + os.sep):
+            continue
+        seen.add(k)
+        keep.append((p, r))
+    return keep
+
+
+def _arcname(a: str) -> str:
+    """The path inside the zip: repo-relative when under the repo (so her archives keep
+    the names restore.py has always shown), else external/<drive>/<path>."""
+    ra, rr = os.path.realpath(a), os.path.realpath(_ROOT)
+    if os.path.normcase(ra).startswith(os.path.normcase(rr) + os.sep):
+        return os.path.relpath(ra, rr).replace("\\", "/")
+    drive, rest = os.path.splitdrive(ra)
+    return ("external/" + drive.rstrip(":") + rest).replace("\\", "/").replace("//", "/")
+
+
+def _eps_roots() -> List[str]:
+    """Episode folders to exclude by location, whatever the source tree they sit in."""
+    if INCLUDE_EPISODES:
+        return []
+    from harness.skills.epdir import configured_root    # the one reader of SP_EPS_DIR
+    dirs = [configured_root()]
+    reg = os.environ.get("SP_RECALL_REGISTRY", "")
+    if reg:
+        dirs.append(os.path.join(os.path.dirname(reg), "eps"))   # the old beside-the-registry default
+    return [os.path.normcase(os.path.realpath(d)) + os.sep for d in dirs if d]
+
+
 def _excluded(rel: str) -> Optional[str]:
     r = rel.replace("\\", "/")
     if r.startswith("var/memory/eps") and INCLUDE_EPISODES:
@@ -133,12 +200,12 @@ def _files() -> Tuple[List[Tuple[str, str]], Dict[str, str]]:
     out: List[Tuple[str, str]] = []
     hit: Dict[str, str] = {}
     backups = os.path.realpath(DIR)
-    for rel, recurse in SOURCES:
-        ap = os.path.join(_ROOT, rel)
+    eps = _eps_roots() if os.environ.get("SP_HOME") else []
+    for ap, recurse in _sources():
         if not os.path.exists(ap):
             continue
         if os.path.isfile(ap):
-            out.append((ap, rel.replace("\\", "/")))
+            out.append((ap, _arcname(ap)))
             continue
         for dirpath, dirnames, filenames in os.walk(ap):
             # NEVER RECURSIVE — by realpath, not by name.
@@ -148,8 +215,11 @@ def _files() -> Tuple[List[Tuple[str, str]], Dict[str, str]]:
             dirnames[:] = [d for d in dirnames if d != "__pycache__"]
             for fn in filenames:
                 a = os.path.join(dirpath, fn)
-                r = os.path.relpath(a, _ROOT).replace("\\", "/")
+                r = _arcname(a)
                 why = _excluded(r)
+                if not why and eps and any(
+                        os.path.normcase(os.path.realpath(a)).startswith(e) for e in eps):
+                    why = EXCLUDE["var/memory/eps"]
                 if why:
                     # Record the DIRECTORY that was excluded, not each of its 154
                     # members — and keep the segment that names it. The first cut
@@ -206,6 +276,8 @@ def run_once(reason: str = "manual") -> Dict:
         manifest = {
             "created": rec["iso"], "reason": reason, "digest": rec["digest"],
             "repo": _ROOT, "files": len(files), "bytes": rec["bytes"],
+            "companion": os.environ.get("SP_COMPANION_ID", ""),
+            "home": os.environ.get("SP_HOME", ""),
             "excluded": skipped,
             "note": "Restore with: python restore.py extract <name> --to <dir>",
         }

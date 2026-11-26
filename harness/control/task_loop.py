@@ -36,8 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 def _task_root() -> str:
-    root = os.environ.get("SP_TASK_ROOT") or os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "_task_state")
+    root = __import__("harness.home", fromlist=["path"]).path("task_root")
     os.makedirs(root, exist_ok=True)
     return root
 
@@ -142,7 +141,7 @@ def _is_refusal(reason: str) -> bool:
 
 
 TASK_SYSTEM = (
-    "You are Kairos working a multi-step task on the operator's machine. Break the goal "
+    "You are {companion} working a multi-step task on the operator's machine. Break the goal "
     "into small steps. Each step: think briefly, then EITHER call ONE tool (to read, edit, run, "
     "or test) OR — when the goal is fully achieved — reply with a line beginning 'DONE:' and a "
     "one-sentence summary. If you get stuck, reply with a line beginning 'BLOCKED:' and why. "
@@ -225,7 +224,7 @@ def run_task(
 
         text = run_with_tools(
             _plan_prompt(state), tools, client=client, config=cfg,
-            on_tool=_cap, max_rounds=4, system_prefix=TASK_SYSTEM)
+            on_tool=_cap, max_rounds=4, system_prefix=__import__("harness.user", fromlist=["say"]).say(TASK_SYSTEM))
         obs = "\n".join(captured) if captured else "(no tool call this step)"
         step = TaskStep(n=n, action=text, observation=obs, ts=time.time())
         state.steps.append(step)

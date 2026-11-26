@@ -212,7 +212,10 @@ print("\n7. ONE TIER RESOLUTION, NOT FOUR")
 src = open(os.path.join(ROOT, "harness", "skills", "narrative.py"),
            encoding="utf-8", errors="replace").read()
 check("narrative.py resolves the personality tier in exactly one place",
-      src.count("memory-okf-personality") == 3      # the docstring + _tier_full's two fallbacks
+      # Since 2026-11-26 the ONE place is harness/home.py: _tier_full asks home.path and
+      # spells no default of its own (the docstring's mention is the only literal left).
+      src.count("memory-okf-personality") == 1
+      and src.count('path("personality_okf")') == 1
       and src.count("_tier_full()") >= 4,
       "the writers honoured SP_PERSONALITY_TIER and the readers hardcoded the repo path")
 check("...and this gate proves it: it set SP_PERSONALITY_TIER and own_time came back",

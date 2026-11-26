@@ -493,7 +493,7 @@ def _spawn_restart(full: bool) -> Dict[str, Any]:
     return {"ok": True, "profile": prof, "full": full, "eta_s": 180 if full else 20}
 
 
-def _do_restart(full: bool) -> None:
+def _do_restart(full: bool, companion: str = "") -> None:
     """Actually relaunch. Called AFTER the response has been written and flushed, because
     a full restart stops this very process and a reply from a dead socket is no reply.
 
@@ -518,6 +518,12 @@ def _do_restart(full: bool) -> None:
     if not prof:
         return
     argv = [sys.executable, os.path.join(_ROOT_DIR, "serve.py"), prof]
+    # THE SAME COMPANION COMES BACK (2026-11-26). serve.py takes the home from
+    # --companion= or the profile, never from the environment, so a restart of a launch
+    # started with --companion=ivy came back as the profile's companion — her.
+    # A SWITCH names the companion to come back as (/v1/companion/switch).
+    if companion or os.environ.get("SP_HOME"):
+        argv.append("--companion=" + (companion or os.environ["SP_HOME"]))
     if not full:
         argv.append("--gateway-only")
     flags = 0
@@ -551,6 +557,38 @@ def _do_restart(full: bool) -> None:
     finally:
         if out is not subprocess.DEVNULL:
             out.close()
+
+
+def _companion_switch(body: Dict[str, Any]):
+    """/v1/companion/switch -> (status, response, after). Another companion, by restart.
+
+    FULL on the native engine, never a gateway bounce: the daemon reads the registry and the
+    episode folder from its OWN environment (recall.rs), so a bounce would leave it recalling
+    the previous companion's memories under the new one's name. An external engine has no
+    memory of its own, so the gateway is enough. Refused mid-turn, like every restart."""
+    from harness import home as _home
+    ref = str(body.get("id") or "").strip()
+    try:
+        hd = _home.home_dir(ref)
+        comp = _home.read(hd)["companion"]
+    except _home.HomeError as exc:
+        return 400, {"ok": False, "error": str(exc)}, None
+    cur = os.environ.get("SP_HOME", "")
+    if cur and os.path.normcase(os.path.normpath(cur)) == os.path.normcase(os.path.normpath(hd)):
+        return 400, {"ok": False, "error": f"{comp.get('name') or ref} is the one running now"}, None
+    from harness.server import launch_routes as _lr
+    refusal = _lr.restart_refusal()
+    if refusal is not None:
+        return refusal[0], refusal[1], None
+    full = "restart" in (_engine_info().get("supports") or [])
+    res = _spawn_restart(full)
+    if not res.get("ok"):
+        return 400, res, None
+    res.update(companion=comp["id"], name=comp.get("name") or comp["id"],
+               note=("restarting as %s — the model reloads too (about %d s), because her memory "
+                     "lives in the engine as well as here" % (comp.get("name") or comp["id"], res["eta_s"]))
+               if full else "restarting as %s (about %d s)" % (comp.get("name") or comp["id"], res["eta_s"]))
+    return 200, res, (lambda: _do_restart(full, companion=hd))
 
 
 def _system_op(body: Dict[str, Any]):
@@ -3106,7 +3144,10 @@ def _run_stdlib(host: str, port: int) -> None:
                 else:
                     try:
                         subprocess.Popen(
-                            [sys.executable, "serve.py", prof, "--daemon-only"],
+                            # her home rides along (2026-11-26): the daemon reads the registry
+                            # and episode paths, and the profile's own home may not be this one
+                            [sys.executable, "serve.py", prof, "--daemon-only"]
+                            + (["--companion=" + os.environ["SP_HOME"]] if os.environ.get("SP_HOME") else []),
                             cwd=_ROOT_DIR,
                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
                         # AND LET HER SPEAK AGAIN. quiesce() had no clearer anywhere, so
@@ -3123,6 +3164,81 @@ def _run_stdlib(host: str, port: int) -> None:
                 self.wfile.write(payload)
             # TUNING: set / reset a knob. Live from the next turn — config that needs a
             # restart is config nobody tunes.
+            elif self.path.split("?", 1)[0] == "/v1/companion/upload":
+                # STREAMED, NOT _body(): a bundle can be gigabytes, and _body() caps at 8 MB
+                # and reads into memory. companion_routes.upload writes 1 MB at a time.
+                from urllib.parse import parse_qs, urlparse as _upu
+                from harness.server import companion_routes as _cr
+                code, res = _cr.upload((parse_qs(_upu(self.path).query).get("name") or [""])[0],
+                                       int(self.headers.get("Content-Length", 0) or 0), self.rfile.read)
+                payload = json.dumps(res).encode()
+                self.send_response(code); _cors(self)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+            elif self.path in ("/v1/setup/plan", "/v1/setup/start", "/v1/setup/cancel",
+                               "/v1/setup/approve", "/v1/setup/profile"):
+                from harness.server import setup_routes as _su
+                try:
+                    code, res = {"/v1/setup/plan": _su.post_plan, "/v1/setup/start": _su.post_start,
+                                 "/v1/setup/cancel": _su.post_cancel, "/v1/setup/approve": _su.post_approve,
+                                 "/v1/setup/profile": _su.post_profile}[self.path](self._body())
+                except ValueError as exc:
+                    code, res = 400, {"ok": False, "error": str(exc)}
+                payload = json.dumps(res).encode()
+                self.send_response(code); _cors(self)
+                self.send_header("Content-Type", "application/json"); self.end_headers()
+                self.wfile.write(payload)
+            elif self.path == "/v1/people":
+                from harness.server import people_routes as _pe
+                try:
+                    code, res = _pe.post_people(self._body())
+                except ValueError as exc:
+                    code, res = 400, {"ok": False, "error": str(exc)}
+                payload = json.dumps(res).encode()
+                self.send_response(code); _cors(self)
+                self.send_header("Content-Type", "application/json"); self.end_headers()
+                self.wfile.write(payload)
+            elif self.path == "/v1/hints":
+                from harness import hints as _hn
+                try:
+                    code, res = 200, _hn.op(self._body())
+                except ValueError as exc:
+                    code, res = 400, {"ok": False, "error": str(exc)}
+                payload = json.dumps(res).encode()
+                self.send_response(code); _cors(self)
+                self.send_header("Content-Type", "application/json"); self.end_headers()
+                self.wfile.write(payload)
+            elif self.path in ("/v1/persona/sections", "/v1/character/preview",
+                               "/v1/character/create", "/v1/character/apply"):
+                from harness.server import persona_routes as _pr
+                try:
+                    code, res = {"/v1/persona/sections": _pr.post_sections,
+                                 "/v1/character/preview": _pr.post_preview,
+                                 "/v1/character/create": _pr.post_create,
+                                 "/v1/character/apply": _pr.post_apply}[self.path](self._body())
+                except ValueError as exc:
+                    code, res = 400, {"ok": False, "error": str(exc)}
+                payload = json.dumps(res).encode()
+                self.send_response(code); _cors(self)
+                self.send_header("Content-Type", "application/json"); self.end_headers()
+                self.wfile.write(payload)
+            elif self.path in ("/v1/companion/export", "/v1/companion/schedule",
+                               "/v1/companion/cancel", "/v1/companion/new", "/v1/companion/create"):
+                from harness.server import companion_routes as _cr
+                try:
+                    code, res = {"/v1/companion/export": _cr.post_export,
+                                 "/v1/companion/schedule": _cr.post_schedule,
+                                 "/v1/companion/cancel": _cr.post_cancel,
+                                 "/v1/companion/new": _cr.post_new,
+                                 "/v1/companion/create": _cr.post_create}[self.path](self._body())
+                except ValueError as exc:
+                    code, res = 400, {"ok": False, "error": str(exc)}
+                payload = json.dumps(res).encode()
+                self.send_response(code); _cors(self)
+                self.send_header("Content-Type", "application/json"); self.end_headers()
+                self.wfile.write(payload)
             elif self.path in ("/v1/launch/edit", "/v1/launch/raw", "/v1/launch/setup"):
                 from harness.server import launch_routes as _lr
                 try:
@@ -3493,6 +3609,20 @@ def _run_stdlib(host: str, port: int) -> None:
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(payload)))
                 self.end_headers(); self.wfile.write(payload)
+            elif self.path == "/v1/companion/switch":
+                code, res, after = _companion_switch(self._body())
+                payload = json.dumps(res).encode()
+                self.send_response(code); _cors(self)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers(); self.wfile.write(payload)
+                try:
+                    self.wfile.flush()
+                except Exception as _swx:
+                    _swallowed(logger, "_dispatch_post", _swx, lane="server")
+                if after is not None:              # only once the answer is on the wire
+                    after()
+                return
             elif self.path == "/v1/system":
                 # THE RESPONSE GOES OUT BEFORE ANYTHING IS STOPPED. A full restart kills
                 # this very process; replying afterwards is replying from a socket that
@@ -4148,6 +4278,52 @@ def _run_stdlib(host: str, port: int) -> None:
                     logger.warning("[music] %s", exc)
                     _safe_error(self, 500)
                 return
+            # THE PERSONA AND CHARACTER WINDOWS (2026-11-26, harness/server/persona_routes.py).
+            if _base == "/v1/setup/kit":
+                from harness.server import setup_routes as _su
+                code, res = _su.get_kit()
+                self.send_response(code); _cors(self)
+                self.send_header("Content-Type", "application/json"); self.end_headers()
+                self.wfile.write(json.dumps(res).encode())
+                return
+            if _base == "/v1/people":
+                from harness.server import people_routes as _pe
+                code, res = _pe.get_people()
+                self.send_response(code); _cors(self)
+                self.send_header("Content-Type", "application/json"); self.end_headers()
+                self.wfile.write(json.dumps(res).encode())
+                return
+            if _base == "/v1/hints":
+                from harness import hints as _hn
+                self.send_response(200); _cors(self)
+                self.send_header("Content-Type", "application/json"); self.end_headers()
+                self.wfile.write(json.dumps(_hn.view()).encode())
+                return
+            if _base in ("/v1/persona/sections", "/v1/character/flow"):
+                from harness.server import persona_routes as _pr
+                code, res = (_pr.get_sections if _base == "/v1/persona/sections" else _pr.get_flow)()
+                self.send_response(code); _cors(self)
+                self.send_header("Content-Type", "application/json"); self.end_headers()
+                self.wfile.write(json.dumps(res).encode())
+                return
+            # THE COMPANION WINDOW (2026-11-26): who she is, bundles, and the file to save.
+            if _base == "/v1/companion":
+                from harness.server import companion_routes as _cr
+                code, res = _cr.get_state()
+                self.send_response(code); _cors(self)
+                self.send_header("Content-Type", "application/json"); self.end_headers()
+                self.wfile.write(json.dumps(res).encode())
+                return
+            if _base == "/v1/companion/bundle":
+                from urllib.parse import parse_qs, urlparse as _upc
+                from harness.server import companion_routes as _cr
+                _bn = (parse_qs(_upc(self.path).query).get("name") or [""])[0]
+                _bp = _cr.bundle_path(_bn)
+                if not _bp:
+                    self.send_error(404)
+                    return
+                self._send_ranged(_bp, "application/zip")
+                return
             if _base in ("/v1/launch", "/v1/launch/status"):
                 from harness.server import launch_routes as _lr
                 code, res = (_lr.get_launch if _base == "/v1/launch" else _lr.get_status)()
@@ -4449,6 +4625,13 @@ def _run_stdlib(host: str, port: int) -> None:
         start_ha_poller()
     except Exception as exc:
         logger.warning("[gateway] home assistant not armed: %s", exc)
+    # THIS HOME IS LIVE (2026-11-26): bundle.py refuses to move a live home's stores; a
+    # reset/load from the room is scheduled and serve.py applies it before the next start.
+    try:
+        from harness import home as _home
+        _home.claim_live()
+    except Exception as exc:
+        logger.warning("[gateway] home live marker not written: %s", exc)
     ThreadingHTTPServer((host, port), Handler).serve_forever()
 
 

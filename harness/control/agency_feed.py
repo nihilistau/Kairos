@@ -85,7 +85,9 @@ def _iso(ts: float) -> str:
 
 
 def _mem_root() -> str:
-    return os.path.join(_ROOT, "memory-okf-personality", "full")
+    # The home's tier (2026-11-26): this read the repo-root literal and ignored the env,
+    # so a sandbox — or a second companion — was shown HER own time.
+    return os.path.join(__import__("harness.home", fromlist=["path"]).path("personality_okf"), "full")
 
 
 def _memory_rows(kind: str, since: float) -> List[Dict[str, Any]]:

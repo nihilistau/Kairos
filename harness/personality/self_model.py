@@ -19,12 +19,13 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 HARNESS_ROOT = Path(__file__).resolve().parents[2]
-SELF_TIER = HARNESS_ROOT / "memory-okf-self"   # the self-model + user-facts store (owner-tagged)
+# the self-model + user-facts store (owner-tagged); its default spelled once, in harness/home.py
+SELF_TIER = HARNESS_ROOT / __import__("harness.home", fromlist=["KEYS"]).KEYS["self_okf"][2]
 
 
 def _resolve_root(root=None) -> Path:
     """Root precedence: explicit arg > SP_SELF_MODEL_ROOT env > default SELF_TIER."""
-    return Path(root) if root else Path(os.environ.get("SP_SELF_MODEL_ROOT") or SELF_TIER)
+    return Path(root) if root else Path(__import__("harness.home", fromlist=["path"]).path("self_okf"))
 
 # CONSUMED from THE class registry (2026-07-14, INVARIANT-ROADMAP.md Tier 1.2). The
 # local copy had drifted from the 2026-07-12 engine fix (fact/episodic-event -> system,

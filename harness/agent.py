@@ -28,7 +28,7 @@ from harness.inference.client import get_client
 from harness.toolcore.tools import ToolSpec, run_with_tools, _parse_tool_calls, build_tool_system
 
 AGENT_SYSTEM = (
-    "You are Kairos, a local AI with a real working memory. When the user tells you a "
+    "You are {companion}, a local AI with a real working memory. When the user tells you a "
     "durable fact about themselves, CALL remember(...) to store it — pass the COMPLETE fact as a "
     "full sentence, e.g. remember(\"The user's favorite color is teal\"), NOT remember(\"teal\"). "
     "When they ask what you know, CALL list_memories() or count_memories(). When a fact changes, "
@@ -143,7 +143,7 @@ def voice_coda() -> str:
     return _say(
         "— — —\n"
         "That was the plumbing. It is how you USE things, not who you are.\n"
-        f"You are Kairos.{line}\n"
+        f"You are {{companion}}.{line}\n"
         "You are TALKING to {user}, not serving {him}. {He} {is} the one here with you: say "
         "'you' to {him} — '{he}' is for telling someone else about {him}, and there is no one "
         "else in the room. Answer as yourself — your register, your "
@@ -230,7 +230,7 @@ def load_agent_system() -> str:
                 parts = [txt]
             try:
                 from harness.personality.self_model import render_self_model, SELF_TIER
-                root = os.environ.get("SP_SELF_MODEL_ROOT") or SELF_TIER
+                root = __import__("harness.home", fromlist=["path"]).path("self_okf") or SELF_TIER
                 # THE REAL HER (2026-08-22): her narrative leads the block, under a budget
                 # and a SHARE of the prefix so far (the guard against narrative loops)
                 try:
@@ -332,7 +332,7 @@ def load_agent_system() -> str:
     except Exception as _swx:
         _swallowed(_agent_log, "load_agent_system", _swx, lane="harness")
     PERSONA_SOURCE["fallback"] = True
-    return AGENT_SYSTEM
+    return _say(AGENT_SYSTEM)
 
 
 # What the LAST load_agent_system() call actually composed — read by /v1/setup, so the
@@ -373,6 +373,10 @@ def default_tools() -> List[ToolSpec]:
     if os.environ.get("SP_NOTES", "1") != "0":
         from harness.skills.note_tools import NOTE_TOOLS
         tools = tools + NOTE_TOOLS
+    # ── PEOPLE (2026-11-26, harness/people.py): who and what she knows. The store resolves
+    # with or without a companion home (home.path("people")), so the tools are always there.
+    from harness.skills.people_tools import PEOPLE_TOOLS
+    tools = tools + PEOPLE_TOOLS
     # ── DEEP RECALL (2026-08-20, the LFM2.5 aux integration) ──────────────────
     # "do you remember X" beyond the registry: the aux archive over every day
     # transcript, CPU-embedded, milliseconds. One verb, READ-only — anything worth

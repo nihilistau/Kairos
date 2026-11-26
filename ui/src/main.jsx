@@ -5,8 +5,31 @@ import { APPS, byId, DOCK_HIDDEN_DEFAULT } from './appRegistry.jsx'
 import * as deskVisibility from './deskVisibility.js'
 import { usePoll } from './apps/panel.jsx'
 import * as api from './api.js'
+
+/* HER NAME, NOT A LITERAL (2026-11-26). The brand and the tab title said "Kairos" for
+ * every companion; they say the one this gateway runs (/v1/companion), and keep the old
+ * word only until the answer comes, or when the launch has no companion home. */
+const BRAND_DEFAULT = 'Kairos'
+function Brand() {
+  const [name, setName] = React.useState(BRAND_DEFAULT)
+  useEffect(() => {
+    let alive = true
+    api.companion().then(d => {
+      const n = (d && d.current && d.current.name) || BRAND_DEFAULT
+      if (alive) setName(n)
+      document.title = n.toLowerCase() + ' · the room'
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [])
+  return (
+    <span className="tb-brand" title={name}>
+      <Icon name="brand" size={16} /><span className="tb-brand-t">{name.toUpperCase()}</span>
+    </span>
+  )
+}
 import Renderer from './room/Renderer.jsx'
 import Clock from './room/Clock.jsx'
+import Hints from './room/Hints.jsx'
 import TopBar from './room/TopBar.jsx'
 import Portrait from './room/Portrait.jsx'
 import Down from './room/Down.jsx'
@@ -327,14 +350,13 @@ function Room() {
           so nothing mounted in it could stay above a window that has been focused a hundred
           times. Here its z sits between the desktop and the taskbar (shell.css). */}
       <Dock />
+      <Hints />
 
       <footer className="taskbar">
         <div className="tb-left">
           {/* THE BRAND CAME DOWN WITH THE DOCK. It is a mark, not a control, so it sits
               where the other glanced-at things live. */}
-          <span className="tb-brand" title="Kairos">
-            <Icon name="brand" size={16} /><span className="tb-brand-t">KAIROS</span>
-          </span>
+          <Brand />
           <a className="tb-console" href="/index.html" title="The original console — still here, unchanged">
             <Icon name="console" size={15} />Console
           </a>

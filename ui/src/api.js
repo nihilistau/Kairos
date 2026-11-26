@@ -272,3 +272,45 @@ export async function* chat(messages, opts = {}) {
     }
   }
 }
+
+/* THE COMPANION WINDOW (2026-11-26, harness/server/companion_routes.py). Export runs now;
+ * reset / load / undo are SCHEDULED and applied by serve.py between the old gateway's exit
+ * and the new one's start — this gateway never moves the stores it has open. postS keeps
+ * the status so a 400's reason reaches the window verbatim. */
+export const companion         = () => get('/v1/companion')
+export const companionExport   = (parts) => postS('/v1/companion/export', { parts })
+export const companionSchedule = (b) => postS('/v1/companion/schedule', b)
+export const companionCancel   = () => postS('/v1/companion/cancel', {})
+export const companionNew      = (b) => postS('/v1/companion/new', b)
+export const companionCreate   = (b) => postS('/v1/companion/create', b)
+export const companionSwitch   = (id) => postS('/v1/companion/switch', { id })
+export const companionBundleUrl = (name) => '/v1/companion/bundle?name=' + encodeURIComponent(name)
+/* A bundle can be gigabytes: the file goes up as the raw body, streamed to disk server-side. */
+export async function companionUpload(file) {
+  const r = await fetch('/v1/companion/upload?name=' + encodeURIComponent(file.name), {
+    method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file,
+  })
+  let j = {}
+  try { j = await r.json() } catch { /* nothing back */ }
+  return { status: r.status, ...j }
+}
+
+/* THE PERSONA AND CHARACTER WINDOWS (2026-11-26, harness/server/persona_routes.py). */
+export const personaSections   = () => get('/v1/persona/sections')
+export const personaSectionsOp = (b) => postS('/v1/persona/sections', b)
+export const characterFlow     = () => get('/v1/character/flow')
+export const characterPreview  = (answers) => postS('/v1/character/preview', { answers })
+export const characterCreate   = (b) => postS('/v1/character/create', b)
+export const characterApply    = (answers) => postS('/v1/character/apply', { answers })
+
+/* FIRST-RUN HINTS (2026-11-26, harness/hints.py; the words are config/hints.json). */
+export const hints   = () => get('/v1/hints')
+export const hintsOp = (b) => postS('/v1/hints', b)
+
+/* PEOPLE (2026-11-26, harness/server/people_routes.py): who and what she knows; users. */
+export const people   = () => get('/v1/people')
+export const peopleOp = (b) => postS('/v1/people', b)
+
+/* THE SETUP CENTRE (2026-11-26, harness/server/setup_routes.py): kits, plan, download, approve, profile. */
+export const setupKit     = () => get('/v1/setup/kit')
+export const setupOp      = (op, b = {}) => postS('/v1/setup/' + op, b)

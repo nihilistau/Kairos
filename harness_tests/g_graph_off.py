@@ -253,15 +253,22 @@ check("config: unset is every switch off, with the documented defaults",
 base = copy.deepcopy(serve.load_profile("companion"))
 base.pop("graph", None)
 env0 = serve.build_env(copy.deepcopy(base))
-check("an absent [graph] table leaves every SP_GRAPH_* key absent",
-      not [k for k in env0 if k.startswith("SP_GRAPH_")], [k for k in env0 if k.startswith("SP_GRAPH_")])
+# SP_GRAPH_DIR is a LOCATION, not a switch: since 2026-11-26 her home names it (the same
+# folder the reader derived beside the registry), so it is present without any [graph].
+# Every SWITCH stays absent, and the location is the home's, not an invention.
+_sw0 = [k for k in env0 if k.startswith("SP_GRAPH_") and k != "SP_GRAPH_DIR"]
+check("an absent [graph] table leaves every SP_GRAPH_* switch absent", not _sw0, _sw0)
+from harness import home as _home  # noqa: E402
+check("...and SP_GRAPH_DIR, when present, is the home's graph folder",
+      "SP_GRAPH_DIR" not in env0 or env0["SP_GRAPH_DIR"] == _home.env_for(
+          serve.home_path(base))["SP_GRAPH_DIR"], env0.get("SP_GRAPH_DIR"))
 on_prof = copy.deepcopy(base)
 on_prof["graph"] = {"annotate": True, "annotate_neighbours": 3, "rules": ["explicit", "day"]}
 env1 = serve.build_env(on_prof)
 check("serve maps [graph] keys", env1.get("SP_GRAPH_ANNOTATE") == "1" and env1.get("SP_GRAPH_ANNOTATE_N") == "3"
       and env1.get("SP_GRAPH_RULES") == "explicit,day", {k: v for k, v in env1.items() if k.startswith("SP_GRAPH_")})
 check("a key the table leaves out stays absent",
-      not any(k in env1 for k in ("SP_GRAPH_BUILD", "SP_GRAPH_FOLLOW", "SP_GRAPH_FOLLOW_CAP", "SP_GRAPH_DIR")))
+      not any(k in env1 for k in ("SP_GRAPH_BUILD", "SP_GRAPH_FOLLOW", "SP_GRAPH_FOLLOW_CAP")))
 for _bad_rules in (["explicit", "dya"], ["nope"]):
     _bad_prof = copy.deepcopy(base)
     _bad_prof["graph"] = {"rules": _bad_rules}

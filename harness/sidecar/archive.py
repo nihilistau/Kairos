@@ -67,7 +67,9 @@ def _sources() -> List[str]:
     search over it was one she had to remember to run.
 
     SP_AUX_ARCHIVE_GLOBS extends the list (';'-separated globs) without a code change."""
-    pats = [os.path.join(_ROOT, "var", "memory", "transcripts", "*.jsonl"),
+    # Beside the registry, where day.py writes them (2026-11-26) — the repo-root literal
+    # had another companion's deep recall searching HER conversations.
+    pats = [os.path.join(os.path.dirname(__import__("harness.home", fromlist=["path"]).path("registry")), "transcripts", "*.jsonl"),
             os.path.join(_tier_full(), "*.md")]
     extra = os.environ.get("SP_AUX_ARCHIVE_GLOBS", "")
     if extra:
@@ -79,7 +81,7 @@ def _sources() -> List[str]:
 
 
 def _index_dir() -> str:
-    d = os.environ.get("SP_AUX_INDEX_DIR") or os.path.join(_ROOT, "var", "aux", "archive")
+    d = __import__("harness.home", fromlist=["path"]).path("aux_index")
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -91,7 +93,7 @@ def _tier_full() -> str:
         return _tf()
     except Exception as _swx:
         _swallowed(_swlog, "_tier_full", _swx, lane="sidecar")
-        return os.path.join(_ROOT, "memory-okf-personality", "full")
+        return os.path.join(__import__("harness.home", fromlist=["path"]).path("personality_okf"), "full")
 
 
 def _day_of(path: str) -> str:
@@ -197,7 +199,7 @@ def query_prefix() -> str:
     from harness.tuning import registry as _tr
     return str(_tr.tune_or_env(
         "aux.query_prefix", "SP_AUX_QUERY_PREFIX",
-        _say("Recall for Kairos: find the moment in her past conversations with {user} that tthe operator's asks about — ")) or "")
+        _say("Recall for {companion}: find the moment in her past conversations with {user} that {user} ask{s} about — ")) or "")
 
 
 def doc_prefix() -> str:

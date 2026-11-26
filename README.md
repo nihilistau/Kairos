@@ -59,29 +59,37 @@ the default face.*
    pip install -e ".[http]"
    ```
 
-2. Give her a personality to start from. This copy is yours to edit, and git ignores it:
+2. Run the launcher, and choose **9 - get set up**:
 
    ```bash
-   cp -r persona-template persona
+   kairos.bat          # Windows
+   ./kairos.sh         # Linux / macOS
    ```
 
-   Her default name is Kairos. Change it, and anything else about her, in `persona/00-identity.md`.
+   It looks at your graphics card and memory and suggests an engine and a model. Then it
+   downloads them: llama.cpp, and Gemma 4 26B-A4B, or the 31B on a big card. Uncensored
+   versions are offered too, with a warning. Every file is checked against its published
+   checksum, and nothing it downloads runs until you approve it.
 
-3. Tell her who you are. In `profiles/companion.toml`, fill in `name` (and `pronouns` if you like)
-   under `[user]`. Left blank, she calls you "the user".
+   It also makes your companion, with a starting personality in her name, a face and a voice,
+   and asks your name so she knows who she is talking to. Already run LM Studio or Ollama? Pick
+   "an engine you already run" and nothing is downloaded.
 
-4. Start your model server. LM Studio listens on port 1234 by default, which is what the profile
-   expects. If yours is somewhere else, change `base_url` under `[engine]` in the same file.
+3. Choose **1 - start** in the launcher, then **8 - open the room**, and say hello.
 
-5. Start her:
+   The room can do all of this as well:
+   - **Character** makes a companion a question at a time.
+   - **Persona** shows who she is, as sections you can edit.
+   - **People** holds the people, pets and places in your life, and who talks to her.
+   - **Companion** saves her as a bundle you can keep or move, resets her, and undoes a reset.
 
-   ```bash
-   python serve.py companion
-   ```
+   On a fresh install, hint cards show you around.
 
-6. Open **http://127.0.0.1:8810/room/** and say hello.
+**Or by hand:** `cp -r persona-template persona`, fill in `[user]` in `profiles/companion.toml`,
+start your model server (LM Studio listens on 1234, which the profile expects), then
+`python serve.py companion` and open **http://127.0.0.1:8810/room/**.
 
-To stop her, click **Shut down** in the taskbar, or run `python serve.py --stop`.
+To stop her, click **Shut down** in the taskbar, choose **2 - stop** in the launcher, or run `python serve.py --stop`.
 
 **If something doesn't work,** open the **Setup** window in the room. It checks each step and tells
 you which one you're stuck on. [`docs/SETUP.md`](docs/SETUP.md) has the full walkthrough: other

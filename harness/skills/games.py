@@ -25,7 +25,8 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 
 
 def _shot_path(mid: str) -> str:
-    return os.path.join(_ROOT, "var", "room", "games", "shots", "%s.png" % mid.replace(os.sep, "_"))
+    # Under the games store (2026-11-26), which SP_GAMES_DIR / the home already move.
+    return os.path.join(__import__("harness.home", fromlist=["path"]).path("games_dir"), "shots", "%s.png" % mid.replace(os.sep, "_"))
 
 
 def list_games() -> str:

@@ -348,9 +348,7 @@ def _run_gates(wt: str, gates=OFFLINE_GATES, timeout: float = 900.0) -> Dict[str
 
 def _receipt(rec: Dict[str, object]) -> Optional[str]:
     try:
-        from harness.personality.self_model import HARNESS_ROOT
-        tier = os.environ.get("SP_TELEMETRY_OKF_ROOT") or str(
-            HARNESS_ROOT / "memory-okf-telemetry")
+        tier = __import__("harness.home", fromlist=["path"]).path("telemetry_okf")
         d = os.path.join(tier, "delegate")
         os.makedirs(d, exist_ok=True)
         # The branch contains a "/" and a branch name is not a filename — the first live run

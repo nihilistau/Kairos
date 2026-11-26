@@ -243,7 +243,7 @@ def observe_once() -> dict:
     try:
         from harness.senses import capture
         from harness.skills.sight import _describe
-        row["seen"] = _describe(capture.photo(), PROMPT)
+        row["seen"] = _describe(capture.photo(), __import__("harness.user", fromlist=["say"]).say(PROMPT))
     except Exception as exc:
         row["error"] = f"{type(exc).__name__}: {exc}"[:300]
     _LAST = row

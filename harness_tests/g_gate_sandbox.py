@@ -79,7 +79,8 @@ NOT_A_STORE = {
     "SP_HA_TOKEN_FILE": "a credential, read-only",
     "SP_XAI_KEY_FILE": "a credential, read-only",
     "SP_CLAUDE_KEY_FILE": "a credential, read-only",
-    "SP_AUX_INDEX_DIR": "a rebuildable index, and every aux gate points it at a temp dir",
+    # SP_AUX_INDEX_DIR left this list 2026-11-26: a home store now (deep recall's index of
+    # HER transcripts), sandboxed in _STORE_ENV.
     "SP_MUSIC_DIR": "his media library, read-only",
     "SP_LIBRARY_DIR": "her shelf of texts, read-only",
     "SP_VOICE_DIR": "voice model assets, read-only",
@@ -88,7 +89,8 @@ NOT_A_STORE = {
     "SP_SCENARIOS_DIR": "scenario definitions, read-only",
     "SP_GAMES_DIR": "game state; g_games and g_holdem sandbox it themselves",
     "SP_PERSONA_DIR": "the persona FRAGMENT directory, read-only (persona.md is covered)",
-    "SP_TASK_ROOT": "the task tree; the pk2 gates sandbox it themselves",
+    # SP_TASK_ROOT left this list 2026-11-26: it is sandboxed now (_STORE_ENV), and its reader
+    # is harness/home.py — whose table G-HOME §6 holds to _STORE_ENV, since this scan cannot see it.
     "SP_PROFILE": "a name, not a path",
     # CACHE is in the suffix list because SP_TTS_CACHE is a real store; this is the
     # int beside it. The cost of widening a name-based rule is exactly this kind of row.

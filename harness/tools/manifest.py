@@ -57,6 +57,7 @@ GROUPS = {
     "bridged":      "from an external MCP server that declared no group",
     "memory":       "what she knows and how she keeps it",
     "board":        "the shared notes, reminders and watches",
+    "people":       "who and what she knows — people, pets, places; her suggestions wait for his yes",
     "presence":     "her modes of being there out loud, and the shelf she reads from (var/library/)",
     "conversation": "past sessions, provenance, what was said",
     "sight":        "her eyes — camera, screen, images",
@@ -114,6 +115,10 @@ FACTS: Dict[str, ToolFacts] = {
     # the board — deliberately NOT memory: memory is what is true, the board is
     # what either of them wants kept in view
     "add_note":            ToolFacts("board", "write"),
+    # people (2026-11-26, harness/skills/people_tools.py): only with a companion home
+    "meet":                ToolFacts("people", "write", note="a PROPOSAL — not anyone until he confirms it in People"),
+    "note_about":          ToolFacts("people", "write", note="through remember(); linked to the person"),
+    "who_is":              ToolFacts("people", "read"),
     "edit_note":           ToolFacts("board", "write"),
     "remove_note":         ToolFacts("board", "write"),
     "find_notes":          ToolFacts("board", "read"),

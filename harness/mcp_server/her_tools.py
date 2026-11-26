@@ -61,7 +61,7 @@ def what_she_is_wearing() -> str:
     # would be a fourth reader of the wardrobe with its own idea of the ranking, which is
     # the bug that took a whole session to find the last time (the duplicate
     # `favourites()`, 2026-08-25). One renderer, one caption.
-    return "In her own words — this text is written to her, so \"you\" means Kairos:\n\n" \
+    return __import__("harness.user", fromlist=["say"]).say("In her own words — this text is written to her, so \"you\" means {companion}:\n\n") \
            + WD.describe()
 
 

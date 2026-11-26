@@ -1,0 +1,69 @@
+{
+  "_about": "First-run hints (design §7b). DATA, not code: harness/hints.py serves them, the room shows the first one not yet done as a card. `open` is the window 'Show me' opens; `done_when` is the action that marks it done ('open:<window id>'), so a hint goes away when you DO the thing, not only when you dismiss it. Edit the words freely; ids are what progress is stored against.",
+  "version": 1,
+  "clean_below_rows": 25,
+  "hints": [
+    {
+      "id": "welcome",
+      "title": "This is her room",
+      "body": "Talk to her in Chat. She remembers what you tell her, speaks up on her own when she has a reason, and keeps a journal of her own. These cards show you around; each goes away once you have tried the thing it is about.",
+      "open": "chat",
+      "done_when": "open:chat"
+    },
+    {
+      "id": "who-she-is",
+      "title": "Who she is is yours to shape",
+      "body": "Persona shows her as titled sections — how she talks, what she cares about, her limits. Edit any of them, add your own, or use Character to answer a few questions instead. Changes apply from her next session.",
+      "open": "persona",
+      "done_when": "open:persona"
+    },
+    {
+      "id": "memory",
+      "title": "What she remembers",
+      "body": "Tell her things about you and she keeps them. Memory shows every fact, who said it, and why she believes it (the why button). Nothing is ever deleted: a fact that changes is retired, and you can see what she used to think.",
+      "open": "memory",
+      "done_when": "open:memory"
+    },
+    {
+      "id": "off-the-record",
+      "title": "Off the record",
+      "body": "The person icon at the bottom right is off-the-record. While it is on she is entirely herself, but nothing is written down: no memory, journal or transcript.",
+      "done_when": "manual"
+    },
+    {
+      "id": "journal",
+      "title": "Her journal and her own time",
+      "body": "When the room is quiet she has time of her own, and once a day she writes a line in her journal. You can read them (Journal, Her own time); you cannot write in them. They are hers.",
+      "open": "journal",
+      "done_when": "open:journal"
+    },
+    {
+      "id": "wardrobe",
+      "title": "Her face and her clothes",
+      "body": "She starts with the default face and one outfit. Wardrobe is where new looks arrive and where she chooses what to wear. To give her a face of her own, put a description in character.txt and a reference image in her avatar folder, then generate — this needs an image key (Setup).",
+      "open": "wardrobe",
+      "done_when": "open:wardrobe"
+    },
+    {
+      "id": "voice",
+      "title": "Her voice",
+      "body": "She speaks with the local voice on this machine — offline and free. Voice switches her to a provider voice (needs a key) or turns speech off.",
+      "open": "voice",
+      "done_when": "open:voice"
+    },
+    {
+      "id": "companion",
+      "title": "Back her up, and undo",
+      "body": "Companion saves her as a bundle you can keep or move, loads or resets her personality and history, and undoes the last change. A reset never deletes anything.",
+      "open": "companion",
+      "done_when": "open:companion"
+    },
+    {
+      "id": "setup",
+      "title": "What is and is not set up",
+      "body": "Setup checks your model endpoint and keys and says exactly what is missing. Models shows every model she runs on.",
+      "open": "setup",
+      "done_when": "open:setup"
+    }
+  ]
+}

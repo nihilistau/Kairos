@@ -1,0 +1,103 @@
+{
+  "_about": "The setup centre's choices (design §4). Models and engines are named by SOURCE (a Hugging Face repo + file patterns, a GitHub repo + asset pattern); exact files, sizes and hashes are resolved LIVE from the catalogues when the wizard shows them, so this file does not go stale. The first pattern that matches wins.",
+  "version": 1,
+  "uncensored_warning": "Uncensored means uncensored: these models have had their refusals and safety tuning removed. They will say and write things the standard models will not. Choose one only if that is what you want.",
+  "models": [
+    {
+      "id": "your model",
+      "title": "Gemma 4 your model (recommended)",
+      "about": "A mixture-of-experts model: 26B parameters, about 4B active per word, so it runs well on an 8–12 GB card with the experts partly in system memory. Google's official 4-bit QAT build.",
+      "repo": "google/gemma-4-your model-it-qat-q4_0-gguf",
+      "model": ["*q4_0*.gguf", "*Q4_0*.gguf", "*.gguf"],
+      "mmproj": ["mmproj*.gguf"],
+      "min_vram_gb": 8, "min_ram_gb": 24, "approx_gb": 16,
+      "licence": "apache-2.0", "uncensored": false, "native": true
+    },
+    {
+      "id": "gemma4-31b",
+      "title": "Gemma 4 31B",
+      "about": "The dense 31B: stronger, and it needs a big card — 24 GB or more — or RunPod.",
+      "repo": "google/gemma-4-31B-it-qat-q4_0-gguf",
+      "model": ["*q4_0*.gguf", "*Q4_0*.gguf", "*.gguf"],
+      "mmproj": ["mmproj*.gguf"],
+      "min_vram_gb": 24, "min_ram_gb": 32, "approx_gb": 19,
+      "licence": "apache-2.0", "uncensored": false, "native": false
+    },
+    {
+      "id": "your model-uncensored",
+      "title": "Gemma 4 your model — uncensored (HauhauCS)",
+      "about": "The your model with its refusals removed (HauhauCS Balanced, QAT), with a matching MTP draft model for faster replies.",
+      "repo": "HauhauCS/Gemma4-your model-QAT-Uncensored-HauhauCS-Balanced-MTP",
+      "model": ["*Balanced-Q4_K_M.gguf", "*Q4_K_M*.gguf", "*.gguf"],
+      "mmproj": ["mmproj*.gguf"],
+      "draft": ["mtp*.gguf", "*mtp*.gguf", "*MTP*.gguf"],
+      "min_vram_gb": 8, "min_ram_gb": 24, "approx_gb": 17,
+      "licence": "gemma", "uncensored": true, "native": true
+    },
+    {
+      "id": "gemma4-31b-uncensored",
+      "title": "Gemma 4 31B — uncensored (HauhauCS)",
+      "about": "The dense 31B with its refusals removed (HauhauCS Balanced, QAT), with an MTP draft model. A 24 GB+ card, or RunPod.",
+      "repo": "HauhauCS/Gemma4-31B-QAT-Uncensored-HauhauCS-Balanced-MTP",
+      "model": ["*Balanced-Q4_K_M.gguf", "*Q4_K_M*.gguf", "*.gguf"],
+      "mmproj": ["mmproj*.gguf"],
+      "draft": ["mtp*.gguf", "*mtp*.gguf", "*MTP*.gguf"],
+      "min_vram_gb": 24, "min_ram_gb": 32, "approx_gb": 21,
+      "licence": "gemma", "uncensored": true, "native": false
+    }
+  ],
+  "licences": {
+    "apache-2.0": {"name": "Apache License 2.0", "url": "https://www.apache.org/licenses/LICENSE-2.0"},
+    "gemma": {"name": "Gemma Terms of Use", "url": "https://ai.google.dev/gemma/terms"}
+  },
+  "engines": [
+    {
+      "id": "llamacpp-cuda",
+      "title": "llama.cpp (NVIDIA, CUDA)",
+      "about": "The standard local engine, built for NVIDIA cards. Downloaded from llama.cpp's own releases.",
+      "github": "ggml-org/llama.cpp",
+      "assets": [["llama-*-bin-win-cuda-12*-x64.zip", "llama-*-bin-win-cuda-*-x64.zip"],
+                 ["cudart-llama-bin-win-cuda-12*-x64.zip", "cudart-llama-bin-win-cuda-*-x64.zip"]],
+      "exe": "llama-server.exe", "os": "nt", "needs": "nvidia"
+    },
+    {
+      "id": "llamacpp-vulkan",
+      "title": "llama.cpp (any GPU, Vulkan)",
+      "about": "llama.cpp for AMD, Intel or NVIDIA cards through Vulkan. A little slower than CUDA on NVIDIA.",
+      "github": "ggml-org/llama.cpp",
+      "assets": [["llama-*-bin-win-vulkan-x64.zip"]],
+      "exe": "llama-server.exe", "os": "nt", "needs": "gpu"
+    },
+    {
+      "id": "llamacpp-cpu",
+      "title": "llama.cpp (CPU only)",
+      "about": "No graphics card needed — slow with a 26B model, but it works.",
+      "github": "ggml-org/llama.cpp",
+      "assets": [["llama-*-bin-win-cpu-x64.zip", "llama-*-bin-win-avx2-x64.zip"]],
+      "exe": "llama-server.exe", "os": "nt", "needs": ""
+    },
+    {
+      "id": "llamacpp-linux",
+      "title": "llama.cpp (Linux)",
+      "about": "llama.cpp's Linux build.",
+      "github": "ggml-org/llama.cpp",
+      "assets": [["llama-*-bin-ubuntu-x64.zip", "llama-*-bin-ubuntu-vulkan-x64.zip"]],
+      "exe": "llama-server", "os": "posix", "needs": ""
+    },
+    {
+      "id": "kairos-engine",
+      "title": "Kairos engine (native, NVIDIA)",
+      "about": "Her own engine: KV memory, byte-exact recall, the fastest MoE decode on small cards. Needs the model converted to .sp (the wizard does it). Windows + CUDA.",
+      "github": "nihilistau/kairos-engine",
+      "assets": [["kairos-engine-*-win-cuda*.zip"]],
+      "exe": "sp-daemon.exe", "transcoder": "sp_transcode.exe", "os": "nt", "needs": "nvidia", "native": true
+    },
+    {
+      "id": "external",
+      "title": "An engine you already run (LM Studio, Ollama, vLLM…)",
+      "about": "Point her at any OpenAI-compatible server. Nothing is downloaded.",
+      "external": true
+    }
+  ],
+  "defaults": {"ctx": 32768, "port": 8080, "gpu_layers": 99}
+}

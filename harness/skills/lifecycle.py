@@ -673,6 +673,27 @@ _ANCHOR = re.compile(
     r"\b(i|i'm|i've|im|my|mine|myself|we|our|ours|us" + _NAME_POSS_ALT + r"|"
     r"the user|user's|the operator)\b", re.I)
 
+# ── OR ABOUT SOMEONE SHE KNOWS (2026-11-26, harness/people.py) ──────────────────────────
+# "Tuffy hates the vacuum cleaner" was refused as "not ABOUT anyone" — true when the only
+# anyone was him and her. A live person, pet or place she knows counts as an anchor when it
+# is the SUBJECT: the claim starts with their name ("Tuffy …", "Sam's boat …", "the cabin
+# …"). A name merely mentioned later in the sentence still does not — the same rule
+# _ANCHOR keeps for him. A PROPOSED person does not anchor anything until he says yes.
+def _anchored_on_known(claim: str) -> bool:
+    try:
+        from harness import people as _pp
+        for r in _pp.everyone():
+            if r.get("status") != "live":
+                continue
+            for n in r["names"]:
+                if re.match(r"\s*(?:the\s+)?" + re.escape(re.sub(r"^the\s+", "", n, flags=re.I))
+                            + r"(?:'s|s')?\b", claim, re.I):
+                    return True
+    except Exception as _swx:
+        _swallowed(_swlog, "_anchored_on_known", _swx, lane="skills")
+    return False
+
+
 # Discourse markers are STRIPPED, not rejected: "oh i always run my pc's 24/7" is a
 # durable fact wearing a conversational hat. Rejecting the sentence for its first word
 # would throw the fact away with the hat.
@@ -803,9 +824,10 @@ def is_memorable(fact: str) -> tuple[bool, str]:
 
     # ANCHORED, not merely mentioning. See _ANCHOR: being named in a sentence is not being
     # what the sentence is about.
-    if not _ANCHOR.search(claim):
+    if not _ANCHOR.search(claim) and not _anchored_on_known(claim):
         return False, _U.say("that is a sentence, not a memory — it is not ABOUT anyone. "
-                       "Store facts about {user}, or about yourself.")
+                       "Store facts about {user}, about yourself, or about someone you know "
+                       "(meet them first).")
 
     return True, ""
 
@@ -1147,6 +1169,39 @@ def note_recalled(row: dict) -> dict:
     return row
 
 
+# ── WHO TOLD HER, AND WHO IT IS ABOUT (2026-11-26, harness/people.py, design §2) ──────
+# Two ADDITIVE fields, stamped here because stamp() is the one function every row creator
+# passes through (remember() and the cleanup rescue; commit_row alone would miss the rescue).
+#   said_by  the active user's person id, on HIS rows (speaker=user) — with several users,
+#            "the user said" has to say which one
+#   about    the ids of the people, pets and places whose names the fact mentions
+# Absent when there is nothing to say: no users configured, or no one named. Old rows have
+# neither and read exactly as before.
+def _stamp_people(row: dict, fact: str, speaker: str) -> None:
+    try:
+        from harness import user as _usr
+        uid = _usr.user_id()
+        if uid and speaker == SPEAKER_USER and not row.get("said_by"):
+            row["said_by"] = uid
+        from harness import people as _pp
+        about = _pp.mentioned(fact)
+        if about:
+            row["about"] = about
+    except Exception as _swx:                       # a person lookup never blocks a memory
+        _swallowed(_swlog, "_stamp_people", _swx, lane="skills")
+
+
+def other_users_secret(row: dict) -> bool:
+    """A PRIVATE fact another user told her (ruling 9.1: shared, except private and off the
+    record). True only for mem_class private-secret rows whose `said_by` is someone other
+    than the user she is talking to now; rows with no `said_by` (every row before people
+    existed) are never hidden by this."""
+    if row.get("mem_class") != "private-secret" or not row.get("said_by"):
+        return False
+    from harness import user as _usr
+    return row["said_by"] != _usr.user_id()
+
+
 def stamp(row: dict, fact: str, speaker: str, src: str,
           supersedes: Optional[list[str]] = None,
           status: Optional[str] = None,
@@ -1175,6 +1230,7 @@ def stamp(row: dict, fact: str, speaker: str, src: str,
     row["src"] = src or ("self" if speaker == SPEAKER_SELF else "user turn")
     if kind:
         row["kind"] = kind
+    _stamp_people(row, fact, speaker)
 
     # ── CLAIM STATUS: AN INFERENCE IS NOT A TESTIMONY (2026-07-14) ──────────────────────
     #
