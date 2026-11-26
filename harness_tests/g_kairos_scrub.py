@@ -271,4 +271,34 @@ for _b2, _d2, _f2 in os.walk(ROOT):
 check("every text extension IN THE SHIPPED TREE is one this scan opens",
       not _unscanned, sorted(_unscanned)[:12])
 
+# ── DOUBLED SEPARATORS AND THE MACHINE'S NAME (2026-11-27) ──────────────────────────────
+# Found by reading the public repos before a push, not by this gate: a path written inside a
+# string literal doubles its separators (`D:\\F\\…`), and the shape rule required a word
+# character right after ONE separator, so 7 lines shipped (an engine test docstring, five
+# NDK paths in .cargo/config.toml, and a docstring of mine in harness/merge.py). And the
+# username rule rewrote MACHINE\user's user and left the machine. Both manifests, read live.
+_EXP_SRC = os.path.join(_SRC_ROOT, "engine-export", "engine-export.toml")
+if os.path.isfile(_MANIFEST) and os.path.isfile(_EXPORTER):
+    import importlib.util as _ilu
+    import tomllib as _tl
+    _sp = _ilu.spec_from_file_location("_kx", _EXPORTER)
+    _kx = _ilu.module_from_spec(_sp)
+    _sp.loader.exec_module(_kx)
+    _doubled = "      --log D:\\\\F\\\\x\\\\_judge_live_serve.log"   # the text as it sat in the file
+    for _mf in (_MANIFEST, _EXP_SRC):
+        if not os.path.isfile(_mf):
+            continue
+        _c = _tl.load(open(_mf, "rb"))
+        _s = _c.get("scrub", {})
+        _pats = _s.get("patterns") or _c.get("patterns") or []
+        _allow = _s.get("pattern_allow") or _c.get("pattern_allow") or []
+        _forb = _s.get("forbidden") or _c.get("forbidden") or []
+        _nm = os.path.basename(_mf)
+        check(_nm + ": a path with doubled separators is a machine-absolute path",
+              bool(_kx._pattern_hits(_doubled, _pats, _allow)), _pats[:1])
+        check(_nm + ": the machine's name in MACHINE\\user form is forbidden",
+              any(f.lower() == "beast\\" for f in _forb), [f for f in _forb if "east" in f])
+else:
+    print("  omitted  the scrub's own rules: no manifest in this tree")
+
 finish("G-KAIROS-SCRUB")

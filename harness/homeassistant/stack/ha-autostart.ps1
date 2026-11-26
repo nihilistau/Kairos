@@ -62,7 +62,7 @@ param(
     [int]    $MinFreeMB    = 1024,
     # ── NOT UNDER %LOCALAPPDATA% (2026-09-11) ────────────────────────────────────
     # The scheduled task that actually launches this CANNOT SEE that directory. Proven by
-    # making the task run `dir` itself: as beast\sam it lists C:\Users\Sam\AppData\Local
+    # making the task run `dir` itself: as the task's own account it lists C:\Users\Sam\AppData\Local
     # and answers "File Not Found" for the HomeAssistant folder, while every shell I have --
     # sandboxed or not -- lists the files happily. My tooling's writes under AppData are
     # container-virtualised: real to me, absent to the system. That is why the 2026-09-09

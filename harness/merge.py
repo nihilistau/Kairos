@@ -1,7 +1,7 @@
 """MERGE — another copy of her, folded into a home, adding and never removing (2026-11-26,
 ruling 9.2: "Merge into one").
 
-Her RunPod copy (D:\\Files\\Projects\\Kairos) was taken from this tree on 2026-11-06 and has
+Her RunPod copy (a separate checkout of this tree) was taken on 2026-11-06 and has
 lived on since: new facts, new days of conversation, journal paragraphs, things said on her own
 time. Merging brings what that copy lived INTO a home, under these rules:
 

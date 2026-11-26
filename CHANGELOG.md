@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.99 — export hygiene (2026-11-27)
+
+* Removed a few build-machine paths and a machine name from comments and docstrings, and taught the export's checks to catch that kind of path next time.
+
 ## 0.8.98 — The engine guards the flat attention kernel itself (2026-11-27)
 
 * The next Kairos engine release falls back to the tiled attention kernel by itself when the flat

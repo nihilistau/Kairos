@@ -6,7 +6,7 @@
 ' ha-autostart.ps1 next to it, because the work is more than one command.
 '
 ' NOT UNDER %LOCALAPPDATA%, and that is not a preference. The task cannot SEE that
-' directory: made to run "dir" itself, as beast\sam, it lists C:\Users\Sam\AppData\Local
+' directory: made to run "dir" itself, as the task's own account, it lists C:\Users\Sam\AppData\Local
 ' and answers "File Not Found" for the folder every shell of mine lists happily. Put here,
 ' wscript found it on the first try. Deployed there, wscript popped an invisible modal
 ' "Can not find script file" and hung forever, which is what a scheduled task does with an
