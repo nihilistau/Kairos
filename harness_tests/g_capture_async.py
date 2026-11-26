@@ -130,10 +130,17 @@ elapsed = (time.perf_counter() - t0) * 1000.0
 
 print("     %d facts written in %.0f ms (the old path: 1,702 ms warm, up to 480,000 ms hung)"
       % (len(FACTS), elapsed))
-check("a turn's memory writes cost her under 250 ms, not 1.7 s and not 8 minutes",
-      elapsed < 250, "%.0f ms" % elapsed)
+# ── THE BOUND IS 1 s, NOT 250 ms (2026-11-27) ────────────────────────────────────────
+# 250 ms went red on a shared GitHub runner at 286 ms (Python 3.12, the bare install, inside
+# the parallel sweep): four store writes, no daemon involved, on a noisy machine. The thing
+# this gate separates is a write that waits on the black hole (120 s per fact, 480 s for four)
+# from one that does not, and 1 s is still more than two orders of magnitude from the former.
+# The mutant (SP_CAPTURE_ASYNC=0) still blocks on the first fact for the full timeout.
+BOUND_MS = 1000
+check("a turn's memory writes cost her under 1 s, not 1.7 s and not 8 minutes",
+      elapsed < BOUND_MS, "%.0f ms" % elapsed)
 check("...and that holds even though the daemon NEVER responds",
-      elapsed < 250, "%.0f ms — she is still waiting on the GPU" % elapsed)
+      elapsed < BOUND_MS, "%.0f ms — she is still waiting on the GPU" % elapsed)
 
 
 # ── 2. THE FACT IS DURABLE THE INSTANT SHE IS TOLD ───────────────────────────────────

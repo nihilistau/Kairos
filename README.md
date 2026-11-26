@@ -71,6 +71,12 @@ the default face.*
    versions are offered too, with a warning. Every file is checked against its published
    checksum, and nothing it downloads runs until you approve it.
 
+   On Windows with an NVIDIA card you can choose the **Kairos engine** instead of llama.cpp.
+   Setup downloads the engine release (with NVIDIA's CUDA libraries included, so nothing else
+   needs installing), asks you to approve it and the model converter it ships, converts the
+   model to the engine's `.sp` format (a few minutes for the 26B), and writes a profile with
+   the settings the model was tested with.
+
    It also makes your companion, with a starting personality in her name, a face and a voice,
    and asks your name so she knows who she is talking to. Already run LM Studio or Ollama? Pick
    "an engine you already run" and nothing is downloaded.
@@ -83,13 +89,19 @@ the default face.*
    - **People** holds the people, pets and places in your life, and who talks to her.
    - **Companion** saves her as a bundle you can keep or move, resets her, and undoes a reset.
 
+   Have two copies of her, say one at home and one on a rented GPU?
+   `python tools/companion.py merge <companion> <other-copy>` brings what the other copy
+   remembered, said and wrote into this one. It never removes or overwrites anything, and it
+   takes a backup first.
+
    On a fresh install, hint cards show you around.
 
 **Or by hand:** `cp -r persona-template persona`, fill in `[user]` in `profiles/companion.toml`,
 start your model server (LM Studio listens on 1234, which the profile expects), then
 `python serve.py companion` and open **http://127.0.0.1:8810/room/**.
 
-To stop her, click **Shut down** in the taskbar, choose **2 - stop** in the launcher, or run `python serve.py --stop`.
+To stop her, click **Shut down** in the taskbar, choose **2 - stop** in the launcher, or run
+`python serve.py --stop`. Stopping from the launcher also stops the engine it started.
 
 **If something doesn't work,** open the **Setup** window in the room. It checks each step and tells
 you which one you're stuck on. [`docs/SETUP.md`](docs/SETUP.md) has the full walkthrough: other
@@ -115,7 +127,10 @@ Everything above runs fully offline. These are add-ons, and all of them ship tur
   first, including the part about network access.
 - **A faster engine.** [`kairos-engine`](https://github.com/nihilistau/kairos-engine) is a custom
   Rust + CUDA backend built for this model on a 12 GB card. You don't need it; reach for it only
-  when your normal server is the bottleneck.
+  when your normal server is the bottleneck. **Get set up** can install it for you (Windows,
+  NVIDIA). Its [releases](https://github.com/nihilistau/kairos-engine/releases) come in two
+  zips: one with NVIDIA's CUDA libraries included, and a much smaller one for machines that
+  already have CUDA 13.
 
 The **Models** window shows every model she uses, whether each is loaded, and a Test button. Anything
 you haven't set up says so instead of failing quietly.
@@ -204,10 +219,11 @@ later, which burned eleven minutes of GPU per cycle.
 | **forgetting** | delete it and it's gone | evicted or re-summarised | retired, never deleted |
 | **speaking first** | never | on a schedule you write | named reasons, silent by default |
 | **personality** | a system prompt | a prompt plus tools | persona plus traits curated from evidence, with mood and outfit cues that change real state |
-| **testing** | manual | unit tests | ~160 offline gates, each a named claim with a receipt |
+| **testing** | manual | unit tests | ~200 offline gates, each a named claim with a receipt |
 
 **What it isn't:** a model server (bring your own), a document-search (RAG) tool (her memory is
-about a person, not a corpus), or multi-user (one companion, one person, local-only by default).
+about a person, not a corpus), or a cloud service. You can keep several companions and let more
+than one person talk to her, but everything lives on your machine, local-only by default.
 The trade-offs: an append-only ledger grows and needs occasional cleanup, a companion who speaks
 first sometimes picks the wrong moment, and a test suite this thorough makes changes slower.
 

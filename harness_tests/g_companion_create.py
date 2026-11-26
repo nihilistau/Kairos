@@ -139,11 +139,22 @@ print("\n7. the four stores follow the home")
 for k, v in H.env_for(r["home"]).items():
     os.environ[k] = v
 from harness.control import shutdown as SD  # noqa: E402
-from harness.sidecar import archive as AR  # noqa: E402
+# Deep recall is the optional sidecar, which imports numpy (2026-11-27: this line was red on
+# every bare-install CI job). Where it is absent its index has no subject, so that ONE check
+# is skipped by name. Every other store below is core and still checked.
+try:
+    from harness.sidecar import archive as AR  # noqa: E402
+except ModuleNotFoundError as e:
+    if e.name != "numpy":
+        raise
+    AR = None
 from harness.skills import games as G, library as L  # noqa: E402
 ins = lambda p: os.path.normcase(os.path.abspath(p)).startswith(os.path.normcase(r["home"]) + os.sep)  # noqa: E731
 check("held-back lines are hers", ins(SD.undelivered_path()), SD.undelivered_path())
-check("deep recall's index is hers", ins(AR._index_dir()), AR._index_dir())
+if AR is None:
+    print("  skip deep recall's index is hers   (numpy absent: the sidecar is not installed)")
+else:
+    check("deep recall's index is hers", ins(AR._index_dir()), AR._index_dir())
 check("deep recall searches HER transcripts", ins(os.path.dirname(H.path("registry"))) and
       any("transcripts" in s for s in [os.path.join(os.path.dirname(H.path("registry")), "transcripts")]))
 check("game shots are hers", ins(G._shot_path("m1")), G._shot_path("m1"))

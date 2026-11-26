@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.9.0 — The first release (2026-11-27)
+
+The first tagged release of Kairos. It gathers everything since the launcher arrived in
+0.8.88: companion homes and bundles, people and users, Get set up (models, llama.cpp or the
+Kairos engine, with every download checked and approved), the lobby page, merging two copies
+of a companion, and the fixes listed below it.
+
+* The README now describes installing the Kairos engine from Get set up, merging companions,
+  and the engine's two release zips.
+* The offline tests pass on a plain install without numpy, and one timing test no longer
+  fails on a slow shared machine.
+
 ## 0.8.99 — export hygiene (2026-11-27)
 
 * Removed a few build-machine paths and a machine name from comments and docstrings, and taught the export's checks to catch that kind of path next time.
