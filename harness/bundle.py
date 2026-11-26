@@ -145,6 +145,7 @@ def export(home: str, parts: Iterable[str] = DEFAULT_EXPORT, *, out: str = "",
     ts = time.strftime("%Y%m%d-%H%M%S")
     name = "%s%s-%s%s" % ((label + "-") if label else "", comp["id"], ts, EXT)
     out = out or os.path.join(bundle_dir(), name)
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)   # --out into a new folder
     part_file = out + ".part"
     files, nbytes, unit_meta = {}, 0, {}
     with zipfile.ZipFile(part_file, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:

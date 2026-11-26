@@ -100,6 +100,15 @@ check("the episodes and the face are not", not any("ep1" in a or "look.png" in a
 check("every file carries a sha256", all(len(v) == 64 for v in man["files"].values()))
 check("the companion is named", man["companion"] == {"id": "ivy", "name": "Ivy"})
 check("no part chosen is refused", bool(_try(lambda: B.export(ivy, []))))
+# --out into a folder that does not exist yet (found 2026-11-26 bundling her into a fresh
+# install: the .part file's open() died on the missing folder)
+_new = os.path.join(SB, "not-yet", "made", "x.kairos")
+try:
+    B.export(ivy, ["personality"], out=_new)
+    _err = ""
+except Exception as e:      # the defect was an OSError, which _try does not catch
+    _err = repr(e)
+check("export --out makes its folder", not _err and os.path.isfile(_new), _err)
 
 print("\n2. inspect refuses what it cannot trust")
 bad = os.path.join(SB, "bad.kairos")

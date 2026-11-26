@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.94 — Exporting a companion into a new folder works (2026-11-26)
+
+* `python tools/companion.py export <id> --out <path>` now creates the folder if it does not exist yet.
+
 ## 0.8.93 — Faster on smaller cards; stop really stops (2026-11-26)
 
 * **llama.cpp now fits the model to your card itself.** Get set up used to force every layer onto the GPU. On a 12 GB card with the 26B model, that ran at about 2 words a second. Setup now leaves the split to llama.cpp, which ran about ten times faster on the same card. If you set up before this version, run Get set up again, or delete `-ngl` and `99` (and `-ngld` and `99`) from the `[engine] command` line of your profile.
