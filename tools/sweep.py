@@ -37,8 +37,18 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Gates that must not run beside the others. Empty since g_backup went hermetic (2026-09-26).
-SERIAL: set = set()
+# Gates that must not run beside the others. Empty from when g_backup went hermetic
+# (2026-09-26) until 2026-11-27.
+#
+# THE THREE THAT SHARE ui/node_modules (2026-11-27). G-ROOM-BUNDLE runs `npm ci` wherever npm
+# is on PATH, and `npm ci` DELETES node_modules before refilling it. GitHub's ubuntu runners
+# ship npm, so in the "npm-less" offline job it ran mid-sweep while G-ROOM-KIT was bundling
+# with esbuild out of that folder: red on 3.11-all and 3.12-all, green on 3.13-all in the same
+# run, and green on all three the run before. G-ROOM-TOKENS writes its probe under
+# node_modules/.cache and reads the font CSS there, so it races the same delete. The serial
+# list runs after the parallel batch, in sweep order, so the bundle's `npm ci` comes first
+# and the other two meet a finished folder.
+SERIAL: set = {"g_room_bundle.py", "g_room_kit.py", "g_room_tokens.py"}
 
 WATCH = ["memory-okf-personality", "memory-okf", "memory-okf-conv", "memory-okf-self",
          "var/memory", "var/room", "var/tuning.json", "persona.md"]

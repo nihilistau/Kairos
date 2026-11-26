@@ -141,6 +141,8 @@ jobs:
       - run: pip install -e ".[http]"
       - run: cd ui && npm ci
       # G-ROOM-KIT renders the kit under node and skips (exit 2) without ui/node_modules,
-      # so it lives here beside the bundle, not in the npm-less offline job.
+      # so it lives here beside the bundle. (The offline job is NOT npm-less, as this said until
+      # 2026-11-27: ubuntu runners ship npm, so G-ROOM-BUNDLE's `npm ci` runs in the sweep too.
+      # tools/sweep.py runs the three node_modules gates serially for that reason.)
       - run: python harness_tests/g_room_kit.py
       - run: python harness_tests/g_room_bundle.py
