@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.95 — Get set up can install the native engine (2026-11-26)
+
+* **Choosing "Kairos engine" in Get set up now works end to end.** You approve the engine,
+  then the model converter it ships. Setup converts the model to `.sp` (a few minutes for
+  the 26B; the room shows a Convert step) and writes a native profile. Before this, that
+  choice produced a profile that could not start.
+* Setup prefers the engine release that includes NVIDIA's CUDA libraries, so nothing else
+  needs installing.
+
 ## 0.8.94 — Exporting a companion into a new folder works (2026-11-26)
 
 * `python tools/companion.py export <id> --out <path>` now creates the folder if it does not exist yet.

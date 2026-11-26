@@ -74,12 +74,35 @@ def main() -> int:
         if st.get("error"):
             print("  !! " + st["error"] + " - run this again to resume")
             return 1
-        ap = I.pending_approval(p)
-        if ap:
-            print(f"\n  approve the engine before it runs: {ap['path']}\n  from {ap['publisher']} release {ap['release']}\n  SHA-256 {ap['sha256']}")
+        # one executable at a time: the engine, then (her native engine) the transcoder it ships
+        while True:
+            ap = I.pending_approval(p)
+            if not ap:
+                break
+            print(f"\n  approve the {ap.get('what', 'engine')} before it runs: {ap['path']}\n"
+                  f"  from {ap['publisher']} release {ap['release']}\n  SHA-256 {ap['sha256']}")
             if _ask("approve it? (yes/no)", "no").lower() not in ("y", "yes"):
                 return 1
             I.approve(ap["sha256"])
+    if I.needs_convert(p):
+        _g, spm, _t = I.sp_paths(p)
+        print(f"\n  converting her model for the native engine (a few minutes for the model)\n  -> {spm}")
+        try:
+            I.start_convert(p)
+        except I.SetupError as x:
+            print("  !! " + str(x))
+            return 1
+        t0 = time.time()
+        while I.status().get("running"):
+            # --stream writes the data region to <out>.datatmp first, then the file itself
+            done = max((os.path.getsize(f) for f in (spm + ".part", spm + ".part.datatmp") if os.path.isfile(f)), default=0)
+            print("\r  converting... %3d s  %.1f GB written " % (time.time() - t0, done / 2 ** 30), end="", flush=True)
+            time.sleep(2)
+        print()
+        st = I.status()
+        if st.get("convert_error") or not st.get("converted"):
+            print("  !! " + (st.get("convert_error") or "the conversion did not finish"))
+            return 1
     # HER, AND YOU (first-time setup = create companion + create user, design §7a): an
     # existing companion, or a new one made the same way the room makes one (named persona,
     # the default face and wardrobe, a local voice); then who you are, as her user1.

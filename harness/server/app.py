@@ -3178,11 +3178,12 @@ def _run_stdlib(host: str, port: int) -> None:
                 self.end_headers()
                 self.wfile.write(payload)
             elif self.path in ("/v1/setup/plan", "/v1/setup/start", "/v1/setup/cancel",
-                               "/v1/setup/approve", "/v1/setup/profile"):
+                               "/v1/setup/approve", "/v1/setup/convert", "/v1/setup/profile"):
                 from harness.server import setup_routes as _su
                 try:
                     code, res = {"/v1/setup/plan": _su.post_plan, "/v1/setup/start": _su.post_start,
                                  "/v1/setup/cancel": _su.post_cancel, "/v1/setup/approve": _su.post_approve,
+                                 "/v1/setup/convert": _su.post_convert,
                                  "/v1/setup/profile": _su.post_profile}[self.path](self._body())
                 except ValueError as exc:
                     code, res = 400, {"ok": False, "error": str(exc)}

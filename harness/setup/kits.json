@@ -87,9 +87,9 @@
     {
       "id": "kairos-engine",
       "title": "Kairos engine (native, NVIDIA)",
-      "about": "Her own engine: KV memory, byte-exact recall, the fastest MoE decode on small cards. Needs the model converted to .sp (the wizard does it). Windows + CUDA.",
+      "about": "Her own engine: KV memory, byte-exact recall, the fastest MoE decode on small cards. Setup converts the model to .sp with the converter the release ships (a few minutes for the 26B). Windows + CUDA; the release with the CUDA libraries is preferred, so nothing else needs installing.",
       "github": "nihilistau/kairos-engine",
-      "assets": [["kairos-engine-*-win-cuda*.zip"]],
+      "assets": [["kairos-engine-*-win-cuda*-cublas.zip", "kairos-engine-*-win-cuda*.zip"]],
       "exe": "sp-daemon.exe", "transcoder": "sp_transcode.exe", "os": "nt", "needs": "nvidia", "native": true
     },
     {

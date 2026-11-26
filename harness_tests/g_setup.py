@@ -221,13 +221,24 @@ I.IN_TREE_TRANSCODER = _intree
 # first wiring passed a STEM, so every native conversion would have died on its usage line.
 I.approve(I._sha(fake))
 _run, seen = I.subprocess.run, {}
-I.subprocess.run = lambda argv, **k: seen.setdefault("argv", argv) and type("R", (), {"returncode": 0})()
+
+
+def _tool(argv, **k):
+    seen.setdefault("argv", argv)
+    for out in argv[2:4]:                       # what the real tool writes: both outputs
+        open(out, "w").write("x")
+    return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+
+I.subprocess.run = _tool
 res = I.convert("m.gguf", os.path.join(SB, "her"), exe=fake)
 I.subprocess.run = _run
 a = seen.get("argv", [])
-check("convert passes the tool its model AND tokenizer paths",
-      a[1:4] == ["m.gguf", os.path.join(SB, "her.sp-model"), os.path.join(SB, "her.sp-tokenizer")]
+check("convert passes the tool its model AND tokenizer paths (as .part, renamed on success)",
+      a[1:4] == ["m.gguf", os.path.join(SB, "her.sp-model.part"), os.path.join(SB, "her.sp-tokenizer.part")]
       and "--q4b" in a and "--stream" in a, a)
+check("…and the finished pair is under the real names", os.path.isfile(os.path.join(SB, "her.sp-model"))
+      and not os.path.exists(os.path.join(SB, "her.sp-model.part")))
 check("the in-tree build is where the setup centre looks",
       I.IN_TREE_TRANSCODER.replace("\\", "/").endswith("engine/tools/sp_transcode/build/sp_transcode.exe")
       or os.name != "nt")
@@ -248,6 +259,123 @@ check("the profile needs the engine approved", "approve" in SR.post_profile({"na
 print("\n9. serve.py")
 c = {"engine": {"command": [os.path.join(SB, "missing.exe")]}}
 check("a missing engine exe is said, not started", serve.launch_engine_command(c, {}, "http://127.0.0.1:9") is False)
+
+print("\n10. her native engine (kairos-engine), end to end")
+# FOUND 2026-11-26: choosing "Kairos engine" wrote an openai profile running sp-daemon.exe with
+# llama-server's flags; nothing asked for the transcoder, nothing converted, and serve.py's
+# `from engine.launch import …` had no engine/launch.py to import. The whole path, on fakes.
+k = I.kits()
+check("the kit prefers the release with the CUDA libraries, then the lean one",
+      I.kits_engine("kairos-engine")["assets"] == [["kairos-engine-*-win-cuda*-cublas.zip", "kairos-engine-*-win-cuda*.zip"]])
+NDEST = os.path.join(SB, "ndata")
+_seen_pats = []
+
+
+def _nasset(repo, pattern, net=None, listing=None, prefer_tag_prefix=None):
+    _seen_pats.append(pattern)
+    name = "kairos-engine-0.8.0-win-cuda13-cublas.zip"
+    return {"tag": "v0.8.0", "name": name, "size": None, "url": "https://github.com/x/" + name, "sha256": "e" * 64}
+
+
+DAEMON, TRANS = b"MZ fake sp-daemon", b"MZ fake sp_transcode"
+
+
+def _ndl(url, dest, *, size=None, sha256=None, **kw):
+    if str(dest).endswith(".zip"):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("sp-daemon.exe", DAEMON)
+            z.writestr("sp_transcode.exe", TRANS)
+            z.writestr("launch.py", "# the release's launch.py\n")
+            z.writestr("cublas64_13.dll", b"nvidia")
+        os.makedirs(os.path.dirname(str(dest)), exist_ok=True)
+        open(dest, "wb").write(buf.getvalue())
+        return dest
+    return fake_download(url, dest, size=size, sha256=sha256)
+
+
+I.github.latest_asset, I.DL.download = _nasset, _ndl
+pn = I.plan("g4-moe-uncensored", "kairos-engine", NDEST)
+check("…and asks the catalogue for it first", bool(_seen_pats) and "cublas" in _seen_pats[0], _seen_pats[:1])
+I.start(pn, licence_ok=True)
+I._JOB["thread"].join(10)
+check("the engine release downloads and unpacks", I.status().get("finished") and os.path.isfile(I.engine_exe(pn)), I.status().get("error"))
+check("it is her native engine, and it needs converting", I.native(pn) and I.needs_convert(pn))
+a1 = I.pending_approval(pn)
+check("approval 1 of 2: the engine", a1 and a1["what"] == "engine" and a1["path"].endswith("sp-daemon.exe"), a1)
+check("converting is refused before anything is approved", "approve" in _err(lambda: I.start_convert(pn)))
+I.approve(a1["sha256"])
+a2 = I.pending_approval(pn)
+check("approval 2 of 2: the transcoder its release ships", a2 and a2["what"] == "transcoder" and a2["path"].endswith("sp_transcode.exe"), a2)
+check("the transcoder the setup centre finds is that one", bool(a2) and I.transcoder(pn) == a2["path"])
+if a2:
+    I.approve(a2["sha256"])
+check("then nothing is pending", I.pending_approval(pn) is None)
+I.ENGINE_DIR = os.path.join(SB, "kairos-root", "engine")   # never the real tree's engine/
+check("the profile is refused before the model is converted",
+      "convert" in _err(lambda: I.write_profile("nat0", pn, companion="ivy")))
+
+# a stand-in converter: the tool's argv, writing what the tool writes (or failing half way)
+FAKE_T = os.path.join(SB, "fake_transcode.py")
+open(FAKE_T, "w").write("import sys\nopen(sys.argv[2],'w').write('M')\nopen(sys.argv[3],'w').write('T')\n"
+                        "sys.exit(3 if 'FAIL' in open(sys.argv[1]).read(1000) else 0)\n")
+_argv = I.convert_argv
+I.convert_argv = lambda exe, g, m, t: [sys.executable, FAKE_T, g, m, t]
+gguf, spm, spt = I.sp_paths(pn)
+check("the .sp pair goes beside the download, same name",
+      spm == gguf[:-5] + ".sp-model" and spt == gguf[:-5] + ".sp-tokenizer", (spm, spt))
+open(gguf, "w").write("FAIL")
+I.start_convert(pn)
+I._JOB["thread"].join(10)
+check("a failed conversion leaves nothing under the real names (it would read as done)",
+      I.status().get("convert_error") and not os.path.exists(spm) and not os.path.exists(spt), I.status().get("convert_error"))
+open(gguf, "w").write("ok")
+I.start_convert(pn)
+I._JOB["thread"].join(10)
+st = I.status()
+check("the conversion runs in the background and lands both files",
+      st.get("converted") and not st.get("converting") and os.path.isfile(spm) and os.path.isfile(spt), st.get("convert_error"))
+check("…and is then not needed", not I.needs_convert(pn))
+I.convert_argv = _argv
+
+try:
+    path = I.write_profile("nat1", pn, companion="ivy", user_name="Sam", user_pronouns="he/him/his")
+    with open(path, "rb") as f:
+        np_ = tomllib.load(f)
+    _why = ""
+except I.SetupError as x:                       # a verdict, not a crash, when an earlier step broke
+    path, np_, _why = "", {"engine": {}, "paths": {}, "companion": {}, "user": {}}, str(x)
+check("the native profile is written", bool(path), _why)
+check("the profile is a NATIVE one (kind sp), from sp.toml", np_["engine"].get("kind") == "sp" and "command" not in np_["engine"], np_["engine"])
+check("…its paths are the approved daemon and the converted model",
+      tuple(np_["paths"].get(k2) for k2 in ("engine_exe", "model", "tokenizer")) == (I.engine_exe(pn), spm, spt), np_["paths"])
+check("…with its companion home and you (sp.toml has no [user] to substitute)",
+      np_["companion"].get("home") == "ivy" and np_["user"].get("name") == "Sam" and "registry" not in np_["paths"], np_.get("user"))
+la = os.path.join(I.ENGINE_DIR, "launch.py")
+_rd = lambda f: open(f).read() if os.path.isfile(f) else ""  # noqa: E731
+check("engine/launch.py is installed from the release, where serve.py imports it",
+      _rd(la) == "# the release's launch.py\n")
+os.makedirs(os.path.dirname(la), exist_ok=True)
+open(la, "w").write("# a cloned engine's own launch.py\n")
+try:
+    I.write_profile("nat2", pn)
+except I.SetupError:
+    pass
+check("…and never over one already there", _rd(la) == "# a cloned engine's own launch.py\n")
+SR._PLAN["p"] = pn
+kit = SR.get_kit()[1]
+check("the Setup window sees no conversion pending and a transcoder", not kit["convert"]["needed"] and kit["transcoder"], kit["convert"])
+np_["paths"]["companions_dir"] = os.environ["SP_COMPANIONS_DIR"]   # ivy lives in the sandbox (§6)
+np_["_profile_name"] = "nat1"
+_env = dict(os.environ)
+try:
+    e = serve.build_env(np_)
+    ok = e.get("SP_ENGINE_KIND") == "sp" and os.path.normcase(e.get("SP_MODEL_PATH", "")) == os.path.normcase(spm)
+except (SystemExit, Exception) as x:
+    ok, e = False, {"refused": str(x)}
+os.environ.clear()
+os.environ.update(_env)
+check("serve.build_env takes the native profile", ok, {k2: e.get(k2) for k2 in ("SP_ENGINE_KIND", "SP_MODEL_PATH", "refused")})
 
 I.hf.files, I.github.releases, I.github.latest_asset, I.DL.download = _hf, _rel, _la, _dl
 finish("G-SETUP")

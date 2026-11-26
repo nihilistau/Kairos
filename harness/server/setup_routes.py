@@ -4,7 +4,8 @@
     POST /v1/setup/plan       {model, engine, dest} -> files, sizes, hashes (live catalogues)
     POST /v1/setup/start      {licence_ok} -> downloads begin in the background
     POST /v1/setup/cancel
-    POST /v1/setup/approve    {sha256} -> the engine executable may run
+    POST /v1/setup/approve    {sha256} -> the engine executable (then its transcoder) may run
+    POST /v1/setup/convert    {} -> GGUF -> .sp for her native engine, in the background
     POST /v1/setup/profile    {name, companion, user_name, user_pronouns, base_url}
 
 The plan is kept in memory between /plan and /start, so the browser never sends back URLs
@@ -30,10 +31,13 @@ def get_kit():
     st = I.status()
     p = _PLAN["p"] or (st.get("plan") if isinstance(st.get("plan"), dict) else None)
     appr = I.pending_approval(p) if p and st.get("finished") else None
+    conv = {"needed": bool(p and st.get("finished") and I.needs_convert(p)),
+            "running": bool(st.get("converting") and st.get("running")),
+            "error": st.get("convert_error") or "", "to": I.sp_paths(p)[1] if I.native(p) else ""}
     return 200, {"ok": True, "models": k["models"], "engines": k["engines"], "licences": k["licences"],
                  "warning": k["uncensored_warning"], "hardware": hw, "suggest": I.suggest(hw),
                  "default_dest": os.path.join(I.H.ROOT, "data"), "state": st, "plan": p,
-                 "approval": appr, "transcoder": bool(I.transcoder())}
+                 "approval": appr, "convert": conv, "transcoder": bool(I.transcoder(p))}
 
 
 def post_plan(body: dict):
@@ -70,10 +74,22 @@ def post_approve(body: dict):
         return _err(400, str(e))
 
 
+def post_convert(_body: dict):
+    p = _PLAN["p"] or I.status().get("plan")
+    if not p:
+        return _err(400, "make a plan first")
+    try:
+        return 200, I.start_convert(p)
+    except I.SetupError as e:
+        return _err(400, str(e))
+
+
 def post_profile(body: dict):
     p = _PLAN["p"] or I.status().get("plan") or {"engine": "external", "items": []}
     if p.get("items") and I.pending_approval(p):
         return _err(400, "approve the engine first")
+    if I.needs_convert(p):
+        return _err(400, "convert her model for the native engine first")
     try:
         path = I.write_profile(str(body.get("name") or ""), p, companion=str(body.get("companion") or ""),
                                user_name=str(body.get("user_name") or ""),

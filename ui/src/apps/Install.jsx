@@ -10,8 +10,9 @@ import { open } from '../windowManager.js'
  * Steps: this machine (what it can run, and a suggestion) → an engine → a model (the
  * uncensored ones behind a plain warning) → where to put it (sizes against free space) →
  * download (resumable, each file checked against its published hash) → approve the engine
- * (nothing downloaded runs until you say so, by its SHA-256) → write the profile, and make
- * her (Character) or pick a companion → the command that starts her.
+ * (nothing downloaded runs until you say so, by its SHA-256) — for her native engine, then its
+ * transcoder, and convert the model to .sp → write the profile, and make her (Character) or pick
+ * a companion → the command that starts her.
  *
  * The browser never sends a URL or a path to fetch: it asks for a plan by ids and can only
  * start the plan it was shown.
@@ -62,6 +63,12 @@ export default function Install() {
           state.refresh()
         }
         const approve = async () => { const r = await api.setupOp('approve', { sha256: d.approval.sha256 }); setM(r.ok ? { ok: true, text: 'Approved.' } : { ok: false, text: r.error }); state.refresh() }
+        const conv = d.convert || {}
+        const convert = async () => {
+          const r = await api.setupOp('convert')
+          setM(r.ok ? { ok: true, text: 'Converting — a few minutes for the model; you can close this window.' } : { ok: false, text: r.error })
+          state.refresh()
+        }
         const write = async () => {
           const r = await api.setupOp('profile', prof)
           if (r.ok) setMade(r); else setM({ ok: false, text: r.error })
@@ -127,10 +134,18 @@ export default function Install() {
             </Step>
 
             {d.approval ? (
-              <Step n="6" title="Approve the engine">
+              <Step n="6" title={d.approval.what === 'transcoder' ? 'Approve the converter' : 'Approve the engine'}>
                 <div className="in-hint">Nothing downloaded runs until you approve it. <b>{d.approval.path}</b>, from {d.approval.publisher} release {d.approval.release}.</div>
                 <code className="in-sha">SHA-256 {d.approval.sha256}</code>
                 <div className="in-row"><Button variant="primary" onClick={approve}>Approve it</Button></div>
+              </Step>
+            ) : null}
+
+            {conv.needed || conv.running || conv.error ? (
+              <Step n="6b" title="Convert her model">
+                <div className="in-hint">Her native engine reads the model as .sp, converted once on this machine. It goes beside the download: <b>{conv.to}</b></div>
+                <div className="in-row"><Button variant="primary" disabled={conv.running || !!d.approval} onClick={convert}>{conv.running ? 'Converting…' : 'Convert'}</Button></div>
+                {conv.error ? <div className="in-hint in-bad">{conv.error}</div> : null}
               </Step>
             ) : null}
 
@@ -145,7 +160,7 @@ export default function Install() {
               </div>
               <div className="in-row">
                 <Button variant="ghost" onClick={() => open('character')}>Make a new companion first (Character)</Button>
-                <Button disabled={!prof.name || (!external && !st.finished) || !!d.approval} onClick={write}>Write the profile</Button>
+                <Button disabled={!prof.name || (!external && !st.finished) || !!d.approval || conv.needed || conv.running} onClick={write}>Write the profile</Button>
               </div>
               {made ? <div className="in-hint">Written: profiles/{made.profile}.toml. Start her with <code>{made.start}</code> (or the launcher, <code>kairos.bat</code>).</div> : null}
             </Step>

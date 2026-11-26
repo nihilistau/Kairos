@@ -10,7 +10,9 @@ approve, convert, and write the profile.
     approve(sha256)            an executable from a downloaded zip runs only after you
                                approve it, recorded by hash (a different file at that path
                                is not approved)
-    convert(gguf)              GGUF -> .sp for her native engine (sp_transcode), when there
+    convert(gguf) / start_convert(plan)
+                               GGUF -> .sp for her native engine, with the sp_transcode its
+                               release ships (approved like the engine), in the background
     write_profile(name, ...)   profiles/<name>.toml — the companion profile with the engine
                                set: base_url, and `[engine] command` so serve.py starts it
 
@@ -334,29 +336,52 @@ def _sha(path: str) -> str:
     return h.hexdigest()
 
 
-def engine_exe(p: dict) -> str:
-    k = kits()
-    e = _by_id(k["engines"], p["engine"], "engine")
-    if e.get("external"):
+def _in_engine(p: dict, name: str) -> str:
+    """A file inside the plan's downloaded engine (its zip's folder), or ""."""
+    if not name:
         return ""
-    for it in p["items"]:
+    for it in p.get("items") or []:
         if it["role"] == "engine":
             root = it["to"][:-4] if it["to"].endswith(".zip") else os.path.dirname(it["to"])
             for dp, _dn, fn in os.walk(root):
-                if e["exe"] in fn:
-                    return os.path.join(dp, e["exe"])
+                if name in fn:
+                    return os.path.join(dp, name)
     return ""
 
 
+def engine_exe(p: dict) -> str:
+    e = kits_engine(p["engine"])
+    return "" if e.get("external") else _in_engine(p, e["exe"])
+
+
+def native(p: Optional[dict]) -> bool:
+    """Her own engine (kairos-engine): kind "sp", a converted model, engine/launch.py."""
+    try:
+        e = kits_engine((p or {}).get("engine") or "")
+    except SetupError:
+        return False
+    return bool(e.get("native") and e.get("transcoder") and not e.get("external"))
+
+
+def bundled_transcoder(p: Optional[dict]) -> str:
+    """sp_transcode as the engine release ships it, beside sp-daemon."""
+    return _in_engine(p, kits_engine(p["engine"]).get("transcoder", "")) if native(p) else ""
+
+
 def pending_approval(p: dict) -> Optional[dict]:
-    exe = engine_exe(p)
-    if not exe or not os.path.isfile(exe):
-        return None
-    sha = _sha(exe)
-    if sha in _state().get("approved", []):
-        return None
-    tag = next((it.get("tag") for it in p["items"] if it["role"] == "engine"), "")
-    return {"path": exe, "sha256": sha, "publisher": kits_engine(p["engine"]).get("github"), "release": tag}
+    """The next executable from this plan that will run and is not yet approved: the engine,
+    then — for her native engine — the transcoder its release ships (2026-11-26: it was never
+    asked for, so the conversion could not have run). One at a time; approve and ask again."""
+    tag = next((it.get("tag") for it in p.get("items") or [] if it["role"] == "engine"), "")
+    for what, exe in (("engine", engine_exe(p)), ("transcoder", bundled_transcoder(p))):
+        if not exe or not os.path.isfile(exe):
+            continue
+        sha = _sha(exe)
+        if sha in _state().get("approved", []):
+            continue
+        return {"what": what, "path": exe, "sha256": sha,
+                "publisher": kits_engine(p["engine"]).get("github"), "release": tag}
+    return None
 
 
 def kits_engine(eid: str) -> dict:
@@ -384,10 +409,11 @@ IN_TREE_TRANSCODER = os.path.join(H.ROOT, "engine", "tools", "sp_transcode", "bu
                                   "sp_transcode.exe" if os.name == "nt" else "sp_transcode")
 
 
-def transcoder() -> str:
-    """sp_transcode: SP_TRANSCODE_EXE, then the in-tree build, then PATH."""
-    for c in (os.environ.get("SP_TRANSCODE_EXE", ""), IN_TREE_TRANSCODER,
-              shutil.which("sp_transcode") or "", shutil.which("sp_transcode.exe") or ""):
+def transcoder(p: Optional[dict] = None) -> str:
+    """sp_transcode: SP_TRANSCODE_EXE, the one the plan's engine release ships, the in-tree
+    build, then PATH."""
+    for c in (os.environ.get("SP_TRANSCODE_EXE", ""), bundled_transcoder(p) if p else "",
+              IN_TREE_TRANSCODER, shutil.which("sp_transcode") or "", shutil.which("sp_transcode.exe") or ""):
         if c and os.path.isfile(c):
             return c
     return ""
@@ -409,10 +435,82 @@ def convert(gguf: str, out_stem: str, *, exe: str = "") -> dict:
     model, tok = out_stem + ".sp-model", out_stem + ".sp-tokenizer"
     if os.path.isfile(model) and os.path.isfile(tok):
         return {"ok": True, "model": model, "tokenizer": tok, "skipped": True}
-    r = subprocess.run(convert_argv(exe, gguf, model, tok), capture_output=True, text=True)
-    if r.returncode != 0:
-        raise SetupError("conversion failed: " + (r.stderr or r.stdout)[-400:])
+    # INTO .part NAMES, RENAMED ONLY ON SUCCESS: "both files exist" is what skips a conversion,
+    # so an interrupted 14 GB write left under the real name would have counted as done.
+    r = subprocess.run(convert_argv(exe, gguf, model + ".part", tok + ".part"), capture_output=True, text=True)
+    if r.returncode != 0 or not (os.path.isfile(model + ".part") and os.path.isfile(tok + ".part")):
+        raise SetupError("conversion failed: " + ((r.stderr or r.stdout) or "no output")[-400:])
+    from harness.store_io import replace_atomic
+    replace_atomic(tok + ".part", tok)
+    replace_atomic(model + ".part", model)
     return {"ok": True, "model": model, "tokenizer": tok}
+
+
+def sp_paths(p: dict) -> tuple:
+    """The .sp pair the plan's model converts to: beside the GGUF, same name."""
+    g = next((it["to"] for it in p.get("items") or [] if it["role"] == "model"), "")
+    stem = g[:-5] if g.lower().endswith(".gguf") else g
+    return g, stem + ".sp-model", stem + ".sp-tokenizer"
+
+
+def needs_convert(p: Optional[dict]) -> bool:
+    if not native(p):
+        return False
+    _g, m, t = sp_paths(p)
+    return not (os.path.isfile(m) and os.path.isfile(t))
+
+
+def start_convert(p: dict) -> dict:
+    """GGUF -> .sp in the background (a 26B takes minutes), as the downloads do: status()
+    carries `converting`, then `converted` or `convert_error`."""
+    if not native(p):
+        raise SetupError("only her native engine needs a converted model")
+    if pending_approval(p):
+        raise SetupError("approve the engine and its transcoder first")
+    exe = transcoder(p)
+    gguf, _m, _t = sp_paths(p)
+    if not os.path.isfile(gguf):
+        raise SetupError("the model is not downloaded yet")
+    with _LOCK:
+        t = _JOB.get("thread")
+        if t and t.is_alive():
+            raise SetupError("a download or conversion is already running")
+        st = _state()
+        st.update(converting=True, convert_error="", converted=False,
+                  convert_started=time.strftime("%Y-%m-%dT%H:%M:%S"))
+        _save(st)
+
+        def run():
+            try:
+                convert(gguf, sp_paths(p)[1][:-len(".sp-model")], exe=exe)
+                st["converted"] = True
+            except (SetupError, OSError) as e:
+                st["convert_error"] = str(e)
+            finally:
+                st["converting"] = False
+                _save(st)
+
+        th = threading.Thread(target=run, name="kairos-convert", daemon=True)
+        _JOB.update(thread=th, cancel=None)
+        th.start()
+    return {"ok": True, "started": True}
+
+
+ENGINE_DIR = os.path.join(H.ROOT, "engine")     # where serve.py imports engine.launch from
+
+
+def install_launcher(p: dict) -> str:
+    """engine/launch.py, from the engine release, where serve.py imports it (`from engine.launch
+    import launch_daemon`). Never over one already there — that is a cloned engine repo's own."""
+    dst = os.path.join(ENGINE_DIR, "launch.py")
+    if os.path.isfile(dst):
+        return dst
+    src = _in_engine(p, "launch.py")
+    if not src:
+        raise SetupError("this engine release has no launch.py — use kairos-engine 0.8.0 or later")
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    shutil.copy2(src, dst)
+    return dst
 
 
 # ── the profile ────────────────────────────────────────────────────────────────────────
@@ -452,10 +550,29 @@ def write_profile(name: str, p: dict, *, companion: str = "", user_name: str = "
     dst = os.path.join(pdir, name + ".toml")
     if os.path.exists(dst):
         raise SetupError(f"profiles/{name}.toml already exists — pick another name")
-    with open(os.path.join(H.ROOT, "profiles", "companion.toml"), encoding="utf-8") as f:
-        text = f.read()
     e = kits_engine(p["engine"]) if p.get("engine") else {"external": True}
     port = kits()["defaults"]["port"]
+    if native(p):
+        # HER NATIVE ENGINE (2026-11-26). This branch did not exist: the profile came out as
+        # kind "openai" with llama-server's flags on sp-daemon.exe. The template is the shipped
+        # sp.toml (kind "sp"); its [paths] get the approved daemon and the CONVERTED model, and
+        # engine/launch.py — serve.py's way to start it — comes from the release.
+        if pending_approval(p):
+            raise SetupError("approve the engine and its transcoder first")
+        if needs_convert(p):
+            raise SetupError("convert the model for her engine first")
+        install_launcher(p)
+        _g, spm, spt = sp_paths(p)
+        with open(os.path.join(H.ROOT, "profiles", "sp.toml"), encoding="utf-8") as f:
+            text = f.read()
+        sec = re.search(r"(?ms)^\[paths\]\n.*?(?=^\[)", text)
+        body = sec.group(0)
+        for key, val in (("engine_exe", engine_exe(p)), ("model", spm), ("tokenizer", spt)):
+            body = re.sub(r"(?m)^%s\s*=.*$" % key, lambda _m, k=key, v=val: "%s = %s" % (k, _q(v)), body, count=1)
+        text = text[:sec.start()] + body + text[sec.end():]
+        return _finish_profile(dst, name, text, companion, user_name, user_pronouns)
+    with open(os.path.join(H.ROOT, "profiles", "companion.toml"), encoding="utf-8") as f:
+        text = f.read()
     if e.get("external"):
         eng = "[engine]\nkind = \"openai\"\nbase_url = %s\nmodel = \"\"\n" % _q(base_url or "http://127.0.0.1:1234")
     else:
@@ -465,9 +582,18 @@ def write_profile(name: str, p: dict, *, companion: str = "", user_name: str = "
                % (time.strftime("%Y-%m-%d"), _q("http://127.0.0.1:%d" % port), ", ".join(_q(x) for x in cmd)))
     # function replacements: a Windows path in the text would be read as a regex escape
     text = re.sub(r"(?ms)^\[engine\]\n.*?(?=^\[)", lambda _m: eng + "\n", text, count=1)
+    return _finish_profile(dst, name, text, companion, user_name, user_pronouns)
+
+
+def _finish_profile(dst: str, name: str, text: str, companion: str, user_name: str,
+                    user_pronouns: str) -> str:
+    """[user] and [companion] for either template, then the file."""
     if user_name:
         _u = "[user]\nname = %s\npronouns = %s\n\n" % (_q(user_name), _q(user_pronouns))
-        text = re.sub(r"(?ms)^\[user\]\n.*?(?=^\[)", lambda _m: _u, text, count=1)
+        if re.search(r"(?m)^\[user\]\s*$", text):
+            text = re.sub(r"(?ms)^\[user\]\n.*?(?=^\[|\Z)", lambda _m: _u, text, count=1)
+        else:   # sp.toml has no [user] section: a substitution alone would silently drop you
+            text = text.rstrip("\n") + "\n\n" + _u
     if companion:
         text = "[companion]\nhome = %s\n\n" % _q(companion) + text
         # with a home, the profile must not name a registry (serve.apply_home refuses two sources)
