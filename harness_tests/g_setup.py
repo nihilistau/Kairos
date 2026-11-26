@@ -65,7 +65,7 @@ check("every engine has assets or is external", all(e.get("assets") or e.get("ex
 # turned every kit's repo into an invalid id the first time a fresh install ran the wizard.
 # The kits ship raw (noscrub) and the ids the code passes around match no scrub rule.
 _man = open(os.path.join(ROOT, "kairos-export", "kairos-export.toml"), encoding="utf-8").read() \
-    if os.path.isdir(os.path.join(ROOT, "kairos-export")) else ""
+    if os.path.exists(os.path.join(ROOT, "kairos-export", "kairos-export.toml")) else ""
 if _man:
     import re as _re
     _rules = _re.findall(r'^"([^"]+)"\s*=\s*"[^"]*"', _man.split("[scrub]", 1)[1], _re.M)
@@ -185,6 +185,10 @@ check("kind openai at the engine's port", eng["kind"] == "openai" and eng["base_
 check("[engine] command: the approved exe and the model, projector and draft",
       eng["command"][0] == exe and roles["model"] in " ".join(eng["command"])
       and "--mmproj" in eng["command"] and "-md" in eng["command"], eng["command"][:4])
+# An explicit layer count switches off llama.cpp's own fitting (found by the fresh install: a
+# 16 GB model forced whole onto a 12 GB card); its defaults, -ngl auto + --fit on, size the split.
+check("[engine] command leaves the layer split to llama.cpp's fit (no -ngl, no -ngld)",
+      not {"-ngl", "-ngld", "--n-gpu-layers", "--gpu-layers"} & set(eng["command"]), eng["command"])
 check("its companion home, and no registry beside it", prof["companion"]["home"] == "ivy" and "registry" not in prof["paths"])
 check("its user", prof["user"] == {"name": "Ray", "pronouns": "he/him/his"})
 import serve  # noqa: E402
@@ -206,11 +210,27 @@ print("\n7. convert")
 os.environ.pop("SP_TRANSCODE_EXE", None)
 _which = I.shutil.which
 I.shutil.which = lambda name: None
+_intree, I.IN_TREE_TRANSCODER = I.IN_TREE_TRANSCODER, os.path.join(SB, "no-build", "sp_transcode.exe")
 check("no transcoder: refused, and it says what to use instead", "llama.cpp" in _err(lambda: I.convert("m.gguf", "out")))
 fake = os.path.join(SB, "sp_transcode.exe")
 open(fake, "wb").write(b"MZ transcoder")
 check("an unapproved transcoder is refused", "approve" in _err(lambda: I.convert("m.gguf", "out", exe=fake)))
 I.shutil.which = _which
+I.IN_TREE_TRANSCODER = _intree
+# The tool takes <in.gguf> <out.sp-model> <out.sp-tokenizer> (engine/tools/sp_transcode); the
+# first wiring passed a STEM, so every native conversion would have died on its usage line.
+I.approve(I._sha(fake))
+_run, seen = I.subprocess.run, {}
+I.subprocess.run = lambda argv, **k: seen.setdefault("argv", argv) and type("R", (), {"returncode": 0})()
+res = I.convert("m.gguf", os.path.join(SB, "her"), exe=fake)
+I.subprocess.run = _run
+a = seen.get("argv", [])
+check("convert passes the tool its model AND tokenizer paths",
+      a[1:4] == ["m.gguf", os.path.join(SB, "her.sp-model"), os.path.join(SB, "her.sp-tokenizer")]
+      and "--q4b" in a and "--stream" in a, a)
+check("the in-tree build is where the setup centre looks",
+      I.IN_TREE_TRANSCODER.replace("\\", "/").endswith("engine/tools/sp_transcode/build/sp_transcode.exe")
+      or os.name != "nt")
 
 print("\n8. the routes")
 from harness.server import setup_routes as SR  # noqa: E402

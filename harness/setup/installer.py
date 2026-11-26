@@ -264,7 +264,12 @@ def start(p: dict, *, licence_ok: bool = False, token: str = "", transport=None,
                         os.makedirs(os.path.dirname(it["to"]), exist_ok=True)
 
                         def prog(done, total=None, **_k):
+                            # SAVED, throttled: status() reads the file, so an unsaved count
+                            # showed 0.0 GB for a whole download (found by the fresh install).
                             st["bytes"] = done
+                            if time.time() - st.get("_saved_at", 0) > 1.5:
+                                st["_saved_at"] = time.time()
+                                _save(st)
                         DL.download(it["url"], Path(it["to"]), size=it["size"], sha256=it["sha256"],
                                     progress=prog, cancel=cancel, transport=transport, resolve=resolve,
                                     token=token or None)
@@ -374,26 +379,37 @@ def approved(path: str) -> bool:
 
 
 # ── converting for her native engine ───────────────────────────────────────────────────
+# Built in this tree by engine/build-transcode.bat (engine/tools/sp_transcode, 2026-11-26).
+IN_TREE_TRANSCODER = os.path.join(H.ROOT, "engine", "tools", "sp_transcode", "build",
+                                  "sp_transcode.exe" if os.name == "nt" else "sp_transcode")
+
+
 def transcoder() -> str:
-    """sp_transcode: [setup] transcoder in the environment, beside sp-daemon, or on PATH."""
-    for c in (os.environ.get("SP_TRANSCODE_EXE", ""), shutil.which("sp_transcode") or "",
-              shutil.which("sp_transcode.exe") or ""):
+    """sp_transcode: SP_TRANSCODE_EXE, then the in-tree build, then PATH."""
+    for c in (os.environ.get("SP_TRANSCODE_EXE", ""), IN_TREE_TRANSCODER,
+              shutil.which("sp_transcode") or "", shutil.which("sp_transcode.exe") or ""):
         if c and os.path.isfile(c):
             return c
     return ""
 
 
+def convert_argv(exe: str, gguf: str, model: str, tok: str) -> List[str]:
+    """The tool takes the model AND tokenizer paths (not a stem); --stream keeps peak memory at
+    about one tensor, so a 26B fits a 32 GB machine, and its output is byte-identical."""
+    return [exe, gguf, model, tok, "--q4b", "--stream", "--verify"]
+
+
 def convert(gguf: str, out_stem: str, *, exe: str = "") -> dict:
     exe = exe or transcoder()
     if not exe:
-        raise SetupError("sp_transcode is not on this machine — it ships in the Kairos engine "
-                         "release; until then use llama.cpp, which needs no conversion")
+        raise SetupError("sp_transcode is not on this machine — build it with "
+                         "engine/build-transcode.bat, or use llama.cpp, which needs no conversion")
     if not approved(exe):
         raise SetupError("approve the transcoder first (its SHA-256 is shown in Setup)")
     model, tok = out_stem + ".sp-model", out_stem + ".sp-tokenizer"
     if os.path.isfile(model) and os.path.isfile(tok):
         return {"ok": True, "model": model, "tokenizer": tok, "skipped": True}
-    r = subprocess.run([exe, gguf, out_stem, "--q4b", "--verify"], capture_output=True, text=True)
+    r = subprocess.run(convert_argv(exe, gguf, model, tok), capture_output=True, text=True)
     if r.returncode != 0:
         raise SetupError("conversion failed: " + (r.stderr or r.stdout)[-400:])
     return {"ok": True, "model": model, "tokenizer": tok}
@@ -401,16 +417,22 @@ def convert(gguf: str, out_stem: str, *, exe: str = "") -> dict:
 
 # ── the profile ────────────────────────────────────────────────────────────────────────
 def engine_command(p: dict, *, ctx: int = 0, port: int = 0) -> List[str]:
-    """llama-server and its flags for this plan (the model, vision, draft, context, port)."""
+    """llama-server and its flags for this plan (the model, vision, draft, context, port).
+
+    NO LAYER COUNT (2026-11-26, found by the fresh install). This passed `-ngl 99`, and llama.cpp
+    answered "failed to fit params to free device memory: n_gpu_layers already set by user" — an
+    explicit count switches off its own fitting, so a 16 GB model was forced whole onto a 12 GB
+    card. Left unset, llama.cpp's defaults (`-ngl auto`, `--fit on`) size the GPU/CPU split to
+    the card, MoE experts included. The draft's layers likewise."""
     d = kits()["defaults"]
     exe = engine_exe(p)
     get = {it["role"]: it["to"] for it in p["items"]}
-    cmd = [exe, "-m", get["model"], "-c", str(ctx or d["ctx"]), "-ngl", str(d["gpu_layers"]),
+    cmd = [exe, "-m", get["model"], "-c", str(ctx or d["ctx"]),
            "--host", "127.0.0.1", "--port", str(port or d["port"]), "--jinja"]
     if get.get("mmproj"):
         cmd += ["--mmproj", get["mmproj"]]
     if get.get("draft"):
-        cmd += ["-md", get["draft"], "--spec-type", "draft-mtp", "-ngld", str(d["gpu_layers"])]
+        cmd += ["-md", get["draft"], "--spec-type", "draft-mtp"]
     return cmd
 
 

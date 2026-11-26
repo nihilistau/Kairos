@@ -99,5 +99,5 @@
       "external": true
     }
   ],
-  "defaults": {"ctx": 32768, "port": 8080, "gpu_layers": 99}
+  "defaults": {"ctx": 32768, "port": 8080}
 }

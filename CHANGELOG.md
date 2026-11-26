@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.93 — Faster on smaller cards; stop really stops (2026-11-26)
+
+* **llama.cpp now fits the model to your card itself.** Get set up used to force every layer onto the GPU. On a 12 GB card with the 26B model, that ran at about 2 words a second. Setup now leaves the split to llama.cpp, which ran about ten times faster on the same card. If you set up before this version, run Get set up again, or delete `-ngl` and `99` (and `-ngld` and `99`) from the `[engine] command` line of your profile.
+* **`kairos.bat stop` stops what `kairos.bat start` started,** including the engine that setup configured, and a companion running on a port other than the default.
+
+## 0.8.92 — The model converter is included; merging two copies of a companion (2026-11-26)
+
+* **The native engine's model converter is included** (`engine/tools/sp_transcode`, built with `engine\build-transcode.bat`). Get set up uses it to turn a GGUF into the `.sp` files the native engine loads. A bug that would have stopped every such conversion is fixed.
+* **Merge two copies of a companion:** `python tools/companion.py merge <companion> <other-copy>` brings what the other copy remembered, said and wrote into this one. It never removes or overwrites anything, and it takes a backup first.
+* **Get set up's download progress** now counts up while it downloads, instead of showing 0.0 GB.
+
 ## 0.8.91 — First-time setup in one place (2026-11-26)
 
 * **One place for first-time setup.** `kairos.bat` → **9 – get set up** now also creates your companion (or uses one you have) and asks your name, so she knows who she is talking to from the first turn.

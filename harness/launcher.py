@@ -181,7 +181,11 @@ def stop(profile: str = "") -> int:
     c = _profile(profile) if profile else {}
     if c.get("runpod"):
         return subprocess.call(runpod_argv("down", profile, c), cwd=ROOT)
-    return subprocess.call([sys.executable, os.path.join(ROOT, "serve.py"), "--stop"], cwd=ROOT)
+    # THE PROFILE GOES WITH THE STOP (2026-11-26, found by the fresh install): a bare --stop looked
+    # for a gateway on :8800 and left the profile's own engine running — the setup centre's
+    # llama-server ([engine] command) and a gateway on another port are only known from it.
+    return subprocess.call([sys.executable, os.path.join(ROOT, "serve.py")] + ([profile] if profile else [])
+                           + ["--stop"], cwd=ROOT)
 
 
 def backup(companion: str) -> str:

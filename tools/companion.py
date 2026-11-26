@@ -9,6 +9,7 @@
     python tools/companion.py reset   kairos --parts history --yes
     python tools/companion.py undo    kairos --yes
     python tools/companion.py history kairos
+    python tools/companion.py merge   kairos ../another-copy --yes   # add what it lived
 
 load / reset / undo refuse while she is running on that home (stop her, or use the room,
 which schedules the change for her next start). Nothing is ever deleted: the old contents
@@ -52,6 +53,7 @@ def main(argv=None) -> int:
     p = sub.add_parser("reset"); p.add_argument("id"); p.add_argument("--parts", required=True); p.add_argument("--yes", action="store_true")
     p = sub.add_parser("undo"); p.add_argument("id"); p.add_argument("--yes", action="store_true")
     p = sub.add_parser("history"); p.add_argument("id")
+    p = sub.add_parser("merge"); p.add_argument("id"); p.add_argument("other"); p.add_argument("--label", default=""); p.add_argument("--yes", action="store_true")
     a = ap.parse_args(argv)
     try:
         if a.cmd in (None, "list"):
@@ -89,6 +91,17 @@ def main(argv=None) -> int:
                 print(f"  {r['ts']}  {r['op']:<8} {','.join(r.get('parts', []))}  {r.get('before') or r.get('undoes') or r.get('from') or ''}")
             return 0
         home = H.home_dir(a.id)
+        if a.cmd == "merge":
+            if not a.yes:
+                print(f"would merge what {a.other} lived into {a.id}, adding and never removing "
+                      "(a bundle of her history is written first). Run again with --yes.")
+                return 2
+            from harness import merge as MG
+            r = MG.merge(home, a.other, label=a.label)
+            print(f"merged {r['label']}: {r['rows_added']} facts, {r['lines_added']} log lines, "
+                  f"{r['days_added']} new days (+{r['days_extended']} extended), {r['journal_paragraphs']} journal "
+                  f"paragraphs, {r['okf_files']} archive files; {r['rows_kept']} differing facts kept as hers")
+            return 0
         if not a.yes:
             what = {"load": f"replace {a.parts} of {a.id} with {getattr(a, 'file', '')}",
                     "reset": f"reset {a.parts} of {a.id} to a blank slate",

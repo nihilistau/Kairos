@@ -52,11 +52,15 @@ try:
     L.start("companion", "ivy")
     L.stop()
     rc = L.main(["start", "--profile=companion", "--companion=wren"])
+    L.main(["stop"])
 finally:
     subprocess.call = _call
 check("start runs serve.py <profile> --companion=<id>",
       calls[0][1].endswith("serve.py") and calls[0][2:] == ["companion", "--companion=ivy"], calls[0])
 check("stop runs serve.py --stop", calls[1][2:] == ["--stop"], calls[1])
+# found by the fresh install: the stop forgot the profile, so a gateway on another port and the
+# profile's own llama-server ([engine] command) were left running
+check("stop after a start names the profile it started", calls[3][2:] == ["companion", "--stop"], calls[3:])
 check("start from the command line remembers the choice (and what it started, for stop)",
       L.load_state() == {"profile": "companion", "companion": "wren", "started_profile": "companion"}, L.load_state())
 

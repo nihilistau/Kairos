@@ -75,6 +75,10 @@ def unread(cfg: dict, serve_src: str) -> list:
 
 
 serve_src = io.open(os.path.join(ROOT, "serve.py"), encoding="utf-8").read()
+# TWO READERS (2026-11-26). serve.py reads a profile into env; the launcher reads it too — a
+# profile's [runpod] table becomes runpod.ps1's arguments in harness/launcher.py runpod_argv and
+# never reaches serve.py. Grading only serve.py turned runpod-31b red for eight keys that ARE read.
+serve_src += io.open(os.path.join(ROOT, "harness", "launcher.py"), encoding="utf-8").read()
 
 profiles = sorted(glob.glob(os.path.join(ROOT, "profiles", "*.toml")))
 # ONE PROFILE IS A TREE TOO (2026-08-25). This read `>= 10` — true of the source tree's
