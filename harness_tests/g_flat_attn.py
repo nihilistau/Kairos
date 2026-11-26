@@ -19,6 +19,9 @@ token's context forever. The door refuses that pair too.
   §2 every tracked native profile (sp.toml first) obeys both rules as written on disk
   §3 the bound is the engine's: Pmax*4 plus the kernel's static shared stays under 48 KB, the
      flat kernel still sizes its shared memory by Pmax, and nothing opts it into more (skipped where engine/ is not in the tree)
+  §4 the engine holds it too (the next engine release): a flat call site that cannot fit gets the tiled
+     kernel (g4_attn_tile_for, its ceiling agreeing with the door's), and segment graphs refuse
+     the flat ring kernel. The door stays for binaries released before that.
 
     python harness_tests/g_flat_attn.py
 """
@@ -130,5 +133,24 @@ else:
     check("nothing opts it into more than 48 KB (if this goes red, the bound moved: re-measure)",
           "cudaFuncAttributeMaxDynamicSharedMemorySize" not in code
           or re.search(r"cudaFuncSetAttribute\([^;]*k_attn_decode_win_dyn", code) is None)
+    # §4 THE ENGINE HOLDS IT TOO (2026-11-27). The door above protects released binaries that
+    # predate the engine fix; the engine now falls back on its own, and these hold that fix.
+    print("§4 the engine falls back instead of serving a failed launch")
+    _m = re.search(r"#define\s+G4_FLAT_SHM_MAX\s+\(\(size_t\)(\d+)u\s*\*\s*sizeof\(float\)\)", code)
+    check("G4_FLAT_SHM_MAX is a position count under 48 KB with room for the static shared",
+          _m is not None and int(_m.group(1)) * 4 + 4 <= 48 * 1024, _m.group(0) if _m else None)
+    check("...and it is the door's bound (the two agree on where the flat kernel runs)",
+          _m is not None and int(_m.group(1)) == BOUND, (_m.group(1) if _m else None, BOUND))
+    _f = re.search(r"static int g4_attn_tile_for\(size_t flat_shm\)\s*\{(.*?)\n\}", code, re.S)
+    check("g4_attn_tile_for returns the tiled width when the flat kernel cannot fit",
+          _f is not None and re.search(r"flat_shm\s*<=\s*G4_FLAT_SHM_MAX\)\s*return t;", _f.group(1))
+          and re.search(r"return 1024;", _f.group(1)) is not None)
+    _bare = re.findall(r"const int (?:TL|PT|PT2)\s*=\s*(?:s->bx_on \? 0 : )?g4_attn_tile\(\)", code)
+    check("no flat call site picks its kernel without asking g4_attn_tile_for", not _bare, _bare)
+    check("the serving decode dispatch asks with the linear layers' attn_shm",
+          re.search(r"const int TL = s->bx_on \? 0 : g4_attn_tile_for\(ring \? 0 : attn_shm\);", code) is not None)
+    check("segment graphs refuse the flat ring kernel (ring + attn_tile 0 -> per-step)",
+          re.search(r"if \(s->ring_W > 0 && g4_attn_tile\(\) == 0\)\s*\{.{0,600}?s->seg_mode = 2;\s*return 0;",
+                    code, re.S) is not None)
 
 finish("G-FLAT-ATTN")

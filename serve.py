@@ -580,7 +580,9 @@ def build_env(c: dict) -> dict:
     #     [g4-kv] FLOAT ATTN LAUNCH FAILED: cudaErrorInvalidValue (... attn_shm=80000)
     # and keeps serving from stale attention output: "17 plus 73421 is 42", runs of digits.
     # Found by flipping sp.toml's knobs one at a time on the model MoE (CHANGELOG 2026-11-26).
-    # The engine cannot refuse this itself (a released binary is what users run), so the door does.
+    # The engine falls back on its own from the release after 0.8.0 (cuda_forward.cu,
+    # g4_attn_tile_for, and segment graphs refuse the flat ring kernel). The door stays,
+    # because a binary released before that is what a user may be running.
     #
     # AND THE FLAT RING KERNEL CANNOT BE GRAPHED. With attn_tile = 0 and ring_w > 0 the SWA
     # layers take k_attn_decode_ring_T, whose context length and shared size come from the

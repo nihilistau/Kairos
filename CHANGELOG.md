@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.98 — The engine guards the flat attention kernel itself (2026-11-27)
+
+* The next Kairos engine release falls back to the tiled attention kernel by itself when the flat
+  one cannot run, and turns segment graphs off where they would replay a stale context. Until
+  you have that release, `serve.py` keeps refusing those settings, as in 0.8.97.
+
 ## 0.8.97 — The native engine profile no longer produces garbage by hand (2026-11-27)
 
 * `profiles/sp.toml` used the flat attention kernel, which cannot launch above a context of
