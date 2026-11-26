@@ -58,22 +58,37 @@ K = I.kits()
 check("every model names a repo, model patterns and a known licence",
       all(m["repo"] and m["model"] and m["licence"] in K["licences"] for m in K["models"]))
 check("the uncensored ones are flagged, and the warning says so plainly",
-      [m["id"] for m in K["models"] if m.get("uncensored")] == ["your model-uncensored", "gemma4-31b-uncensored"]
+      [m["id"] for m in K["models"] if m.get("uncensored")] == ["g4-moe-uncensored", "g4-31b-uncensored"]
       and "uncensored" in K["uncensored_warning"].lower())
 check("every engine has assets or is external", all(e.get("assets") or e.get("external") for e in K["engines"]))
+# THE EXPORT'S SCRUB GENERALISES HIS MODEL'S NAME AWAY ("26B-A4B" -> "your model"), which
+# turned every kit's repo into an invalid id the first time a fresh install ran the wizard.
+# The kits ship raw (noscrub) and the ids the code passes around match no scrub rule.
+_man = open(os.path.join(ROOT, "kairos-export", "kairos-export.toml"), encoding="utf-8").read() \
+    if os.path.isdir(os.path.join(ROOT, "kairos-export")) else ""
+if _man:
+    import re as _re
+    _rules = _re.findall(r'^"([^"]+)"\s*=\s*"[^"]*"', _man.split("[scrub]", 1)[1], _re.M)
+    check("the kits ship unscrubbed (their repo ids are the point)", '"harness/setup/kits.json"' in _man.split("noscrub = [", 1)[1].split("]", 1)[0])
+    _hit = [(m["id"], r) for m in K["models"] for r in _rules if r in m["id"]]
+    _src = open(os.path.join(ROOT, "harness", "setup", "installer.py"), encoding="utf-8").read()
+    check("no kit id, and no installer string, matches a scrub rule",
+          not _hit and not [r for r in _rules if r in _src and r.lower().startswith(("26b", "gemma4-26", "gemma-4-26"))], _hit)
+else:
+    print("  omitted  the scrub check: no export manifest in this tree")
 
 print("\n2. suggest()")
 s = I.suggest({"os": "nt", "gpus": [{"name": "RTX 2060", "vram_gb": 12, "vendor": "nvidia"}], "ram_gb": 32})
-check("12 GB NVIDIA: the your model on llama.cpp CUDA", (s["engine"], s["model"]) == ("llamacpp-cuda", "your model"), s)
+check("12 GB NVIDIA: the mixture-of-experts model on llama.cpp CUDA", (s["engine"], s["model"]) == ("llamacpp-cuda", "g4-moe"), s)
 s = I.suggest({"os": "nt", "gpus": [{"name": "4090", "vram_gb": 24, "vendor": "nvidia"}], "ram_gb": 64})
-check("24 GB + 64 GB: the 31B", s["model"] == "gemma4-31b")
+check("24 GB + 64 GB: the 31B", s["model"] == "g4-31b")
 check("no card: the CPU build", I.suggest({"os": "nt", "gpus": [], "ram_gb": 32})["engine"] == "llamacpp-cpu")
 check("Linux: the Linux build", I.suggest({"os": "posix", "gpus": [], "ram_gb": 32})["engine"] == "llamacpp-linux")
 
 print("\n3. plan()")
 FILES = [{"path": "mmproj-X-BF16.gguf", "size": 10, "sha256": "a" * 64},
-         {"path": "Gemma4-your model-QAT-Uncensored-HauhauCS-Balanced-Q4_K_M.gguf", "size": 1000, "sha256": "b" * 64},
-         {"path": "mtp-gemma-4-your model-it.gguf", "size": 5, "sha256": "c" * 64},
+         {"path": "Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-Q4_K_M.gguf", "size": 1000, "sha256": "b" * 64},
+         {"path": "mtp-gemma-4-26B-A4B-it.gguf", "size": 5, "sha256": "c" * 64},
          {"path": "README.md", "size": 1, "sha256": None}]
 _hf, _rel, _la = I.hf.files, I.github.releases, I.github.latest_asset
 I.hf.files = lambda repo, token=None, net=None: FILES
@@ -84,7 +99,7 @@ def _asset(repo, pattern, net=None, listing=None, prefer_tag_prefix=None):
 
 
 I.github.latest_asset = _asset
-p = I.plan("your model-uncensored", "llamacpp-cuda", DEST)
+p = I.plan("g4-moe-uncensored", "llamacpp-cuda", DEST)
 roles = {i["role"]: i["name"] for i in p["items"]}
 check("the model file is the model, never the projector or the draft", roles.get("model", "").endswith("Q4_K_M.gguf"), roles)
 check("…with the projector and the draft beside it", roles.get("mmproj", "").startswith("mmproj") and roles.get("draft", "").startswith("mtp"))
@@ -92,18 +107,18 @@ check("…and the engine release asset", "engine" in [i["role"] for i in p["item
 check("every file carries its published hash", all(i["sha256"] for i in p["items"]))
 check("sizes against free space (model, projector, draft, engine, runtime)", p["bytes"] == 1115 and p["fits"], (p["bytes"], p["fits"]))
 check("the uncensored warning comes with an uncensored model", p["uncensored"] and p["warning"])
-p2 = I.plan("your model", "external", DEST)
+p2 = I.plan("g4-moe", "external", DEST)
 check("…and not with the standard one", not p2["uncensored"] and not p2["warning"])
 check("an external engine downloads no engine", "engine" not in [i["role"] for i in p2["items"]], [i["role"] for i in p2["items"]])
 
 print("\n3b. a file already on this machine")
 have = os.path.join(SB, "mymodels", "sub")
 os.makedirs(have)
-open(os.path.join(have, "Gemma4-your model-QAT-Uncensored-HauhauCS-Balanced-Q4_K_M.gguf"), "wb").write(b"m" * 1000)
-pr = I.plan("your model-uncensored", "external", DEST, reuse=[os.path.join(SB, "mymodels")])
+open(os.path.join(have, "Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-Q4_K_M.gguf"), "wb").write(b"m" * 1000)
+pr = I.plan("g4-moe-uncensored", "external", DEST, reuse=[os.path.join(SB, "mymodels")])
 mi = [i for i in pr["items"] if i["role"] == "model"][0]
 check("found by name and size, and not counted as a download", mi.get("reuse") and pr["need_bytes"] == pr["bytes"] - 1000)
-pr2 = I.plan("your model-uncensored", "external", DEST, reuse=[])
+pr2 = I.plan("g4-moe-uncensored", "external", DEST, reuse=[])
 check("…and without reuse folders, it downloads", not [i for i in pr2["items"] if i.get("reuse")])
 
 print("\n4. start()")
@@ -200,7 +215,7 @@ I.shutil.which = _which
 print("\n8. the routes")
 from harness.server import setup_routes as SR  # noqa: E402
 SR._PLAN["p"] = None
-check("a relative folder is refused", SR.post_plan({"model": "your model", "engine": "external", "dest": "data"})[0] == 400)
+check("a relative folder is refused", SR.post_plan({"model": "g4-moe", "engine": "external", "dest": "data"})[0] == 400)
 _st = I.status
 I.status = lambda: {}
 check("start needs a plan", SR.post_start({"licence_ok": True})[0] == 400)

@@ -114,10 +114,10 @@ def suggest(hw: dict) -> dict:
         engine = "llamacpp-cuda"
     else:
         engine = "llamacpp-cpu"
-    model = "gemma4-31b" if vram >= 24 and hw.get("ram_gb", 0) >= 32 else "your model"
+    model = "g4-31b" if vram >= 24 and hw.get("ram_gb", 0) >= 32 else "g4-moe"
     why = (f"{vram:.0f} GB on the graphics card and {hw.get('ram_gb', 0):.0f} GB of memory: "
-           + ("the dense 31B fits." if model == "gemma4-31b" else
-              "the your model fits — it keeps part of itself in system memory and stays quick."))
+           + ("the dense 31B fits." if model == "g4-31b" else
+              "the mixture-of-experts model fits — it keeps part of itself in system memory and stays quick."))
     return {"engine": engine, "model": model, "why": why}
 
 

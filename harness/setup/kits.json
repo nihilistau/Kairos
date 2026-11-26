@@ -4,17 +4,17 @@
   "uncensored_warning": "Uncensored means uncensored: these models have had their refusals and safety tuning removed. They will say and write things the standard models will not. Choose one only if that is what you want.",
   "models": [
     {
-      "id": "your model",
-      "title": "Gemma 4 your model (recommended)",
+      "id": "g4-moe",
+      "title": "Gemma 4 26B-A4B (recommended)",
       "about": "A mixture-of-experts model: 26B parameters, about 4B active per word, so it runs well on an 8–12 GB card with the experts partly in system memory. Google's official 4-bit QAT build.",
-      "repo": "google/gemma-4-your model-it-qat-q4_0-gguf",
+      "repo": "google/gemma-4-26B-A4B-it-qat-q4_0-gguf",
       "model": ["*q4_0*.gguf", "*Q4_0*.gguf", "*.gguf"],
       "mmproj": ["mmproj*.gguf"],
       "min_vram_gb": 8, "min_ram_gb": 24, "approx_gb": 16,
       "licence": "apache-2.0", "uncensored": false, "native": true
     },
     {
-      "id": "gemma4-31b",
+      "id": "g4-31b",
       "title": "Gemma 4 31B",
       "about": "The dense 31B: stronger, and it needs a big card — 24 GB or more — or RunPod.",
       "repo": "google/gemma-4-31B-it-qat-q4_0-gguf",
@@ -24,10 +24,10 @@
       "licence": "apache-2.0", "uncensored": false, "native": false
     },
     {
-      "id": "your model-uncensored",
-      "title": "Gemma 4 your model — uncensored (HauhauCS)",
-      "about": "The your model with its refusals removed (HauhauCS Balanced, QAT), with a matching MTP draft model for faster replies.",
-      "repo": "HauhauCS/Gemma4-your model-QAT-Uncensored-HauhauCS-Balanced-MTP",
+      "id": "g4-moe-uncensored",
+      "title": "Gemma 4 26B-A4B — uncensored (HauhauCS)",
+      "about": "The 26B-A4B with its refusals removed (HauhauCS Balanced, QAT), with a matching MTP draft model for faster replies.",
+      "repo": "HauhauCS/Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-MTP",
       "model": ["*Balanced-Q4_K_M.gguf", "*Q4_K_M*.gguf", "*.gguf"],
       "mmproj": ["mmproj*.gguf"],
       "draft": ["mtp*.gguf", "*mtp*.gguf", "*MTP*.gguf"],
@@ -35,7 +35,7 @@
       "licence": "gemma", "uncensored": true, "native": true
     },
     {
-      "id": "gemma4-31b-uncensored",
+      "id": "g4-31b-uncensored",
       "title": "Gemma 4 31B — uncensored (HauhauCS)",
       "about": "The dense 31B with its refusals removed (HauhauCS Balanced, QAT), with an MTP draft model. A 24 GB+ card, or RunPod.",
       "repo": "HauhauCS/Gemma4-31B-QAT-Uncensored-HauhauCS-Balanced-MTP",
