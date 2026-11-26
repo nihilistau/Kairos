@@ -570,6 +570,13 @@ def write_profile(name: str, p: dict, *, companion: str = "", user_name: str = "
         for key, val in (("engine_exe", engine_exe(p)), ("model", spm), ("tokenizer", spt)):
             body = re.sub(r"(?m)^%s\s*=.*$" % key, lambda _m, k=key, v=val: "%s = %s" % (k, _q(v)), body, count=1)
         text = text[:sec.start()] + body + text[sec.end():]
+        # THE SETTINGS THIS MODEL RUNS WITH (2026-11-26, found by the end-to-end run): sp.toml
+        # alone gave "exceeds Pmax" (4096 is shorter than a companion's system prompt), then a
+        # byte-exact path not implemented for MoE experts, then garbage. The kit carries the
+        # values her own stack runs this model with on a 12 GB card.
+        for sect, vals in native_settings(e).items():
+            for key, val in vals.items():
+                text = _toml_set(text, sect, key, val)
         return _finish_profile(dst, name, text, companion, user_name, user_pronouns)
     with open(os.path.join(H.ROOT, "profiles", "companion.toml"), encoding="utf-8") as f:
         text = f.read()
@@ -583,6 +590,47 @@ def write_profile(name: str, p: dict, *, companion: str = "", user_name: str = "
     # function replacements: a Windows path in the text would be read as a regex escape
     text = re.sub(r"(?ms)^\[engine\]\n.*?(?=^\[)", lambda _m: eng + "\n", text, count=1)
     return _finish_profile(dst, name, text, companion, user_name, user_pronouns)
+
+
+def native_settings(e: dict, hw: Optional[dict] = None) -> dict:
+    """The kit's [kv]/[decode] values for her native engine, with the expert cache scaled to
+    the card: 6 GB is what a 12 GB card was tested with; below that, VRAM minus 6 (min 1)."""
+    prof = json.loads(json.dumps(e.get("profile") or {}))
+    kv = prof.get("kv") or {}
+    if "moe_cache_gb" in kv:
+        try:
+            hw = hw if hw is not None else hardware()
+            vram = max((g.get("vram_gb") or 0) for g in hw.get("gpus") or [{}])
+        except Exception as x:   # no nvidia-smi: keep the tested value, and say so in the log
+            import logging
+            from harness.loud import swallowed as _sw
+            _sw(logging.getLogger(__name__), "setup.native_settings", x)
+            vram = 0
+        if vram and vram < 12:
+            kv["moe_cache_gb"] = float(max(1, int(vram) - 6))
+    return prof
+
+
+def _toml_val(v) -> str:
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return repr(v)
+    return _q(str(v))
+
+
+def _toml_set(text: str, sect: str, key: str, val) -> str:
+    """`key = val` in [sect]: the line replaced where it exists, else added under the header."""
+    m = re.search(r"(?ms)^\[%s\]\n.*?(?=^\[|\Z)" % re.escape(sect), text)
+    line = "%s = %s" % (key, _toml_val(val))
+    if not m:
+        return text.rstrip("\n") + "\n\n[%s]\n%s\n" % (sect, line)
+    body = m.group(0)
+    if re.search(r"(?m)^%s\s*=" % re.escape(key), body):
+        body = re.sub(r"(?m)^%s\s*=.*$" % re.escape(key), lambda _m: line, body, count=1)
+    else:
+        body = body.replace("[%s]\n" % sect, "[%s]\n%s\n" % (sect, line), 1)
+    return text[:m.start()] + body + text[m.end():]
 
 
 def _finish_profile(dst: str, name: str, text: str, companion: str, user_name: str,

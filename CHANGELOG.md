@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.96 — The native engine's profile works out of the box (2026-11-26)
+
+* The profile Get set up writes for the Kairos engine now carries the settings the model is
+  tested with (on a 12 GB RTX 2060). Without them it could not serve a companion: the system
+  prompt was too long for its limit, and the model's output was garbage. On smaller cards the
+  expert cache is scaled down; that is untested.
+
 ## 0.8.95 — Get set up can install the native engine (2026-11-26)
 
 * **Choosing "Kairos engine" in Get set up now works end to end.** You approve the engine,

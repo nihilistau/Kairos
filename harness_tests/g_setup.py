@@ -349,6 +349,17 @@ check("the native profile is written", bool(path), _why)
 check("the profile is a NATIVE one (kind sp), from sp.toml", np_["engine"].get("kind") == "sp" and "command" not in np_["engine"], np_["engine"])
 check("…its paths are the approved daemon and the converted model",
       tuple(np_["paths"].get(k2) for k2 in ("engine_exe", "model", "tokenizer")) == (I.engine_exe(pn), spm, spt), np_["paths"])
+# FOUND BY THE END-TO-END RUN: sp.toml's own [kv]/[decode] gave "exceeds Pmax", then a byte-exact
+# path MoE does not have, then garbage. The kit's tested values must reach the profile.
+_kp = I.kits_engine("kairos-engine")["profile"]
+_bad = [f"{sec}.{k2}" for sec in ("kv", "decode") for k2, v in _kp[sec].items()
+        if k2 != "moe_cache_gb" and np_.get(sec, {}).get(k2) != v]
+check("…and the kit's tested [kv]/[decode] settings (Pmax 20000, byte-exact off, KV persistence off…)",
+      not _bad and np_.get("kv", {}).get("pmax") == 20000 and np_.get("decode", {}).get("byteexact") is False
+      and np_.get("kv", {}).get("persist") is False, _bad[:6])
+_ns = lambda v: I.native_settings(I.kits_engine("kairos-engine"), {"gpus": [{"vram_gb": v}]})["kv"]["moe_cache_gb"]  # noqa: E731
+check("…the expert cache is the tested 6 GB on a 12 GB+ card, and smaller on a smaller one",
+      (_ns(12), _ns(24), _ns(8), _ns(6)) == (6.0, 6.0, 2.0, 1.0), (_ns(12), _ns(24), _ns(8), _ns(6)))
 check("…with its companion home and you (sp.toml has no [user] to substitute)",
       np_["companion"].get("home") == "ivy" and np_["user"].get("name") == "Sam" and "registry" not in np_["paths"], np_.get("user"))
 la = os.path.join(I.ENGINE_DIR, "launch.py")
